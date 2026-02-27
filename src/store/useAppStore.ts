@@ -62,6 +62,17 @@ interface AppStore {
   insertionIndex: number | null
   lastEditedHistoryIndex: number | null
   affectedHistoryIndices: number[]
+  viewSettings: {
+    showNodeIds: boolean
+    showElementIds: boolean
+    showNodes: boolean
+    showElements: boolean
+    showSupports: boolean
+    showNodalLoads: boolean
+    showElementLoads: boolean
+    showGrid: boolean
+  }
+  viewportAction: { kind: 'zoomIn' | 'zoomOut' | 'fit'; token: number } | null
   initModel: (ndm: 2 | 3, ndf: number) => void
   pushCommand: (cmd: Command) => void
   insertCommandAt: (cmd: Command, index: number | null) => void
@@ -73,6 +84,8 @@ interface AppStore {
   setInsertionIndex: (index: number | null) => void
   undo: () => void
   redo: () => void
+  setViewSetting: (key: keyof AppStore['viewSettings'], value: boolean) => void
+  requestViewportAction: (kind: 'zoomIn' | 'zoomOut' | 'fit') => void
   setMode: (mode: AppMode) => void
   importResults: (files: { name: string; data: string }[]) => void
 }
@@ -86,6 +99,17 @@ export const useAppStore = create<AppStore>((set, get) => ({
   insertionIndex: null,
   lastEditedHistoryIndex: null,
   affectedHistoryIndices: [],
+  viewSettings: {
+    showNodeIds: false,
+    showElementIds: false,
+    showNodes: true,
+    showElements: true,
+    showSupports: true,
+    showNodalLoads: true,
+    showElementLoads: true,
+    showGrid: true,
+  },
+  viewportAction: null,
 
   initModel: (ndm, ndf) => set(() => {
     const cmd: Command = { type: 'MODEL_INIT', ndm, ndf }
@@ -177,6 +201,10 @@ export const useAppStore = create<AppStore>((set, get) => ({
   redo: () => set((s) => ({
     history: { ...s.history, cursor: Math.min(s.history.commands.length - 1, s.history.cursor + 1) },
   })),
+
+  setViewSetting: (key, value) => set((s) => ({ viewSettings: { ...s.viewSettings, [key]: value } })),
+
+  requestViewportAction: (kind) => set((s) => ({ viewportAction: { kind, token: (s.viewportAction?.token ?? 0) + 1 } })),
 
   setMode: (mode) => set({ mode }),
   importResults: (files) => set({ results: { files } }),

@@ -2,8 +2,11 @@ import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { ZoomIn, ZoomOut, Maximize2, Box } from 'lucide-react'
+import { useAppStore } from '@/store/useAppStore'
 
 export function ActionBar() {
+  const requestViewportAction = useAppStore((s) => s.requestViewportAction)
+
   return (
     <footer className="h-9 border-t flex items-center px-3 gap-2 shrink-0 text-xs text-muted-foreground">
       <span className="flex-1 truncate">Ready</span>
@@ -11,7 +14,7 @@ export function ActionBar() {
       <div className="flex items-center gap-0.5">
         <Tooltip>
           <TooltipTrigger asChild>
-            <Button variant="ghost" size="icon" className="size-7">
+            <Button variant="ghost" size="icon" className="size-7" onClick={() => requestViewportAction('zoomIn')}>
               <ZoomIn className="size-3.5" />
             </Button>
           </TooltipTrigger>
@@ -19,7 +22,7 @@ export function ActionBar() {
         </Tooltip>
         <Tooltip>
           <TooltipTrigger asChild>
-            <Button variant="ghost" size="icon" className="size-7">
+            <Button variant="ghost" size="icon" className="size-7" onClick={() => requestViewportAction('zoomOut')}>
               <ZoomOut className="size-3.5" />
             </Button>
           </TooltipTrigger>
@@ -27,7 +30,7 @@ export function ActionBar() {
         </Tooltip>
         <Tooltip>
           <TooltipTrigger asChild>
-            <Button variant="ghost" size="icon" className="size-7">
+            <Button variant="ghost" size="icon" className="size-7" onClick={() => requestViewportAction('fit')}>
               <Maximize2 className="size-3.5" />
             </Button>
           </TooltipTrigger>
