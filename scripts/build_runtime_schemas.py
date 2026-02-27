@@ -117,8 +117,15 @@ def build_command_schema(fn: str, variants: list[dict[str, Any]]) -> dict[str, A
       "defaultValue": sorted(yields)[0],
     }]
     if non_literal:
-      # Keep one non-literal variant as additional hints
-      schema["args"].extend(non_literal[0]["args"])
+      base_generic = min(non_literal, key=lambda p: len(p["args"]))["args"]
+      generic_args = list(base_generic)
+      if generic_args and generic_args[0].get("kind") == "str":
+        first_name = str(generic_args[0].get("name", "")).lower()
+        if "type" in first_name or first_name == choice_name.lower():
+          generic_args = [{"kind": "str", "name": "customType"}] + generic_args[1:]
+      yields["user-supplied"] = stable_unique_args(generic_args)
+      schema["args"][0]["options"] = sorted(yields)
+      schema["args"][0]["yields"] = {k: yields[k] for k in sorted(yields)}
   else:
     # Pick shortest signature as base (usually core form)
     base = min(parsed, key=lambda p: len(p["args"])) if parsed else {"args": []}

@@ -58,7 +58,8 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
           "NewtonLineSearch",
           "PeriodicNewton",
           "RaphsonNewton",
-          "SecantNewton"
+          "SecantNewton",
+          "user-supplied"
         ],
         yields: {
           BFGS: [
@@ -212,17 +213,19 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
               kind: "float",
               name: "maxDim"
             }
+          ],
+          "user-supplied": [
+            {
+              kind: "str",
+              name: "customType"
+            },
+            {
+              kind: "vec",
+              length: "dynamic",
+              name: "algoArgs"
+            }
           ]
         }
-      },
-      {
-        kind: "str",
-        name: "algoType"
-      },
-      {
-        kind: "vec",
-        length: "dynamic",
-        name: "algoArgs"
       }
     ],
     category: "model",
@@ -476,7 +479,8 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
           "Radau",
           "Trapezoidal",
           "UserDefined",
-          "UserHinge"
+          "UserHinge",
+          "user-supplied"
         ],
         yields: {
           CompositeSimpson: [
@@ -848,21 +852,23 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
               length: "dynamic",
               name: "wtsR"
             }
+          ],
+          "user-supplied": [
+            {
+              kind: "str",
+              name: "customType"
+            },
+            {
+              kind: "int",
+              name: "tag"
+            },
+            {
+              kind: "vec",
+              length: "dynamic",
+              name: "args"
+            }
           ]
         }
-      },
-      {
-        kind: "str",
-        name: "type"
-      },
-      {
-        kind: "int",
-        name: "tag"
-      },
-      {
-        kind: "vec",
-        length: "dynamic",
-        name: "args"
       }
     ],
     category: "model",
@@ -1088,7 +1094,8 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
           "Lagrange",
           "Penalty",
           "Plain",
-          "Transformation"
+          "Transformation",
+          "user-supplied"
         ],
         yields: {
           Lagrange: [
@@ -1112,17 +1119,19 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
             }
           ],
           Plain: [],
-          Transformation: []
+          Transformation: [],
+          "user-supplied": [
+            {
+              kind: "str",
+              name: "customType"
+            },
+            {
+              kind: "vec",
+              length: "dynamic",
+              name: "constraintArgs"
+            }
+          ]
         }
-      },
-      {
-        kind: "str",
-        name: "constraintType"
-      },
-      {
-        kind: "vec",
-        length: "dynamic",
-        name: "constraintArgs"
       }
     ],
     category: "model",
@@ -1547,6 +1556,7 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
           "singleFPBearing",
           "stdBrick",
           "twoNodeLink",
+          "user-supplied",
           "zeroLength",
           "zeroLengthContact2D",
           "zeroLengthContact3D",
@@ -5412,6 +5422,26 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
               name: "m"
             }
           ],
+          "user-supplied": [
+            {
+              kind: "int",
+              name: "eleType"
+            },
+            {
+              kind: "int",
+              name: "eleTag"
+            },
+            {
+              kind: "vec",
+              length: "dynamic",
+              name: "eleNodes"
+            },
+            {
+              kind: "vec",
+              length: "dynamic",
+              name: "eleArgs"
+            }
+          ],
           zeroLength: [
             {
               kind: "int",
@@ -5750,24 +5780,6 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
             }
           ]
         }
-      },
-      {
-        kind: "int",
-        name: "eleType"
-      },
-      {
-        kind: "int",
-        name: "eleTag"
-      },
-      {
-        kind: "vec",
-        length: "dynamic",
-        name: "eleNodes"
-      },
-      {
-        kind: "vec",
-        length: "dynamic",
-        name: "eleArgs"
       }
     ],
     category: "model",
@@ -6525,7 +6537,8 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
           "VelDepMultiLinear",
           "VelDependent",
           "VelNormalFrcDep",
-          "VelPressureDep"
+          "VelPressureDep",
+          "user-supplied"
         ],
         yields: {
           Coulomb: [
@@ -6649,21 +6662,23 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
               kind: "str",
               name: "transRate"
             }
+          ],
+          "user-supplied": [
+            {
+              kind: "str",
+              name: "customType"
+            },
+            {
+              kind: "int",
+              name: "frnTag"
+            },
+            {
+              kind: "vec",
+              length: "dynamic",
+              name: "frnArgs"
+            }
           ]
         }
-      },
-      {
-        kind: "str",
-        name: "frnType"
-      },
-      {
-        kind: "int",
-        name: "frnTag"
-      },
-      {
-        kind: "vec",
-        length: "dynamic",
-        name: "frnArgs"
       }
     ],
     category: "model",
@@ -6714,7 +6729,8 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
         options: [
           "Corotational",
           "Linear",
-          "PDelta"
+          "PDelta",
+          "user-supplied"
         ],
         yields: {
           Corotational: [
@@ -6794,21 +6810,23 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
               length: "dynamic",
               name: "vecxz"
             }
+          ],
+          "user-supplied": [
+            {
+              kind: "str",
+              name: "customType"
+            },
+            {
+              kind: "int",
+              name: "transfTag"
+            },
+            {
+              kind: "vec",
+              length: "dynamic",
+              name: "transfArgs"
+            }
           ]
         }
-      },
-      {
-        kind: "str",
-        name: "transfType"
-      },
-      {
-        kind: "int",
-        name: "transfTag"
-      },
-      {
-        kind: "vec",
-        length: "dynamic",
-        name: "transfArgs"
       }
     ],
     category: "model",
@@ -7480,7 +7498,8 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
           "Newmark",
           "PFEM",
           "ParallelDisplacementControl",
-          "TRBDF2"
+          "TRBDF2",
+          "user-supplied"
         ],
         yields: {
           ArcLength: [
@@ -7639,17 +7658,19 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
               name: "dUmax"
             }
           ],
-          TRBDF2: []
+          TRBDF2: [],
+          "user-supplied": [
+            {
+              kind: "str",
+              name: "customType"
+            },
+            {
+              kind: "vec",
+              length: "dynamic",
+              name: "intArgs"
+            }
+          ]
         }
-      },
-      {
-        kind: "str",
-        name: "intType"
-      },
-      {
-        kind: "vec",
-        length: "dynamic",
-        name: "intArgs"
       }
     ],
     category: "model",
@@ -7735,7 +7756,8 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
         options: [
           "circ",
           "rect",
-          "straight"
+          "straight",
+          "user-supplied"
         ],
         yields: {
           circ: [
@@ -7820,17 +7842,19 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
               length: "dynamic",
               name: "end"
             }
+          ],
+          "user-supplied": [
+            {
+              kind: "str",
+              name: "customType"
+            },
+            {
+              kind: "vec",
+              length: "dynamic",
+              name: "args"
+            }
           ]
         }
-      },
-      {
-        kind: "str",
-        name: "type"
-      },
-      {
-        kind: "vec",
-        length: "dynamic",
-        name: "args"
       }
     ],
     category: "model",
@@ -7983,7 +8007,8 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
           "part",
           "quad",
           "tet",
-          "tri"
+          "tri",
+          "user-supplied"
         ],
         yields: {
           bg: [
@@ -8251,21 +8276,23 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
               length: "dynamic",
               name: "eleArgs"
             }
+          ],
+          "user-supplied": [
+            {
+              kind: "str",
+              name: "customType"
+            },
+            {
+              kind: "int",
+              name: "tag"
+            },
+            {
+              kind: "vec",
+              length: "dynamic",
+              name: "args"
+            }
           ]
         }
-      },
-      {
-        kind: "str",
-        name: "type"
-      },
-      {
-        kind: "int",
-        name: "tag"
-      },
-      {
-        kind: "vec",
-        length: "dynamic",
-        name: "args"
       }
     ],
     category: "model",
@@ -8448,7 +8475,8 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
           "PressureDependMultiYield02",
           "PressureDependMultiYield03",
           "PressureIndependMultiYield",
-          "stressDensity"
+          "stressDensity",
+          "user-supplied"
         ],
         yields: {
           AcousticMedium: [
@@ -9897,21 +9925,23 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
               kind: "str",
               name: "p1"
             }
+          ],
+          "user-supplied": [
+            {
+              kind: "int",
+              name: "matType"
+            },
+            {
+              kind: "int",
+              name: "matTag"
+            },
+            {
+              kind: "vec",
+              length: "dynamic",
+              name: "matArgs"
+            }
           ]
         }
-      },
-      {
-        kind: "int",
-        name: "matType"
-      },
-      {
-        kind: "int",
-        name: "matTag"
-      },
-      {
-        kind: "vec",
-        length: "dynamic",
-        name: "matArgs"
       }
     ],
     category: "model",
@@ -10465,24 +10495,27 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
           "ParallelPlain",
           "ParallelRCM",
           "Plain",
-          "RCM"
+          "RCM",
+          "user-supplied"
         ],
         yields: {
           AMD: [],
           ParallelPlain: [],
           ParallelRCM: [],
           Plain: [],
-          RCM: []
+          RCM: [],
+          "user-supplied": [
+            {
+              kind: "int",
+              name: "numbererType"
+            },
+            {
+              kind: "vec",
+              length: "dynamic",
+              name: "numbererArgs"
+            }
+          ]
         }
-      },
-      {
-        kind: "int",
-        name: "numbererType"
-      },
-      {
-        kind: "vec",
-        length: "dynamic",
-        name: "numbererArgs"
       }
     ],
     category: "model",
@@ -10639,7 +10672,8 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
         options: [
           "circ",
           "quad",
-          "rect"
+          "rect",
+          "user-supplied"
         ],
         yields: {
           circ: [
@@ -10728,17 +10762,19 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
               length: "dynamic",
               name: "crdsJ"
             }
+          ],
+          "user-supplied": [
+            {
+              kind: "str",
+              name: "customType"
+            },
+            {
+              kind: "vec",
+              length: "dynamic",
+              name: "args"
+            }
           ]
         }
-      },
-      {
-        kind: "str",
-        name: "type"
-      },
-      {
-        kind: "vec",
-        length: "dynamic",
-        name: "args"
       }
     ],
     category: "model",
@@ -10779,7 +10815,8 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
         options: [
           "MultipleSupport",
           "Plain",
-          "UniformExcitation"
+          "UniformExcitation",
+          "user-supplied"
         ],
         yields: {
           MultipleSupport: [
@@ -10861,21 +10898,23 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
               kind: "str",
               name: "fact"
             }
+          ],
+          "user-supplied": [
+            {
+              kind: "str",
+              name: "customType"
+            },
+            {
+              kind: "int",
+              name: "patternTag"
+            },
+            {
+              kind: "vec",
+              length: "dynamic",
+              name: "patternArgs"
+            }
           ]
         }
-      },
-      {
-        kind: "str",
-        name: "patternType"
-      },
-      {
-        kind: "int",
-        name: "patternTag"
-      },
-      {
-        kind: "vec",
-        length: "dynamic",
-        name: "patternArgs"
       }
     ],
     category: "model",
@@ -11239,7 +11278,8 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
           "EnvelopeElement",
           "EnvelopeNode",
           "Node",
-          "PVD"
+          "PVD",
+          "user-supplied"
         ],
         yields: {
           BgPVD: [
@@ -11861,17 +11901,19 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
               length: "dynamic",
               name: "res"
             }
+          ],
+          "user-supplied": [
+            {
+              kind: "str",
+              name: "customType"
+            },
+            {
+              kind: "vec",
+              length: "dynamic",
+              name: "recorderArgs"
+            }
           ]
         }
-      },
-      {
-        kind: "str",
-        name: "recorderType"
-      },
-      {
-        kind: "vec",
-        length: "dynamic",
-        name: "recorderArgs"
       }
     ],
     category: "recorder",
@@ -12112,7 +12154,8 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
         name: "type",
         options: [
           "recorders",
-          "sp"
+          "sp",
+          "user-supplied"
         ],
         yields: {
           recorders: [],
@@ -12129,16 +12172,18 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
               kind: "int",
               name: "patternTag"
             }
+          ],
+          "user-supplied": [
+            {
+              kind: "str",
+              name: "customType"
+            },
+            {
+              kind: "int",
+              name: "tag"
+            }
           ]
         }
-      },
-      {
-        kind: "str",
-        name: "type"
-      },
-      {
-        kind: "int",
-        name: "tag"
       }
     ],
     category: "model",
@@ -12399,7 +12444,8 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
           "RCCircularSection",
           "RCSection2d",
           "Uniaxial",
-          "WFSection2d"
+          "WFSection2d",
+          "user-supplied"
         ],
         yields: {
           Aggregator: [
@@ -12825,21 +12871,23 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
               kind: "str",
               name: "nff"
             }
+          ],
+          "user-supplied": [
+            {
+              kind: "str",
+              name: "customType"
+            },
+            {
+              kind: "int",
+              name: "secTag"
+            },
+            {
+              kind: "vec",
+              length: "dynamic",
+              name: "secArgs"
+            }
           ]
         }
-      },
-      {
-        kind: "str",
-        name: "secType"
-      },
-      {
-        kind: "int",
-        name: "secTag"
-      },
-      {
-        kind: "vec",
-        length: "dynamic",
-        name: "secArgs"
       }
     ],
     category: "model",
@@ -13759,7 +13807,8 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
           "ProfileSPD",
           "SparseSYM",
           "SuperLU",
-          "UmfPack"
+          "UmfPack",
+          "user-supplied"
         ],
         yields: {
           BandGen: [],
@@ -13800,17 +13849,19 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
           ProfileSPD: [],
           SparseSYM: [],
           SuperLU: [],
-          UmfPack: []
+          UmfPack: [],
+          "user-supplied": [
+            {
+              kind: "str",
+              name: "customType"
+            },
+            {
+              kind: "vec",
+              length: "dynamic",
+              name: "systemArgs"
+            }
+          ]
         }
-      },
-      {
-        kind: "str",
-        name: "systemType"
-      },
-      {
-        kind: "vec",
-        length: "dynamic",
-        name: "systemArgs"
       }
     ],
     category: "model",
@@ -13905,7 +13956,8 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
           "RelativeEnergyIncr",
           "RelativeNormDispIncr",
           "RelativeNormUnbalance",
-          "RelativeTotalNormDispIncr"
+          "RelativeTotalNormDispIncr",
+          "user-supplied"
         ],
         yields: {
           EnergyIncr: [
@@ -14145,17 +14197,19 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
               kind: "str",
               name: "nType"
             }
+          ],
+          "user-supplied": [
+            {
+              kind: "str",
+              name: "customType"
+            },
+            {
+              kind: "vec",
+              length: "dynamic",
+              name: "testArgs"
+            }
           ]
         }
-      },
-      {
-        kind: "str",
-        name: "testType"
-      },
-      {
-        kind: "vec",
-        length: "dynamic",
-        name: "testArgs"
       }
     ],
     category: "model",
@@ -14272,7 +14326,8 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
           "Pulse",
           "Rectangular",
           "Triangle",
-          "Trig"
+          "Trig",
+          "user-supplied"
         ],
         yields: {
           Constant: [
@@ -14552,21 +14607,23 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
               kind: "float",
               name: "zeroShift"
             }
+          ],
+          "user-supplied": [
+            {
+              kind: "str",
+              name: "customType"
+            },
+            {
+              kind: "int",
+              name: "tsTag"
+            },
+            {
+              kind: "vec",
+              length: "dynamic",
+              name: "tsArgs"
+            }
           ]
         }
-      },
-      {
-        kind: "str",
-        name: "tsType"
-      },
-      {
-        kind: "int",
-        name: "tsTag"
-      },
-      {
-        kind: "vec",
-        length: "dynamic",
-        name: "tsArgs"
       }
     ],
     category: "model",
@@ -14697,7 +14754,8 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
           "TzLiq1",
           "TzSimple1",
           "Viscous",
-          "ViscousDamper"
+          "ViscousDamper",
+          "user-supplied"
         ],
         yields: {
           AxialSp: [
@@ -18322,21 +18380,23 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
               kind: "float",
               name: "maxHalf"
             }
+          ],
+          "user-supplied": [
+            {
+              kind: "int",
+              name: "matType"
+            },
+            {
+              kind: "int",
+              name: "matTag"
+            },
+            {
+              kind: "vec",
+              length: "dynamic",
+              name: "matArgs"
+            }
           ]
         }
-      },
-      {
-        kind: "int",
-        name: "matType"
-      },
-      {
-        kind: "int",
-        name: "matTag"
-      },
-      {
-        kind: "vec",
-        length: "dynamic",
-        name: "matArgs"
       }
     ],
     category: "model",

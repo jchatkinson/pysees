@@ -1,4 +1,4 @@
-import { Fragment } from 'react'
+import { Fragment, useState } from 'react'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Separator } from '@/components/ui/separator'
 import { useAppStore } from '@/store/useAppStore'
@@ -23,9 +23,40 @@ function isRecorderCommand(cmd: Command) {
 }
 
 export function HistoryPanel() {
-  const { history, selectedHistoryIndex, setSelectedHistoryIndex, affectedHistoryIndices } = useAppStore()
+  const {
+    history,
+    selectedHistoryIndex,
+    setSelectedHistoryIndex,
+    affectedHistoryIndices,
+    insertionIndex,
+    setInsertionIndex,
+    moveCommand,
+  } = useAppStore()
+  const [dragIndex, setDragIndex] = useState<number | null>(null)
   const { commands, cursor } = history
   const affectedSet = new Set(affectedHistoryIndices)
+
+  const renderInsertionTarget = (index: number) => (
+    <button
+      key={`insert-${index}`}
+      className={[
+        'w-full h-3 rounded-sm transition-colors relative',
+        index === 0 ? 'hidden' : '',
+        insertionIndex === index ? 'bg-primary/20' : 'hover:bg-accent/60',
+      ].join(' ')}
+      onClick={() => setInsertionIndex(index)}
+      onDragOver={(e) => { e.preventDefault(); setInsertionIndex(index) }}
+      onDrop={(e) => {
+        e.preventDefault()
+        if (dragIndex === null) return
+        moveCommand(dragIndex, index)
+        setDragIndex(null)
+      }}
+      title={`Insert at ${index + 1}`}
+    >
+      {insertionIndex === index && <span className="absolute inset-x-2 top-1/2 -translate-y-1/2 h-px bg-primary" />}
+    </button>
+  )
 
   return (
     <div className="flex flex-col h-full">
@@ -45,29 +76,47 @@ export function HistoryPanel() {
                 {isRecorder && i > 0 && !isRecorderCommand(commands[i - 1]) && (
                   <Separator className="my-1" />
                 )}
-                <button
-                  className={[
-                    'w-full text-left px-2 py-1.5 rounded text-xs font-mono transition-colors',
-                    'hover:bg-accent',
-                    isCurrent ? 'bg-accent' : '',
-                    selectedHistoryIndex === i ? 'ring-1 ring-primary/40 bg-accent/70' : '',
-                    isAffected ? 'bg-amber-100/60 dark:bg-amber-900/25 ring-1 ring-amber-300/70 dark:ring-amber-700/50' : '',
-                    isFuture ? 'opacity-40' : '',
-                    isRecorder ? 'text-muted-foreground' : '',
-                  ].join(' ')}
-                  onClick={() => setSelectedHistoryIndex(i)}
-                >
-                  {summary(cmd)}
-                </button>
+                <div className="flex items-center gap-1">
+                  <button
+                    className={[
+                      'shrink-0 text-muted-foreground hover:text-foreground cursor-grab active:cursor-grabbing px-1 text-[10px]',
+                      i <= 0 ? 'opacity-0 pointer-events-none' : '',
+                    ].join(' ')}
+                    draggable={i > 0}
+                    onDragStart={() => setDragIndex(i)}
+                    onDragEnd={() => setDragIndex(null)}
+                    title="Drag to reorder"
+                  >
+                    ::
+                  </button>
+                  <button
+                    className={[
+                      'w-full text-left px-2 py-1.5 rounded text-xs font-mono transition-colors relative',
+                      'hover:bg-accent',
+                      selectedHistoryIndex === i ? 'ring-1 ring-primary/50 bg-primary/10' : '',
+                      isAffected ? 'bg-amber-100/60 dark:bg-amber-900/25 ring-1 ring-amber-300/70 dark:ring-amber-700/50' : '',
+                      isFuture ? 'opacity-40' : '',
+                      isRecorder ? 'text-muted-foreground' : '',
+                    ].join(' ')}
+                    onClick={() => setSelectedHistoryIndex(i)}
+                    onDoubleClick={() => setInsertionIndex(i)}
+                  >
+                    {isCurrent && <span className="absolute left-0 top-1 bottom-1 w-0.5 bg-primary/70 rounded" />}
+                    {summary(cmd)}
+                  </button>
+                </div>
+                {i + 1 < commands.length && renderInsertionTarget(i + 1)}
               </Fragment>
             )
           })}
+          {commands.length > 0 && renderInsertionTarget(commands.length)}
         </div>
       </ScrollArea>
       <div className="border-t p-2 shrink-0">
-        <button className="w-full text-xs text-muted-foreground hover:text-foreground hover:bg-accent rounded py-1.5 transition-colors">
-          + Script
-        </button>
+        <div className="flex items-center justify-between text-[11px] text-muted-foreground px-1">
+          <span>Insert: {insertionIndex === null ? 'end' : `${insertionIndex + 1}`}</span>
+          <button className="hover:text-foreground" onClick={() => setInsertionIndex(null)}>reset</button>
+        </div>
       </div>
     </div>
   )
