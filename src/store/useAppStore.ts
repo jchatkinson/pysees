@@ -155,7 +155,8 @@ export const useAppStore = create<AppStore>((set, get) => ({
     const insertAt = to > fromIndex ? to - 1 : to
     commands.splice(insertAt, 0, item)
 
-    const remapIndex = (idx: number | null) => {
+    // Remap an element's position after the move (used for selectedHistoryIndex)
+    const remapElementIndex = (idx: number | null) => {
       if (idx === null) return null
       if (idx === fromIndex) return insertAt
       if (fromIndex < idx && idx < to) return idx - 1
@@ -163,11 +164,15 @@ export const useAppStore = create<AppStore>((set, get) => ({
       return idx
     }
 
-    const cursorRaw = remapIndex(s.history.cursor)
-    const cursor = cursorRaw === null ? s.history.cursor : cursorRaw
+    // Cursor tracks the active/inactive boundary (count-based), not an element position.
+    // Moving a command within the active range doesn't change the active count.
+    let cursor = s.history.cursor
+    if (fromIndex <= cursor && insertAt > cursor) cursor -= 1
+    else if (fromIndex > cursor && insertAt <= cursor) cursor += 1
+
     return {
       history: { ...s.history, commands, cursor },
-      selectedHistoryIndex: remapIndex(s.selectedHistoryIndex),
+      selectedHistoryIndex: remapElementIndex(s.selectedHistoryIndex),
       insertionIndex: to,
       lastEditedHistoryIndex: null,
       affectedHistoryIndices: [],
