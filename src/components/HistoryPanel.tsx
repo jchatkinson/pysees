@@ -20,8 +20,9 @@ function summary(cmd: Command): string {
 const recorderTypes = new Set<Command['type']>(['ADD_RECORDER'])
 
 export function HistoryPanel() {
-  const { history } = useAppStore()
+  const { history, selectedHistoryIndex, setSelectedHistoryIndex, affectedHistoryIndices } = useAppStore()
   const { commands, cursor } = history
+  const affectedSet = new Set(affectedHistoryIndices)
 
   return (
     <div className="flex flex-col h-full">
@@ -35,6 +36,7 @@ export function HistoryPanel() {
             const isRecorder = recorderTypes.has(cmd.type)
             const isCurrent = i === cursor
             const isFuture = i > cursor
+            const isAffected = i <= cursor && affectedSet.has(i)
             return (
               <Fragment key={i}>
                 {isRecorder && i > 0 && !recorderTypes.has(commands[i - 1].type) && (
@@ -45,9 +47,12 @@ export function HistoryPanel() {
                     'w-full text-left px-2 py-1.5 rounded text-xs font-mono transition-colors',
                     'hover:bg-accent',
                     isCurrent ? 'bg-accent' : '',
+                    selectedHistoryIndex === i ? 'ring-1 ring-primary/40 bg-accent/70' : '',
+                    isAffected ? 'bg-amber-100/60 dark:bg-amber-900/25 ring-1 ring-amber-300/70 dark:ring-amber-700/50' : '',
                     isFuture ? 'opacity-40' : '',
                     isRecorder ? 'text-muted-foreground' : '',
                   ].join(' ')}
+                  onClick={() => setSelectedHistoryIndex(i)}
                 >
                   {summary(cmd)}
                 </button>

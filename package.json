@@ -7,7 +7,9 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "schema:extract": "uv run python scripts/generate_opensees_schemas.py",
+    "schema:build": "uv run python scripts/build_runtime_schemas.py"
   },
   "dependencies": {
     "@base-ui/react": "^1.2.0",

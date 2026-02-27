@@ -1,0 +1,16 @@
+{
+  "commands": {
+    "node": [
+      {
+        "signature": "ops.node(nodeTag, *coords)",
+        "argsRaw": ["nodeTag", "*coords"],
+        "argsInferred": [
+          { "kind": "int", "name": "nodeTag" },
+          { "kind": "vec", "name": "coords", "length": "ndm" }
+        ],
+        "examples": [{ "file": "manual-override", "line": 1 }]
+      }
+    ]
+  }
+}
+

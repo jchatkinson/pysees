@@ -75,29 +75,31 @@ export function SchemaFormField({ arg, values, setValue, ctx, disabled }: Schema
       </div>
     )
   }
-  const key = arg.name
-  const selected = String(values[key] ?? arg.options[0] ?? '')
-  return (
-    <div className="grid gap-1.5">
-      <Label className="text-xs">{arg.label ?? arg.name}</Label>
-      <Select value={selected} onValueChange={(value) => setValue(key, value)} disabled={disabled}>
-        <SelectTrigger className="w-full">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          {arg.options.map((option) => <SelectItem key={option} value={option}>{option}</SelectItem>)}
-        </SelectContent>
-      </Select>
-      {(arg.yields[selected] ?? []).length > 0 && (
-        <div className="grid gap-2 rounded border p-2">
-          {(arg.yields[selected] ?? []).map((child) => (
-            <Fragment key={child.kind === 'flag' ? child.flag : child.name}>
-              <SchemaFormField arg={child} values={values} setValue={setValue} ctx={ctx} disabled={disabled} />
-            </Fragment>
-          ))}
-        </div>
-      )}
-    </div>
-  )
+  if (arg.kind === 'choice') {
+    const key = arg.name
+    const selected = String(values[key] ?? arg.options[0] ?? '')
+    return (
+      <div className="grid gap-1.5">
+        <Label className="text-xs">{arg.label ?? arg.name}</Label>
+        <Select value={selected} onValueChange={(value) => setValue(key, value)} disabled={disabled}>
+          <SelectTrigger className="w-full">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {arg.options.map((option: string) => <SelectItem key={option} value={option}>{option}</SelectItem>)}
+          </SelectContent>
+        </Select>
+        {(arg.yields[selected] ?? []).length > 0 && (
+          <div className="grid gap-2 rounded border p-2">
+            {(arg.yields[selected] ?? []).map((child: ArgDef) => (
+              <Fragment key={child.kind === 'flag' ? child.flag : child.name}>
+                <SchemaFormField arg={child} values={values} setValue={setValue} ctx={ctx} disabled={disabled} />
+              </Fragment>
+            ))}
+          </div>
+        )}
+      </div>
+    )
+  }
+  return null
 }
-
