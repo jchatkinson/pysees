@@ -1,8 +1,11 @@
+import { TooltipProvider } from '@/components/ui/tooltip'
+import { AppShell } from '@/components/AppShell'
+
 export function App() {
   return (
-    <div className="flex items-center justify-center min-h-screen">
-      <div className="font-medium">Hello World</div>
-    </div>
+    <TooltipProvider>
+      <AppShell />
+    </TooltipProvider>
   )
 }
 
