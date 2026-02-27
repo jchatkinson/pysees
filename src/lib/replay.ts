@@ -41,6 +41,7 @@ function apply(state: ModelState, cmd: Command): ModelState {
     case 'SCRIPT_GROUP':
       return cmd.commands.reduce(apply, state)
     case 'ADD_RECORDER':
+    case 'ADD_OPS':
       return state
     default:
       return state

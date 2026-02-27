@@ -13,11 +13,14 @@ function summary(cmd: Command): string {
     case 'FIX': return `fix  node ${cmd.nodeId}`
     case 'ADD_LOAD': return `load  node ${cmd.nodeId}`
     case 'ADD_RECORDER': return `recorder  ${cmd.recorderType}`
+    case 'ADD_OPS': return `${cmd.fn}  (${Object.keys(cmd.values).length} args)`
     case 'SCRIPT_GROUP': return `script  (${cmd.commands.length} cmds)`
   }
 }
 
-const recorderTypes = new Set<Command['type']>(['ADD_RECORDER'])
+function isRecorderCommand(cmd: Command) {
+  return cmd.type === 'ADD_RECORDER' || (cmd.type === 'ADD_OPS' && cmd.category === 'recorder')
+}
 
 export function HistoryPanel() {
   const { history, selectedHistoryIndex, setSelectedHistoryIndex, affectedHistoryIndices } = useAppStore()
@@ -33,13 +36,13 @@ export function HistoryPanel() {
             <p className="text-xs text-muted-foreground text-center py-6">No commands yet.</p>
           )}
           {commands.map((cmd, i) => {
-            const isRecorder = recorderTypes.has(cmd.type)
+            const isRecorder = isRecorderCommand(cmd)
             const isCurrent = i === cursor
             const isFuture = i > cursor
             const isAffected = i <= cursor && affectedSet.has(i)
             return (
               <Fragment key={i}>
-                {isRecorder && i > 0 && !recorderTypes.has(commands[i - 1].type) && (
+                {isRecorder && i > 0 && !isRecorderCommand(commands[i - 1]) && (
                   <Separator className="my-1" />
                 )}
                 <button

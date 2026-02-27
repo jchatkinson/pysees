@@ -36,7 +36,7 @@ function CommandFormBody({
 
   return (
     <>
-      <ScrollArea className="flex-1">
+      <ScrollArea className="flex-1 min-h-0">
         <div className="p-3 grid gap-3">
           {schema.args.map((arg) => (
             <SchemaFormField
@@ -115,7 +115,7 @@ export function CommandForm() {
 
   if (!selectedSchema) {
     return (
-      <div className="flex flex-col h-full">
+      <div className="flex flex-col h-full min-h-0">
         <div className="px-3 py-2 text-xs font-medium text-muted-foreground border-b shrink-0">Command</div>
         <div className="flex-1 flex items-center justify-center">
           <p className="text-xs text-muted-foreground">Create a model to add commands.</p>
@@ -125,7 +125,7 @@ export function CommandForm() {
   }
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full min-h-0 overflow-hidden">
       <div className="px-3 py-2 text-xs font-medium text-muted-foreground border-b shrink-0">
         {hasSelection ? `Edit Command #${selectedHistoryIndex! + 1}` : 'Command'}
       </div>

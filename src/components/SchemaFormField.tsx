@@ -37,8 +37,30 @@ export function SchemaFormField({ arg, values, setValue, ctx, disabled }: Schema
   if (arg.kind === 'vec') {
     const key = arg.name
     const len = resolveArgLen(arg.length, ctx)
-    const arr = Array.isArray(values[key]) ? values[key] : Array.from({ length: len }, () => 0)
+    const arr = Array.isArray(values[key]) ? values[key] : []
     const label = arg.label ?? arg.name
+    if (len === 'dynamic') {
+      return (
+        <div className="grid gap-1.5">
+          <Label className="text-xs">{label}</Label>
+          <Input
+            type="text"
+            value={arr.join(', ')}
+            onChange={(e) => {
+              const next = e.target.value
+                .split(',')
+                .map((v) => v.trim())
+                .filter(Boolean)
+                .map((v) => num(v))
+              setValue(key, next)
+            }}
+            placeholder="e.g. 1, 2, 3"
+            disabled={disabled}
+          />
+        </div>
+      )
+    }
+    const fixed = arr.length ? arr : Array.from({ length: len }, () => 0)
     return (
       <div className="grid gap-1.5">
         <Label className="text-xs">{label}</Label>
@@ -47,9 +69,9 @@ export function SchemaFormField({ arg, values, setValue, ctx, disabled }: Schema
             <Input
               key={`${key}-${idx}`}
               type="number"
-              value={String(arr[idx] ?? 0)}
+              value={String(fixed[idx] ?? 0)}
               onChange={(e) => {
-                const next = [...arr]
+                const next = [...fixed]
                 next[idx] = num(e.target.value)
                 setValue(key, next)
               }}

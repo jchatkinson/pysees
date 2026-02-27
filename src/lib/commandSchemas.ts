@@ -1,12 +1,11 @@
 import type { Command } from '@/types/commands'
 import type { ModelState } from '@/types/model'
-import type { ArgDef, SchemaContext } from '@/types/schema'
+import type { ArgDef, ArgLen, SchemaContext } from '@/types/schema'
 import { GENERATED_COMMAND_SCHEMAS } from '@/generated/commandSchemas.generated'
-
-type V1CommandType = Extract<Command['type'], 'ADD_NODE' | 'FIX' | 'ADD_LOAD' | 'ADD_ELEMENT'>
+import type { GeneratedArgDef } from '@/generated/commandSchemas.generated'
 
 export interface CommandSchema {
-  cmd: V1CommandType
+  cmd: string
   fn: string
   label: string
   category: 'model' | 'recorder'
@@ -29,8 +28,8 @@ function ints(v: unknown) {
   return nums(v).map((x) => Math.trunc(x))
 }
 
-function generatedFn(fn: string) {
-  return GENERATED_COMMAND_SCHEMAS.find((s) => s.fn === fn)
+function titleCase(s: string) {
+  return s.replace(/([A-Z])/g, ' $1').replace(/^./, (c) => c.toUpperCase()).trim()
 }
 
 function vec(name: string, label: string, length: number | 'ndm' | 'ndf', defaultValue: number[]): ArgDef {
@@ -39,6 +38,10 @@ function vec(name: string, label: string, length: number | 'ndm' | 'ndf', defaul
 
 function int(name: string, label: string, defaultValue: number): ArgDef {
   return { kind: 'int', name, label, defaultValue }
+}
+
+function generatedFn(fn: string) {
+  return GENERATED_COMMAND_SCHEMAS.find((s) => s.fn === fn)
 }
 
 function nodeArgsFromGenerated(): ArgDef[] {
@@ -52,9 +55,7 @@ function fixArgsFromGenerated(): ArgDef[] {
   const generated = generatedFn('fix')
   const hasNodeTag = generated?.args.some((a) => a.kind === 'int' && a.name.toLowerCase().includes('node'))
   const hasConstr = generated?.args.some((a) => a.kind === 'vec' && a.name.toLowerCase().includes('constr'))
-  if (!hasNodeTag || !hasConstr) {
-    return [int('nodeId', 'Node ID', 1), vec('dofs', 'DOF Fix Flags (0/1)', 'ndf', [1, 1, 1, 0, 0, 0])]
-  }
+  if (!hasNodeTag || !hasConstr) return [int('nodeId', 'Node ID', 1), vec('dofs', 'DOF Fix Flags (0/1)', 'ndf', [1, 1, 1, 0, 0, 0])]
   return [int('nodeId', 'Node ID', 1), vec('dofs', 'DOF Fix Flags (0/1)', 'ndf', [1, 1, 1, 0, 0, 0])]
 }
 
@@ -62,9 +63,7 @@ function loadArgsFromGenerated(): ArgDef[] {
   const generated = generatedFn('load')
   const hasNodeTag = generated?.args.some((a) => a.kind === 'int' && a.name.toLowerCase().includes('node'))
   const hasValues = generated?.args.some((a) => a.kind === 'vec' && a.name.toLowerCase().includes('load'))
-  if (!hasNodeTag || !hasValues) {
-    return [int('nodeId', 'Node ID', 1), vec('values', 'Load Values', 'ndf', [0, 0, 0, 0, 0, 0])]
-  }
+  if (!hasNodeTag || !hasValues) return [int('nodeId', 'Node ID', 1), vec('values', 'Load Values', 'ndf', [0, 0, 0, 0, 0, 0])]
   return [int('nodeId', 'Node ID', 1), vec('values', 'Load Values', 'ndf', [0, 0, 0, 0, 0, 0])]
 }
 
@@ -79,7 +78,7 @@ function elementArgsFromGenerated(): ArgDef[] {
   ]
 }
 
-export const V1_COMMAND_SCHEMAS: CommandSchema[] = [
+const V1_COMMAND_SCHEMAS: CommandSchema[] = [
   {
     cmd: 'ADD_NODE',
     fn: 'node',
@@ -131,13 +130,46 @@ export const V1_COMMAND_SCHEMAS: CommandSchema[] = [
   },
 ]
 
-export function getAvailableSchemas(ndm: number) {
-  return V1_COMMAND_SCHEMAS.filter((schema) => !schema.ndmFilter || schema.ndmFilter.includes(ndm))
+const RESERVED_FNS = new Set<string>(['node', 'fix', 'load', 'element'])
+
+function mapGeneratedArg(arg: GeneratedArgDef): ArgDef {
+  if (arg.kind === 'choice') {
+    const yields: Record<string, ArgDef[]> = {}
+    for (const [key, value] of Object.entries(arg.yields)) yields[key] = value.map(mapGeneratedArg)
+    return { kind: 'choice', name: arg.name, label: titleCase(arg.name), options: arg.options, yields, defaultValue: arg.defaultValue }
+  }
+  if (arg.kind === 'vec') {
+    const length: ArgLen = arg.length === 'dynamic' || arg.length === 'ndm' || arg.length === 'ndf' ? arg.length : Number(arg.length)
+    return { kind: 'vec', name: arg.name, label: titleCase(arg.name), length, defaultValue: [] }
+  }
+  return { kind: arg.kind, name: arg.name, label: titleCase(arg.name), defaultValue: arg.literal ?? (arg.kind === 'str' ? '' : 0) }
 }
 
-export function resolveArgLen(len: number | 'ndm' | 'ndf', ctx: SchemaContext) {
+const GENERATED_NON_V1_SCHEMAS: CommandSchema[] = GENERATED_COMMAND_SCHEMAS
+  .filter((schema) => !RESERVED_FNS.has(schema.fn))
+  .map((schema) => ({
+    cmd: `OPS:${schema.fn}`,
+    fn: schema.fn,
+    label: titleCase(schema.label || schema.fn),
+    category: schema.category,
+    args: schema.args.map(mapGeneratedArg),
+    optional: schema.optional.map(mapGeneratedArg),
+    create: (values, _model, base) => ({
+      type: 'ADD_OPS',
+      fn: base?.type === 'ADD_OPS' ? base.fn : schema.fn,
+      category: schema.category,
+      values,
+    }),
+  }))
+
+export function getAvailableSchemas(ndm: number) {
+  return [...V1_COMMAND_SCHEMAS, ...GENERATED_NON_V1_SCHEMAS].filter((schema) => !schema.ndmFilter || schema.ndmFilter.includes(ndm))
+}
+
+export function resolveArgLen(len: ArgLen, ctx: SchemaContext): number | 'dynamic' {
   if (len === 'ndm') return ctx.ndm
   if (len === 'ndf') return ctx.ndf
+  if (len === 'dynamic') return 'dynamic'
   return len
 }
 
@@ -149,6 +181,10 @@ function defaultsForArg(arg: ArgDef, ctx: SchemaContext, out: Record<string, unk
   if (arg.kind === 'vec') {
     const len = resolveArgLen(arg.length, ctx)
     const seed = arg.defaultValue ?? []
+    if (len === 'dynamic') {
+      out[arg.name] = [...seed]
+      return
+    }
     out[arg.name] = Array.from({ length: len }, (_, idx) => seed[idx] ?? 0)
     return
   }
@@ -183,11 +219,14 @@ export function validateCommand(cmd: Command, model: ModelState) {
 }
 
 export function getSchemaForCommand(cmd: Command, ndm: number) {
+  const schemas = getAvailableSchemas(ndm)
+  if (cmd.type === 'ADD_OPS') return schemas.find((schema) => schema.cmd === `OPS:${cmd.fn}`) ?? null
   if (cmd.type !== 'ADD_NODE' && cmd.type !== 'FIX' && cmd.type !== 'ADD_LOAD' && cmd.type !== 'ADD_ELEMENT') return null
-  return getAvailableSchemas(ndm).find((schema) => schema.cmd === cmd.type) ?? null
+  return schemas.find((schema) => schema.cmd === cmd.type) ?? null
 }
 
 export function commandToValues(cmd: Command, ctx: SchemaContext) {
+  if (cmd.type === 'ADD_OPS') return { ...cmd.values }
   const base = {
     ADD_NODE: { coords: Array.from({ length: ctx.ndm }, (_, i) => cmd.type === 'ADD_NODE' ? (cmd.coords[i] ?? 0) : 0) },
     FIX: {

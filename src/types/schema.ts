@@ -1,4 +1,4 @@
-export type ArgLen = number | 'ndm' | 'ndf'
+export type ArgLen = number | 'ndm' | 'ndf' | 'dynamic'
 
 export type ArgDef =
   | { kind: 'int' | 'float' | 'str'; name: string; label?: string; defaultValue?: number | string }
@@ -10,4 +10,3 @@ export interface SchemaContext {
   ndm: number
   ndf: number
 }
-
