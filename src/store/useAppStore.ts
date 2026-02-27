@@ -73,7 +73,7 @@ interface AppStore {
     showGrid: boolean
   }
   viewportAction: { kind: 'zoomIn' | 'zoomOut' | 'fit'; token: number } | null
-  initModel: (ndm: 2 | 3, ndf: number) => void
+  initModel: (ndm: 2 | 3, ndf: number, extraCommands?: Command[]) => void
   pushCommand: (cmd: Command) => void
   insertCommandAt: (cmd: Command, index: number | null) => void
   updateCommandAt: (index: number, cmd: Command) => void
@@ -111,9 +111,10 @@ export const useAppStore = create<AppStore>((set, get) => ({
   },
   viewportAction: null,
 
-  initModel: (ndm, ndf) => set(() => {
-    const cmd: Command = { type: 'MODEL_INIT', ndm, ndf }
-    return { config: { ndm, ndf }, history: { commands: [cmd], cursor: 0 }, selectedHistoryIndex: null, insertionIndex: null, lastEditedHistoryIndex: null, affectedHistoryIndices: [] }
+  initModel: (ndm, ndf, extraCommands) => set(() => {
+    const initCmd: Command = { type: 'MODEL_INIT', ndm, ndf }
+    const commands = [initCmd, ...(extraCommands ?? [])]
+    return { config: { ndm, ndf }, history: { commands, cursor: commands.length - 1 }, selectedHistoryIndex: null, insertionIndex: null, lastEditedHistoryIndex: null, affectedHistoryIndices: [] }
   }),
 
   pushCommand: (cmd) => set((s) => {
