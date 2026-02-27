@@ -1,6 +1,62 @@
 # PySees
 
-## OpenSeesPy schema extraction
+## Project Description
+
+PySees is a web-based GUI preprocessor/postprocessor for OpenSeesPy structural models.  
+It does not run OpenSees in the browser. Instead, users build parametric models from command history, export a Python script, run analysis externally on their local machine, and import recorder results back for visualization. Further integration with opensees may be possible in the future, if licensing requirements are permissive, but that has not yet been investigated. 
+
+## Goals
+
+- Lower the barrier to entry for OpenSees by reducing the amount of programming expertise required to get started.
+- Provide a gentle path into OpenSees by bridging traditional structural analysis workflows with its code-first environment.
+- Expand OpenSees adoption by making modeling and postprocessing more accessible to a broader audience.
+- Reduce repeated setup effort for students and researchers through a core set of reusable modeling and visualization utilities.
+
+## Technical Objectives
+
+- Provide a history-based, parametric modeling workflow for OpenSeesPy.
+- Keep scene rendering and script export as pure functions of command history replay.
+- Support script-assisted model generation for repetitive geometry and loading patterns.
+- Enable lightweight postprocessing from imported recorder files.
+
+## Features
+
+- Immutable command history with undo/redo and replay-derived model state.
+- Schema-driven command forms for OpenSees command entry.
+- 3D viewport with nodes/elements/supports/load glyphs.
+- View controls for IDs and visibility toggles.
+- Python export pipeline target (`openseespy.opensees` script output).
+
+## Roadmap
+
+1. Complete V1 model pipeline: model/node/fix/load/timeSeries/pattern/geomTransf/basic elements.
+2. Add scripting workflow (`SCRIPT_GROUP`) for parametric command generation.
+3. Implement robust Python exporter and round-trip validation.
+4. Expand results mode: deformed shape, time history plotting, force/reaction views.
+5. Improve large-recorder import path with chunked parsing and worker-based processing.
+
+## Usage
+
+### Development
+
+1. Install dependencies:
+   `npm install`
+2. Start local development:
+   `npm run dev`
+3. Run lint checks:
+   `npm run lint`
+4. Build the app:
+   `npm run build`
+5. Preview the production build:
+   `npm run preview`
+
+Schema-related scripts:
+- Extract schema candidates:
+  `npm run schema:extract -- --docs-root /tmp/OpenSeesPyDoc --output src/generated/opensees-schema-candidates.json`
+- Build runtime schemas:
+  `npm run schema:build -- --input src/generated/opensees-schema-candidates.json --output src/generated/commandSchemas.generated.ts`
+
+### OpenSeesPy schema extraction
 
 Use the reusable generator to parse OpenSeesPyDoc RST files and emit command schema candidates.
 
@@ -8,21 +64,21 @@ Use the reusable generator to parse OpenSeesPyDoc RST files and emit command sch
    `git clone https://github.com/zhuminjie/OpenSeesPyDoc /tmp/OpenSeesPyDoc`
 2. Run extraction:
    `npm run schema:extract -- --docs-root /tmp/OpenSeesPyDoc --output src/generated/opensees-schema-candidates.json`
-   - Default mode parses only RST function directives (`.. function::`, `.. py:function::`) to avoid prose/citation noise.
-   - Optional fallback parsing (less strict): add `--include-code-calls` and/or `--include-inline-calls`.
 3. Optional manual corrections:
-   - Copy `scripts/opensees-schema-overrides.example.json` to a local overrides file.
-   - Re-run with `--overrides /path/to/overrides.json`.
+   `scripts/opensees-schema-overrides.example.json` -> local overrides file, then re-run with `--overrides /path/to/overrides.json`.
 
-The output is intended as a generated candidate artifact for manual review before promoting into production command schemas.
+Notes:
+- Default mode parses only RST function directives (`.. function::`, `.. py:function::`) to avoid prose/citation noise.
+- Optional fallback parsing (less strict): add `--include-code-calls` and/or `--include-inline-calls`.
+- The output is a candidate artifact intended for manual review before production use.
 
-## Runtime schema generation
+### Runtime schema generation
 
-Build normalized runtime schemas from the extracted candidates:
+Build normalized runtime schemas from extracted candidates:
 
 `npm run schema:build -- --input src/generated/opensees-schema-candidates.json --output src/generated/commandSchemas.generated.ts`
 
-This second pass:
-- normalizes argument names/kinds
+This pass:
+- normalizes argument names and kinds
 - groups literal-first overloads into `choice` schemas
 - emits deterministic TypeScript for direct app import
