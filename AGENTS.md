@@ -41,6 +41,7 @@ CommandHistory[] → replay() → ModelState → Three.js scene
 
 ## IMPORTANT NOTES: 
 
+- Do not build or run dev server unless specifically asked. 
 - Use standard Shadcn components and architecture wherever possible
 - Keep code compact. For example, do not newline every property of an html element or js object. 
 - When a task has an unclear outcome, ask for more information.
