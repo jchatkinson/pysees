@@ -2,9 +2,10 @@ export type ArgLen = number | 'ndm' | 'ndf' | 'dynamic'
 
 export type ArgDef =
   | { kind: 'int' | 'float' | 'str'; name: string; label?: string; defaultValue?: number | string }
-  | { kind: 'vec'; name: string; label?: string; length: ArgLen; defaultValue?: number[] }
+  | { kind: 'vec'; name: string; label?: string; length: ArgLen; defaultValue?: number[]; nodeSync?: boolean }
   | { kind: 'flag'; flag: string; label?: string; args: ArgDef[]; defaultValue?: boolean }
   | { kind: 'choice'; name: string; label?: string; options: string[]; yields: Record<string, ArgDef[]>; defaultValue?: string }
+  | { kind: 'idlist'; name: string; label?: string; defaultValue?: number[] }
 
 export interface SchemaContext {
   ndm: number

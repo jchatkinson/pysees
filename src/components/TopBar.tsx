@@ -1,8 +1,9 @@
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
-import { Undo2, Redo2, Triangle } from 'lucide-react'
+import { Undo2, Redo2 } from 'lucide-react'
 import { useAppStore } from '@/store/useAppStore'
+import { PiscesLogo } from '@/components/icons/PiscesLogo'
 
 export function TopBar() {
   const { mode, setMode, undo, redo, history, viewSettings, setViewSetting, requestViewportAction } = useAppStore()
@@ -13,7 +14,7 @@ export function TopBar() {
   return (
     <header className="h-12 border-b flex items-center px-3 gap-3 shrink-0">
       <div className="flex items-center gap-1.5 text-sm font-semibold select-none">
-        <Triangle className="size-4 text-primary fill-primary" />
+        <PiscesLogo className="size-4 text-primary" aria-hidden="true" />
         PySees
       </div>
       <Separator orientation="vertical" className="self-stretch" />

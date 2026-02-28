@@ -62,6 +62,14 @@ interface AppStore {
   insertionIndex: number | null
   lastEditedHistoryIndex: number | null
   affectedHistoryIndices: number[]
+  // viewport node selection
+  selectedNodeIds: number[]
+  setSelectedNodeIds: (ids: number[]) => void
+  toggleNodeInSelection: (id: number, additive: boolean) => void
+  nodePickMode: 'none' | 'idlist' | 'vec-sequential'
+  setNodePickMode: (mode: 'none' | 'idlist' | 'vec-sequential') => void
+  pendingNodePick: number | null
+  setPendingNodePick: (id: number | null) => void
   viewSettings: {
     showNodeIds: boolean
     showElementIds: boolean
@@ -99,6 +107,17 @@ export const useAppStore = create<AppStore>((set, get) => ({
   insertionIndex: null,
   lastEditedHistoryIndex: null,
   affectedHistoryIndices: [],
+  selectedNodeIds: [],
+  setSelectedNodeIds: (ids) => set({ selectedNodeIds: ids }),
+  toggleNodeInSelection: (id, additive) => set((s) => {
+    if (!additive) return { selectedNodeIds: [id] }
+    const has = s.selectedNodeIds.includes(id)
+    return { selectedNodeIds: has ? s.selectedNodeIds.filter((x) => x !== id) : [...s.selectedNodeIds, id] }
+  }),
+  nodePickMode: 'none',
+  setNodePickMode: (mode) => set({ nodePickMode: mode }),
+  pendingNodePick: null,
+  setPendingNodePick: (id) => set({ pendingNodePick: id }),
   viewSettings: {
     showNodeIds: false,
     showElementIds: false,

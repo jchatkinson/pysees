@@ -121,6 +121,7 @@ export function CommandForm() {
   const previewDeleteCascade = useAppStore((s) => s.previewDeleteCascade)
   const deleteCommandCascade = useAppStore((s) => s.deleteCommandCascade)
   const setSelectedHistoryIndex = useAppStore((s) => s.setSelectedHistoryIndex)
+  const setSelectedNodeIds = useAppStore((s) => s.setSelectedNodeIds)
   const insertionIndex = useAppStore((s) => s.insertionIndex)
   const selectedHistoryIndex = useAppStore((s) => s.selectedHistoryIndex)
   const history = useAppStore((s) => s.history)
@@ -159,6 +160,7 @@ export function CommandForm() {
           setPendingDeleteIndex(null)
           return
         }
+        setSelectedNodeIds([])
         setSelectedHistoryIndex(null)
       },
     },
@@ -246,6 +248,21 @@ export function CommandForm() {
             actionLabel="Add Command"
             initial={initialValues(selectedSchema, ctx)}
             submitValues={(values) => {
+              // If the schema has an idlist field, create one command per ID
+              const idListField = selectedSchema.args.find((a) => a.kind === 'idlist')
+              if (idListField) {
+                const ids = (values[idListField.name] as number[]) ?? []
+                if (!ids.length) return 'Enter at least one node ID.'
+                let at = insertionIndex
+                for (const id of ids) {
+                  const cmd = selectedSchema.create({ ...values, [idListField.name]: id }, model)
+                  const err = validateCommand(cmd, model)
+                  if (err) return err
+                  insertCommandAt(cmd, at)
+                  if (at !== null) at++
+                }
+                return null
+              }
               const cmd = selectedSchema.create(values, model)
               const validation = validateCommand(cmd, model)
               if (validation) return validation

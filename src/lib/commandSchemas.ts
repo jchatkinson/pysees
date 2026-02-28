@@ -52,19 +52,11 @@ function nodeArgsFromGenerated(): ArgDef[] {
 }
 
 function fixArgsFromGenerated(): ArgDef[] {
-  const generated = generatedFn('fix')
-  const hasNodeTag = generated?.args.some((a) => a.kind === 'int' && a.name.toLowerCase().includes('node'))
-  const hasConstr = generated?.args.some((a) => a.kind === 'vec' && a.name.toLowerCase().includes('constr'))
-  if (!hasNodeTag || !hasConstr) return [int('nodeId', 'Node ID', 1), vec('dofs', 'DOF Fix Flags (0/1)', 'ndf', [1, 1, 1, 0, 0, 0])]
-  return [int('nodeId', 'Node ID', 1), vec('dofs', 'DOF Fix Flags (0/1)', 'ndf', [1, 1, 1, 0, 0, 0])]
+  return [{ kind: 'idlist', name: 'nodeId', label: 'Node ID(s)' }, vec('dofs', 'DOF Fix Flags (0/1)', 'ndf', [1, 1, 1, 0, 0, 0])]
 }
 
 function loadArgsFromGenerated(): ArgDef[] {
-  const generated = generatedFn('load')
-  const hasNodeTag = generated?.args.some((a) => a.kind === 'int' && a.name.toLowerCase().includes('node'))
-  const hasValues = generated?.args.some((a) => a.kind === 'vec' && a.name.toLowerCase().includes('load'))
-  if (!hasNodeTag || !hasValues) return [int('nodeId', 'Node ID', 1), vec('values', 'Load Values', 'ndf', [0, 0, 0, 0, 0, 0])]
-  return [int('nodeId', 'Node ID', 1), vec('values', 'Load Values', 'ndf', [0, 0, 0, 0, 0, 0])]
+  return [{ kind: 'idlist', name: 'nodeId', label: 'Node ID(s)' }, vec('values', 'Load Values', 'ndf', [0, 0, 0, 0, 0, 0])]
 }
 
 function elementArgsFromGenerated(): ArgDef[] {
@@ -74,7 +66,7 @@ function elementArgsFromGenerated(): ArgDef[] {
   const options = ['Truss', 'ElasticBeamColumn'].filter((opt) => optionsRaw.includes(opt) || optionsRaw.includes('elasticBeamColumn'))
   return [
     { kind: 'choice', name: 'eleType', label: 'Element Type', options: options.length ? options : ['Truss', 'ElasticBeamColumn'], yields: {}, defaultValue: 'Truss' },
-    vec('nodes', 'Node IDs', 2, [1, 2]),
+    { kind: 'vec', name: 'nodes', label: 'Node IDs', length: 2, defaultValue: [1, 2], nodeSync: true },
   ]
 }
 
@@ -197,6 +189,9 @@ function defaultsForArg(arg: ArgDef, ctx: SchemaContext, out: Record<string, unk
     out[arg.name] = arg.defaultValue ?? arg.options[0] ?? ''
     for (const child of arg.yields[String(out[arg.name])] ?? []) defaultsForArg(child, ctx, out)
   }
+  if (arg.kind === 'idlist') {
+    out[arg.name] = arg.defaultValue ?? []
+  }
 }
 
 export function initialValues(schema: CommandSchema, ctx: SchemaContext) {
@@ -230,11 +225,12 @@ export function commandToValues(cmd: Command, ctx: SchemaContext) {
   const base = {
     ADD_NODE: { coords: Array.from({ length: ctx.ndm }, (_, i) => cmd.type === 'ADD_NODE' ? (cmd.coords[i] ?? 0) : 0) },
     FIX: {
-      nodeId: cmd.type === 'FIX' ? cmd.nodeId : 1,
+      // idlist field expects number[] — wrap single nodeId in array for edit initialisation
+      nodeId: cmd.type === 'FIX' ? [cmd.nodeId] : [1],
       dofs: Array.from({ length: ctx.ndf }, (_, i) => cmd.type === 'FIX' ? (cmd.dofs.includes(i + 1) ? 1 : 0) : 0),
     },
     ADD_LOAD: {
-      nodeId: cmd.type === 'ADD_LOAD' ? cmd.nodeId : 1,
+      nodeId: cmd.type === 'ADD_LOAD' ? [cmd.nodeId] : [1],
       values: Array.from({ length: ctx.ndf }, (_, i) => cmd.type === 'ADD_LOAD' ? (cmd.values[i] ?? 0) : 0),
     },
     ADD_ELEMENT: {

@@ -1,5 +1,6 @@
 import { Html } from '@react-three/drei'
 import type { NodeState } from '@/types/model'
+import { useAppStore } from '@/store/useAppStore'
 import { toVec3 } from './utils'
 
 const NODE_RADIUS = 0.12
@@ -15,7 +16,6 @@ const LABEL_STYLE: React.CSSProperties = {
   whiteSpace: 'nowrap',
   userSelect: 'none',
   pointerEvents: 'none',
-  // offset up-right so the chip doesn't cover the sphere
   transform: 'translate(4px, -16px)',
 }
 
@@ -23,17 +23,22 @@ function Node({
   node,
   selected,
   showId,
-  onSelect,
+  onToggle,
 }: {
   node: NodeState
   selected: boolean
   showId: boolean
-  onSelect: (id: number) => void
+  onToggle: (id: number, additive: boolean) => void
 }) {
   const pos = toVec3(node.coords)
   return (
     <group position={pos}>
-      <mesh onClick={() => onSelect(node.id)}>
+      <mesh
+        onClick={(e) => {
+          e.stopPropagation()
+          onToggle(node.id, e.nativeEvent.shiftKey)
+        }}
+      >
         <sphereGeometry args={[NODE_RADIUS, 20, 20]} />
         <meshStandardMaterial color={selected ? '#2563eb' : '#111827'} />
       </mesh>
@@ -50,15 +55,24 @@ export function NodesLayer({
   nodes,
   showNodes,
   showNodeIds,
-  selectedNodeId,
-  onSelect,
 }: {
   nodes: NodeState[]
   showNodes: boolean
   showNodeIds: boolean
-  selectedNodeId: number | null
-  onSelect: (id: number) => void
 }) {
+  const selectedNodeIds = useAppStore((s) => s.selectedNodeIds)
+  const toggleNodeInSelection = useAppStore((s) => s.toggleNodeInSelection)
+  const nodePickMode = useAppStore((s) => s.nodePickMode)
+  const setPendingNodePick = useAppStore((s) => s.setPendingNodePick)
+
+  const selectedSet = new Set(selectedNodeIds)
+
+  const handleToggle = (id: number, shiftKey: boolean) => {
+    const seq = nodePickMode === 'vec-sequential'
+    toggleNodeInSelection(id, shiftKey || seq)
+    if (seq) setPendingNodePick(id)
+  }
+
   if (!showNodes && !showNodeIds) return null
   return (
     <>
@@ -66,9 +80,9 @@ export function NodesLayer({
         <Node
           key={node.id}
           node={node}
-          selected={selectedNodeId === node.id}
+          selected={selectedSet.has(node.id)}
           showId={showNodeIds}
-          onSelect={onSelect}
+          onToggle={handleToggle}
         />
       ))}
     </>
