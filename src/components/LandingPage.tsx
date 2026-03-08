@@ -3,14 +3,13 @@ import { Button } from '@/components/ui/button'
 import { MarketingHeader } from '@/components/MarketingHeader'
 import { ChangelogSection } from '@/components/ChangelogSection'
 import { LandingFooter } from '@/components/LandingFooter'
+import { FeaturesSection } from '@/components/FeaturesSection'
 import hero1 from '@/assets/hero1.png'
 import hero2 from '@/assets/hero2.png'
+import { Link } from 'react-router-dom'
+import { SignedOut } from '@clerk/clerk-react'
 
-interface LandingPageProps {
-  onEnterStudio: () => void
-}
-
-export function LandingPage({ onEnterStudio }: LandingPageProps) {
+export function LandingPage() {
   const heroShots = [hero1, hero2]
   const [activeShot, setActiveShot] = useState(0)
 
@@ -23,13 +22,17 @@ export function LandingPage({ onEnterStudio }: LandingPageProps) {
           <h1 className="mt-3 text-4xl font-semibold leading-tight tracking-tight text-slate-900 md:text-5xl">Parametric models without scripting first.</h1>
           <p className="mt-4 max-w-xl text-base text-slate-600">Build geometry, constraints, loads, and recorders in a history-driven GUI. Export valid Python and import recorder output for results view.</p>
           <div className="mt-7 flex flex-wrap gap-3">
-            <Button asChild size="lg">
-              <a href="/signup">Sign up</a>
+            <SignedOut>
+              <Button asChild size="lg">
+                <Link to="/signup">Sign up</Link>
+              </Button>
+              <Button asChild size="lg" variant="secondary">
+                <Link to="/login">Log in</Link>
+              </Button>
+            </SignedOut>
+            <Button asChild size="lg" variant="outline">
+              <Link to="/studio">Open Studio</Link>
             </Button>
-            <Button asChild size="lg" variant="secondary">
-              <a href="/login">Log in</a>
-            </Button>
-            <Button onClick={onEnterStudio} size="lg" variant="outline">Open Studio</Button>
           </div>
           <div className="mt-8 flex flex-wrap gap-3">
             {heroShots.map((shot, idx) => (
@@ -44,17 +47,7 @@ export function LandingPage({ onEnterStudio }: LandingPageProps) {
           <img src={heroShots[activeShot]} alt="PySees app screenshot" className="h-full max-h-[520px] w-full rounded-2xl object-cover object-top" />
         </div>
       </section>
-      <section id="features" className="border-t bg-white">
-        <div className="mx-auto w-full max-w-6xl px-4 py-14 md:px-6">
-          <h2 className="text-2xl font-semibold tracking-tight text-slate-900">Features</h2>
-          <p className="mt-3 max-w-3xl text-sm text-slate-600">Scaffold section ready for screenshots and feature callouts.</p>
-          <div className="mt-6 grid gap-4 md:grid-cols-3">
-            <div className="h-32 rounded-xl border border-dashed border-slate-300 bg-slate-50" />
-            <div className="h-32 rounded-xl border border-dashed border-slate-300 bg-slate-50" />
-            <div className="h-32 rounded-xl border border-dashed border-slate-300 bg-slate-50" />
-          </div>
-        </div>
-      </section>
+      <FeaturesSection />
       <ChangelogSection />
       <LandingFooter />
     </main>

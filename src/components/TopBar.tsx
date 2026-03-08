@@ -4,6 +4,7 @@ import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMe
 import { Undo2, Redo2 } from 'lucide-react'
 import { useAppStore } from '@/store/useAppStore'
 import { PiscesLogo } from '@/components/icons/PiscesLogo'
+import { UserButton } from '@clerk/clerk-react'
 
 export function TopBar() {
   const { mode, setMode, undo, redo, history, viewSettings, setViewSetting, requestViewportAction } = useAppStore()
@@ -74,6 +75,7 @@ export function TopBar() {
         </Button>
       </div>
       <span className="ml-auto text-xs text-muted-foreground">{mode === 'model' ? 'Model' : 'Results'}</span>
+      <UserButton afterSignOutUrl="/" appearance={{ elements: { avatarBox: 'h-7 w-7' } }} />
     </header>
   )
 }

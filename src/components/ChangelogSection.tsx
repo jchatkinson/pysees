@@ -2,6 +2,7 @@ import type { ReactNode } from 'react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { ChevronDown } from 'lucide-react'
+import { Link } from 'react-router-dom'
 
 type ChangelogItem = {
   version: string
@@ -15,35 +16,6 @@ type ChangelogItem = {
 }
 
 const CHANGELOG_ITEMS: ChangelogItem[] = [
-  {
-    version: 'v0.2.0',
-    date: 'March 8, 2026',
-    title: 'Landing + Route Split',
-    subtitle: 'New marketing route structure with dedicated studio entry point.',
-    content: (
-      <>
-        <p>The base route now serves a landing page and the modeling app runs at <code>/studio</code>.</p>
-        <p>Navigation scaffolds are in place for feature storytelling and change visibility.</p>
-      </>
-    ),
-    new: ['Dedicated landing page at /', 'Studio route moved to /studio', 'Scaffold routes: /about, /contact, /signup, /login'],
-    updates: ['Hero section uses real app screenshots', 'Top navigation includes Features, Change Log, About, Contact'],
-    bugs: ['Fixed route fallthrough issue for scaffold pages'],
-  }, {
-    version: 'v0.2.0',
-    date: 'March 8, 2026',
-    title: 'Landing + Route Split',
-    subtitle: 'New marketing route structure with dedicated studio entry point.',
-    content: (
-      <>
-        <p>The base route now serves a landing page and the modeling app runs at <code>/studio</code>.</p>
-        <p>Navigation scaffolds are in place for feature storytelling and change visibility.</p>
-      </>
-    ),
-    new: ['Dedicated landing page at /', 'Studio route moved to /studio', 'Scaffold routes: /about, /contact, /signup, /login'],
-    updates: ['Hero section uses real app screenshots', 'Top navigation includes Features, Change Log, About, Contact'],
-    bugs: ['Fixed route fallthrough issue for scaffold pages'],
-  },
   {
     version: 'v0.2.0',
     date: 'March 8, 2026',
@@ -133,7 +105,7 @@ export function ChangelogSection() {
           <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
             <input type="email" placeholder="Your email" className="h-8 w-56 rounded-md border border-slate-300 bg-white px-3 text-sm" />
             <Button asChild size="lg">
-              <a href="/signup">Sign up</a>
+              <Link to="/signup">Sign up</Link>
             </Button>
           </div>
         </div>
