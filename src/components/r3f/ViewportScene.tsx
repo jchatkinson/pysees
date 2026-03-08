@@ -2,7 +2,7 @@ import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef } from 'rea
 import { useThree } from '@react-three/fiber'
 import { OrbitControls } from '@react-three/drei'
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib'
-import { Box3, PerspectiveCamera, Vector3 } from 'three'
+import { Box3, MOUSE, PerspectiveCamera, Vector3 } from 'three'
 import { useAppStore, useModelState } from '@/store/useAppStore'
 import { toVec3 } from './utils'
 import { SceneHelpers } from './SceneHelpers'
@@ -20,7 +20,8 @@ export type ViewportSceneRef = {
   hitTestNode: (x: number, y: number) => number | null
 }
 
-export const ViewportScene = forwardRef<ViewportSceneRef>(function ViewportScene(_props, ref) {
+export const ViewportScene = forwardRef<ViewportSceneRef, { shiftRotateEnabled?: boolean }>(function ViewportScene(props, ref) {
+  const { shiftRotateEnabled = false } = props
   const model = useModelState()
   const viewportAction = useAppStore((s) => s.viewportAction)
   const viewSettings = useAppStore((s) => s.viewSettings)
@@ -118,9 +119,10 @@ export const ViewportScene = forwardRef<ViewportSceneRef>(function ViewportScene
       <OrbitControls
         ref={controlsRef}
         makeDefault
-        enableRotate
-        enablePan
+        enableRotate={shiftRotateEnabled}
+        enablePan={shiftRotateEnabled}
         enableZoom
+        mouseButtons={{ LEFT: MOUSE.PAN, MIDDLE: MOUSE.DOLLY, RIGHT: MOUSE.ROTATE }}
         screenSpacePanning
         target={[0, 0, 0]}
         minDistance={0.5}
