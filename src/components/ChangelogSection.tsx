@@ -17,6 +17,21 @@ type ChangelogItem = {
 
 const CHANGELOG_ITEMS: ChangelogItem[] = [
   {
+    version: 'v0.3.0',
+    date: 'March 9, 2026',
+    title: 'Live Material Previews',
+    subtitle: 'Create live previews of material definitions by streaming the data to a local opensees instance.',
+    content: (
+      <>
+        <p>Added a dedicated Material Preview overlay for uniaxial materials. With this new preview, you can generate a simple load protocol or use your own, and chart the response of your material definition in realtime!</p>
+        <p>The preview is made possible by connecting to a local openseespy instance on the users machine. The included agent script, written in go, will create a websocket to the app and stream io to an available python and opensees instance. Note, python and openseespy must be available on the users path for this to work.</p>
+      </>
+    ),
+    new: ['Material Preview panel with local agent run to preview materials in realtime', 'Load Protocol builder: monotonic, cyclic, and custom strain lists', 'Hysteresis replay controls: Animate and scrub slider to investigate material hysteresis.', 'Local Agent: A small go script to connect to a preinstalled openseespy instance, and facilitate io between the app and openseespy.'],
+    updates: [],
+    bugs: [],
+  },
+  {
     version: 'v0.2.0',
     date: 'March 8, 2026',
     title: 'Landing + Route Split',
@@ -85,9 +100,9 @@ function TimelineItem({ item }: { item: ChangelogItem }) {
         <p className="mt-2 text-sm text-slate-600">{item.subtitle}</p>
         <div className="mt-4 space-y-2 text-sm text-slate-600">{item.content}</div>
         <div className="mt-5 space-y-3">
-          <ChangeGroup label="New" items={item.new} tone="green" />
-          <ChangeGroup label="Updates" items={item.updates} tone="blue" />
-          <ChangeGroup label="Bug Fixes" items={item.bugs} tone="amber" />
+          {item.new.length > 0 && <ChangeGroup label="New" items={item.new} tone="green" />}
+          {item.updates.length > 0 && <ChangeGroup label="Updates" items={item.updates} tone="blue" />}
+          {item.bugs.length > 0 && <ChangeGroup label="Bug Fixes" items={item.bugs} tone="amber" />}
         </div>
       </div>
     </article>

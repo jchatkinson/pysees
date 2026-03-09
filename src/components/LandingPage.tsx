@@ -6,12 +6,19 @@ import { LandingFooter } from '@/components/LandingFooter'
 import { FeaturesSection } from '@/components/FeaturesSection'
 import hero1 from '@/assets/hero1.png'
 import hero2 from '@/assets/hero2.png'
+import hero3 from '@/assets/hero3.png'
 import { Link } from 'react-router-dom'
 import { SignedOut } from '@clerk/clerk-react'
 
 export function LandingPage() {
-  const heroShots = [hero1, hero2]
+  const heroShots = [
+    { src: hero1, thumbAlt: 'PySees screenshot 1' },
+    { src: hero2, thumbAlt: 'PySees screenshot 2' },
+    { src: hero3, thumbAlt: 'PySees screenshot 3' },
+    { src: '/material_preview.gif', thumbAlt: 'PySees material preview animation' },
+  ]
   const [activeShot, setActiveShot] = useState(0)
+  const active = heroShots[activeShot]
 
   return (
     <main className="min-h-screen bg-slate-50">
@@ -36,15 +43,14 @@ export function LandingPage() {
           </div>
           <div className="mt-8 flex flex-wrap gap-3">
             {heroShots.map((shot, idx) => (
-              <button key={shot} onClick={() => setActiveShot(idx)} className={`overflow-hidden rounded-xl border bg-white ${activeShot === idx ? 'border-sky-500 shadow-sm' : 'border-slate-200'}`}>
-                <img src={shot} alt={`PySees screenshot ${idx + 1}`} className="h-16 w-28 object-cover md:h-20 md:w-36" />
+              <button key={shot.src} onClick={() => setActiveShot(idx)} className={`overflow-hidden rounded-xl border bg-white ${activeShot === idx ? 'border-sky-500 shadow-sm' : 'border-slate-200'}`}>
+                <img src={shot.src} alt={shot.thumbAlt} className="h-16 w-28 object-cover md:h-20 md:w-36" />
               </button>
             ))}
-            <div className="grid h-16 w-28 place-items-center rounded-xl border border-dashed border-slate-300 text-[11px] text-slate-500 md:h-20 md:w-36">More soon</div>
           </div>
         </div>
-        <div className="relative rounded-3xl border border-slate-200 bg-white p-4 shadow-lg">
-          <img src={heroShots[activeShot]} alt="PySees app screenshot" className="h-full max-h-[520px] w-full rounded-2xl object-cover object-top" />
+        <div className="relative w-full aspect-[4/3] rounded-3xl border border-slate-200 bg-white p-4 shadow-lg">
+          <img src={active.src} alt="PySees app screenshot" className="h-full w-full rounded-2xl object-cover object-top" />
         </div>
       </section>
       <FeaturesSection />

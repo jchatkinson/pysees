@@ -130,6 +130,7 @@ export function MaterialPreviewOverlay() {
   const runMaterialPreview = useAppStore((s) => s.runMaterialPreview)
   const cancelMaterialPreview = useAppStore((s) => s.cancelMaterialPreview)
   const setPanelOpen = useAppStore((s) => s.setMaterialPreviewPanelOpen)
+  const clearMaterialPreviewResult = useAppStore((s) => s.clearMaterialPreviewResult)
   const clearLogs = useAppStore((s) => s.clearMaterialPreviewLogs)
 
   const [showLogs, setShowLogs] = useState(false)
@@ -155,6 +156,11 @@ export function MaterialPreviewOverlay() {
     customText: protocolText,
   }), [approxSteps, maxStrain, numCycles, protocolText, protocolType, strainIncrement])
   const protocolChartData = useMemo(() => generatedProtocol.map((eps, i) => ({ i, eps })), [generatedProtocol])
+
+  useEffect(() => {
+    clearMaterialPreviewResult()
+    setScrubCount(null)
+  }, [clearMaterialPreviewResult, previewInputCommand, protocolType, maxStrain, numCycles, strainIncrement, approxSteps, protocolText])
 
   if (!panelOpen) return null
 
@@ -238,7 +244,7 @@ export function MaterialPreviewOverlay() {
                       value={protocolText}
                       onChange={(e) => setProtocolText(e.target.value)}
                       rows={3}
-                      className="text-xs"
+                      className="text-xs [field-sizing:fixed] h-24 max-h-24 overflow-y-scroll"
                       placeholder="0, 0.001, -0.001, 0.002, -0.002"
                     />
                   </div>

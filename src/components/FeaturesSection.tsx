@@ -1,5 +1,6 @@
 import { CheckCircle2 } from 'lucide-react'
 import hero1 from '@/assets/hero1.png'
+const materialPreviewGif = '/material_preview.gif'
 
 type FeatureGroup = {
   eyebrow: string
@@ -58,7 +59,7 @@ export function FeaturesSection() {
             <FeatureList items={FEATURE_GROUPS[0].items} />
           </div>
           <div className="overflow-hidden rounded-xl border border-slate-200 bg-slate-50 p-4">
-            <img src={hero1} alt="PySees feature preview" className="h-full w-full rounded-md object-cover object-top" />
+            <img src={materialPreviewGif} alt="PySees feature preview" className="h-full w-full rounded-md object-cover object-top" />
           </div>
         </div>
 

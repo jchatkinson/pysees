@@ -124,6 +124,7 @@ interface AppStore {
   setMaterialPreviewPanelOpen: (open: boolean) => void
   setMaterialPreviewProtocol: (points: number[]) => void
   setMaterialPreviewInputCommand: (cmd: Command | null) => void
+  clearMaterialPreviewResult: () => void
   clearMaterialPreviewLogs: () => void
 }
 
@@ -414,9 +415,26 @@ export const useAppStore = create<AppStore>((set, get) => {
     }
   },
 
+  clearMaterialPreviewResult: () => {
+    resetBufferedPoints()
+    set((s) => ({ materialPreview: { ...s.materialPreview, running: false, jobId: null, points: [], error: null } }))
+  },
+
   setMaterialPreviewPanelOpen: (open) => set((s) => ({ materialPreview: { ...s.materialPreview, panelOpen: open } })),
   setMaterialPreviewProtocol: (points) => set((s) => ({ materialPreview: { ...s.materialPreview, protocol: points } })),
-  setMaterialPreviewInputCommand: (cmd) => set((s) => ({ materialPreview: { ...s.materialPreview, inputCommand: cmd } })),
+  setMaterialPreviewInputCommand: (cmd) => {
+    const prevSig = JSON.stringify(get().materialPreview.inputCommand)
+    const nextSig = JSON.stringify(cmd)
+    const changed = prevSig !== nextSig
+    if (changed) resetBufferedPoints()
+    set((s) => ({
+      materialPreview: {
+        ...s.materialPreview,
+        inputCommand: cmd,
+        ...(changed ? { running: false, jobId: null, points: [], error: null } : {}),
+      },
+    }))
+  },
   clearMaterialPreviewLogs: () => set((s) => ({ materialPreview: { ...s.materialPreview, logs: [] } })),
   })
 })
