@@ -2,6 +2,11 @@ import { create } from 'zustand'
 import type { Command, CommandHistory } from '@/types/commands'
 import type { AppMode, ModelConfig, ResultsState } from '@/types/model'
 import { replay } from '@/lib/replay'
+import { LocalAgentClient, type AgentConnectionState } from '@/lib/localAgent'
+import { buildUniaxialMaterialCallArgs } from '@/lib/commandSchemas'
+
+const DEFAULT_STRAIN_PROTOCOL = [0, 0.001, -0.001, 0.002, -0.002, 0.003, -0.003, 0]
+const agentClient = new LocalAgentClient()
 
 function producedNodeIds(cmd: Command): Set<number> {
   if (cmd.type === 'ADD_NODE') return new Set([cmd.id])
@@ -58,6 +63,17 @@ interface AppStore {
   mode: AppMode
   config: ModelConfig | null
   results: ResultsState | null
+  localAgent: {
+    status: AgentConnectionState
+    port: number | null
+    error: string | null
+  }
+  materialPreview: {
+    running: boolean
+    jobId: string | null
+    points: { eps: number; sig: number }[]
+    error: string | null
+  }
   selectedHistoryIndex: number | null
   insertionIndex: number | null
   lastEditedHistoryIndex: number | null
@@ -96,6 +112,10 @@ interface AppStore {
   requestViewportAction: (kind: 'zoomIn' | 'zoomOut' | 'fit') => void
   setMode: (mode: AppMode) => void
   importResults: (files: { name: string; data: string }[]) => void
+  connectLocalAgent: () => Promise<void>
+  disconnectLocalAgent: () => void
+  runMaterialPreview: (cmd: Command) => void
+  cancelMaterialPreview: () => void
 }
 
 export const useAppStore = create<AppStore>((set, get) => ({
@@ -103,6 +123,8 @@ export const useAppStore = create<AppStore>((set, get) => ({
   mode: 'model',
   config: null,
   results: null,
+  localAgent: { status: 'disconnected', port: null, error: null },
+  materialPreview: { running: false, jobId: null, points: [], error: null },
   selectedHistoryIndex: null,
   insertionIndex: null,
   lastEditedHistoryIndex: null,
@@ -233,6 +255,89 @@ export const useAppStore = create<AppStore>((set, get) => ({
 
   setMode: (mode) => set({ mode }),
   importResults: (files) => set({ results: { files } }),
+
+  connectLocalAgent: async () => {
+    set((s) => ({ localAgent: { ...s.localAgent, status: 'connecting', error: null } }))
+    try {
+      const port = await agentClient.connect()
+      set({ localAgent: { status: 'connected', port, error: null } })
+      agentClient.onEvent((event) => {
+        if (event.type === 'job_started') {
+          set({ materialPreview: { running: true, jobId: event.jobId, points: [], error: null } })
+          return
+        }
+        if (event.type === 'point') {
+          set((s) => {
+            if (s.materialPreview.jobId !== event.jobId) return s
+            return { materialPreview: { ...s.materialPreview, points: [...s.materialPreview.points, { eps: event.eps, sig: event.sig }] } }
+          })
+          return
+        }
+        if (event.type === 'job_error') {
+          set((s) => {
+            if (s.materialPreview.jobId !== event.jobId) return s
+            return { materialPreview: { ...s.materialPreview, running: false, error: `${event.code}: ${event.message}` } }
+          })
+          return
+        }
+        if (event.type === 'job_finished') {
+          set((s) => {
+            if (s.materialPreview.jobId !== event.jobId) return s
+            return { materialPreview: { ...s.materialPreview, running: false } }
+          })
+        }
+      })
+      agentClient.onClose(() => set({ localAgent: { status: 'disconnected', port: null, error: null } }))
+    } catch (error) {
+      set({ localAgent: { status: 'error', port: null, error: String(error) } })
+    }
+  },
+
+  disconnectLocalAgent: () => {
+    agentClient.disconnect()
+    set({ localAgent: { status: 'disconnected', port: null, error: null }, materialPreview: { running: false, jobId: null, points: [], error: null } })
+  },
+
+  runMaterialPreview: (cmd) => {
+    const s = get()
+    if (!s.config) return
+    if (s.localAgent.status !== 'connected') {
+      set((prev) => ({ materialPreview: { ...prev.materialPreview, error: 'Connect to local agent first.' } }))
+      return
+    }
+    if (cmd.type !== 'ADD_OPS' || cmd.fn !== 'uniaxialMaterial') {
+      set((prev) => ({ materialPreview: { ...prev.materialPreview, error: 'Preview only supports uniaxialMaterial commands.' } }))
+      return
+    }
+    const args = buildUniaxialMaterialCallArgs(cmd.values, { ndm: s.config.ndm, ndf: s.config.ndf }, replay(s.history).nextMatId)
+    if (!args || args.length < 2) {
+      set((prev) => ({ materialPreview: { ...prev.materialPreview, error: 'Material arguments are incomplete.' } }))
+      return
+    }
+    const jobId = crypto.randomUUID()
+    set({ materialPreview: { running: true, jobId, points: [], error: null } })
+    try {
+      agentClient.runMaterial({
+        jobId,
+        materialCall: { fn: 'uniaxialMaterial', args },
+        protocol: { strain: DEFAULT_STRAIN_PROTOCOL },
+        ndm: s.config.ndm,
+        ndf: s.config.ndf,
+      })
+    } catch (error) {
+      set((prev) => ({ materialPreview: { ...prev.materialPreview, running: false, error: String(error) } }))
+    }
+  },
+
+  cancelMaterialPreview: () => {
+    const jobId = get().materialPreview.jobId
+    if (!jobId) return
+    try {
+      agentClient.cancelJob(jobId)
+    } finally {
+      set((s) => ({ materialPreview: { ...s.materialPreview, running: false } }))
+    }
+  },
 }))
 
 /** Derived model state — re-computes on every history change */

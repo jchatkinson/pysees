@@ -7,7 +7,19 @@ import { PiscesLogo } from '@/components/icons/PiscesLogo'
 import { UserButton } from '@clerk/clerk-react'
 
 export function TopBar() {
-  const { mode, setMode, undo, redo, history, viewSettings, setViewSetting, requestViewportAction } = useAppStore()
+  const {
+    mode,
+    setMode,
+    undo,
+    redo,
+    history,
+    viewSettings,
+    setViewSetting,
+    requestViewportAction,
+    localAgent,
+    connectLocalAgent,
+    disconnectLocalAgent,
+  } = useAppStore()
   const canUndo = history.cursor > 0
   const canRedo = history.cursor < history.commands.length - 1
   const checked = (v: boolean | 'indeterminate') => v === true
@@ -26,6 +38,16 @@ export function TopBar() {
         <DropdownMenuContent>
           <DropdownMenuItem disabled>New Model</DropdownMenuItem>
           <DropdownMenuItem disabled>Export .py</DropdownMenuItem>
+          <DropdownMenuSeparator />
+          {localAgent.status === 'connected' ? (
+            <DropdownMenuItem onSelect={disconnectLocalAgent}>
+              Disconnect local instance (:{localAgent.port})
+            </DropdownMenuItem>
+          ) : (
+            <DropdownMenuItem onSelect={() => { void connectLocalAgent() }} disabled={localAgent.status === 'connecting'}>
+              {localAgent.status === 'connecting' ? 'Connecting to local instance...' : 'Connect to local instance'}
+            </DropdownMenuItem>
+          )}
         </DropdownMenuContent>
       </DropdownMenu>
       <DropdownMenu>

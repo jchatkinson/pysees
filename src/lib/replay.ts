@@ -41,8 +41,13 @@ function apply(state: ModelState, cmd: Command): ModelState {
     case 'SCRIPT_GROUP':
       return cmd.commands.reduce(apply, state)
     case 'ADD_RECORDER':
-    case 'ADD_OPS':
       return state
+    case 'ADD_OPS': {
+      if (cmd.fn !== 'uniaxialMaterial') return state
+      const rawTag = Number(cmd.values.matTag ?? 1)
+      const matTag = Number.isFinite(rawTag) ? Math.max(1, Math.trunc(rawTag)) : 1
+      return { ...state, nextMatId: Math.max(state.nextMatId, matTag + 1) }
+    }
     default:
       return state
   }

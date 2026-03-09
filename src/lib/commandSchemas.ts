@@ -146,12 +146,24 @@ const GENERATED_NON_V1_SCHEMAS: CommandSchema[] = GENERATED_COMMAND_SCHEMAS
     category: schema.category,
     args: schema.args.map(mapGeneratedArg),
     optional: schema.optional.map(mapGeneratedArg),
-    create: (values, _model, base) => ({
-      type: 'ADD_OPS',
-      fn: base?.type === 'ADD_OPS' ? base.fn : schema.fn,
-      category: schema.category,
-      values,
-    }),
+    create: (values, model, base) => {
+      if (schema.fn !== 'uniaxialMaterial') {
+        return {
+          type: 'ADD_OPS',
+          fn: base?.type === 'ADD_OPS' ? base.fn : schema.fn,
+          category: schema.category,
+          values,
+        }
+      }
+      const rawTag = Number(values.matTag)
+      const matTag = Number.isFinite(rawTag) && rawTag > 0 ? Math.trunc(rawTag) : model.nextMatId
+      return {
+        type: 'ADD_OPS',
+        fn: base?.type === 'ADD_OPS' ? base.fn : schema.fn,
+        category: schema.category,
+        values: { ...values, matTag },
+      }
+    },
   }))
 
 export function getAvailableSchemas(ndm: number) {
@@ -194,10 +206,11 @@ function defaultsForArg(arg: ArgDef, ctx: SchemaContext, out: Record<string, unk
   }
 }
 
-export function initialValues(schema: CommandSchema, ctx: SchemaContext) {
+export function initialValues(schema: CommandSchema, ctx: SchemaContext, model?: ModelState) {
   const out: Record<string, unknown> = {}
   for (const arg of schema.args) defaultsForArg(arg, ctx, out)
   for (const arg of schema.optional) defaultsForArg(arg, ctx, out)
+  if (schema.fn === 'uniaxialMaterial' && (!Number.isFinite(Number(out.matTag)) || Number(out.matTag) <= 0)) out.matTag = model?.nextMatId ?? 1
   return out
 }
 
@@ -243,4 +256,49 @@ export function commandToValues(cmd: Command, ctx: SchemaContext) {
   if (cmd.type === 'ADD_LOAD') return base.ADD_LOAD
   if (cmd.type === 'ADD_ELEMENT') return base.ADD_ELEMENT
   return {}
+}
+
+function flattenArgValues(arg: ArgDef, values: Record<string, unknown>, ctx: SchemaContext, fallbackMatTag: number): (string | number | boolean | null)[] {
+  if (arg.kind === 'int') {
+    const raw = Number(values[arg.name] ?? arg.defaultValue)
+    const n = Number.isFinite(raw) && raw > 0 ? Math.trunc(raw) : (arg.name === 'matTag' ? fallbackMatTag : Math.trunc(num(arg.defaultValue, 0)))
+    return [n]
+  }
+  if (arg.kind === 'float') {
+    const n = Number(values[arg.name] ?? arg.defaultValue)
+    return [Number.isFinite(n) ? n : num(arg.defaultValue, 0)]
+  }
+  if (arg.kind === 'str') {
+    const v = values[arg.name]
+    if (typeof v === 'string') return [v]
+    if (typeof arg.defaultValue === 'string') return [arg.defaultValue]
+    return ['']
+  }
+  if (arg.kind === 'vec') {
+    const v = Array.isArray(values[arg.name]) ? values[arg.name] : []
+    const len = resolveArgLen(arg.length, ctx)
+    if (len === 'dynamic') return v.map((x) => num(x))
+    return Array.from({ length: len }, (_, i) => num(v[i]))
+  }
+  if (arg.kind === 'flag') {
+    if (!Boolean(values[arg.flag])) return []
+    return [arg.flag, ...arg.args.flatMap((child) => flattenArgValues(child, values, ctx, fallbackMatTag))]
+  }
+  if (arg.kind === 'choice') {
+    const selected = String(values[arg.name] ?? arg.defaultValue ?? arg.options[0] ?? '')
+    return [selected, ...(arg.yields[selected] ?? []).flatMap((child) => flattenArgValues(child, values, ctx, fallbackMatTag))]
+  }
+  return []
+}
+
+export function buildUniaxialMaterialCallArgs(values: Record<string, unknown>, ctx: SchemaContext, fallbackMatTag: number) {
+  const schema = getAvailableSchemas(ctx.ndm).find((s) => s.cmd === 'OPS:uniaxialMaterial')
+  if (!schema) return null
+  const choice = schema.args.find((a): a is Extract<ArgDef, { kind: 'choice' }> => a.kind === 'choice' && a.name === 'matType')
+  if (!choice) return null
+  const matType = String(values.matType ?? choice.defaultValue ?? choice.options[0] ?? '').trim()
+  if (!matType) return null
+  const yielded = choice.yields[matType] ?? []
+  const rest = yielded.flatMap((arg) => flattenArgValues(arg, values, ctx, fallbackMatTag))
+  return [matType, ...rest]
 }

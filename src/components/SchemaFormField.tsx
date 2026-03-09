@@ -26,6 +26,36 @@ function parseIds(text: string): number[] {
     .filter((n) => !isNaN(n) && n > 0)
 }
 
+function seedDefaults(arg: ArgDef, values: Record<string, unknown>, setValue: (key: string, value: unknown) => void, ctx: SchemaContext) {
+  if (arg.kind === 'int' || arg.kind === 'float') {
+    if (values[arg.name] === undefined) setValue(arg.name, Number(arg.defaultValue ?? 0))
+    return
+  }
+  if (arg.kind === 'str') {
+    if (values[arg.name] === undefined) setValue(arg.name, String(arg.defaultValue ?? ''))
+    return
+  }
+  if (arg.kind === 'vec') {
+    if (values[arg.name] !== undefined) return
+    const len = resolveArgLen(arg.length, ctx)
+    if (len === 'dynamic') setValue(arg.name, [...(arg.defaultValue ?? [])])
+    else setValue(arg.name, Array.from({ length: len }, (_, i) => arg.defaultValue?.[i] ?? 0))
+    return
+  }
+  if (arg.kind === 'flag') {
+    if (values[arg.flag] === undefined) setValue(arg.flag, Boolean(arg.defaultValue))
+    for (const child of arg.args) seedDefaults(child, values, setValue, ctx)
+    return
+  }
+  if (arg.kind === 'choice') {
+    const selected = String(values[arg.name] ?? arg.defaultValue ?? arg.options[0] ?? '')
+    if (values[arg.name] === undefined) setValue(arg.name, selected)
+    for (const child of arg.yields[selected] ?? []) seedDefaults(child, values, setValue, ctx)
+    return
+  }
+  if (arg.kind === 'idlist' && values[arg.name] === undefined) setValue(arg.name, arg.defaultValue ?? [])
+}
+
 // ─── idlist field ─────────────────────────────────────────────────────────────
 
 function IdListField({
@@ -237,7 +267,10 @@ export function SchemaFormField({ arg, values, setValue, ctx, disabled }: Schema
     return (
       <div className="grid gap-1.5">
         <Label className="text-xs">{arg.label ?? arg.name}</Label>
-        <Select value={selected} onValueChange={(value) => setValue(key, value)} disabled={disabled}>
+        <Select value={selected} onValueChange={(value) => {
+          setValue(key, value)
+          for (const child of arg.yields[value] ?? []) seedDefaults(child, values, setValue, ctx)
+        }} disabled={disabled}>
           <SelectTrigger className="w-full">
             <SelectValue />
           </SelectTrigger>

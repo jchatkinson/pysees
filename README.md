@@ -82,3 +82,32 @@ This pass:
 - normalizes argument names and kinds
 - groups literal-first overloads into `choice` schemas
 - emits deterministic TypeScript for direct app import
+
+## Local Agent (material preview MVP)
+
+PySees can connect to a local Go agent for live material hysteresis preview without running OpenSees on the server.
+
+### Build agent
+
+```bash
+cd agent
+/usr/local/go/bin/go build ./cmd/pysees-agent
+```
+
+### Run agent
+
+```bash
+cd agent
+./pysees-agent
+```
+
+The agent binds to the first free localhost port in: `8765, 8766, 8767, 8768`.
+
+### Connect from app
+
+In Studio: `File > Connect to local instance`.
+
+Current contract:
+- `GET /health`
+- `POST /v1/session`
+- `GET /v1/ws?token=...`
