@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -19,11 +19,89 @@ function num(v: unknown) {
   return Number.isFinite(n) ? n : 0
 }
 
+function isTransientNumericText(text: string) {
+  return text === '' || text === '-' || text === '.' || text === '-.'
+}
+
+function parseCommittedNumber(text: string) {
+  if (isTransientNumericText(text)) return null
+  const n = Number(text)
+  return Number.isFinite(n) ? n : null
+}
+
+function normalizeCommittedNumber(n: number, kind: 'int' | 'float') {
+  return kind === 'int' ? Math.trunc(n) : n
+}
+
+function NumberInput({
+  value,
+  kind,
+  onCommit,
+  disabled,
+  onFocus,
+}: {
+  value: unknown
+  kind: 'int' | 'float'
+  onCommit: (value: number) => void
+  disabled?: boolean
+  onFocus?: () => void
+}) {
+  const committed = num(value)
+  const [draft, setDraft] = useState(String(committed))
+  const [focused, setFocused] = useState(false)
+
+  useEffect(() => {
+    if (!focused) setDraft(String(committed))
+  }, [committed, focused])
+
+  return (
+    <Input
+      type="number"
+      value={draft}
+      onChange={(e) => {
+        const text = e.target.value
+        setDraft(text)
+        const parsed = parseCommittedNumber(text)
+        if (parsed !== null) onCommit(normalizeCommittedNumber(parsed, kind))
+      }}
+      onFocus={() => {
+        setFocused(true)
+        onFocus?.()
+      }}
+      onBlur={(e) => {
+        setFocused(false)
+        const parsed = parseCommittedNumber(e.target.value)
+        if (parsed === null) {
+          setDraft(String(committed))
+          return
+        }
+        const normalized = normalizeCommittedNumber(parsed, kind)
+        onCommit(normalized)
+        setDraft(String(normalized))
+      }}
+      disabled={disabled}
+    />
+  )
+}
+
 function parseIds(text: string): number[] {
   return text
     .split(/[\s,]+/)
     .map((s) => parseInt(s.trim(), 10))
     .filter((n) => !isNaN(n) && n > 0)
+}
+
+function tryParseDynamicFloatList(text: string): number[] | null {
+  const tokens = text.split(',').map((s) => s.trim())
+  const out: number[] = []
+  for (const token of tokens) {
+    if (!token) continue
+    if (isTransientNumericText(token)) return null
+    const n = Number(token)
+    if (!Number.isFinite(n)) return null
+    out.push(n)
+  }
+  return out
 }
 
 function seedDefaults(arg: ArgDef, values: Record<string, unknown>, setValue: (key: string, value: unknown) => void, ctx: SchemaContext) {
@@ -32,6 +110,7 @@ function seedDefaults(arg: ArgDef, values: Record<string, unknown>, setValue: (k
     return
   }
   if (arg.kind === 'str') {
+    if (arg.name === 'literal') return
     if (values[arg.name] === undefined) setValue(arg.name, String(arg.defaultValue ?? ''))
     return
   }
@@ -143,6 +222,14 @@ function VecField({
 
   const [nextSlot, setNextSlot] = useState(0)
   const activeRef = useRef(false)
+  const dynamicInit = arr.map((v) => String(num(v))).join(', ')
+  const [dynamicRaw, setDynamicRaw] = useState(dynamicInit)
+  const [dynamicFocused, setDynamicFocused] = useState(false)
+
+  useEffect(() => {
+    if (len !== 'dynamic' || dynamicFocused) return
+    setDynamicRaw(arr.map((v) => String(num(v))).join(', '))
+  }, [arr, dynamicFocused, len])
 
   // When a pending pick arrives while this vec field is active, fill the next slot
   useEffect(() => {
@@ -161,14 +248,18 @@ function VecField({
         <Label className="text-xs">{label}</Label>
         <Input
           type="text"
-          value={arr.join(', ')}
+          value={dynamicRaw}
           onChange={(e) => {
-            const next = e.target.value
-              .split(',')
-              .map((v) => v.trim())
-              .filter(Boolean)
-              .map((v) => num(v))
-            setValue(arg.name, next)
+            const text = e.target.value
+            setDynamicRaw(text)
+            const parsed = tryParseDynamicFloatList(text)
+            if (parsed) setValue(arg.name, parsed)
+          }}
+          onFocus={() => setDynamicFocused(true)}
+          onBlur={() => {
+            setDynamicFocused(false)
+            const parsed = tryParseDynamicFloatList(dynamicRaw)
+            if (parsed) setValue(arg.name, parsed)
           }}
           placeholder="e.g. 1, 2, 3"
           disabled={disabled}
@@ -193,13 +284,13 @@ function VecField({
         }}
       >
         {Array.from({ length: len }, (_, idx) => (
-          <Input
+          <NumberInput
             key={`${arg.name}-${idx}`}
-            type="number"
-            value={String(fixed[idx] ?? 0)}
-            onChange={(e) => {
+            value={fixed[idx]}
+            kind="float"
+            onCommit={(value) => {
               const next = [...fixed]
-              next[idx] = num(e.target.value)
+              next[idx] = value
               setValue(arg.name, next)
             }}
             onFocus={() => {
@@ -229,17 +320,18 @@ export function SchemaFormField({ arg, values, setValue, ctx, disabled }: Schema
     return <IdListField arg={arg} values={values} setValue={setValue} disabled={disabled} />
   }
   if (arg.kind === 'int' || arg.kind === 'float' || arg.kind === 'str') {
+    if (arg.kind === 'str' && arg.name === 'literal') return null
     const key = arg.name
     const label = arg.label ?? arg.name
+
     return (
       <div className="grid gap-1.5">
         <Label className="text-xs">{label}</Label>
-        <Input
-          type={arg.kind === 'str' ? 'text' : 'number'}
-          value={String(values[key] ?? '')}
-          onChange={(e) => setValue(key, arg.kind === 'str' ? e.target.value : Number(e.target.value))}
-          disabled={disabled}
-        />
+        {arg.kind === 'str' ? (
+          <Input type="text" value={String(values[key] ?? '')} onChange={(e) => setValue(key, e.target.value)} disabled={disabled} />
+        ) : (
+          <NumberInput value={values[key]} kind={arg.kind} onCommit={(value) => setValue(key, value)} disabled={disabled} />
+        )}
       </div>
     )
   }
@@ -255,8 +347,8 @@ export function SchemaFormField({ arg, values, setValue, ctx, disabled }: Schema
           <input type="checkbox" checked={enabled} onChange={(e) => setValue(key, e.target.checked)} disabled={disabled} />
           {arg.label ?? arg.flag}
         </label>
-        {enabled && arg.args.map((child) => (
-          <SchemaFormField key={child.kind === 'flag' ? child.flag : child.name} arg={child} values={values} setValue={setValue} ctx={ctx} disabled={disabled} />
+        {enabled && arg.args.map((child, idx) => (
+          <SchemaFormField key={`flag-${arg.flag}-${child.kind === 'flag' ? child.flag : child.name}-${idx}`} arg={child} values={values} setValue={setValue} ctx={ctx} disabled={disabled} />
         ))}
       </div>
     )
@@ -280,10 +372,8 @@ export function SchemaFormField({ arg, values, setValue, ctx, disabled }: Schema
         </Select>
         {(arg.yields[selected] ?? []).length > 0 && (
           <div className="grid gap-2 rounded border p-2">
-            {(arg.yields[selected] ?? []).map((child: ArgDef) => (
-              <Fragment key={child.kind === 'flag' ? child.flag : child.name}>
-                <SchemaFormField arg={child} values={values} setValue={setValue} ctx={ctx} disabled={disabled} />
-              </Fragment>
+            {(arg.yields[selected] ?? []).map((child: ArgDef, idx: number) => (
+              <SchemaFormField key={`choice-${key}-${selected}-${child.kind === 'flag' ? child.flag : child.name}-${idx}`} arg={child} values={values} setValue={setValue} ctx={ctx} disabled={disabled} />
             ))}
           </div>
         )}

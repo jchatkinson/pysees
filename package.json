@@ -8,6 +8,9 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
+    "agent:run": "cd agent && go run ./cmd/pysees-agent",
+    "agent:venv": "cd agent && go run ./cmd/pysees-agent --python-bin ../.venv/bin/python",
+    "agent:build": "cd agent && go build ./cmd/pysees-agent",
     "schema:extract": "uv run python scripts/generate_opensees_schemas.py",
     "schema:build": "uv run python scripts/build_runtime_schemas.py"
   },
@@ -26,6 +29,7 @@
     "react-dom": "^19.2.0",
     "react-router-dom": "^7.9.6",
     "react-resizable-panels": "^4.6.5",
+    "recharts": "^2.15.4",
     "shadcn": "^3.8.5",
     "tailwind-merge": "^3.5.0",
     "tailwindcss": "^4.1.17",

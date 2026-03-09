@@ -1,84 +1,18 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '@/components/ui/input-group'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
 import { useAppStore, useModelState } from '@/store/useAppStore'
-import { commandToValues, getAvailableSchemas, getSchemaForCommand, initialValues, validateCommand } from '@/lib/commandSchemas'
+import { commandToValues, getAvailableSchemas, getCommandDocUrl, getSchemaForCommand, initialValues, validateCommand } from '@/lib/commandSchemas'
 import type { CommandSchema } from '@/lib/commandSchemas'
 import type { SchemaContext } from '@/types/schema'
 import { SchemaFormField } from '@/components/SchemaFormField'
 import { replay } from '@/lib/replay'
 import type { Command } from '@/types/commands'
 import { useHotkeyRegistry } from '@/lib/hotkeys'
-import { X } from 'lucide-react'
-
-function collectMaterialTags(cmd: Command, out: Set<number>) {
-  if (cmd.type === 'ADD_MATERIAL') {
-    out.add(cmd.id)
-    return
-  }
-  if (cmd.type === 'ADD_OPS' && cmd.fn === 'uniaxialMaterial') {
-    const tag = Number(cmd.values.matTag)
-    if (Number.isFinite(tag) && tag > 0) out.add(Math.trunc(tag))
-    return
-  }
-  if (cmd.type === 'SCRIPT_GROUP') for (const child of cmd.commands) collectMaterialTags(child, out)
-}
-
-function findMatTag(cmd: Command): number | null {
-  if (cmd.type !== 'ADD_OPS' || cmd.fn !== 'uniaxialMaterial') return null
-  const tag = Number(cmd.values.matTag)
-  return Number.isFinite(tag) && tag > 0 ? Math.trunc(tag) : null
-}
-
-function MaterialPreviewPanel({ cmd, disabled }: { cmd: Command; disabled: boolean }) {
-  const localAgent = useAppStore((s) => s.localAgent)
-  const materialPreview = useAppStore((s) => s.materialPreview)
-  const runMaterialPreview = useAppStore((s) => s.runMaterialPreview)
-  const cancelMaterialPreview = useAppStore((s) => s.cancelMaterialPreview)
-
-  const points = materialPreview.points
-  const xs = points.map((p) => p.eps)
-  const ys = points.map((p) => p.sig)
-  const minX = xs.length ? Math.min(...xs) : -1
-  const maxX = xs.length ? Math.max(...xs) : 1
-  const minY = ys.length ? Math.min(...ys) : -1
-  const maxY = ys.length ? Math.max(...ys) : 1
-  const spanX = Math.max(1e-12, maxX - minX)
-  const spanY = Math.max(1e-12, maxY - minY)
-  const polyline = points
-    .map((p) => `${((p.eps - minX) / spanX) * 100},${100 - ((p.sig - minY) / spanY) * 100}`)
-    .join(' ')
-
-  return (
-    <div className="rounded border p-2 grid gap-2">
-      <div className="flex items-center justify-between">
-        <p className="text-[11px] font-medium">Local Material Preview</p>
-        <p className="text-[10px] text-muted-foreground">
-          {localAgent.status === 'connected' ? `Connected:${localAgent.port}` : localAgent.status}
-        </p>
-      </div>
-      {materialPreview.error && <p className="text-[10px] text-destructive">{materialPreview.error}</p>}
-      {localAgent.error && <p className="text-[10px] text-destructive">{localAgent.error}</p>}
-      <svg viewBox="0 0 100 100" className="h-28 w-full rounded border bg-muted/20">
-        <polyline fill="none" stroke="currentColor" strokeWidth="1.2" points={polyline} />
-      </svg>
-      <div className="flex items-center justify-between">
-        <p className="text-[10px] text-muted-foreground">{points.length} points</p>
-        <div className="flex gap-2">
-          <Button size="sm" variant="outline" disabled={disabled || localAgent.status !== 'connected' || materialPreview.running} onClick={() => runMaterialPreview(cmd)}>
-            Run Local Preview
-          </Button>
-          <Button size="sm" variant="ghost" disabled={!materialPreview.running} onClick={cancelMaterialPreview}>
-            Cancel
-          </Button>
-        </div>
-      </div>
-    </div>
-  )
-}
+import { CircleHelp, X } from 'lucide-react'
 
 function keyOf(schema: CommandSchema) {
   return schema.cmd
@@ -122,7 +56,8 @@ function CommandFormBody({
   submitValues,
   onCancel,
   onDelete,
-  footerExtra,
+  onValuesChange,
+  previewAction,
 }: {
   schema: CommandSchema
   ctx: SchemaContext
@@ -132,19 +67,26 @@ function CommandFormBody({
   submitValues: (values: Record<string, unknown>) => string | null
   onCancel?: () => void
   onDelete?: () => void
-  footerExtra?: (values: Record<string, unknown>) => ReactNode
+  onValuesChange?: (values: Record<string, unknown>) => void
+  previewAction?: { onClick: () => void; disabled?: boolean }
 }) {
   const [values, setValues] = useState<Record<string, unknown>>(() => initial)
   const [error, setError] = useState<string | null>(null)
   const setValue = (key: string, value: unknown) => setValues((prev) => ({ ...prev, [key]: value }))
 
+  useEffect(() => {
+    onValuesChange?.(values)
+  // Parent recreates callback inline; avoid replaying on unchanged values.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [values])
+
   return (
     <>
       <ScrollArea className="flex-1 min-h-0">
         <div className="p-3 grid gap-3">
-          {schema.args.map((arg) => (
+          {schema.args.map((arg, idx) => (
             <SchemaFormField
-              key={arg.kind === 'flag' ? arg.flag : arg.name}
+              key={`arg-${arg.kind === 'flag' ? arg.flag : arg.name}-${idx}`}
               arg={arg}
               values={values}
               setValue={setValue}
@@ -152,9 +94,9 @@ function CommandFormBody({
               disabled={locked}
             />
           ))}
-          {schema.optional.map((arg) => (
+          {schema.optional.map((arg, idx) => (
             <SchemaFormField
-              key={arg.kind === 'flag' ? arg.flag : arg.name}
+              key={`opt-${arg.kind === 'flag' ? arg.flag : arg.name}-${idx}`}
               arg={arg}
               values={values}
               setValue={setValue}
@@ -167,11 +109,15 @@ function CommandFormBody({
       <div className="border-t p-3 grid gap-2 shrink-0">
         {error && <p className="text-[11px] text-destructive">{error}</p>}
         {locked && <p className="text-[11px] text-muted-foreground">Model is read-only in Results mode.</p>}
-        {footerExtra?.(values)}
         <div className="flex gap-2">
           {onDelete && (
             <Button variant="destructive" size="sm" onClick={onDelete} disabled={locked}>
               Delete
+            </Button>
+          )}
+          {previewAction && (
+            <Button variant="outline" size="sm" className="flex-1" onClick={previewAction.onClick} disabled={locked || previewAction.disabled}>
+              Preview
             </Button>
           )}
           <Button variant="outline" size="sm" className="flex-1" onClick={() => { setValues(initial); setError(null) }} disabled={locked}>
@@ -208,6 +154,8 @@ export function CommandForm() {
   const deleteCommandCascade = useAppStore((s) => s.deleteCommandCascade)
   const setSelectedHistoryIndex = useAppStore((s) => s.setSelectedHistoryIndex)
   const setSelectedNodeIds = useAppStore((s) => s.setSelectedNodeIds)
+  const setMaterialPreviewInputCommand = useAppStore((s) => s.setMaterialPreviewInputCommand)
+  const setMaterialPreviewPanelOpen = useAppStore((s) => s.setMaterialPreviewPanelOpen)
   const insertionIndex = useAppStore((s) => s.insertionIndex)
   const selectedHistoryIndex = useAppStore((s) => s.selectedHistoryIndex)
   const history = useAppStore((s) => s.history)
@@ -227,6 +175,7 @@ export function CommandForm() {
   const [selectedGroup, setSelectedGroup] = useState<CommandGroup>('model')
   const [query, setQuery] = useState('')
   const [debouncedQuery, setDebouncedQuery] = useState('')
+  const [activeFormValues, setActiveFormValues] = useState<Record<string, unknown>>({})
   const [pendingDeleteIndex, setPendingDeleteIndex] = useState<number | null>(null)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const filteredSchemas = useMemo(() => {
@@ -237,18 +186,17 @@ export function CommandForm() {
     })
   }, [schemas, debouncedQuery, selectedGroup])
   const selectedSchema = filteredSchemas.find((s) => s.cmd === selectedCmd) ?? filteredSchemas[0] ?? null
+  const activeSchema = isEditing ? editSchema : selectedSchema
+  const fallbackDocValues = useMemo(() => {
+    if (Object.keys(activeFormValues).length > 0) return activeFormValues
+    if (isEditing && selectedCommand) return commandToValues(selectedCommand, ctx)
+    if (selectedSchema) return initialValues(selectedSchema, ctx, model)
+    return {}
+  }, [activeFormValues, ctx, isEditing, model, selectedCommand, selectedSchema])
+  const activeDocsUrl = activeSchema ? getCommandDocUrl(activeSchema.fn, fallbackDocValues) : null
   const locked = mode === 'results'
   const pendingDeleteIndices = pendingDeleteIndex === null ? [] : previewDeleteCascade(pendingDeleteIndex)
   const isUniaxial = (cmd: Command) => cmd.type === 'ADD_OPS' && cmd.fn === 'uniaxialMaterial'
-  const existingMaterialTags = useMemo(() => {
-    const tags = new Set<number>()
-    for (let i = 0; i <= history.cursor; i += 1) {
-      if (isEditing && i === selectedHistoryIndex) continue
-      const cmd = history.commands[i]
-      if (cmd) collectMaterialTags(cmd, tags)
-    }
-    return tags
-  }, [history.commands, history.cursor, isEditing, selectedHistoryIndex])
 
   const requestDelete = (index: number) => {
     setPendingDeleteIndex(index)
@@ -263,6 +211,15 @@ export function CommandForm() {
     const id = window.setTimeout(() => setDebouncedQuery(query), 300)
     return () => window.clearTimeout(id)
   }, [query])
+
+  useEffect(() => {
+    if (isEditing && editSchema && selectedCommand) return
+    if (!selectedSchema) setMaterialPreviewInputCommand(null)
+  }, [isEditing, editSchema, selectedCommand, selectedSchema, setMaterialPreviewInputCommand])
+
+  useEffect(() => {
+    setActiveFormValues({})
+  }, [selectedHistoryIndex, selectedSchema?.cmd])
 
   useHotkeyRegistry([
     {
@@ -312,8 +269,20 @@ export function CommandForm() {
 
   return (
     <div className="flex flex-col h-full min-h-0 overflow-hidden">
-      <div className="px-3 py-2 text-xs font-medium text-muted-foreground border-b shrink-0">
-        {hasSelection ? `Edit Command #${selectedHistoryIndex! + 1}` : 'Command'}
+      <div className="px-3 py-2 text-xs font-medium text-muted-foreground border-b shrink-0 flex items-center gap-2">
+        <span>{hasSelection ? `Edit Command #${selectedHistoryIndex! + 1}` : 'Command'}</span>
+        {activeDocsUrl && (
+          <a
+            href={activeDocsUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="ml-auto inline-flex items-center rounded p-0.5 text-muted-foreground hover:bg-accent hover:text-foreground"
+            title={`Open ${activeSchema?.fn} docs`}
+            aria-label={`Open ${activeSchema?.fn} docs`}
+          >
+            <CircleHelp className="size-3.5" />
+          </a>
+        )}
       </div>
       {isEditing && editSchema && selectedCommand ? (
         <CommandFormBody
@@ -333,18 +302,12 @@ export function CommandForm() {
           }}
           onCancel={() => setSelectedHistoryIndex(null)}
           onDelete={() => requestDelete(selectedHistoryIndex!)}
-          footerExtra={(values) => {
+          onValuesChange={(values) => {
+            setActiveFormValues(values)
             const cmd = editSchema.create(values, editModel, selectedCommand)
-            if (!isUniaxial(cmd)) return null
-            const tag = findMatTag(cmd)
-            const conflict = tag !== null && existingMaterialTags.has(tag)
-            return (
-              <div className="grid gap-2">
-                {conflict && <p className="text-[10px] text-amber-600">Warning: material tag {tag} already exists.</p>}
-                <MaterialPreviewPanel cmd={cmd} disabled={locked} />
-              </div>
-            )
+            setMaterialPreviewInputCommand(isUniaxial(cmd) ? cmd : null)
           }}
+          previewAction={isUniaxial(selectedCommand) ? { onClick: () => setMaterialPreviewPanelOpen(true) } : undefined}
         />
       ) : (
         <>
@@ -410,6 +373,12 @@ export function CommandForm() {
               locked={locked}
               actionLabel="Add Command"
               initial={initialValues(selectedSchema, ctx, model)}
+              onValuesChange={(values) => {
+                setActiveFormValues(values)
+                const cmd = selectedSchema.create(values, model)
+                setMaterialPreviewInputCommand(isUniaxial(cmd) ? cmd : null)
+              }}
+              previewAction={selectedSchema.fn === 'uniaxialMaterial' ? { onClick: () => setMaterialPreviewPanelOpen(true) } : undefined}
               submitValues={(values) => {
                 // If the schema has an idlist field, create one command per ID
                 const idListField = selectedSchema.args.find((a) => a.kind === 'idlist')
@@ -431,18 +400,6 @@ export function CommandForm() {
                 if (validation) return validation
                 insertCommandAt(cmd, insertionIndex)
                 return null
-              }}
-              footerExtra={(values) => {
-                const cmd = selectedSchema.create(values, model)
-                if (!isUniaxial(cmd)) return null
-                const tag = findMatTag(cmd)
-                const conflict = tag !== null && existingMaterialTags.has(tag)
-                return (
-                  <div className="grid gap-2">
-                    {conflict && <p className="text-[10px] text-amber-600">Warning: material tag {tag} already exists.</p>}
-                    <MaterialPreviewPanel cmd={cmd} disabled={locked} />
-                  </div>
-                )
               }}
             />
           ) : (

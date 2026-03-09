@@ -134,7 +134,8 @@ function mapGeneratedArg(arg: GeneratedArgDef): ArgDef {
     const length: ArgLen = arg.length === 'dynamic' || arg.length === 'ndm' || arg.length === 'ndf' ? arg.length : Number(arg.length)
     return { kind: 'vec', name: arg.name, label: titleCase(arg.name), length, defaultValue: [] }
   }
-  return { kind: arg.kind, name: arg.name, label: titleCase(arg.name), defaultValue: arg.literal ?? (arg.kind === 'str' ? '' : 0) }
+  if (arg.kind === 'str') return { kind: arg.kind, name: arg.name, label: titleCase(arg.name), defaultValue: arg.literal ?? '' }
+  return { kind: arg.kind, name: arg.name, label: titleCase(arg.name), defaultValue: undefined }
 }
 
 const GENERATED_NON_V1_SCHEMAS: CommandSchema[] = GENERATED_COMMAND_SCHEMAS
@@ -170,6 +171,58 @@ export function getAvailableSchemas(ndm: number) {
   return [...V1_COMMAND_SCHEMAS, ...GENERATED_NON_V1_SCHEMAS].filter((schema) => !schema.ndmFilter || schema.ndmFilter.includes(ndm))
 }
 
+function docsUrlFromRstPath(path: string) {
+  const htmlPath = path.replace(/\.rst$/i, '.html').replace(/^\/+/, '')
+  return `https://openseespydoc.readthedocs.io/en/latest/${htmlPath}`
+}
+
+function normalizeToken(value: string) {
+  return value.toLowerCase().replace(/[^a-z0-9]/g, '')
+}
+
+function getUniaxialMaterialDocUrl(values?: Record<string, unknown>) {
+  const matType = typeof values?.matType === 'string' ? values.matType.trim() : ''
+  if (!matType) return docsUrlFromRstPath('src/uniaxialMaterial.rst')
+
+  const generated = GENERATED_COMMAND_SCHEMAS.find((schema) => schema.fn === 'uniaxialMaterial')
+  const examplePaths = (generated?.examples ?? []).map(([path]) => path)
+  const pathByNormalizedBase = new Map<string, string>()
+  for (const path of examplePaths) {
+    const base = path.split('/').pop()?.replace(/\.rst$/i, '') ?? ''
+    if (!base) continue
+    pathByNormalizedBase.set(normalizeToken(base), path)
+  }
+
+  const aliases: Record<string, string> = {
+    steel01: 'steel01',
+    steel01thermal: 'steel01thermal',
+    steel02: 'steel02',
+    steel4: 'steel4',
+    pipe: 'pipeMaterial',
+  }
+
+  const normalizedMatType = normalizeToken(matType)
+  const aliasBase = aliases[normalizedMatType]
+  if (aliasBase) {
+    const aliasPath = pathByNormalizedBase.get(normalizeToken(aliasBase))
+    if (aliasPath) return docsUrlFromRstPath(aliasPath)
+  }
+  const directPath = pathByNormalizedBase.get(normalizedMatType)
+  if (directPath) return docsUrlFromRstPath(directPath)
+
+  return `https://openseespydoc.readthedocs.io/en/latest/search.html?q=${encodeURIComponent(`uniaxialMaterial ${matType}`)}`
+}
+
+export function getCommandDocUrl(fn: string, values?: Record<string, unknown>) {
+  if (fn === 'uniaxialMaterial') return getUniaxialMaterialDocUrl(values)
+  const generated = GENERATED_COMMAND_SCHEMAS.find((schema) => schema.fn === fn)
+  const sourcePath = generated?.examples[0]?.[0]
+  if (sourcePath && sourcePath.endsWith('.rst')) {
+    return docsUrlFromRstPath(sourcePath)
+  }
+  return `https://openseespydoc.readthedocs.io/en/latest/search.html?q=${encodeURIComponent(fn)}`
+}
+
 export function resolveArgLen(len: ArgLen, ctx: SchemaContext): number | 'dynamic' {
   if (len === 'ndm') return ctx.ndm
   if (len === 'ndf') return ctx.ndf
@@ -179,7 +232,9 @@ export function resolveArgLen(len: ArgLen, ctx: SchemaContext): number | 'dynami
 
 function defaultsForArg(arg: ArgDef, ctx: SchemaContext, out: Record<string, unknown>) {
   if (arg.kind === 'int' || arg.kind === 'float' || arg.kind === 'str') {
-    out[arg.name] = arg.defaultValue ?? (arg.kind === 'str' ? '' : 0)
+    if (arg.kind === 'str' && arg.name === 'literal') return
+    if (arg.defaultValue !== undefined) out[arg.name] = arg.defaultValue
+    else if (arg.kind === 'str') out[arg.name] = ''
     return
   }
   if (arg.kind === 'vec') {
@@ -260,19 +315,38 @@ export function commandToValues(cmd: Command, ctx: SchemaContext) {
 
 function flattenArgValues(arg: ArgDef, values: Record<string, unknown>, ctx: SchemaContext, fallbackMatTag: number): (string | number | boolean | null)[] {
   if (arg.kind === 'int') {
-    const raw = Number(values[arg.name] ?? arg.defaultValue)
-    const n = Number.isFinite(raw) && raw > 0 ? Math.trunc(raw) : (arg.name === 'matTag' ? fallbackMatTag : Math.trunc(num(arg.defaultValue, 0)))
+    const rawValue = values[arg.name]
+    if ((rawValue === undefined || rawValue === null || rawValue === '') && arg.name !== 'matTag') return []
+    const raw = Number(rawValue ?? arg.defaultValue)
+    const n = Number.isFinite(raw) && raw > 0 ? Math.trunc(raw) : (arg.name === 'matTag' ? fallbackMatTag : NaN)
+    if (!Number.isFinite(n)) return []
     return [n]
   }
   if (arg.kind === 'float') {
-    const n = Number(values[arg.name] ?? arg.defaultValue)
-    return [Number.isFinite(n) ? n : num(arg.defaultValue, 0)]
+    const rawValue = values[arg.name]
+    if (rawValue === undefined || rawValue === null || rawValue === '') return []
+    const n = Number(rawValue ?? arg.defaultValue)
+    if (!Number.isFinite(n)) return []
+    return [n]
   }
   if (arg.kind === 'str') {
+    if (arg.name === 'literal') return typeof arg.defaultValue === 'string' ? [arg.defaultValue] : []
     const v = values[arg.name]
-    if (typeof v === 'string') return [v]
-    if (typeof arg.defaultValue === 'string') return [arg.defaultValue]
-    return ['']
+    if (typeof v === 'string') {
+      const trimmed = v.trim()
+      if (trimmed.length === 0) return []
+      const n = Number(trimmed)
+      if (Number.isFinite(n)) return [n]
+      return [v]
+    }
+    if (typeof arg.defaultValue === 'string') {
+      const trimmed = arg.defaultValue.trim()
+      if (trimmed.length === 0) return []
+      const n = Number(trimmed)
+      if (Number.isFinite(n)) return [n]
+      return [arg.defaultValue]
+    }
+    return []
   }
   if (arg.kind === 'vec') {
     const v = Array.isArray(values[arg.name]) ? values[arg.name] : []

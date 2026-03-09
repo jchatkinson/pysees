@@ -75,10 +75,20 @@ type Config struct {
 }
 
 type Server struct {
-	cfg      Config
-	upgrader websocket.Upgrader
-	tokensMu sync.Mutex
-	tokens   map[string]time.Time
+	cfg         Config
+	upgrader    websocket.Upgrader
+	tokensMu    sync.Mutex
+	tokens      map[string]time.Time
+	preflight   PreflightStatus
+	preflightMu sync.RWMutex
+}
+
+type PreflightStatus struct {
+	Ready     bool   `json:"ready"`
+	PythonBin string `json:"pythonBin,omitempty"`
+	ErrorCode string `json:"errorCode,omitempty"`
+	Error     string `json:"error,omitempty"`
+	CheckedAt string `json:"checkedAt"`
 }
 
 type MaterialCall struct {
@@ -117,6 +127,7 @@ func New(cfg Config) *Server {
 	}
 	s := &Server{cfg: cfg, tokens: map[string]time.Time{}}
 	s.upgrader = websocket.Upgrader{CheckOrigin: s.allowOrigin}
+	s.refreshPreflight()
 	return s
 }
 
@@ -141,7 +152,16 @@ func (s *Server) Handler() http.Handler {
 }
 
 func (s *Server) health(w http.ResponseWriter, _ *http.Request) {
-	writeJSON(w, http.StatusOK, map[string]string{"name": "pysees-agent", "version": "0.1.0"})
+	status := s.getPreflight()
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"name":      "pysees-agent",
+		"version":   "0.1.0",
+		"ready":     status.Ready,
+		"pythonBin": status.PythonBin,
+		"errorCode": status.ErrorCode,
+		"error":     status.Error,
+		"checkedAt": status.CheckedAt,
+	})
 }
 
 func (s *Server) session(w http.ResponseWriter, r *http.Request) {
@@ -155,6 +175,14 @@ func (s *Server) session(w http.ResponseWriter, r *http.Request) {
 	}
 	if !s.allowOrigin(r) {
 		writeJSON(w, http.StatusForbidden, map[string]string{"error": "origin_not_allowed"})
+		return
+	}
+	if pf := s.getPreflight(); !pf.Ready {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]string{
+			"error":     "agent_not_ready",
+			"errorCode": pf.ErrorCode,
+			"message":   pf.Error,
+		})
 		return
 	}
 	token := randomToken(24)
@@ -217,6 +245,10 @@ func (s *Server) ws(w http.ResponseWriter, r *http.Request) {
 				send(map[string]interface{}{"type": "job_error", "jobId": msg.JobID, "code": "BAD_REQUEST", "message": err.Error()})
 				continue
 			}
+			if pf := s.getPreflight(); !pf.Ready {
+				send(map[string]interface{}{"type": "job_error", "jobId": msg.JobID, "code": pf.ErrorCode, "message": pf.Error})
+				continue
+			}
 			runMu.Lock()
 			if currentCancel != nil {
 				currentCancel()
@@ -231,6 +263,13 @@ func (s *Server) ws(w http.ResponseWriter, r *http.Request) {
 				start := time.Now()
 				err := s.runMaterialJob(ctx, m, send)
 				if err != nil {
+					matType := "unknown"
+					if len(m.MaterialCall.Args) > 0 {
+						if v, ok := m.MaterialCall.Args[0].(string); ok && strings.TrimSpace(v) != "" {
+							matType = v
+						}
+					}
+					log.Printf("job %s failed (material=%s): %v", m.JobID, matType, err)
 					code := "EXEC_FAILED"
 					if errors.Is(err, context.DeadlineExceeded) {
 						code = "EXEC_TIMEOUT"
@@ -240,6 +279,7 @@ func (s *Server) ws(w http.ResponseWriter, r *http.Request) {
 					send(map[string]interface{}{"type": "job_error", "jobId": m.JobID, "code": code, "message": err.Error()})
 					return
 				}
+				log.Printf("job %s finished in %dms", m.JobID, time.Since(start).Milliseconds())
 				send(map[string]interface{}{"type": "job_finished", "jobId": m.JobID, "pointCount": len(m.Protocol.Strain), "elapsedMs": time.Since(start).Milliseconds()})
 			}(msg)
 
@@ -274,7 +314,7 @@ func (s *Server) runMaterialJob(ctx context.Context, msg RunMaterialMsg, send fu
 		return err
 	}
 
-	cmd := exec.CommandContext(ctx, s.cfg.PythonBin, scriptPath)
+	cmd, usedBin := s.buildPythonCommand(ctx, scriptPath)
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
 		return err
@@ -284,7 +324,7 @@ func (s *Server) runMaterialJob(ctx context.Context, msg RunMaterialMsg, send fu
 		return err
 	}
 	if err := cmd.Start(); err != nil {
-		return fmt.Errorf("python start failed: %w", err)
+		return fmt.Errorf("python start failed (%s): %w", usedBin, err)
 	}
 
 	var wg sync.WaitGroup
@@ -297,6 +337,76 @@ func (s *Server) runMaterialJob(ctx context.Context, msg RunMaterialMsg, send fu
 		return waitErr
 	}
 	return ctx.Err()
+}
+
+func (s *Server) buildPythonCommand(ctx context.Context, scriptPath string) (*exec.Cmd, string) {
+	bin, err := s.resolvePythonBin()
+	if err != nil {
+		bin = strings.TrimSpace(s.cfg.PythonBin)
+		if bin == "" {
+			bin = "python"
+		}
+	}
+	return exec.CommandContext(ctx, bin, scriptPath), bin
+}
+
+func (s *Server) resolvePythonBin() (string, error) {
+	bin := strings.TrimSpace(s.cfg.PythonBin)
+	if bin == "" {
+		bin = "python"
+	}
+	if bin == "python" {
+		if _, err := exec.LookPath("python"); err == nil {
+			return "python", nil
+		}
+		if _, err := exec.LookPath("python3"); err == nil {
+			return "python3", nil
+		}
+		return "", errors.New("python executable not found in PATH")
+	}
+	if _, err := exec.LookPath(bin); err != nil {
+		return "", fmt.Errorf("%s not found in PATH", bin)
+	}
+	return bin, nil
+}
+
+func (s *Server) refreshPreflight() {
+	checked := time.Now().UTC().Format(time.RFC3339)
+	bin, err := s.resolvePythonBin()
+	if err != nil {
+		s.setPreflight(PreflightStatus{Ready: false, ErrorCode: "PYTHON_NOT_FOUND", Error: err.Error(), CheckedAt: checked})
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, bin, "-c", "import openseespy.opensees as ops; print('ok')")
+	if out, err := cmd.CombinedOutput(); err != nil {
+		msg := strings.TrimSpace(string(out))
+		if msg == "" {
+			msg = err.Error()
+		}
+		s.setPreflight(PreflightStatus{
+			Ready:     false,
+			PythonBin: bin,
+			ErrorCode: "OPENSEES_IMPORT_FAILED",
+			Error:     msg,
+			CheckedAt: checked,
+		})
+		return
+	}
+	s.setPreflight(PreflightStatus{Ready: true, PythonBin: bin, CheckedAt: checked})
+}
+
+func (s *Server) getPreflight() PreflightStatus {
+	s.preflightMu.RLock()
+	defer s.preflightMu.RUnlock()
+	return s.preflight
+}
+
+func (s *Server) setPreflight(status PreflightStatus) {
+	s.preflightMu.Lock()
+	defer s.preflightMu.Unlock()
+	s.preflight = status
 }
 
 func scanStdout(wg *sync.WaitGroup, r io.Reader, jobID string, send func(interface{})) {
@@ -312,6 +422,7 @@ func scanStdout(wg *sync.WaitGroup, r io.Reader, jobID string, send func(interfa
 			Message string  `json:"message"`
 		}
 		if err := json.Unmarshal([]byte(line), &event); err != nil {
+			log.Printf("[job:%s stdout] %s", jobID, line)
 			send(map[string]interface{}{"type": "job_log", "jobId": jobID, "stream": "stdout", "line": line})
 			continue
 		}
@@ -320,8 +431,12 @@ func scanStdout(wg *sync.WaitGroup, r io.Reader, jobID string, send func(interfa
 			continue
 		}
 		if event.Event == "error" {
+			log.Printf("[job:%s script-error] %s", jobID, event.Message)
 			send(map[string]interface{}{"type": "job_error", "jobId": jobID, "code": "EXEC_FAILED", "message": event.Message})
 		}
+	}
+	if err := s.Err(); err != nil {
+		log.Printf("[job:%s stdout-scan-error] %v", jobID, err)
 	}
 }
 
@@ -329,7 +444,12 @@ func scanStderr(wg *sync.WaitGroup, r io.Reader, jobID string, send func(interfa
 	defer wg.Done()
 	s := bufio.NewScanner(r)
 	for s.Scan() {
-		send(map[string]interface{}{"type": "job_log", "jobId": jobID, "stream": "stderr", "line": s.Text()})
+		line := s.Text()
+		log.Printf("[job:%s stderr] %s", jobID, line)
+		send(map[string]interface{}{"type": "job_log", "jobId": jobID, "stream": "stderr", "line": line})
+	}
+	if err := s.Err(); err != nil {
+		log.Printf("[job:%s stderr-scan-error] %v", jobID, err)
 	}
 }
 

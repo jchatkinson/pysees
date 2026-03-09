@@ -73,6 +73,10 @@ interface AppStore {
     jobId: string | null
     points: { eps: number; sig: number }[]
     error: string | null
+    logs: { stream: 'stdout' | 'stderr'; line: string }[]
+    panelOpen: boolean
+    protocol: number[]
+    inputCommand: Command | null
   }
   selectedHistoryIndex: number | null
   insertionIndex: number | null
@@ -114,8 +118,12 @@ interface AppStore {
   importResults: (files: { name: string; data: string }[]) => void
   connectLocalAgent: () => Promise<void>
   disconnectLocalAgent: () => void
-  runMaterialPreview: (cmd: Command) => void
+  runMaterialPreview: (protocolOverride?: number[]) => void
   cancelMaterialPreview: () => void
+  setMaterialPreviewPanelOpen: (open: boolean) => void
+  setMaterialPreviewProtocol: (points: number[]) => void
+  setMaterialPreviewInputCommand: (cmd: Command | null) => void
+  clearMaterialPreviewLogs: () => void
 }
 
 export const useAppStore = create<AppStore>((set, get) => ({
@@ -124,7 +132,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
   config: null,
   results: null,
   localAgent: { status: 'disconnected', port: null, error: null },
-  materialPreview: { running: false, jobId: null, points: [], error: null },
+  materialPreview: { running: false, jobId: null, points: [], error: null, logs: [], panelOpen: false, protocol: [...DEFAULT_STRAIN_PROTOCOL], inputCommand: null },
   selectedHistoryIndex: null,
   insertionIndex: null,
   lastEditedHistoryIndex: null,
@@ -263,7 +271,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
       set({ localAgent: { status: 'connected', port, error: null } })
       agentClient.onEvent((event) => {
         if (event.type === 'job_started') {
-          set({ materialPreview: { running: true, jobId: event.jobId, points: [], error: null } })
+          set((s) => ({ materialPreview: { ...s.materialPreview, running: true, jobId: event.jobId, points: [], error: null, logs: [] } }))
           return
         }
         if (event.type === 'point') {
@@ -278,6 +286,10 @@ export const useAppStore = create<AppStore>((set, get) => ({
             if (s.materialPreview.jobId !== event.jobId) return s
             return { materialPreview: { ...s.materialPreview, running: false, error: `${event.code}: ${event.message}` } }
           })
+          return
+        }
+        if (event.type === 'job_log') {
+          set((s) => ({ materialPreview: { ...s.materialPreview, logs: [...s.materialPreview.logs, { stream: event.stream, line: event.line }] } }))
           return
         }
         if (event.type === 'job_finished') {
@@ -295,12 +307,20 @@ export const useAppStore = create<AppStore>((set, get) => ({
 
   disconnectLocalAgent: () => {
     agentClient.disconnect()
-    set({ localAgent: { status: 'disconnected', port: null, error: null }, materialPreview: { running: false, jobId: null, points: [], error: null } })
+    set((s) => ({
+      localAgent: { status: 'disconnected', port: null, error: null },
+      materialPreview: { ...s.materialPreview, running: false, jobId: null, points: [], error: null, logs: [] },
+    }))
   },
 
-  runMaterialPreview: (cmd) => {
+  runMaterialPreview: (protocolOverride) => {
     const s = get()
+    const cmd = s.materialPreview.inputCommand
     if (!s.config) return
+    if (!cmd) {
+      set((prev) => ({ materialPreview: { ...prev.materialPreview, error: 'Select or edit a uniaxialMaterial command first.' } }))
+      return
+    }
     if (s.localAgent.status !== 'connected') {
       set((prev) => ({ materialPreview: { ...prev.materialPreview, error: 'Connect to local agent first.' } }))
       return
@@ -315,12 +335,13 @@ export const useAppStore = create<AppStore>((set, get) => ({
       return
     }
     const jobId = crypto.randomUUID()
-    set({ materialPreview: { running: true, jobId, points: [], error: null } })
+    const protocol = protocolOverride && protocolOverride.length ? protocolOverride : (s.materialPreview.protocol.length ? s.materialPreview.protocol : DEFAULT_STRAIN_PROTOCOL)
+    set((prev) => ({ materialPreview: { ...prev.materialPreview, running: true, jobId, points: [], error: null, logs: [], protocol } }))
     try {
       agentClient.runMaterial({
         jobId,
         materialCall: { fn: 'uniaxialMaterial', args },
-        protocol: { strain: DEFAULT_STRAIN_PROTOCOL },
+        protocol: { strain: protocol },
         ndm: s.config.ndm,
         ndf: s.config.ndf,
       })
@@ -338,6 +359,11 @@ export const useAppStore = create<AppStore>((set, get) => ({
       set((s) => ({ materialPreview: { ...s.materialPreview, running: false } }))
     }
   },
+
+  setMaterialPreviewPanelOpen: (open) => set((s) => ({ materialPreview: { ...s.materialPreview, panelOpen: open } })),
+  setMaterialPreviewProtocol: (points) => set((s) => ({ materialPreview: { ...s.materialPreview, protocol: points } })),
+  setMaterialPreviewInputCommand: (cmd) => set((s) => ({ materialPreview: { ...s.materialPreview, inputCommand: cmd } })),
+  clearMaterialPreviewLogs: () => set((s) => ({ materialPreview: { ...s.materialPreview, logs: [] } })),
 }))
 
 /** Derived model state — re-computes on every history change */

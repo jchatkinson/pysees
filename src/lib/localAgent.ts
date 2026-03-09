@@ -26,6 +26,9 @@ interface SessionResponse {
 interface HealthResponse {
   name: string
   version: string
+  ready?: boolean
+  errorCode?: string
+  error?: string
 }
 
 export class LocalAgentClient {
@@ -68,6 +71,10 @@ export class LocalAgentClient {
           errors.push(`Port ${port}: unexpected service ${health.name}`)
           continue
         }
+        if (health.ready === false) {
+          errors.push(`Port ${port}: ${health.errorCode ?? 'NOT_READY'}${health.error ? `: ${health.error}` : ''}`)
+          continue
+        }
         const session = await this.createSession(port)
         await this.openWs(port, session.sessionToken)
         this.port = port
@@ -105,7 +112,17 @@ export class LocalAgentClient {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ client: 'pysees-web' }),
     }, 1500)
-    if (!response.ok) throw new Error(`session status ${response.status}`)
+    if (!response.ok) {
+      let message = `session status ${response.status}`
+      try {
+        const body = await response.json() as { errorCode?: string; message?: string; error?: string }
+        const suffix = body.message || body.error || ''
+        if (body.errorCode || suffix) message = `${body.errorCode ?? 'SESSION_ERROR'}${suffix ? `: ${suffix}` : ''}`
+      } catch {
+        // ignore body parse errors
+      }
+      throw new Error(message)
+    }
     return response.json() as Promise<SessionResponse>
   }
 
