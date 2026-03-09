@@ -41,11 +41,11 @@ export function TopBar() {
           <DropdownMenuSeparator />
           {localAgent.status === 'connected' ? (
             <DropdownMenuItem onSelect={disconnectLocalAgent}>
-              Disconnect local instance (:{localAgent.port})
+              Disconnect (:{localAgent.port})
             </DropdownMenuItem>
           ) : (
             <DropdownMenuItem onSelect={() => { void connectLocalAgent() }} disabled={localAgent.status === 'connecting'}>
-              {localAgent.status === 'connecting' ? 'Connecting to local instance...' : 'Connect to local instance'}
+              {localAgent.status === 'connecting' ? 'Connecting to local...' : 'Connect to local'}
             </DropdownMenuItem>
           )}
         </DropdownMenuContent>

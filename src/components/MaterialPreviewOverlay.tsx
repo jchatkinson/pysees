@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { memo, useEffect, useMemo, useState } from 'react'
 import { X, Play, Square, Eraser, ChevronDown, ChevronUp } from 'lucide-react'
 import { CartesianGrid, Line, LineChart, XAxis, YAxis } from 'recharts'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -19,9 +19,59 @@ const hysteresisChartConfig = {
 
 const protocolChartConfig = { eps: { label: 'Strain', color: '#22c55e' } } as const
 
+const HysteresisChartPanel = memo(function HysteresisChartPanel({ connected }: { connected: boolean }) {
+  const points = useAppStore((s) => s.materialPreview.points)
+
+  return (
+    <div className="rounded border p-2">
+      <div className="mb-1 flex items-center justify-between">
+        <p className="text-[11px] font-medium">Chart</p>
+        <p className="text-[10px] text-muted-foreground">{points.length} points</p>
+      </div>
+      {connected ? (
+        <ChartContainer config={hysteresisChartConfig} className="h-72 w-full">
+          <LineChart data={points} margin={{ left: 2, right: 6, top: 6, bottom: 2 }}>
+            <CartesianGrid />
+            <XAxis
+              type="number"
+              dataKey="eps"
+              domain={['auto', 'auto']}
+              tickLine={false}
+              axisLine={false}
+              minTickGap={20}
+              tick={{ fontSize: 9 }}
+            />
+            <YAxis
+              type="number"
+              domain={['auto', 'auto']}
+              tickLine={false}
+              axisLine={false}
+              width={28}
+              tick={{ fontSize: 9 }}
+            />
+            <ChartTooltip content={<ChartTooltipContent />} />
+            <Line type="linear" dataKey="sig" stroke={hysteresisChartConfig.sig.color} strokeWidth={1.75} dot={false} isAnimationActive={false} connectNulls />
+          </LineChart>
+        </ChartContainer>
+      ) : (
+        <div className="grid h-72 place-items-center rounded border bg-muted/20 p-6 text-center text-xs text-muted-foreground">
+          Not Connected - Setup connection to local opensees instance to enable material previews
+        </div>
+      )}
+    </div>
+  )
+})
+
 export function MaterialPreviewOverlay() {
-  const localAgent = useAppStore((s) => s.localAgent)
-  const preview = useAppStore((s) => s.materialPreview)
+  const localAgentStatus = useAppStore((s) => s.localAgent.status)
+  const localAgentPort = useAppStore((s) => s.localAgent.port)
+  const localAgentError = useAppStore((s) => s.localAgent.error)
+  const panelOpen = useAppStore((s) => s.materialPreview.panelOpen)
+  const previewProtocol = useAppStore((s) => s.materialPreview.protocol)
+  const previewError = useAppStore((s) => s.materialPreview.error)
+  const previewLogs = useAppStore((s) => s.materialPreview.logs)
+  const previewRunning = useAppStore((s) => s.materialPreview.running)
+  const previewInputCommand = useAppStore((s) => s.materialPreview.inputCommand)
   const runMaterialPreview = useAppStore((s) => s.runMaterialPreview)
   const cancelMaterialPreview = useAppStore((s) => s.cancelMaterialPreview)
   const setPanelOpen = useAppStore((s) => s.setMaterialPreviewPanelOpen)
@@ -33,13 +83,12 @@ export function MaterialPreviewOverlay() {
   const [numCycles, setNumCycles] = useState('3')
   const [strainIncrement, setStrainIncrement] = useState<CyclicStrainIncrement>('evenly_per_cycle')
   const [approxSteps, setApproxSteps] = useState('200')
-  const [protocolText, setProtocolText] = useState(preview.protocol.join(', '))
+  const [protocolText, setProtocolText] = useState(previewProtocol.join(', '))
 
   useEffect(() => {
-    setProtocolText(preview.protocol.join(', '))
-  }, [preview.protocol])
+    setProtocolText(previewProtocol.join(', '))
+  }, [previewProtocol])
 
-  const chartData = useMemo(() => preview.points.map((p) => ({ eps: p.eps, sig: p.sig })), [preview.points])
   const generatedProtocol = useMemo(() => generateLoadingProtocol({
     type: protocolType,
     maxStrain: Number(maxStrain),
@@ -50,7 +99,7 @@ export function MaterialPreviewOverlay() {
   }), [approxSteps, maxStrain, numCycles, protocolText, protocolType, strainIncrement])
   const protocolChartData = useMemo(() => generatedProtocol.map((eps, i) => ({ i, eps })), [generatedProtocol])
 
-  if (!preview.panelOpen) return null
+  if (!panelOpen) return null
 
   return (
     <div className="absolute bottom-3 right-3 z-40 w-[560px] max-w-[calc(100%-1.5rem)]">
@@ -59,7 +108,7 @@ export function MaterialPreviewOverlay() {
           <div className="flex items-center gap-2">
             <CardTitle className="text-sm">Material Preview</CardTitle>
             <span className="ml-auto text-[10px] text-muted-foreground">
-              {localAgent.status === 'connected' ? `Connected :${localAgent.port}` : localAgent.status}
+              {localAgentStatus === 'connected' ? `Connected :${localAgentPort}` : localAgentStatus}
             </span>
             <Button size="icon" variant="ghost" className="size-6" onClick={() => setPanelOpen(false)}>
               <X className="size-3.5" />
@@ -67,8 +116,8 @@ export function MaterialPreviewOverlay() {
           </div>
         </CardHeader>
         <CardContent className="grid gap-2">
-          {(preview.error || localAgent.error) && (
-            <p className="text-[11px] text-destructive">{preview.error || localAgent.error}</p>
+          {(previewError || localAgentError) && (
+            <p className="text-[11px] text-destructive">{previewError || localAgentError}</p>
           )}
 
           <Tabs defaultValue="protocol">
@@ -157,42 +206,7 @@ export function MaterialPreviewOverlay() {
             </TabsContent>
 
             <TabsContent value="hysteresis" className="mt-2">
-              <div className="rounded border p-2">
-                <div className="mb-1 flex items-center justify-between">
-                  <p className="text-[11px] font-medium">Chart</p>
-                  <p className="text-[10px] text-muted-foreground">{chartData.length} points</p>
-                </div>
-                {localAgent.status === 'connected' ? (
-                  <ChartContainer config={hysteresisChartConfig} className="h-72 w-full">
-                    <LineChart data={chartData} margin={{ left: 2, right: 6, top: 6, bottom: 2 }}>
-                      <CartesianGrid />
-                      <XAxis
-                        type="number"
-                        dataKey="eps"
-                        domain={['auto', 'auto']}
-                        tickLine={false}
-                        axisLine={false}
-                        minTickGap={20}
-                        tick={{ fontSize: 9 }}
-                      />
-                      <YAxis
-                        type="number"
-                        domain={['auto', 'auto']}
-                        tickLine={false}
-                        axisLine={false}
-                        width={28}
-                        tick={{ fontSize: 9 }}
-                      />
-                      <ChartTooltip content={<ChartTooltipContent />} />
-                      <Line type="linear" dataKey="sig" stroke={hysteresisChartConfig.sig.color} strokeWidth={1.75} dot={{ r: 1.5 }} isAnimationActive={false} connectNulls />
-                    </LineChart>
-                  </ChartContainer>
-                ) : (
-                  <div className="grid h-72 place-items-center rounded border bg-muted/20 p-6 text-center text-xs text-muted-foreground">
-                    Not Connected - Setup connection to local opensees instance to enable material previews
-                  </div>
-                )}
-              </div>
+              <HysteresisChartPanel connected={localAgentStatus === 'connected'} />
             </TabsContent>
           </Tabs>
 
@@ -202,11 +216,11 @@ export function MaterialPreviewOverlay() {
               onClick={() => {
                 runMaterialPreview(generatedProtocol)
               }}
-              disabled={localAgent.status !== 'connected' || !preview.inputCommand || preview.running}
+              disabled={localAgentStatus !== 'connected' || !previewInputCommand || previewRunning}
             >
               <Play className="mr-1 size-3.5" />Run
             </Button>
-            <Button size="sm" variant="outline" onClick={cancelMaterialPreview} disabled={!preview.running}>
+            <Button size="sm" variant="outline" onClick={cancelMaterialPreview} disabled={!previewRunning}>
               <Square className="mr-1 size-3.5" />Cancel
             </Button>
             <Button size="sm" variant="ghost" onClick={clearLogs}>
@@ -221,10 +235,10 @@ export function MaterialPreviewOverlay() {
             </button>
             {showLogs && (
               <div className="mt-2 max-h-28 overflow-auto rounded border bg-muted/20 p-2 font-mono text-[10px]">
-                {preview.logs.length === 0 ? (
+                {previewLogs.length === 0 ? (
                   <p className="text-muted-foreground">No logs.</p>
                 ) : (
-                  preview.logs.map((log, i) => <p key={`${log.stream}-${i}`}>[{log.stream}] {log.line}</p>)
+                  previewLogs.map((log, i) => <p key={`${log.stream}-${i}`}>[{log.stream}] {log.line}</p>)
                 )}
               </div>
             )}
