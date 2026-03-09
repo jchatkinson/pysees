@@ -7,6 +7,7 @@ import { buildUniaxialMaterialCallArgs } from '@/lib/commandSchemas'
 
 const DEFAULT_STRAIN_PROTOCOL = [0, 0.001, -0.001, 0.002, -0.002, 0.003, -0.003, 0]
 const agentClient = new LocalAgentClient()
+const POINT_FLUSH_MS = 100
 
 function producedNodeIds(cmd: Command): Set<number> {
   if (cmd.type === 'ADD_NODE') return new Set([cmd.id])
@@ -126,7 +127,49 @@ interface AppStore {
   clearMaterialPreviewLogs: () => void
 }
 
-export const useAppStore = create<AppStore>((set, get) => ({
+export const useAppStore = create<AppStore>((set, get) => {
+  let bufferedPoints: { eps: number; sig: number }[] = []
+  let bufferedJobId: string | null = null
+  let flushTimer: ReturnType<typeof setTimeout> | null = null
+
+  const clearFlushTimer = () => {
+    if (!flushTimer) return
+    clearTimeout(flushTimer)
+    flushTimer = null
+  }
+
+  const resetBufferedPoints = () => {
+    clearFlushTimer()
+    bufferedPoints = []
+    bufferedJobId = null
+  }
+
+  const flushBufferedPoints = (jobId?: string) => {
+    if (bufferedPoints.length === 0 || !bufferedJobId) return
+    if (jobId && bufferedJobId !== jobId) return
+    const activeJobId = bufferedJobId
+    const batch = bufferedPoints
+    bufferedPoints = []
+    set((s) => {
+      if (s.materialPreview.jobId !== activeJobId) return s
+      return { materialPreview: { ...s.materialPreview, points: s.materialPreview.points.concat(batch) } }
+    })
+  }
+
+  const queueBufferedPoint = (jobId: string, point: { eps: number; sig: number }) => {
+    if (get().materialPreview.jobId !== jobId) return
+    if (bufferedJobId && bufferedJobId !== jobId) resetBufferedPoints()
+    bufferedJobId = jobId
+    bufferedPoints.push(point)
+    if (!flushTimer) {
+      flushTimer = setTimeout(() => {
+        flushTimer = null
+        flushBufferedPoints()
+      }, POINT_FLUSH_MS)
+    }
+  }
+
+  return ({
   history: { commands: [], cursor: -1 },
   mode: 'model',
   config: null,
@@ -265,23 +308,25 @@ export const useAppStore = create<AppStore>((set, get) => ({
   importResults: (files) => set({ results: { files } }),
 
   connectLocalAgent: async () => {
+    resetBufferedPoints()
     set((s) => ({ localAgent: { ...s.localAgent, status: 'connecting', error: null } }))
     try {
       const port = await agentClient.connect()
       set({ localAgent: { status: 'connected', port, error: null } })
       agentClient.onEvent((event) => {
         if (event.type === 'job_started') {
+          resetBufferedPoints()
           set((s) => ({ materialPreview: { ...s.materialPreview, running: true, jobId: event.jobId, points: [], error: null, logs: [] } }))
           return
         }
         if (event.type === 'point') {
-          set((s) => {
-            if (s.materialPreview.jobId !== event.jobId) return s
-            return { materialPreview: { ...s.materialPreview, points: [...s.materialPreview.points, { eps: event.eps, sig: event.sig }] } }
-          })
+          queueBufferedPoint(event.jobId, { eps: event.eps, sig: event.sig })
           return
         }
         if (event.type === 'job_error') {
+          clearFlushTimer()
+          flushBufferedPoints(event.jobId)
+          resetBufferedPoints()
           set((s) => {
             if (s.materialPreview.jobId !== event.jobId) return s
             return { materialPreview: { ...s.materialPreview, running: false, error: `${event.code}: ${event.message}` } }
@@ -293,19 +338,26 @@ export const useAppStore = create<AppStore>((set, get) => ({
           return
         }
         if (event.type === 'job_finished') {
+          clearFlushTimer()
+          flushBufferedPoints(event.jobId)
+          resetBufferedPoints()
           set((s) => {
             if (s.materialPreview.jobId !== event.jobId) return s
             return { materialPreview: { ...s.materialPreview, running: false } }
           })
         }
       })
-      agentClient.onClose(() => set({ localAgent: { status: 'disconnected', port: null, error: null } }))
+      agentClient.onClose(() => {
+        resetBufferedPoints()
+        set({ localAgent: { status: 'disconnected', port: null, error: null } })
+      })
     } catch (error) {
       set({ localAgent: { status: 'error', port: null, error: String(error) } })
     }
   },
 
   disconnectLocalAgent: () => {
+    resetBufferedPoints()
     agentClient.disconnect()
     set((s) => ({
       localAgent: { status: 'disconnected', port: null, error: null },
@@ -336,6 +388,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
     }
     const jobId = crypto.randomUUID()
     const protocol = protocolOverride && protocolOverride.length ? protocolOverride : (s.materialPreview.protocol.length ? s.materialPreview.protocol : DEFAULT_STRAIN_PROTOCOL)
+    resetBufferedPoints()
     set((prev) => ({ materialPreview: { ...prev.materialPreview, running: true, jobId, points: [], error: null, logs: [], protocol } }))
     try {
       agentClient.runMaterial({
@@ -356,6 +409,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
     try {
       agentClient.cancelJob(jobId)
     } finally {
+      resetBufferedPoints()
       set((s) => ({ materialPreview: { ...s.materialPreview, running: false } }))
     }
   },
@@ -364,7 +418,8 @@ export const useAppStore = create<AppStore>((set, get) => ({
   setMaterialPreviewProtocol: (points) => set((s) => ({ materialPreview: { ...s.materialPreview, protocol: points } })),
   setMaterialPreviewInputCommand: (cmd) => set((s) => ({ materialPreview: { ...s.materialPreview, inputCommand: cmd } })),
   clearMaterialPreviewLogs: () => set((s) => ({ materialPreview: { ...s.materialPreview, logs: [] } })),
-}))
+  })
+})
 
 /** Derived model state — re-computes on every history change */
 export const useModelState = () => replay(useAppStore((s) => s.history))

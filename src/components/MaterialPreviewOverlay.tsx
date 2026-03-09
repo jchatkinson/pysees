@@ -1,10 +1,11 @@
-import { memo, useEffect, useMemo, useState } from 'react'
+import { memo, useEffect, useMemo, useRef, useState } from 'react'
 import { X, Play, Square, Eraser, ChevronDown, ChevronUp } from 'lucide-react'
 import { CartesianGrid, Line, LineChart, XAxis, YAxis } from 'recharts'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Input } from '@/components/ui/input'
+import { Slider } from '@/components/ui/slider'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -18,19 +19,72 @@ const hysteresisChartConfig = {
 } as const
 
 const protocolChartConfig = { eps: { label: 'Strain', color: '#22c55e' } } as const
+const HYSTERESIS_ANIMATION_MS = 3000
 
-const HysteresisChartPanel = memo(function HysteresisChartPanel({ connected }: { connected: boolean }) {
+const HysteresisChartPanel = memo(function HysteresisChartPanel({
+  connected,
+  animateToken,
+  scrubCount,
+}: {
+  connected: boolean
+  animateToken: number
+  scrubCount: number | null
+}) {
   const points = useAppStore((s) => s.materialPreview.points)
+  const [displayCount, setDisplayCount] = useState(0)
+  const displayCountRef = useRef(0)
+
+  useEffect(() => {
+    displayCountRef.current = displayCount
+  }, [displayCount])
+
+  useEffect(() => {
+    setDisplayCount(0)
+    displayCountRef.current = 0
+  }, [animateToken])
+
+  useEffect(() => {
+    if (scrubCount === null) return
+    setDisplayCount(Math.max(0, Math.min(points.length, scrubCount)))
+  }, [points.length, scrubCount])
+
+  useEffect(() => {
+    if (displayCount > points.length) setDisplayCount(points.length)
+  }, [displayCount, points.length])
+
+  useEffect(() => {
+    if (scrubCount !== null || displayCountRef.current >= points.length) return
+    const startCount = displayCountRef.current
+    const endCount = points.length
+    const distance = endCount - startCount
+    const durationMs = Math.max(100, Math.round((distance / Math.max(endCount, 1)) * HYSTERESIS_ANIMATION_MS))
+    let raf = 0
+    let startTs: number | null = null
+    const tick = (ts: number) => {
+      if (startTs === null) startTs = ts
+      const progress = Math.min(1, (ts - startTs) / durationMs)
+      const next = Math.round(startCount + distance * progress)
+      if (next !== displayCountRef.current) {
+        displayCountRef.current = next
+        setDisplayCount(next)
+      }
+      if (progress < 1) raf = requestAnimationFrame(tick)
+    }
+    raf = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(raf)
+  }, [animateToken, points.length, scrubCount])
+
+  const animatedPoints = useMemo(() => points.slice(0, displayCount), [displayCount, points])
 
   return (
     <div className="rounded border p-2">
       <div className="mb-1 flex items-center justify-between">
         <p className="text-[11px] font-medium">Chart</p>
-        <p className="text-[10px] text-muted-foreground">{points.length} points</p>
+        <p className="text-[10px] text-muted-foreground">{animatedPoints.length}/{points.length} points</p>
       </div>
       {connected ? (
         <ChartContainer config={hysteresisChartConfig} className="h-72 w-full">
-          <LineChart data={points} margin={{ left: 2, right: 6, top: 6, bottom: 2 }}>
+          <LineChart data={animatedPoints} margin={{ left: 2, right: 6, top: 6, bottom: 2 }}>
             <CartesianGrid />
             <XAxis
               type="number"
@@ -72,6 +126,7 @@ export function MaterialPreviewOverlay() {
   const previewLogs = useAppStore((s) => s.materialPreview.logs)
   const previewRunning = useAppStore((s) => s.materialPreview.running)
   const previewInputCommand = useAppStore((s) => s.materialPreview.inputCommand)
+  const previewPointCount = useAppStore((s) => s.materialPreview.points.length)
   const runMaterialPreview = useAppStore((s) => s.runMaterialPreview)
   const cancelMaterialPreview = useAppStore((s) => s.cancelMaterialPreview)
   const setPanelOpen = useAppStore((s) => s.setMaterialPreviewPanelOpen)
@@ -84,6 +139,8 @@ export function MaterialPreviewOverlay() {
   const [strainIncrement, setStrainIncrement] = useState<CyclicStrainIncrement>('evenly_per_cycle')
   const [approxSteps, setApproxSteps] = useState('200')
   const [protocolText, setProtocolText] = useState(previewProtocol.join(', '))
+  const [animateToken, setAnimateToken] = useState(0)
+  const [scrubCount, setScrubCount] = useState<number | null>(null)
 
   useEffect(() => {
     setProtocolText(previewProtocol.join(', '))
@@ -206,7 +263,7 @@ export function MaterialPreviewOverlay() {
             </TabsContent>
 
             <TabsContent value="hysteresis" className="mt-2">
-              <HysteresisChartPanel connected={localAgentStatus === 'connected'} />
+              <HysteresisChartPanel connected={localAgentStatus === 'connected'} animateToken={animateToken} scrubCount={scrubCount} />
             </TabsContent>
           </Tabs>
 
@@ -223,16 +280,41 @@ export function MaterialPreviewOverlay() {
             <Button size="sm" variant="outline" onClick={cancelMaterialPreview} disabled={!previewRunning}>
               <Square className="mr-1 size-3.5" />Cancel
             </Button>
-            <Button size="sm" variant="ghost" onClick={clearLogs}>
-              <Eraser className="mr-1 size-3.5" />Clear Logs
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => {
+                setScrubCount(null)
+                setAnimateToken((v) => v + 1)
+              }}
+              disabled={localAgentStatus !== 'connected' || previewRunning || previewPointCount === 0}
+            >
+              Animate
             </Button>
+            <div className="ml-auto flex min-w-0 flex-1 items-center gap-2">
+              <p className="shrink-0 text-[10px] text-muted-foreground">{scrubCount ?? previewPointCount}/{previewPointCount}</p>
+              <Slider
+                value={[scrubCount ?? previewPointCount]}
+                min={0}
+                max={Math.max(1, previewPointCount)}
+                step={1}
+                className="w-full"
+                onValueChange={(value) => setScrubCount(value[0] ?? 0)}
+                disabled={previewPointCount === 0}
+              />
+            </div>
           </div>
 
           <div className="rounded border p-2">
-            <button className="flex w-full items-center text-[11px] font-medium" onClick={() => setShowLogs((v) => !v)}>
-              Runtime logs
-              {showLogs ? <ChevronUp className="ml-auto size-3.5" /> : <ChevronDown className="ml-auto size-3.5" />}
-            </button>
+            <div className="flex items-center gap-2">
+              <button className="flex flex-1 items-center text-[11px] font-medium" onClick={() => setShowLogs((v) => !v)}>
+                Runtime logs
+                {showLogs ? <ChevronUp className="ml-auto size-3.5" /> : <ChevronDown className="ml-auto size-3.5" />}
+              </button>
+              <Button size="sm" variant="ghost" onClick={clearLogs} disabled={previewLogs.length === 0}>
+                <Eraser className="mr-1 size-3.5" />Clear Logs
+              </Button>
+            </div>
             {showLogs && (
               <div className="mt-2 max-h-28 overflow-auto rounded border bg-muted/20 p-2 font-mono text-[10px]">
                 {previewLogs.length === 0 ? (
