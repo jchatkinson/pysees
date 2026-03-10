@@ -4,6 +4,7 @@ import { LandingPage } from '@/components/LandingPage'
 import { Button } from '@/components/ui/button'
 import { AboutPage } from '@/components/AboutPage'
 import { ContactPage } from '@/components/ContactPage'
+import { TermsPage } from '@/components/TermsPage'
 import { Link, Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { RedirectToSignIn, SignIn, SignUp, SignedIn, SignedOut } from '@clerk/clerk-react'
 import { useEffect } from 'react'
@@ -68,6 +69,7 @@ export function App() {
         <Route path="/studio" element={<StudioRoute />} />
         <Route path="/about" element={<AboutPage />} />
         <Route path="/contact" element={<ContactPage />} />
+        <Route path="/terms" element={<TermsPage />} />
         <Route path="/signup" element={<AuthPage mode="sign-up" />} />
         <Route path="/login" element={<AuthPage mode="sign-in" />} />
         <Route path="/app" element={<Navigate to="/studio" replace />} />

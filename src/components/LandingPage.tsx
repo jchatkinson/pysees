@@ -25,8 +25,8 @@ export function LandingPage() {
       <MarketingHeader currentPath="/" />
       <section className="mx-auto grid w-full max-w-6xl gap-10 px-4 pb-16 pt-10 md:grid-cols-2 md:px-6 md:pt-16">
         <div className="flex flex-col justify-center">
-          <p className="text-xs uppercase tracking-[0.2em] text-sky-600">OpenSeesPy visual pre/post</p>
-          <h1 className="mt-3 text-4xl font-semibold leading-tight tracking-tight text-slate-900 md:text-5xl">Parametric models without scripting first.</h1>
+          <p className="text-xs uppercase tracking-[0.2em] text-sky-600">OpenSeesPy visual pre/post-processor</p>
+          <h1 className="mt-3 text-4xl font-semibold leading-tight tracking-tight text-slate-900 md:text-5xl">Parametric models for OpenSeesPy.</h1>
           <p className="mt-4 max-w-xl text-base text-slate-600">Build geometry, constraints, loads, and recorders in a history-driven GUI. Export valid Python and import recorder output for results view.</p>
           <div className="mt-7 flex flex-wrap gap-3">
             <SignedOut>

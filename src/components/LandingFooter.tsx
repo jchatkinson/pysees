@@ -31,6 +31,7 @@ export function LandingFooter() {
           <ul className="mt-4 space-y-2 text-sm text-slate-600">
             <li><Link className="hover:text-slate-900" to="/about">About</Link></li>
             <li><Link className="hover:text-slate-900" to="/contact">Contact</Link></li>
+            <li><Link className="hover:text-slate-900" to="/terms">Terms & Privacy</Link></li>
           </ul>
         </div>
 
