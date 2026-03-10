@@ -3,7 +3,7 @@ import type { Command, CommandHistory } from '@/types/commands'
 import type { AppMode, ModelConfig, ResultsState } from '@/types/model'
 import { replay } from '@/lib/replay'
 import { LocalAgentClient, type AgentConnectionState } from '@/lib/localAgent'
-import { buildUniaxialMaterialCallArgs } from '@/lib/commandSchemas'
+import { buildUniaxialMaterialCallArgs, validateCommand } from '@/lib/commandSchemas'
 
 const DEFAULT_STRAIN_PROTOCOL = [0, 0.001, -0.001, 0.002, -0.002, 0.003, -0.003, 0]
 const agentClient = new LocalAgentClient()
@@ -368,6 +368,7 @@ export const useAppStore = create<AppStore>((set, get) => {
 
   runMaterialPreview: (protocolOverride) => {
     const s = get()
+    const currentModel = replay(s.history)
     const cmd = s.materialPreview.inputCommand
     if (!s.config) return
     if (!cmd) {
@@ -382,7 +383,12 @@ export const useAppStore = create<AppStore>((set, get) => {
       set((prev) => ({ materialPreview: { ...prev.materialPreview, error: 'Preview only supports uniaxialMaterial commands.' } }))
       return
     }
-    const args = buildUniaxialMaterialCallArgs(cmd.values, { ndm: s.config.ndm, ndf: s.config.ndf }, replay(s.history).nextMatId)
+    const validation = validateCommand(cmd, currentModel)
+    if (validation) {
+      set((prev) => ({ materialPreview: { ...prev.materialPreview, error: validation } }))
+      return
+    }
+    const args = buildUniaxialMaterialCallArgs(cmd.values, { ndm: s.config.ndm, ndf: s.config.ndf }, currentModel.nextMatId)
     if (!args || args.length < 2) {
       set((prev) => ({ materialPreview: { ...prev.materialPreview, error: 'Material arguments are incomplete.' } }))
       return

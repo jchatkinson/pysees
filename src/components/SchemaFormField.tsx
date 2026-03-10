@@ -2,9 +2,11 @@ import { useEffect, useRef, useState } from 'react'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import type { ArgDef, SchemaContext } from '@/types/schema'
 import { resolveArgLen } from '@/lib/commandSchemas'
 import { useAppStore } from '@/store/useAppStore'
+import { CircleHelp } from 'lucide-react'
 
 interface SchemaFormFieldProps {
   arg: ArgDef
@@ -135,6 +137,24 @@ function seedDefaults(arg: ArgDef, values: Record<string, unknown>, setValue: (k
   if (arg.kind === 'idlist' && values[arg.name] === undefined) setValue(arg.name, arg.defaultValue ?? [])
 }
 
+function FieldLabel({ text, description }: { text: string; description?: string }) {
+  return (
+    <Label className="text-xs flex items-center gap-1.5">
+      <span>{text}</span>
+      {description && (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button type="button" className="text-muted-foreground hover:text-foreground" tabIndex={-1} aria-label={`${text} info`}>
+              <CircleHelp className="size-3" />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent side="top">{description}</TooltipContent>
+        </Tooltip>
+      )}
+    </Label>
+  )
+}
+
 // ─── idlist field ─────────────────────────────────────────────────────────────
 
 function IdListField({
@@ -188,7 +208,7 @@ function IdListField({
 
   return (
     <div className="grid gap-1.5">
-      <Label className="text-xs">{label}</Label>
+      <FieldLabel text={label} description={arg.description} />
       <Input
         type="text"
         value={rawText}
@@ -245,7 +265,7 @@ function VecField({
   if (len === 'dynamic') {
     return (
       <div className="grid gap-1.5">
-        <Label className="text-xs">{label}</Label>
+        <FieldLabel text={label} description={arg.description} />
         <Input
           type="text"
           value={dynamicRaw}
@@ -272,7 +292,7 @@ function VecField({
 
   return (
     <div className="grid gap-1.5">
-      <Label className="text-xs">{label}</Label>
+      <FieldLabel text={label} description={arg.description} />
       <div
         className="grid gap-1"
         style={{ gridTemplateColumns: `repeat(${Math.min(len, 6)}, minmax(0,1fr))` }}
@@ -326,7 +346,7 @@ export function SchemaFormField({ arg, values, setValue, ctx, disabled }: Schema
 
     return (
       <div className="grid gap-1.5">
-        <Label className="text-xs">{label}</Label>
+        <FieldLabel text={label} description={arg.description} />
         {arg.kind === 'str' ? (
           <Input type="text" value={String(values[key] ?? '')} onChange={(e) => setValue(key, e.target.value)} disabled={disabled} />
         ) : (
@@ -345,7 +365,17 @@ export function SchemaFormField({ arg, values, setValue, ctx, disabled }: Schema
       <div className="grid gap-2 rounded border p-2">
         <label className="flex items-center gap-2 text-xs">
           <input type="checkbox" checked={enabled} onChange={(e) => setValue(key, e.target.checked)} disabled={disabled} />
-          {arg.label ?? arg.flag}
+          <span>{arg.label ?? arg.flag}</span>
+          {arg.description && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button type="button" className="text-muted-foreground hover:text-foreground" tabIndex={-1} aria-label={`${arg.label ?? arg.flag} info`}>
+                  <CircleHelp className="size-3" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="top">{arg.description}</TooltipContent>
+            </Tooltip>
+          )}
         </label>
         {enabled && arg.args.map((child, idx) => (
           <SchemaFormField key={`flag-${arg.flag}-${child.kind === 'flag' ? child.flag : child.name}-${idx}`} arg={child} values={values} setValue={setValue} ctx={ctx} disabled={disabled} />
@@ -358,7 +388,7 @@ export function SchemaFormField({ arg, values, setValue, ctx, disabled }: Schema
     const selected = String(values[key] ?? arg.options[0] ?? '')
     return (
       <div className="grid gap-1.5">
-        <Label className="text-xs">{arg.label ?? arg.name}</Label>
+        <FieldLabel text={arg.label ?? arg.name} description={arg.description} />
         <Select value={selected} onValueChange={(value) => {
           setValue(key, value)
           for (const child of arg.yields[value] ?? []) seedDefaults(child, values, setValue, ctx)

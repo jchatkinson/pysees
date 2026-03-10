@@ -23,6 +23,11 @@ from typing import Any
 CALL_RE = re.compile(r"(?:^|[^A-Za-z0-9_])(?:ops\.)?([A-Za-z_]\w*)\s*\((.*)\)\s*$")
 FUNCTION_DIRECTIVE_RE = re.compile(r"^\s*\.\.\s+function::\s*(.+?)\s*$")
 PY_FUNCTION_DIRECTIVE_RE = re.compile(r"^\s*\.\.\s+py:function::\s*(.+?)\s*$")
+PARAM_ROW_RE = re.compile(r"^\s*``")
+PARAM_TYPE_RE = re.compile(r"\|[^|]+\|\s+(.*)$")
+PARAM_NAME_RE = re.compile(r"``([^`]+)``")
+DEFAULT_TEXT_RE = re.compile(r"default\s*[=:]\s*([^\s,;)\]]+)", re.IGNORECASE)
+OPTIONAL_TEXT_RE = re.compile(r"\(\s*optional\b", re.IGNORECASE)
 
 
 @dataclass(frozen=True)
@@ -114,6 +119,169 @@ def infer_arg(token: str) -> dict[str, Any]:
     return {"kind": "float", "name": bare or "value"}
 
   return {"kind": "str", "name": bare or "value"}
+
+
+def normalize_key(value: str) -> str:
+  return re.sub(r"[^a-z0-9]", "", value.lower())
+
+
+def parse_default_scalar(raw: str) -> Any | None:
+  token = raw.strip().strip(">").strip("<").strip(".,;:")
+  if not token:
+    return None
+  if (token.startswith("'") and token.endswith("'")) or (token.startswith('"') and token.endswith('"')):
+    return token[1:-1]
+  low = token.lower()
+  if low == "true":
+    return True
+  if low == "false":
+    return False
+  if re.match(r"^-?\d+$", token):
+    return int(token)
+  if re.match(r"^-?(?:\d+\.\d*|\d*\.\d+|\d+)(?:[eE][+-]?\d+)?$", token):
+    return float(token)
+  return token
+
+
+def extract_uniaxial_signature(lines: list[str]) -> tuple[str, list[str], int] | None:
+  i = 0
+  while i < len(lines):
+    line = lines[i]
+    d = FUNCTION_DIRECTIVE_RE.match(line) or PY_FUNCTION_DIRECTIVE_RE.match(line)
+    if not d:
+      i += 1
+      continue
+    sig_text = d.group(1).strip()
+    j = i + 1
+    while j < len(lines):
+      cont = lines[j]
+      cont_stripped = cont.strip()
+      if not cont_stripped:
+        break
+      if cont_stripped.startswith(".. "):
+        break
+      if cont_stripped.startswith(":"):
+        break
+      if len(cont) - len(cont.lstrip(" ")) == 0:
+        break
+      sig_text += " " + cont_stripped
+      j += 1
+    m = CALL_RE.search(sig_text)
+    if not m:
+      i = j
+      continue
+    fn = m.group(1)
+    if fn != "uniaxialMaterial":
+      i = j
+      continue
+    args = split_top_level_args(m.group(2).strip())
+    if not args:
+      i = j
+      continue
+    first = args[0].strip().strip("'\"")
+    if not first or normalize_key(first) == "mattype":
+      i = j
+      continue
+    return (first, args, i + 1)
+  return None
+
+
+def parse_signature_defaults(args: list[str]) -> dict[str, Any]:
+  out: dict[str, Any] = {}
+  for token in args:
+    t = token.strip().strip("<>").strip()
+    if not t or "=" not in t:
+      continue
+    left, right = t.split("=", 1)
+    name = left.strip().lstrip("*")
+    default_value = parse_default_scalar(right)
+    if not name or default_value is None:
+      continue
+    out[normalize_key(name)] = default_value
+  return out
+
+
+def parse_param_table(lines: list[str]) -> dict[str, dict[str, Any]]:
+  out: dict[str, dict[str, Any]] = {}
+  i = 0
+  while i < len(lines):
+    line = lines[i]
+    if not PARAM_ROW_RE.match(line):
+      i += 1
+      continue
+    names = [n.strip() for n in PARAM_NAME_RE.findall(line)]
+    if not names:
+      i += 1
+      continue
+    desc_match = PARAM_TYPE_RE.search(line)
+    desc = desc_match.group(1).strip() if desc_match else line.split("``")[-1].strip()
+    j = i + 1
+    while j < len(lines):
+      cont = lines[j]
+      stripped = cont.strip()
+      if not stripped:
+        break
+      if PARAM_ROW_RE.match(cont):
+        break
+      if stripped.startswith(".. ") or stripped.startswith(":"):
+        break
+      if re.fullmatch(r"[=\s]+", stripped):
+        break
+      desc += " " + stripped
+      j += 1
+    clean_desc = re.sub(r"\s+", " ", desc).strip()
+    optional = bool(OPTIONAL_TEXT_RE.search(clean_desc))
+    default_match = DEFAULT_TEXT_RE.search(clean_desc)
+    default_from_desc = parse_default_scalar(default_match.group(1)) if default_match else None
+    for raw_name in names:
+      normalized = normalize_key(raw_name.strip("'\""))
+      if not normalized:
+        continue
+      existing = out.get(normalized, {})
+      if not existing.get("description") and clean_desc:
+        existing["description"] = clean_desc
+      existing["required"] = not optional
+      if default_from_desc is not None:
+        existing["defaultFromDescription"] = default_from_desc
+      out[normalized] = existing
+    i = j
+  return out
+
+
+def extract_uniaxial_docs_metadata(rst_files: list[Path], root: Path) -> dict[str, Any]:
+  out: dict[str, Any] = {}
+  for rst in rst_files:
+    lines = rst.read_text(encoding="utf-8", errors="ignore").splitlines()
+    sig = extract_uniaxial_signature(lines)
+    if sig is None:
+      continue
+    mat_type, args, line_no = sig
+    mat_key = normalize_key(mat_type)
+    signature_defaults = parse_signature_defaults(args)
+    table_meta = parse_param_table(lines)
+    arg_meta: dict[str, Any] = {}
+    for token in args[1:]:
+      tok = token.strip().strip("<>").strip()
+      if not tok:
+        continue
+      raw_name = tok.split("=", 1)[0].strip().lstrip("*").strip()
+      key = normalize_key(raw_name)
+      if not key:
+        continue
+      meta = dict(table_meta.get(key, {}))
+      if key in signature_defaults:
+        meta["defaultFromSignature"] = signature_defaults[key]
+      if "required" not in meta:
+        meta["required"] = True
+      meta["name"] = raw_name
+      arg_meta[key] = meta
+    out[mat_key] = {
+      "matType": mat_type,
+      "source": str(rst.relative_to(root)),
+      "line": line_no,
+      "args": arg_meta,
+    }
+  return out
 
 
 def extract_signatures(
@@ -249,6 +417,7 @@ def main() -> None:
 
   commands = dedupe_signatures(signatures)
   commands = apply_overrides(commands, args.overrides)
+  uniaxial_docs = extract_uniaxial_docs_metadata(rst_files, docs_root)
 
   payload = {
     "generatedAt": datetime.now(timezone.utc).isoformat(),
@@ -256,6 +425,7 @@ def main() -> None:
     "rstFilesScanned": len(rst_files),
     "signaturesFound": len(signatures),
     "commands": commands,
+    "uniaxialMaterialDocs": uniaxial_docs,
   }
 
   args.output.parent.mkdir(parents=True, exist_ok=True)

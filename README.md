@@ -54,7 +54,7 @@ Schema-related scripts:
 - Extract schema candidates:
   `npm run schema:extract -- --docs-root /tmp/OpenSeesPyDoc --output src/generated/opensees-schema-candidates.json`
 - Build runtime schemas:
-  `npm run schema:build -- --input src/generated/opensees-schema-candidates.json --output src/generated/commandSchemas.generated.ts`
+  `npm run schema:build -- --input src/generated/opensees-schema-candidates.json --output src/generated/commandSchemas.generated.ts --uniaxial-defaults scripts/uniaxial-material-defaults.json`
 
 ### OpenSeesPy schema extraction
 
@@ -70,18 +70,28 @@ Use the reusable generator to parse OpenSeesPyDoc RST files and emit command sch
 Notes:
 - Default mode parses only RST function directives (`.. function::`, `.. py:function::`) to avoid prose/citation noise.
 - Optional fallback parsing (less strict): add `--include-code-calls` and/or `--include-inline-calls`.
+- The extractor also enriches `uniaxialMaterial` candidates with parsed argument metadata from docs tables:
+  - short descriptions for UI tooltips
+  - required/optional flags (`(optional)` text in docs marks optional; otherwise required)
+  - explicit defaults from signatures and `default=...` description text
 - The output is a candidate artifact intended for manual review before production use.
 
 ### Runtime schema generation
 
 Build normalized runtime schemas from extracted candidates:
 
-`npm run schema:build -- --input src/generated/opensees-schema-candidates.json --output src/generated/commandSchemas.generated.ts`
+`npm run schema:build -- --input src/generated/opensees-schema-candidates.json --output src/generated/commandSchemas.generated.ts --uniaxial-defaults scripts/uniaxial-material-defaults.json`
 
 This pass:
 - normalizes argument names and kinds
 - groups literal-first overloads into `choice` schemas
+- applies uniaxial doc metadata (description + required/optional + parsed defaults)
+- applies curated uniaxial fallback defaults from `scripts/uniaxial-material-defaults.json` when docs do not provide defaults
 - emits deterministic TypeScript for direct app import
+
+Recommended regeneration sequence after doc updates:
+1. `npm run schema:extract -- --docs-root /path/to/OpenSeesPyDoc --output src/generated/opensees-schema-candidates.json`
+2. `npm run schema:build -- --input src/generated/opensees-schema-candidates.json --output src/generated/commandSchemas.generated.ts --uniaxial-defaults scripts/uniaxial-material-defaults.json`
 
 ## Local Agent (material preview MVP)
 

@@ -128,14 +128,17 @@ function mapGeneratedArg(arg: GeneratedArgDef): ArgDef {
   if (arg.kind === 'choice') {
     const yields: Record<string, ArgDef[]> = {}
     for (const [key, value] of Object.entries(arg.yields)) yields[key] = value.map(mapGeneratedArg)
-    return { kind: 'choice', name: arg.name, label: titleCase(arg.name), options: arg.options, yields, defaultValue: arg.defaultValue }
+    return { kind: 'choice', name: arg.name, label: titleCase(arg.name), options: arg.options, yields, defaultValue: arg.defaultValue, description: arg.description, required: arg.required, defaultSource: arg.defaultSource }
   }
   if (arg.kind === 'vec') {
     const length: ArgLen = arg.length === 'dynamic' || arg.length === 'ndm' || arg.length === 'ndf' ? arg.length : Number(arg.length)
-    return { kind: 'vec', name: arg.name, label: titleCase(arg.name), length, defaultValue: [] }
+    return { kind: 'vec', name: arg.name, label: titleCase(arg.name), length, defaultValue: arg.defaultValue ?? [], description: arg.description, required: arg.required, defaultSource: arg.defaultSource }
   }
-  if (arg.kind === 'str') return { kind: arg.kind, name: arg.name, label: titleCase(arg.name), defaultValue: arg.literal ?? '' }
-  return { kind: arg.kind, name: arg.name, label: titleCase(arg.name), defaultValue: undefined }
+  if (arg.kind === 'str') {
+    const strDefault = arg.literal ?? (typeof arg.defaultValue === 'string' || typeof arg.defaultValue === 'number' ? arg.defaultValue : '')
+    return { kind: arg.kind, name: arg.name, label: titleCase(arg.name), defaultValue: strDefault, description: arg.description, required: arg.required, defaultSource: arg.defaultSource }
+  }
+  return { kind: arg.kind, name: arg.name, label: titleCase(arg.name), defaultValue: typeof arg.defaultValue === 'number' ? arg.defaultValue : undefined, description: arg.description, required: arg.required, defaultSource: arg.defaultSource }
 }
 
 const GENERATED_NON_V1_SCHEMAS: CommandSchema[] = GENERATED_COMMAND_SCHEMAS
@@ -269,7 +272,73 @@ export function initialValues(schema: CommandSchema, ctx: SchemaContext, model?:
   return out
 }
 
+function hasRequiredArgValue(arg: ArgDef, values: Record<string, unknown>, ctx: SchemaContext): boolean {
+  if (!arg.required) return true
+  if (arg.kind === 'int' || arg.kind === 'float') {
+    const value = values[arg.name]
+    if (value === undefined || value === null || value === '') return false
+    return Number.isFinite(Number(value))
+  }
+  if (arg.kind === 'str') {
+    if (arg.name === 'literal') return true
+    const value = values[arg.name]
+    return typeof value === 'string' ? value.trim().length > 0 : value !== undefined && value !== null
+  }
+  if (arg.kind === 'vec') {
+    const value = values[arg.name]
+    if (!Array.isArray(value)) return false
+    const len = resolveArgLen(arg.length, ctx)
+    if (len === 'dynamic') return value.length > 0 && value.every((item) => Number.isFinite(Number(item)))
+    if (value.length < len) return false
+    return Array.from({ length: len }, (_, i) => Number.isFinite(Number(value[i]))).every(Boolean)
+  }
+  if (arg.kind === 'idlist') {
+    const value = values[arg.name]
+    return Array.isArray(value) && value.length > 0 && value.every((item) => Number.isFinite(Number(item)) && Number(item) > 0)
+  }
+  if (arg.kind === 'flag') {
+    return Boolean(values[arg.flag])
+  }
+  if (arg.kind === 'choice') {
+    const selected = String(values[arg.name] ?? arg.defaultValue ?? '')
+    return selected.trim().length > 0
+  }
+  return true
+}
+
+function validateRequiredArgs(args: ArgDef[], values: Record<string, unknown>, ctx: SchemaContext): string | null {
+  for (const arg of args) {
+    if (!hasRequiredArgValue(arg, values, ctx)) return `${arg.label ?? arg.name} is required.`
+    if (arg.kind === 'flag' && Boolean(values[arg.flag])) {
+      const nested = validateRequiredArgs(arg.args, values, ctx)
+      if (nested) return nested
+    }
+    if (arg.kind === 'choice') {
+      const selected = String(values[arg.name] ?? arg.defaultValue ?? '')
+      const nested = validateRequiredArgs(arg.yields[selected] ?? [], values, ctx)
+      if (nested) return nested
+    }
+  }
+  return null
+}
+
+export function validateUniaxialMaterialValues(values: Record<string, unknown>, ctx: SchemaContext): string | null {
+  const schema = getAvailableSchemas(ctx.ndm).find((s) => s.cmd === 'OPS:uniaxialMaterial')
+  if (!schema) return null
+  const choice = schema.args.find((a): a is Extract<ArgDef, { kind: 'choice' }> => a.kind === 'choice' && a.name === 'matType')
+  if (!choice) return null
+  const matType = String(values.matType ?? choice.defaultValue ?? choice.options[0] ?? '').trim()
+  if (!matType) return 'Material type is required.'
+  const yielded = choice.yields[matType] ?? []
+  return validateRequiredArgs(yielded, values, ctx)
+}
+
 export function validateCommand(cmd: Command, model: ModelState) {
+  if (cmd.type === 'ADD_OPS' && cmd.fn === 'uniaxialMaterial') {
+    const ctx: SchemaContext = { ndm: model.config?.ndm ?? 3, ndf: model.config?.ndf ?? 6 }
+    const error = validateUniaxialMaterialValues(cmd.values, ctx)
+    if (error) return error
+  }
   if (cmd.type === 'FIX' || cmd.type === 'ADD_LOAD') {
     if (!model.nodes.has(cmd.nodeId)) return `Node ${cmd.nodeId} does not exist.`
   }
