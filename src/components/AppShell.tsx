@@ -12,7 +12,7 @@ export function AppShell() {
       <InitModal />
       <TopBar />
       <div className="flex-1 min-h-0 overflow-hidden">
-        <ResizablePanelGroup direction="horizontal">
+        <ResizablePanelGroup orientation="horizontal">
           <ResizablePanel defaultSize="20%">
             <HistoryPanel />
           </ResizablePanel>

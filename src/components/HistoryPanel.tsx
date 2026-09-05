@@ -105,7 +105,11 @@ export function HistoryPanel() {
   const toggleGroup = (g: DisplayGroup) => {
     setOverrides(prev => {
       const next = new Set(prev)
-      next.has(g.startIndex) ? next.delete(g.startIndex) : next.add(g.startIndex)
+      if (next.has(g.startIndex)) {
+        next.delete(g.startIndex)
+      } else {
+        next.add(g.startIndex)
+      }
       return next
     })
   }

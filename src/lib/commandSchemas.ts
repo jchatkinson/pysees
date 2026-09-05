@@ -36,10 +36,6 @@ function vec(name: string, label: string, length: number | 'ndm' | 'ndf', defaul
   return { kind: 'vec', name, label, length, defaultValue }
 }
 
-function int(name: string, label: string, defaultValue: number): ArgDef {
-  return { kind: 'int', name, label, defaultValue }
-}
-
 function generatedFn(fn: string) {
   return GENERATED_COMMAND_SCHEMAS.find((s) => s.fn === fn)
 }
@@ -308,7 +304,10 @@ function hasRequiredArgValue(arg: ArgDef, values: Record<string, unknown>, ctx: 
 
 function validateRequiredArgs(args: ArgDef[], values: Record<string, unknown>, ctx: SchemaContext): string | null {
   for (const arg of args) {
-    if (!hasRequiredArgValue(arg, values, ctx)) return `${arg.label ?? arg.name} is required.`
+    if (!hasRequiredArgValue(arg, values, ctx)) {
+      const name = arg.kind === 'flag' ? arg.flag : arg.name
+      return `${arg.label ?? name} is required.`
+    }
     if (arg.kind === 'flag' && Boolean(values[arg.flag])) {
       const nested = validateRequiredArgs(arg.args, values, ctx)
       if (nested) return nested
@@ -418,13 +417,13 @@ function flattenArgValues(arg: ArgDef, values: Record<string, unknown>, ctx: Sch
     return []
   }
   if (arg.kind === 'vec') {
-    const v = Array.isArray(values[arg.name]) ? values[arg.name] : []
+    const v = Array.isArray(values[arg.name]) ? (values[arg.name] as unknown[]) : []
     const len = resolveArgLen(arg.length, ctx)
-    if (len === 'dynamic') return v.map((x) => num(x))
+    if (len === 'dynamic') return v.map((x: unknown) => num(x))
     return Array.from({ length: len }, (_, i) => num(v[i]))
   }
   if (arg.kind === 'flag') {
-    if (!Boolean(values[arg.flag])) return []
+    if (!values[arg.flag]) return []
     return [arg.flag, ...arg.args.flatMap((child) => flattenArgValues(child, values, ctx, fallbackMatTag))]
   }
   if (arg.kind === 'choice') {

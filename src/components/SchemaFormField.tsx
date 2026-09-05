@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -52,9 +52,11 @@ function NumberInput({
   const [draft, setDraft] = useState(String(committed))
   const [focused, setFocused] = useState(false)
 
-  useEffect(() => {
+  const [prevCommitted, setPrevCommitted] = useState(committed)
+  if (committed !== prevCommitted) {
+    setPrevCommitted(committed)
     if (!focused) setDraft(String(committed))
-  }, [committed, focused])
+  }
 
   return (
     <Input
@@ -162,7 +164,9 @@ function IdListField({
   values,
   setValue,
   disabled,
-}: Pick<SchemaFormFieldProps, 'arg' | 'values' | 'setValue' | 'disabled'>) {
+}: Pick<SchemaFormFieldProps, 'values' | 'setValue' | 'disabled'> & {
+  arg: Extract<ArgDef, { kind: 'idlist' }>
+}) {
   const selectedNodeIds = useAppStore((s) => s.selectedNodeIds)
   const setSelectedNodeIds = useAppStore((s) => s.setSelectedNodeIds)
   const setNodePickMode = useAppStore((s) => s.setNodePickMode)
@@ -237,7 +241,8 @@ function VecField({
   const setNodePickMode = useAppStore((s) => s.setNodePickMode)
 
   const len = resolveArgLen(arg.length, ctx)
-  const arr = Array.isArray(values[arg.name]) ? (values[arg.name] as unknown[]) : []
+  const rawVec = values[arg.name]
+  const arr = useMemo(() => (Array.isArray(rawVec) ? (rawVec as unknown[]) : []), [rawVec])
   const label = arg.label ?? arg.name
 
   const [nextSlot, setNextSlot] = useState(0)

@@ -160,7 +160,7 @@ export function CommandForm() {
   const selectedHistoryIndex = useAppStore((s) => s.selectedHistoryIndex)
   const history = useAppStore((s) => s.history)
   const model = useModelState()
-  const ctx: SchemaContext = { ndm: model.config?.ndm ?? 3, ndf: model.config?.ndf ?? 6 }
+  const ctx = useMemo<SchemaContext>(() => ({ ndm: model.config?.ndm ?? 3, ndf: model.config?.ndf ?? 6 }), [model.config?.ndm, model.config?.ndf])
   const selectedCommand = selectedHistoryIndex !== null ? history.commands[selectedHistoryIndex] : null
   const editSchema = selectedCommand ? getSchemaForCommand(selectedCommand, ctx.ndm) : null
   const hasSelection = selectedHistoryIndex !== null
@@ -203,9 +203,16 @@ export function CommandForm() {
     setDeleteDialogOpen(true)
   }
 
-  useEffect(() => {
-    if (selectedSchema && selectedSchema.cmd !== selectedCmd) setSelectedCmd(selectedSchema.cmd)
-  }, [selectedSchema, selectedCmd])
+  const [prevSelectionKey, setPrevSelectionKey] = useState('')
+  const currentSelectionKey = `${selectedHistoryIndex}-${selectedSchema?.cmd}`
+  if (currentSelectionKey !== prevSelectionKey) {
+    setPrevSelectionKey(currentSelectionKey)
+    setActiveFormValues({})
+  }
+
+  if (selectedSchema && selectedSchema.cmd !== selectedCmd) {
+    setSelectedCmd(selectedSchema.cmd)
+  }
 
   useEffect(() => {
     const id = window.setTimeout(() => setDebouncedQuery(query), 300)
@@ -216,10 +223,6 @@ export function CommandForm() {
     if (isEditing && editSchema && selectedCommand) return
     if (!selectedSchema) setMaterialPreviewInputCommand(null)
   }, [isEditing, editSchema, selectedCommand, selectedSchema, setMaterialPreviewInputCommand])
-
-  useEffect(() => {
-    setActiveFormValues({})
-  }, [selectedHistoryIndex, selectedSchema?.cmd])
 
   useHotkeyRegistry([
     {

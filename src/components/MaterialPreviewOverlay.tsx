@@ -31,26 +31,22 @@ const HysteresisChartPanel = memo(function HysteresisChartPanel({
   scrubCount: number | null
 }) {
   const points = useAppStore((s) => s.materialPreview.points)
-  const [displayCount, setDisplayCount] = useState(0)
+  const [animCount, setAnimCount] = useState(0)
   const displayCountRef = useRef(0)
 
-  useEffect(() => {
-    displayCountRef.current = displayCount
-  }, [displayCount])
+  const [prevAnimateToken, setPrevAnimateToken] = useState(animateToken)
+  if (animateToken !== prevAnimateToken) {
+    setPrevAnimateToken(animateToken)
+    setAnimCount(0)
+  }
+
+  const effectiveCount = scrubCount !== null
+    ? Math.max(0, Math.min(points.length, scrubCount))
+    : Math.min(animCount, points.length)
 
   useEffect(() => {
-    setDisplayCount(0)
-    displayCountRef.current = 0
-  }, [animateToken])
-
-  useEffect(() => {
-    if (scrubCount === null) return
-    setDisplayCount(Math.max(0, Math.min(points.length, scrubCount)))
-  }, [points.length, scrubCount])
-
-  useEffect(() => {
-    if (displayCount > points.length) setDisplayCount(points.length)
-  }, [displayCount, points.length])
+    displayCountRef.current = effectiveCount
+  }, [effectiveCount])
 
   useEffect(() => {
     if (scrubCount !== null || displayCountRef.current >= points.length) return
@@ -65,8 +61,7 @@ const HysteresisChartPanel = memo(function HysteresisChartPanel({
       const progress = Math.min(1, (ts - startTs) / durationMs)
       const next = Math.round(startCount + distance * progress)
       if (next !== displayCountRef.current) {
-        displayCountRef.current = next
-        setDisplayCount(next)
+        setAnimCount(next)
       }
       if (progress < 1) raf = requestAnimationFrame(tick)
     }
@@ -74,7 +69,7 @@ const HysteresisChartPanel = memo(function HysteresisChartPanel({
     return () => cancelAnimationFrame(raf)
   }, [animateToken, points.length, scrubCount])
 
-  const animatedPoints = useMemo(() => points.slice(0, displayCount), [displayCount, points])
+  const animatedPoints = useMemo(() => points.slice(0, effectiveCount), [effectiveCount, points])
 
   return (
     <div className="rounded border p-2">
