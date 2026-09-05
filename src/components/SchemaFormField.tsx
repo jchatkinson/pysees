@@ -247,14 +247,10 @@ function VecField({
 
   const [nextSlot, setNextSlot] = useState(0)
   const activeRef = useRef(false)
-  const dynamicInit = arr.map((v) => String(num(v))).join(', ')
-  const [dynamicRaw, setDynamicRaw] = useState(dynamicInit)
-  const [dynamicFocused, setDynamicFocused] = useState(false)
-
-  useEffect(() => {
-    if (len !== 'dynamic' || dynamicFocused) return
-    setDynamicRaw(arr.map((v) => String(num(v))).join(', '))
-  }, [arr, dynamicFocused, len])
+  const [active, setActive] = useState(false)
+  const formattedVec = arr.map((v) => String(num(v))).join(', ')
+  const [dynamicOverride, setDynamicOverride] = useState<string | null>(null)
+  const dynamicRaw = dynamicOverride ?? formattedVec
 
   // When a pending pick arrives while this vec field is active, fill the next slot
   useEffect(() => {
@@ -276,15 +272,15 @@ function VecField({
           value={dynamicRaw}
           onChange={(e) => {
             const text = e.target.value
-            setDynamicRaw(text)
+            setDynamicOverride(text)
             const parsed = tryParseDynamicFloatList(text)
             if (parsed) setValue(arg.name, parsed)
           }}
-          onFocus={() => setDynamicFocused(true)}
+          onFocus={() => setDynamicOverride(dynamicRaw)}
           onBlur={() => {
-            setDynamicFocused(false)
             const parsed = tryParseDynamicFloatList(dynamicRaw)
             if (parsed) setValue(arg.name, parsed)
+            setDynamicOverride(null)
           }}
           placeholder="e.g. 1, 2, 3"
           disabled={disabled}
@@ -304,6 +300,7 @@ function VecField({
         onBlur={(e) => {
           if (arg.nodeSync && !e.currentTarget.contains(e.relatedTarget as Node)) {
             activeRef.current = false
+            setActive(false)
             setNodePickMode('none')
           }
         }}
@@ -321,6 +318,7 @@ function VecField({
             onFocus={() => {
               if (arg.nodeSync) {
                 activeRef.current = true
+                setActive(true)
                 setNextSlot(idx)
                 setNodePickMode('vec-sequential')
               }
@@ -329,7 +327,7 @@ function VecField({
           />
         ))}
       </div>
-      {arg.nodeSync && activeRef.current && (
+      {arg.nodeSync && active && (
         <p className="text-[10px] text-muted-foreground">
           Click nodes in viewport to fill sequentially
         </p>

@@ -137,10 +137,12 @@ export function MaterialPreviewOverlay() {
   const [protocolText, setProtocolText] = useState(previewProtocol.join(', '))
   const [animateToken, setAnimateToken] = useState(0)
   const [scrubCount, setScrubCount] = useState<number | null>(null)
+  const [syncedPreviewProtocol, setSyncedPreviewProtocol] = useState(previewProtocol)
 
-  useEffect(() => {
+  if (previewProtocol !== syncedPreviewProtocol) {
+    setSyncedPreviewProtocol(previewProtocol)
     setProtocolText(previewProtocol.join(', '))
-  }, [previewProtocol])
+  }
 
   const generatedProtocol = useMemo(() => generateLoadingProtocol({
     type: protocolType,
@@ -154,6 +156,7 @@ export function MaterialPreviewOverlay() {
 
   useEffect(() => {
     clearMaterialPreviewResult()
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- resets scrub position alongside the store's stale-result clear
     setScrubCount(null)
   }, [clearMaterialPreviewResult, previewInputCommand, protocolType, maxStrain, numCycles, strainIncrement, approxSteps, protocolText])
 

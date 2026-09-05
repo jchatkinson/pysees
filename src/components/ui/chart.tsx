@@ -44,7 +44,7 @@ function ChartStyle({ id, config }: { id: string; config: ChartConfig }) {
 
 export const ChartTooltip = RechartsPrimitive.Tooltip
 
-export function ChartTooltipContent({ active, payload }: RechartsPrimitive.TooltipProps<number, string>) {
+export function ChartTooltipContent({ active, payload }: Partial<RechartsPrimitive.TooltipContentProps<number, string>>) {
   if (!active || !payload?.length) return null
   return (
     <div className="rounded border bg-background px-2 py-1 text-[10px] shadow-sm">
