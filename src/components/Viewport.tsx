@@ -15,6 +15,7 @@ export function Viewport() {
   const [marquee, setMarquee] = useState<MarqueeRect | null>(null)
   const marqueeActive = useRef(false)
   const dragStart = useRef<{ x: number; y: number } | null>(null)
+  const suppressNextClick = useRef(false)
   const [shiftDown, setShiftDown] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
 
@@ -64,6 +65,16 @@ export function Viewport() {
           if (wasMarquee) {
             if (marquee) sceneRef.current.selectInRect(marquee)
             setMarquee(null)
+            // The browser still fires a native `click` after this pointerup (mousedown and
+            // mouseup landed on the same canvas element), which would otherwise hit the
+            // scene's empty-space handler and immediately clear the selection we just made.
+            suppressNextClick.current = true
+          }
+        }}
+        onClickCapture={(e) => {
+          if (suppressNextClick.current) {
+            suppressNextClick.current = false
+            e.stopPropagation()
           }
         }}
       >

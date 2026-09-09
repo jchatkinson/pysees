@@ -14,7 +14,13 @@ import { LoadsLayer } from './Loads'
 const NODE_HIT_RADIUS_PX = 12
 
 export type ViewportSceneRef = {
-  /** Select all nodes whose projected screen position falls inside the given canvas-relative rect */
+  /**
+   * Select nodes touched by a canvas-relative drag rect.
+   * `x1,y1` is the drag start and `x2,y2` is the drag end (not pre-sorted), so the
+   * direction of the drag can be determined: left-to-right is an exclusive "window"
+   * select (node marker must be fully inside the rect), right-to-left is an inclusive
+   * "crossing" select (node marker only needs to overlap the rect).
+   */
   selectInRect: (rect: { x1: number; y1: number; x2: number; y2: number }) => void
   /** Return the ID of the nearest node within hit radius of (x, y) in canvas pixels, or null */
   hitTestNode: (x: number, y: number) => number | null
@@ -42,12 +48,20 @@ export const ViewportScene = forwardRef<ViewportSceneRef, { shiftRotateEnabled?:
       const maxX = Math.max(x1, x2)
       const minY = Math.min(y1, y2)
       const maxY = Math.max(y1, y2)
+      // Left-to-right drag => exclusive "window" select (must be fully enclosed).
+      // Right-to-left drag => inclusive "crossing" select (partial overlap counts).
+      const exclusive = x2 >= x1
       const selected: number[] = []
       for (const node of model.nodes.values()) {
         const v = new Vector3(...toVec3(node.coords)).project(camera)
         const sx = (v.x + 1) * 0.5 * size.width
         const sy = (-v.y + 1) * 0.5 * size.height
-        if (sx >= minX && sx <= maxX && sy >= minY && sy <= maxY) selected.push(node.id)
+        const hit = exclusive
+          ? sx - NODE_HIT_RADIUS_PX >= minX && sx + NODE_HIT_RADIUS_PX <= maxX
+            && sy - NODE_HIT_RADIUS_PX >= minY && sy + NODE_HIT_RADIUS_PX <= maxY
+          : sx + NODE_HIT_RADIUS_PX >= minX && sx - NODE_HIT_RADIUS_PX <= maxX
+            && sy + NODE_HIT_RADIUS_PX >= minY && sy - NODE_HIT_RADIUS_PX <= maxY
+        if (hit) selected.push(node.id)
       }
       setSelectedNodeIds(selected)
     },
