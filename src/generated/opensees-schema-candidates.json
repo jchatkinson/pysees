@@ -26766,7 +26766,7 @@
       }
     ]
   },
-  "generatedAt": "2026-03-10T16:32:28.786084+00:00",
+  "generatedAt": "2026-03-10T17:17:31.347023+00:00",
   "rstFilesScanned": 536,
   "signaturesFound": 485,
   "source": "/home/jchat/projects/OpenSeesPyDoc",
@@ -26774,41 +26774,49 @@
     "axialsp": {
       "args": {
         "bcy": {
+          "declaredType": "float",
           "description": "reduction rate for tensile elastic range ( ``bte``), tensile yielding ( ``bty``) and compressive yielding ( ``bcy``) (see note 1)",
           "name": "bcy",
           "required": true
         },
         "bte": {
+          "declaredType": "float",
           "description": "reduction rate for tensile elastic range ( ``bte``), tensile yielding ( ``bty``) and compressive yielding ( ``bcy``) (see note 1)",
           "name": "bte",
           "required": true
         },
         "bty": {
+          "declaredType": "float",
           "description": "reduction rate for tensile elastic range ( ``bte``), tensile yielding ( ``bty``) and compressive yielding ( ``bcy``) (see note 1)",
           "name": "bty",
           "required": true
         },
         "fcr": {
+          "declaredType": "float",
           "description": "target point stress (see note 1)",
           "name": "fcr",
           "required": true
         },
         "fcy": {
+          "declaredType": "float",
           "description": "yield stress under tension ( ``fty``) and compression ( ``fcy``) (see note 1)",
           "name": "fcy",
           "required": true
         },
         "fty": {
+          "declaredType": "float",
           "description": "yield stress under tension ( ``fty``) and compression ( ``fcy``) (see note 1)",
           "name": "fty",
           "required": true
         },
         "mattag": {
+          "declaredType": "int",
           "description": "integer tag identifying material",
           "name": "matTag",
           "required": true
         },
         "sce": {
+          "declaredType": "float",
           "description": "compressive modulus",
           "name": "sce",
           "required": true
@@ -26821,51 +26829,61 @@
     "axialsphd": {
       "args": {
         "ath": {
+          "declaredType": "float",
           "description": "hardening strain ratio to yield strain",
           "name": "ath",
           "required": true
         },
         "bcy": {
+          "declaredType": "float",
           "description": "reduction rate for tensile elastic range (``bte``), tensile yielding (``bty``), tensile hardening ( ``bth``) and compressive yielding (``bcy``) (see note 1)",
           "name": "bcy",
           "required": true
         },
         "bte": {
+          "declaredType": "float",
           "description": "reduction rate for tensile elastic range (``bte``), tensile yielding (``bty``), tensile hardening ( ``bth``) and compressive yielding (``bcy``) (see note 1)",
           "name": "bte",
           "required": true
         },
         "bth": {
+          "declaredType": "float",
           "description": "reduction rate for tensile elastic range (``bte``), tensile yielding (``bty``), tensile hardening ( ``bth``) and compressive yielding (``bcy``) (see note 1)",
           "name": "bth",
           "required": true
         },
         "bty": {
+          "declaredType": "float",
           "description": "reduction rate for tensile elastic range (``bte``), tensile yielding (``bty``), tensile hardening ( ``bth``) and compressive yielding (``bcy``) (see note 1)",
           "name": "bty",
           "required": true
         },
         "fcr": {
+          "declaredType": "float",
           "description": "target point stress (see note 1)",
           "name": "fcr",
           "required": true
         },
         "fcy": {
+          "declaredType": "float",
           "description": "yield stress under tension (``fty``) and compression (``fcy``) (see note 1)",
           "name": "fcy",
           "required": true
         },
         "fty": {
+          "declaredType": "float",
           "description": "yield stress under tension (``fty``) and compression (``fcy``) (see note 1)",
           "name": "fty",
           "required": true
         },
         "mattag": {
+          "declaredType": "int",
           "description": "integer tag identifying material",
           "name": "matTag",
           "required": true
         },
         "sce": {
+          "declaredType": "float",
           "description": "compressive modulus",
           "name": "sce",
           "required": true
@@ -26878,11 +26896,13 @@
     "backbone": {
       "args": {
         "backbonetag": {
+          "declaredType": "int",
           "description": "integer tag identifying a predefined backbone function.",
           "name": "backboneTag",
           "required": true
         },
         "mattag": {
+          "declaredType": "int",
           "description": "integer tag identifying material",
           "name": "matTag",
           "required": true
@@ -26895,6 +26915,7 @@
     "barslip": {
       "args": {
         "anclratio": {
+          "declaredType": "float",
           "defaultFromDescription": 1.0,
           "defaultFromSignature": 1.0,
           "description": "floating point value defining the ratio of anchorage length used for the reinforcing bar to the dimension of the joint in the direction of the reinforcing bar (optional, default: 1.0)",
@@ -26902,79 +26923,94 @@
           "required": false
         },
         "bsflag": {
+          "declaredType": "str",
           "description": "string indicating relative bond strength for the anchored reinforcing bar (options: ``'Strong'`` or ``'Weak'``)",
           "name": "bsFlag",
           "required": true
         },
         "damage": {
-          "defaultFromDescription": "``'Damage'``",
+          "declaredType": "str",
+          "defaultFromDescription": "Damage",
           "defaultFromSignature": "Damage",
           "description": "string indicating type of damage:whether there is full damage in the material or no damage (optional, options: ``'Damage'``, ``'NoDamage'`` ; default: ``'Damage'``)",
           "name": "damage",
           "required": false
         },
         "db": {
+          "declaredType": "float",
           "description": "point value defining the diameter of reinforcing steel",
           "name": "db",
           "required": true
         },
         "depth": {
+          "declaredType": "float",
           "description": "floating point value defining the dimension of the member (beam or column) perpendicular to the dimension of the plane of the paper",
           "name": "depth",
           "required": true
         },
         "eh": {
+          "declaredType": "float",
           "description": "floating point value defining the hardening modulus of the reinforcing steel",
           "name": "Eh",
           "required": true
         },
         "es": {
+          "declaredType": "float",
           "description": "floating point value defining the modulus of elasticity of the reinforcing steel",
           "name": "Es",
           "required": true
         },
         "fc": {
+          "declaredType": "float",
           "description": "positive floating point value defining the compressive strength of the concrete in which the reinforcing bar is anchored",
           "name": "fc",
           "required": true
         },
         "fu": {
+          "declaredType": "float",
           "description": "positive floating point value defining the ultimate strength of the reinforcing steel",
           "name": "fu",
           "required": true
         },
         "fy": {
+          "declaredType": "float",
           "description": "positive floating point value defining the yield strength of the reinforcing steel",
           "name": "fy",
           "required": true
         },
         "height": {
+          "declaredType": "float",
           "description": "floating point value defining the height of the flexural member, perpendicular to direction in which the reinforcing steel is placed, but in the plane of the paper",
           "name": "height",
           "required": true
         },
         "ld": {
+          "declaredType": "float",
           "description": "floating point value defining the development length of the reinforcing steel",
           "name": "ld",
           "required": true
         },
         "mattag": {
+          "declaredType": "int",
           "description": "integer tag identifying material",
           "name": "matTag",
           "required": true
         },
         "nb": {
+          "declaredType": "int",
           "description": "an integer defining the number of anchored bars",
           "name": "nb",
           "required": true
         },
         "type": {
+          "declaredType": "str",
           "description": "string indicating where the reinforcing bar is placed. (options: ``'beamtop'``, ``'beambot'`` or ``'column'``)",
           "name": "type",
           "required": true
         },
         "unit": {
-          "defaultFromDescription": "``'psi'``",
+          "declaredType": "str",
+          "defaultFromDescription": "psi",
           "defaultFromSignature": "psi",
           "description": "string indicating the type of unit system used (optional, options: ``'psi'``, ``'MPa'``, ``'Pa'``, ``'psf'``, ``'ksi'``, ``'ksf'``) (default: ``'psi'`` / ``'MPa'``)",
           "name": "unit",
@@ -26988,86 +27024,103 @@
     "bilin": {
       "args": {
         "asneg": {
+          "declaredType": "float",
           "description": "strain hardening ratio for negative loading direction",
           "name": "as_Neg",
           "required": true
         },
         "asplus": {
+          "declaredType": "float",
           "description": "strain hardening ratio for positive loading direction",
           "name": "as_Plus",
           "required": true
         },
         "ca": {
+          "declaredType": "float",
           "description": "rate of accelerated reloading deterioration. The default value is 1.0.",
           "name": "c_A",
           "required": true
         },
         "cc": {
+          "declaredType": "float",
           "description": "rate of post-capping strength deterioration. The default value is 1.0.",
           "name": "c_C",
           "required": true
         },
         "ck": {
+          "declaredType": "float",
           "description": "rate of unloading stiffness deterioration. The default value is 1.0.",
           "name": "c_K",
           "required": true
         },
         "cs": {
+          "declaredType": "float",
           "description": "rate of strength deterioration. The default value is 1.0.",
           "name": "c_S",
           "required": true
         },
         "dneg": {
+          "declaredType": "float",
           "description": "rate of cyclic deterioration in the negative loading direction (this parameter is used to create assymetric hysteretic behavior for the case of a composite beam). For symmetric hysteretic response use 1.0.",
           "name": "D_Neg",
           "required": true
         },
         "dplus": {
+          "declaredType": "float",
           "description": "rate of cyclic deterioration in the positive loading direction (this parameter is used to create assymetric hysteretic behavior for the case of a composite beam). For symmetric hysteretic response use 1.0.",
           "name": "D_Plus",
           "required": true
         },
         "k0": {
+          "declaredType": "float",
           "description": "elastic stiffness",
           "name": "K0",
           "required": true
         },
         "lamdaa": {
+          "declaredType": "float",
           "description": "Cyclic deterioration parameter for acceleration reloading stiffness deterioration (is not a deterioration mode for a component with Bilinear hysteretic response) [Input value is required, but not used; set Lamda_A = 0].",
           "name": "Lamda_A",
           "required": true
         },
         "lamdac": {
+          "declaredType": "float",
           "description": "Cyclic deterioration parameter for post-capping strength deterioration [E_t=Lamda_C*M_y; set Lamda_C = 0 to disable this mode of deterioration]",
           "name": "Lamda_C",
           "required": true
         },
         "lamdak": {
+          "declaredType": "float",
           "description": "Cyclic deterioration parameter for unloading stiffness deterioration [E_t=Lamda_K*M_y; set Lamda_k = 0 to disable this mode of deterioration]",
           "name": "Lamda_K",
           "required": true
         },
         "lamdas": {
+          "declaredType": "float",
           "description": "Cyclic deterioration parameter for strength deterioration [E_t=Lamda_S*M_y; set Lamda_S = 0 to disable this mode of deterioration]",
           "name": "Lamda_S",
           "required": true
         },
         "mattag": {
+          "declaredType": "int",
           "description": "integer tag identifying material",
           "name": "matTag",
           "required": true
         },
         "myneg": {
+          "declaredType": "float",
           "description": "effective yield strength for negative loading direction (negative value)",
           "name": "My_Neg",
           "required": true
         },
         "myplus": {
+          "declaredType": "float",
           "description": "effective yield strength for positive loading direction",
           "name": "My_Plus",
           "required": true
         },
         "nfactor": {
+          "declaredType": "float",
           "defaultFromDescription": 0,
           "defaultFromSignature": 0.0,
           "description": "elastic stiffness amplification factor, mainly for use with concentrated plastic hinge elements (optional, default = 0).",
@@ -27075,41 +27128,49 @@
           "required": false
         },
         "resneg": {
+          "declaredType": "float",
           "description": "residual strength ratio for negative loading direction (positive value)",
           "name": "Res_Neg",
           "required": true
         },
         "respos": {
+          "declaredType": "float",
           "description": "residual strength ratio for positive loading direction",
           "name": "Res_Pos",
           "required": true
         },
         "thetapcneg": {
+          "declaredType": "float",
           "description": "post-capping rotation for negative loading direction (positive value)",
           "name": "theta_pc_Neg",
           "required": true
         },
         "thetapcplus": {
+          "declaredType": "float",
           "description": "post-capping rotation for positive loading direction",
           "name": "theta_pc_Plus",
           "required": true
         },
         "thetapneg": {
+          "declaredType": "float",
           "description": "pre-capping rotation for negative loading direction (often noted as plastic rotation capacity) (positive value)",
           "name": "theta_p_Neg",
           "required": true
         },
         "thetapplus": {
+          "declaredType": "float",
           "description": "pre-capping rotation for positive loading direction (often noted as plastic rotation capacity)",
           "name": "theta_p_Plus",
           "required": true
         },
         "thetauneg": {
+          "declaredType": "float",
           "description": "ultimate rotation capacity for negative loading direction (positive value)",
           "name": "theta_u_Neg",
           "required": true
         },
         "thetauplus": {
+          "declaredType": "float",
           "description": "ultimate rotation capacity for positive loading direction",
           "name": "theta_u_Plus",
           "required": true
@@ -27122,17 +27183,20 @@
     "bilinearoildamper": {
       "args": {
         "abstol": {
+          "declaredType": "float",
           "defaultFromSignature": 1e-10,
           "description": "Tolerance for absolute error control of adaptive iterative algorithm (default value 10^-10)",
           "name": "AbsTol",
           "required": true
         },
         "cd": {
+          "declaredType": "float",
           "description": "Damping coefficient",
           "name": "Cd",
           "required": true
         },
         "fr": {
+          "declaredType": "float",
           "defaultFromDescription": 1.0,
           "defaultFromSignature": 1.0,
           "description": "Damper relief load (default=1.0, Damper property)",
@@ -27140,34 +27204,40 @@
           "required": true
         },
         "kel": {
+          "declaredType": "float",
           "description": "Elastic stiffness of linear spring to model the axial flexibility of a viscous damper (e.g. combined stiffness of the supporting brace and internal damper portion)",
           "name": "K_el",
           "required": true
         },
         "lgap": {
+          "declaredType": "float",
           "defaultFromSignature": 0.0,
           "description": "Gap length to simulate the gap length due to the pin tolerance",
           "name": "LGap",
           "required": true
         },
         "mattag": {
+          "declaredType": "int",
           "description": "integer tag identifying material",
           "name": "matTag",
           "required": true
         },
         "maxhalf": {
+          "declaredType": "int",
           "defaultFromSignature": 15,
           "description": "Maximum number of sub-step iterations within an integration step (default value 15)",
           "name": "MaxHalf",
           "required": true
         },
         "nm": {
+          "declaredType": "int",
           "defaultFromSignature": 1,
           "description": "Employed adaptive numerical algorithm (default value NM = 1;",
           "name": "NM",
           "required": true
         },
         "p": {
+          "declaredType": "float",
           "defaultFromDescription": 1.0,
           "defaultFromSignature": 1.0,
           "description": "Post-relief viscous damping coefficient ratio (default=1.0, linear oil damper)",
@@ -27175,6 +27245,7 @@
           "required": true
         },
         "reltol": {
+          "declaredType": "float",
           "defaultFromSignature": 1e-06,
           "description": "Tolerance for absolute relative error control of the adaptive iterative algorithm (default value 10^-6)",
           "name": "RelTol",
@@ -27188,36 +27259,43 @@
     "bondsp01": {
       "args": {
         "b": {
+          "declaredType": "float",
           "description": "Initial hardening ratio in the monotonic slip vs. bar stress response (0.3~0.5)",
           "name": "b",
           "required": true
         },
         "fu": {
+          "declaredType": "float",
           "description": "Ultimate strength of the reinforcement steel",
           "name": "Fu",
           "required": true
         },
         "fy": {
+          "declaredType": "float",
           "description": "Yield strength of the reinforcement steel",
           "name": "Fy",
           "required": true
         },
         "mattag": {
+          "declaredType": "int",
           "description": "integer tag identifying material",
           "name": "matTag",
           "required": true
         },
         "r": {
+          "declaredType": "float",
           "description": "Pinching factor for the cyclic slip vs. bar response (0.5~1.0)",
           "name": "R",
           "required": true
         },
         "su": {
+          "declaredType": "float",
           "description": "Rebar slip at the loaded end at the bar fracture strength",
           "name": "Su",
           "required": true
         },
         "sy": {
+          "declaredType": "float",
           "description": "Rebar slip at member interface under yield stress. (see NOTES below)",
           "name": "Sy",
           "required": true
@@ -27230,51 +27308,61 @@
     "boucwen": {
       "args": {
         "alpha": {
+          "declaredType": "float",
           "description": "ratio of post-yield stiffness to the initial elastic stiffenss (0< alpha <1)",
           "name": "alpha",
           "required": true
         },
         "ao": {
+          "declaredType": "float",
           "description": "parameters that control tangent stiffness",
           "name": "Ao",
           "required": true
         },
         "beta": {
+          "declaredType": "float",
           "description": "parameters that control shape of hysteresis loop; depending on the values of gamma and beta softening, hardening or quasi-linearity can be simulated (look at the NOTES)",
           "name": "beta",
           "required": true
         },
         "deltaa": {
+          "declaredType": "float",
           "description": "parameters that control tangent stiffness",
           "name": "deltaA",
           "required": true
         },
         "deltaeta": {
+          "declaredType": "float",
           "description": "parameters that control material degradation",
           "name": "deltaEta",
           "required": true
         },
         "deltanu": {
+          "declaredType": "float",
           "description": "parameters that control material degradation",
           "name": "deltaNu",
           "required": true
         },
         "gamma": {
+          "declaredType": "float",
           "description": "parameters that control shape of hysteresis loop; depending on the values of gamma and beta softening, hardening or quasi-linearity can be simulated (look at the NOTES)",
           "name": "gamma",
           "required": true
         },
         "ko": {
+          "declaredType": "float",
           "description": "initial elastic stiffness",
           "name": "ko",
           "required": true
         },
         "mattag": {
+          "declaredType": "int",
           "description": "integer tag identifying material",
           "name": "matTag",
           "required": true
         },
         "n": {
+          "declaredType": "float",
           "description": "parameter that controls transition from linear to nonlinear range (as n increases the transition becomes sharper; n is usually grater or equal to 1)",
           "name": "n",
           "required": true
@@ -27287,76 +27375,91 @@
     "bwbn": {
       "args": {
         "alpha": {
+          "declaredType": "float",
           "description": "ratio of post-yield stiffness to the initial elastic stiffenss (0< alpha <1)",
           "name": "alpha",
           "required": true
         },
         "ao": {
+          "declaredType": "float",
           "description": "parameter that controls tangent stiffness",
           "name": "Ao",
           "required": true
         },
         "beta": {
+          "declaredType": "float",
           "description": "parameters that control shape of hysteresis loop; depending on the values of gamma and beta softening, hardening or quasi-linearity can be simulated (look at the BoucWen Material)",
           "name": "beta",
           "required": true
         },
         "deltashi": {
+          "declaredType": "float",
           "description": "parameters that control pinching",
           "name": "deltaShi",
           "required": true
         },
         "gamma": {
+          "declaredType": "float",
           "description": "parameters that control shape of hysteresis loop; depending on the values of gamma and beta softening, hardening or quasi-linearity can be simulated (look at the BoucWen Material)",
           "name": "gamma",
           "required": true
         },
         "ko": {
+          "declaredType": "float",
           "description": "initial elastic stiffness",
           "name": "ko",
           "required": true
         },
         "lambda": {
+          "declaredType": "float",
           "description": "parameters that control pinching",
           "name": "lambda",
           "required": true
         },
         "mattag": {
+          "declaredType": "int",
           "description": "integer tag identifying material",
           "name": "matTag",
           "required": true
         },
         "maxiter": {
+          "declaredType": "float",
           "description": "maximum iterations",
           "name": "maxIter",
           "required": true
         },
         "n": {
+          "declaredType": "float",
           "description": "parameter that controls transition from linear to nonlinear range (as n increases the transition becomes sharper; n is usually grater or equal to 1)",
           "name": "n",
           "required": true
         },
         "p": {
+          "declaredType": "float",
           "description": "parameters that control pinching",
           "name": "p",
           "required": true
         },
         "q": {
+          "declaredType": "float",
           "description": "parameters that control pinching",
           "name": "q",
           "required": true
         },
         "shi": {
+          "declaredType": "float",
           "description": "parameters that control pinching",
           "name": "Shi",
           "required": true
         },
         "tol": {
+          "declaredType": "float",
           "description": "tolerance",
           "name": "tol",
           "required": true
         },
         "zetas": {
+          "declaredType": "float",
           "description": "parameters that control pinching",
           "name": "zetas",
           "required": true
@@ -27369,12 +27472,14 @@
     "cast": {
       "args": {
         "a1": {
+          "declaredType": "float",
           "defaultFromSignature": "s2*Pp/Kp",
           "description": "isotropic hardening parameter, increase of compression yield envelope as proportion of yield strength after a plastic deformation of a2*(Pp/Kp)",
           "name": "a1",
           "required": true
         },
         "a2": {
+          "declaredType": "float",
           "defaultFromDescription": 1.0,
           "defaultFromSignature": 1.0,
           "description": "isotropic hardening parameter (see explanation under a1). (optional default = 1.0)",
@@ -27382,12 +27487,14 @@
           "required": false
         },
         "a3": {
+          "declaredType": "float",
           "defaultFromSignature": "a4*Pp/Kp",
           "description": "isotropic hardening parameter, increase of tension yield envelope as proportion of yield strength after a plastic deformation of a4*(Pp/Kp)",
           "name": "a3",
           "required": true
         },
         "a4": {
+          "declaredType": "float",
           "defaultFromDescription": 1.0,
           "defaultFromSignature": 1.0,
           "description": "isotropic hardening parameter (see explanation under a3). (optional default = 1.0)",
@@ -27395,56 +27502,67 @@
           "required": false
         },
         "b": {
+          "declaredType": "float",
           "description": "Strain hardening ratio",
           "name": "b",
           "required": true
         },
         "bo": {
+          "declaredType": "float",
           "description": "Width of an individual yielding finger at its base of the CSF-brace",
           "name": "bo",
           "required": true
         },
         "cr1": {
+          "declaredType": "float",
           "description": "Parameter that controls the Bauschinger effect. Recommended Value cR1=0.925",
           "name": "cR1",
           "required": true
         },
         "cr2": {
+          "declaredType": "float",
           "description": "Parameter that controls the Bauschinger effect. Recommended Value cR2=0.150",
           "name": "cR2",
           "required": true
         },
         "e": {
+          "declaredType": "float",
           "description": "Modulus of elasticity of the steel material of the yielding finger",
           "name": "E",
           "required": true
         },
         "fy": {
+          "declaredType": "float",
           "description": "Yield strength of the steel material of the yielding finger",
           "name": "fy",
           "required": true
         },
         "h": {
+          "declaredType": "float",
           "description": "Thickness of an individual yielding finger",
           "name": "h",
           "required": true
         },
         "l": {
+          "declaredType": "float",
           "description": "Height of an individual yielding finger",
           "name": "L",
           "required": true
         },
         "mattag": {
+          "declaredType": "int",
           "description": "integer tag identifying material",
           "name": "matTag",
           "required": true
         },
         "n": {
+          "declaredType": "int",
           "description": "Number of yield fingers of the CSF-brace",
           "name": "n",
           "required": true
         },
         "ro": {
+          "declaredType": "float",
           "description": "Parameter that controls the Bauschinger effect. Recommended Values for $Ro=between 10 to 30",
           "name": "Ro",
           "required": true
@@ -27457,86 +27575,103 @@
     "cfssswp": {
       "args": {
         "af": {
+          "declaredType": "float",
           "description": "Framing cross section area (mm2)",
           "name": "Af",
           "required": true
         },
         "ds": {
+          "declaredType": "float",
           "description": "Screws diameter (mm)",
           "name": "ds",
           "required": true
         },
         "dt": {
+          "declaredType": "float",
           "description": "Anchor bolt's diameter (mm)",
           "name": "dt",
           "required": true
         },
         "fuf": {
+          "declaredType": "float",
           "description": "Tensile strength of framing members (MPa)",
           "name": "fuf",
           "required": true
         },
         "fus": {
+          "declaredType": "float",
           "description": "Tensile strength of steel sheet sheathing (MPa)",
           "name": "fus",
           "required": true
         },
         "fyf": {
+          "declaredType": "float",
           "description": "Yield strength of framing members (MPa)",
           "name": "fyf",
           "required": true
         },
         "fys": {
+          "declaredType": "float",
           "description": "Yield strength of steel sheet sheathing (MPa)",
           "name": "fys",
           "required": true
         },
         "height": {
+          "declaredType": "float",
           "description": "SWP's height (mm)",
           "name": "height",
           "required": true
         },
         "mattag": {
+          "declaredType": "int",
           "description": "integer tag identifying material",
           "name": "matTag",
           "required": true
         },
         "np": {
+          "declaredType": "float",
           "description": "Sheathing number (one or two sides sheathed)",
           "name": "np",
           "required": true
         },
         "openingarea": {
+          "declaredType": "float",
           "description": "Total area of openings (mm2)",
           "name": "openingArea",
           "required": true
         },
         "openinglength": {
+          "declaredType": "float",
           "description": "Cumulative length of openings (mm)",
           "name": "openingLength",
           "required": true
         },
         "sc": {
+          "declaredType": "float",
           "description": "Screw spacing on the SWP perimeter (mm)",
           "name": "sc",
           "required": true
         },
         "tf": {
+          "declaredType": "float",
           "description": "Framing thickness (mm)",
           "name": "tf",
           "required": true
         },
         "ts": {
+          "declaredType": "float",
           "description": "Sheathing thickness (mm)",
           "name": "ts",
           "required": true
         },
         "vs": {
+          "declaredType": "float",
           "description": "Screws shear strength (N)",
           "name": "Vs",
           "required": true
         },
         "width": {
+          "declaredType": "float",
           "description": "SWP's width (mm)",
           "name": "width",
           "required": true
@@ -27549,81 +27684,97 @@
     "cfswswp": {
       "args": {
         "ds": {
+          "declaredType": "float",
           "description": "Screws diameter (mm)",
           "name": "ds",
           "required": true
         },
         "fut": {
+          "declaredType": "float",
           "description": "Tensile strength of framing members (MPa)",
           "name": "fut",
           "required": true
         },
         "height": {
+          "declaredType": "float",
           "description": "SWP's height (mm)",
           "name": "height",
           "required": true
         },
         "ife": {
+          "declaredType": "float",
           "description": "Moment of inertia of the double end-stud (mm4)",
           "name": "Ife",
           "required": true
         },
         "ifi": {
+          "declaredType": "float",
           "description": "Moment of inertia of the intermediate stud (mm4)",
           "name": "Ifi",
           "required": true
         },
         "mattag": {
+          "declaredType": "int",
           "description": "integer tag identifying material",
           "name": "matTag",
           "required": true
         },
         "nc": {
+          "declaredType": "float",
           "description": "Total number of screws located on the SWP perimeter",
           "name": "nc",
           "required": true
         },
         "np": {
+          "declaredType": "float",
           "description": "Sheathing number (one or two sides sheathed)",
           "name": "np",
           "required": true
         },
         "openingarea": {
+          "declaredType": "float",
           "description": "Total area of openings (mm2)",
           "name": "openingArea",
           "required": true
         },
         "openinglength": {
+          "declaredType": "float",
           "description": "Cumulative length of openings (mm)",
           "name": "openingLength",
           "required": true
         },
         "sc": {
+          "declaredType": "float",
           "description": "Screw spacing on the SWP perimeter (mm)",
           "name": "sc",
           "required": true
         },
         "tf": {
+          "declaredType": "float",
           "description": "Framing thickness (mm)",
           "name": "tf",
           "required": true
         },
         "ts": {
+          "declaredType": "float",
           "description": "Sheathing thickness (mm)",
           "name": "ts",
           "required": true
         },
         "type": {
+          "declaredType": "int",
           "description": "Integer identifier used to define wood sheathing type (DFP=1, OSB=2, CSP=3)",
           "name": "type",
           "required": true
         },
         "vs": {
+          "declaredType": "float",
           "description": "Screws shear strength (N)",
           "name": "Vs",
           "required": true
         },
         "width": {
+          "declaredType": "float",
           "description": "SWP's width (mm)",
           "name": "width",
           "required": true
@@ -27636,26 +27787,31 @@
     "concrete01": {
       "args": {
         "epsc0": {
+          "declaredType": "float",
           "description": "concrete strain at maximum strength",
           "name": "epsc0",
           "required": true
         },
         "epsu": {
+          "declaredType": "float",
           "description": "concrete strain at crushing strength",
           "name": "epsU",
           "required": true
         },
         "fpc": {
+          "declaredType": "float",
           "description": "concrete compressive strength at 28 days (compression is negative)",
           "name": "fpc",
           "required": true
         },
         "fpcu": {
+          "declaredType": "float",
           "description": "concrete crushing strength",
           "name": "fpcu",
           "required": true
         },
         "mattag": {
+          "declaredType": "int",
           "description": "integer tag identifying material",
           "name": "matTag",
           "required": true
@@ -27668,33 +27824,39 @@
     "concrete01withsitc": {
       "args": {
         "endstrainsitc": {
+          "declaredType": "float",
           "defaultFromDescription": 0.03,
           "defaultFromSignature": 0.01,
           "description": "optional, default = 0.03",
           "name": "endStrainSITC",
-          "required": true
+          "required": false
         },
         "epsc0": {
+          "declaredType": "float",
           "description": "concrete strain at maximum strength",
           "name": "epsc0",
           "required": true
         },
         "epsu": {
+          "declaredType": "float",
           "description": "concrete strain at crushing strength",
           "name": "epsU",
           "required": true
         },
         "fpc": {
+          "declaredType": "float",
           "description": "concrete compressive strength at 28 days (compression is negative)",
           "name": "fpc",
           "required": true
         },
         "fpcu": {
+          "declaredType": "float",
           "description": "concrete crushing strength",
           "name": "fpcu",
           "required": true
         },
         "mattag": {
+          "declaredType": "int",
           "description": "integer tag identifying material",
           "name": "matTag",
           "required": true
@@ -27707,41 +27869,49 @@
     "concrete02": {
       "args": {
         "epsc0": {
+          "declaredType": "float",
           "description": "concrete strain at maximum strength",
           "name": "epsc0",
           "required": true
         },
         "epsu": {
+          "declaredType": "float",
           "description": "concrete strain at crushing strength",
           "name": "epsU",
           "required": true
         },
         "ets": {
+          "declaredType": "float",
           "description": "tension softening stiffness (absolute value) (slope of the linear tension softening branch)",
           "name": "Ets",
           "required": true
         },
         "fpc": {
+          "declaredType": "float",
           "description": "concrete compressive strength at 28 days (compression is negative)",
           "name": "fpc",
           "required": true
         },
         "fpcu": {
+          "declaredType": "float",
           "description": "concrete crushing strength",
           "name": "fpcu",
           "required": true
         },
         "ft": {
+          "declaredType": "float",
           "description": "tensile strength",
           "name": "ft",
           "required": true
         },
         "lambda": {
+          "declaredType": "float",
           "description": "ratio between unloading slope at $epscu and initial slope",
           "name": "lambda",
           "required": true
         },
         "mattag": {
+          "declaredType": "int",
           "description": "integer tag identifying material",
           "name": "matTag",
           "required": true
@@ -27754,41 +27924,49 @@
     "concrete04": {
       "args": {
         "beta": {
+          "declaredType": "float",
           "description": "loating point value defining the exponential curve parameter to define the residual stress (as a factor of ft) at etu",
           "name": "beta",
           "required": true
         },
         "ec": {
+          "declaredType": "float",
           "description": "floating point values defining initial stiffness",
           "name": "Ec",
           "required": true
         },
         "epsc": {
+          "declaredType": "float",
           "description": "floating point values defining concrete strain at maximum strength",
           "name": "epsc",
           "required": true
         },
         "epscu": {
+          "declaredType": "float",
           "description": "floating point values defining concrete strain at crushing strength",
           "name": "epscu",
           "required": true
         },
         "et": {
+          "declaredType": "float",
           "description": "floating point value defining ultimate tensile strain of concrete (optional)",
           "name": "et",
           "required": false
         },
         "fc": {
+          "declaredType": "float",
           "description": "floating point values defining concrete compressive strength at 28 days (compression is negative)",
           "name": "fc",
           "required": true
         },
         "fct": {
+          "declaredType": "float",
           "description": "floating point value defining the maximum tensile strength of concrete (optional)",
           "name": "fct",
           "required": false
         },
         "mattag": {
+          "declaredType": "int",
           "description": "integer tag identifying material",
           "name": "matTag",
           "required": true
@@ -27801,51 +27979,61 @@
     "concrete06": {
       "args": {
         "alpha1": {
+          "declaredType": "float",
           "description": ":math:`\\alpha_1` parameter for compressive plastic strain definition",
           "name": "alpha1",
           "required": true
         },
         "alpha2": {
+          "declaredType": "float",
           "description": ":math:`\\alpha_2` parameter for tensile plastic strain definition",
           "name": "alpha2",
           "required": true
         },
         "b": {
+          "declaredType": "float",
           "description": "exponent of the tension stiffening curve",
           "name": "b",
           "required": true
         },
         "e0": {
+          "declaredType": "float",
           "description": "strain at compressive strength",
           "name": "e0",
           "required": true
         },
         "ecr": {
+          "declaredType": "float",
           "description": "tensile strain at peak stress (fcr)",
           "name": "ecr",
           "required": true
         },
         "fc": {
+          "declaredType": "float",
           "description": "concrete compressive strength (compression is negative)",
           "name": "fc",
           "required": true
         },
         "fcr": {
+          "declaredType": "float",
           "description": "tensile strength",
           "name": "fcr",
           "required": true
         },
         "k": {
+          "declaredType": "float",
           "description": "post-peak compressive shape factor",
           "name": "k",
           "required": true
         },
         "mattag": {
+          "declaredType": "int",
           "description": "integer tag identifying material",
           "name": "matTag",
           "required": true
         },
         "n": {
+          "declaredType": "float",
           "description": "compressive shape factor",
           "name": "n",
           "required": true
@@ -27858,46 +28046,55 @@
     "concrete07": {
       "args": {
         "ec": {
+          "declaredType": "float",
           "description": "Initial Elastic modulus of the concrete",
           "name": "Ec",
           "required": true
         },
         "epsc": {
+          "declaredType": "float",
           "description": "concrete strain at maximum compressive strength",
           "name": "epsc",
           "required": true
         },
         "et": {
+          "declaredType": "float",
           "description": "tensile strain at max tensile strength of concrete",
           "name": "et",
           "required": true
         },
         "fc": {
+          "declaredType": "float",
           "description": "concrete compressive strength (compression is negative)",
           "name": "fc",
           "required": true
         },
         "ft": {
+          "declaredType": "float",
           "description": "tensile strength of concrete (tension is positive)",
           "name": "ft",
           "required": true
         },
         "mattag": {
+          "declaredType": "int",
           "description": "integer tag identifying material",
           "name": "matTag",
           "required": true
         },
         "r": {
+          "declaredType": "float",
           "description": "Parameter that controls the nonlinear descending branch",
           "name": "r",
           "required": true
         },
         "xn": {
+          "declaredType": "float",
           "description": "Non-dimensional term that defines the strain at which the straight line descent begins in compression",
           "name": "xn",
           "required": true
         },
         "xp": {
+          "declaredType": "float",
           "description": "Non-dimensional term that defines the strain at which the straight line descent begins in tension",
           "name": "xp",
           "required": true
@@ -27910,37 +28107,44 @@
     "concretecm": {
       "args": {
         "ec": {
+          "declaredType": "float",
           "description": "Initial tangent modulus (:math:`E_c`)",
           "name": "Ec",
           "required": true
         },
         "epcc": {
+          "declaredType": "float",
           "description": "Strain at compressive strength (:math:`\\epsilon'_c`)",
           "name": "epcc",
           "required": true
         },
         "et": {
+          "declaredType": "float",
           "description": "Strain at tensile strength (:math:`\\epsilon_t`)",
           "name": "et",
           "required": true
         },
         "fpcc": {
+          "declaredType": "float",
           "description": "Compressive strength (:math:`f'_c`)",
           "name": "fpcc",
           "required": true
         },
         "ft": {
+          "declaredType": "float",
           "description": "Tensile strength (:math:`f_t`)",
           "name": "ft",
           "required": true
         },
         "gapclose": {
+          "declaredType": "float",
           "defaultFromSignature": 0,
           "description": "optional, denote next parameter is ``GapClose``",
           "name": "GapClose",
-          "required": true
+          "required": false
         },
         "mattag": {
+          "declaredType": "int",
           "description": "integer tag identifying material",
           "name": "matTag",
           "required": true
@@ -27948,24 +28152,28 @@
         "mon": {
           "description": "optional, monotonic stress-strain relationship only: mon=1 (invoked in FSAM only), mon=0 (no impact since monotonic)",
           "name": "mon",
-          "required": true
+          "required": false
         },
         "rc": {
+          "declaredType": "float",
           "description": "Shape parameter in Tsai's equation defined for compression (:math:`r_c`)",
           "name": "rc",
           "required": true
         },
         "rt": {
+          "declaredType": "float",
           "description": "Shape parameter in Tsai's equation defined for tension (:math:`r_t`)",
           "name": "rt",
           "required": true
         },
         "xcrn": {
+          "declaredType": "float",
           "description": "Non-dimensional critical strain on compression envelope (:math:`\\epsilon^{-}_{cr}`, where the envelope curve starts following a straight line)",
           "name": "xcrn",
           "required": true
         },
         "xcrp": {
+          "declaredType": "float",
           "description": "Non-dimensional critical strain on tension envelope (:math:`\\epsilon^{+}_{cr}`, where the envelope curve starts following a straight line - large value [e.g., 10000] recommended when tension stiffening is considered)",
           "name": "xcrp",
           "required": true
@@ -27978,53 +28186,63 @@
     "concreted": {
       "args": {
         "alphac": {
+          "declaredType": "float",
           "description": "compressive descending parameter",
           "name": "alphac",
           "required": true
         },
         "alphat": {
+          "declaredType": "float",
           "description": "tensile descending parameter",
           "name": "alphat",
           "required": true
         },
         "cesp": {
+          "declaredType": "float",
           "defaultFromSignature": 0.25,
           "description": "plastic parameter, recommended values: 0.2~0.3",
           "name": "cesp",
           "required": true
         },
         "ec": {
+          "declaredType": "float",
           "description": "concrete initial Elastic modulus",
           "name": "Ec",
           "required": true
         },
         "epsc": {
+          "declaredType": "float",
           "description": "concrete strain at corresponding to compressive strength",
           "name": "epsc",
           "required": true
         },
         "epst": {
+          "declaredType": "float",
           "description": "concrete strain at corresponding to tensile strength",
           "name": "epst",
           "required": true
         },
         "etap": {
+          "declaredType": "float",
           "defaultFromSignature": 1.15,
           "description": "plastic parameter, recommended values: 1.0~1.3",
           "name": "etap",
           "required": true
         },
         "fc": {
+          "declaredType": "float",
           "description": "concrete compressive strength",
           "name": "fc",
           "required": true
         },
         "ft": {
+          "declaredType": "float",
           "description": "concrete tensile strength",
           "name": "ft",
           "required": true
         },
         "mattag": {
+          "declaredType": "int",
           "description": "integer tag identifying material",
           "name": "matTag",
           "required": true
@@ -28037,47 +28255,56 @@
     "confinedconcrete01": {
       "args": {
         "ec": {
+          "declaredType": "float",
           "description": "initial elastic modulus of unconfined concrete.",
           "name": "Ec",
           "required": true
         },
         "epsculimit": {
+          "declaredType": "float",
           "description": "Unknown",
           "name": "epscuLimit",
           "required": true
         },
         "epscutype": {
+          "declaredType": "str",
           "defaultFromDescription": 0.05,
           "description": "Method to define confined concrete ultimate strain - ``-epscu`` then value is confined concrete ultimate strain, - ``-gamma`` then value is the ratio of the strength corresponding to ultimate strain to the peak strength of the confined concrete stress-strain curve. If ``gamma`` cannot be achieved in the range [0, epscuLimit] then epscuLimit (optional, default: 0.05) will be assumed as ultimate strain.",
           "name": "epscu_type",
           "required": false
         },
         "epscuval": {
+          "declaredType": "float",
           "description": "Value for the definition of the concrete ultimate strain",
           "name": "epscu_val",
           "required": true
         },
         "es0": {
+          "declaredType": "float",
           "description": "elastic modulus of the hoop steel.",
           "name": "Es0",
           "required": true
         },
         "fpc": {
+          "declaredType": "float",
           "description": "unconfined cylindrical strength of concrete specimen.",
           "name": "fpc",
           "required": true
         },
         "fyh": {
+          "declaredType": "float",
           "description": "yielding strength of the hoop steel.",
           "name": "fyh",
           "required": true
         },
         "gravel": {
+          "declaredType": "str",
           "description": "Unknown",
           "name": "'-gravel'",
           "required": true
         },
         "haratio": {
+          "declaredType": "float",
           "description": "hardening ratio of the hoop steel.",
           "name": "haRatio",
           "required": true
@@ -28087,66 +28314,79 @@
           "required": true
         },
         "internalargs": {
+          "declaredType": "listf",
           "description": "``internalArgs= [phisi, Si, fyhi, Es0i, haRatioi, mui]`` optional parameters for defining the internal transverse reinforcement. If they are not specified they will be assumed equal to the external ones (for ``S2``, ``S3``, ``S4a``, ``S4b`` and ``S5`` typed).",
           "name": "internalArgs",
-          "required": true
+          "required": false
         },
         "l1": {
+          "declaredType": "float",
           "description": "length/diameter of square/circular core section measured respect to the hoop center line.",
           "name": "L1",
           "required": true
         },
         "l2": {
+          "declaredType": "float",
           "description": "additional dimensions when multiple hoops are being used.",
           "name": "L2",
           "required": true
         },
         "l3": {
+          "declaredType": "float",
           "description": "additional dimensions when multiple hoops are being used.",
           "name": "L3",
           "required": true
         },
         "mattag": {
+          "declaredType": "int",
           "description": "integer tag identifying material",
           "name": "matTag",
           "required": true
         },
         "maxnumiter": {
+          "declaredType": "int",
           "description": "Unknown",
           "name": "maxNumIter",
           "required": true
         },
         "mu": {
+          "declaredType": "float",
           "description": "ductility factor of the hoop steel.",
           "name": "mu",
           "required": true
         },
         "nu": {
+          "declaredType": "str",
           "description": "or |list| Definition for Poisson's Ratio. - ``['-nu', <value of Poisson's ratio>]`` - ``'-varub'`` Poisson's ratio is defined as a function of axial strain by means of the expression proposed by Braga et al. (2006) with the upper bound equal to 0.5 -``'-varnoub'`` Poisson's ratio is defined as a function of axial strain by means of the expression proposed by Braga et al. (2006) without any upper bound.",
           "name": "nu",
           "required": true
         },
         "philon": {
+          "declaredType": "float",
           "description": "diameter of longitudinal bars.",
           "name": "phiLon",
           "required": true
         },
         "phis": {
+          "declaredType": "float",
           "description": "hoop diameter. If section arrangement has multiple hoops it refers to the external hoop.",
           "name": "phis",
           "required": true
         },
         "s": {
+          "declaredType": "float",
           "description": "hoop spacing.",
           "name": "S",
           "required": true
         },
         "sectype": {
+          "declaredType": "str",
           "description": "tag for the transverse reinforcement configuration. see image below.",
           "name": "secType",
           "required": true
         },
         "silica": {
+          "declaredType": "str",
           "description": "Unknown",
           "name": "'-silica'",
           "required": true
@@ -28157,6 +28397,7 @@
           "required": true
         },
         "tol": {
+          "declaredType": "float",
           "description": "Unknown",
           "name": "tol",
           "required": true
@@ -28166,9 +28407,10 @@
           "required": true
         },
         "wrapargs": {
+          "declaredType": "listf",
           "description": "``wrapArgs=[cover, Am, Sw, ful, Es0w]`` optional parameters required when section is strengthened with FRP wraps.",
           "name": "wrapArgs",
-          "required": true
+          "required": false
         }
       },
       "line": 7,
@@ -28178,41 +28420,49 @@
     "doddrestrepo": {
       "args": {
         "esh": {
+          "declaredType": "float",
           "description": "Tensile strain at initiation of strain hardening",
           "name": "ESH",
           "required": true
         },
         "eshi": {
+          "declaredType": "float",
           "description": "Tensile strain for a point on strain hardening curve, recommended range of values for ESHI: [ (ESU + 5*ESH)/6, (ESU + 3*ESH)/4]",
           "name": "ESHI",
           "required": true
         },
         "esu": {
+          "declaredType": "float",
           "description": "Tensile strain at the UTS",
           "name": "ESU",
           "required": true
         },
         "fshi": {
+          "declaredType": "float",
           "description": "Tensile stress at point on strain hardening curve corresponding to ESHI",
           "name": "FSHI",
           "required": true
         },
         "fsu": {
+          "declaredType": "float",
           "description": "Ultimate tensile strength (UTS)",
           "name": "Fsu",
           "required": true
         },
         "fy": {
+          "declaredType": "float",
           "description": "Yield strength",
           "name": "Fy",
           "required": true
         },
         "mattag": {
+          "declaredType": "int",
           "description": "integer tag identifying material",
           "name": "matTag",
           "required": true
         },
         "omegafac": {
+          "declaredType": "float",
           "defaultFromDescription": 1.0,
           "defaultFromSignature": 1.0,
           "description": "Roundedness factor for Bauschinger curve in cycle reversals from the strain hardening curve. Range: [0.75, 1.15]. Largest value tends to near a bilinear Bauschinger curve. Default = 1.0.",
@@ -28220,6 +28470,7 @@
           "required": true
         },
         "youngs": {
+          "declaredType": "float",
           "description": "Modulus of elasticity",
           "name": "Youngs",
           "required": true
@@ -28232,76 +28483,91 @@
     "ecc01": {
       "args": {
         "alphac": {
+          "declaredType": "float",
           "description": "exponent of the unloading curve in the compressive softening",
           "name": "alphaC",
           "required": true
         },
         "alphacu": {
+          "declaredType": "float",
           "description": "exponent of the compressive softening curve (use 1 for linear softening)",
           "name": "alphaCU",
           "required": true
         },
         "alphat1": {
+          "declaredType": "float",
           "description": "exponent of the unloading curve in tensile strain hardening region",
           "name": "alphaT1",
           "required": true
         },
         "alphat2": {
+          "declaredType": "float",
           "description": "exponent of the unloading curve in tensile softening region",
           "name": "alphaT2",
           "required": true
         },
         "betac": {
+          "declaredType": "float",
           "description": "parameter to determine permanent strain in compression",
           "name": "betaC",
           "required": true
         },
         "betat": {
+          "declaredType": "float",
           "description": "parameter to determine permanent strain in tension",
           "name": "betaT",
           "required": true
         },
         "epsc0": {
+          "declaredType": "float",
           "description": "strain at compressive strength (see NOTES)",
           "name": "epsc0",
           "required": true
         },
         "epsc1": {
+          "declaredType": "float",
           "description": "ultimate compressive strain (see NOTES)",
           "name": "epsc1",
           "required": true
         },
         "epst0": {
+          "declaredType": "float",
           "description": "strain at tensile cracking stress",
           "name": "epst0",
           "required": true
         },
         "epst1": {
+          "declaredType": "float",
           "description": "strain at peak tensile stress",
           "name": "epst1",
           "required": true
         },
         "epst2": {
+          "declaredType": "float",
           "description": "ultimate tensile strain",
           "name": "epst2",
           "required": true
         },
         "mattag": {
+          "declaredType": "int",
           "description": "integer tag identifying material",
           "name": "matTag",
           "required": true
         },
         "sigc0": {
+          "declaredType": "float",
           "description": "compressive strength (see NOTES)",
           "name": "sigc0",
           "required": true
         },
         "sigt0": {
+          "declaredType": "float",
           "description": "tensile cracking stress",
           "name": "sigt0",
           "required": true
         },
         "sigt1": {
+          "declaredType": "float",
           "description": "peak tensile stress",
           "name": "sigt1",
           "required": true
@@ -28314,11 +28580,13 @@
     "elastic": {
       "args": {
         "e": {
+          "declaredType": "float",
           "description": "tangent",
           "name": "E",
           "required": true
         },
         "eneg": {
+          "declaredType": "float",
           "defaultFromDescription": "E",
           "defaultFromSignature": "E",
           "description": "tangent in compression (optional, default=E)",
@@ -28326,6 +28594,7 @@
           "required": false
         },
         "eta": {
+          "declaredType": "float",
           "defaultFromDescription": 0.0,
           "defaultFromSignature": 0.0,
           "description": "damping tangent (optional, default=0.0)",
@@ -28333,6 +28602,7 @@
           "required": false
         },
         "mattag": {
+          "declaredType": "int",
           "description": "integer tag identifying material",
           "name": "matTag",
           "required": true
@@ -28345,45 +28615,49 @@
     "elasticbilin": {
       "args": {
         "en1": {
-          "defaultFromDescription": "``EP1``",
+          "declaredType": "float",
+          "defaultFromDescription": "EP1",
           "defaultFromSignature": "EP1",
           "description": "optional, default = ``EP1``. tangent in compression for stains: 0 < strains <= ``epsN2``",
           "name": "EN1",
-          "required": true
+          "required": false
         },
         "en2": {
-          "defaultFromDescription": "``EP2``",
+          "declaredType": "float",
+          "defaultFromDescription": "EP2",
           "defaultFromSignature": "EP2",
           "description": "optional, default = ``EP2``. tangent in compression with strains < ``epsN2``",
           "name": "EN2",
-          "required": true
+          "required": false
         },
         "ep1": {
-          "defaultFromDescription": "``EP1``",
+          "declaredType": "float",
           "description": "tangent in tension for stains: 0 <= strains <= ``epsP2``",
           "name": "EP1",
           "required": true
         },
         "ep2": {
-          "defaultFromDescription": "``EP2``",
+          "declaredType": "float",
           "description": "tangent when material in tension with strains > ``epsP2``",
           "name": "EP2",
           "required": true
         },
         "epsn2": {
-          "defaultFromDescription": "``-epsP2``",
+          "declaredType": "float",
+          "defaultFromDescription": "-epsP2",
           "defaultFromSignature": "-epsP2",
-          "description": "optional, default = ``EP1``. tangent in compression for stains: 0 < strains <= ``epsN2``",
+          "description": "optional, default = ``-epsP2``. strain at which material changes tangent in compression.",
           "name": "epsN2",
-          "required": true
+          "required": false
         },
         "epsp2": {
-          "defaultFromDescription": "``-epsP2``",
-          "description": "tangent in tension for stains: 0 <= strains <= ``epsP2``",
+          "declaredType": "float",
+          "description": "strain at which material changes tangent in tension.",
           "name": "epsP2",
           "required": true
         },
         "mattag": {
+          "declaredType": "int",
           "description": "integer tag identifying material",
           "name": "matTag",
           "required": true
@@ -28396,6 +28670,7 @@
     "elasticmultilinear": {
       "args": {
         "eta": {
+          "declaredType": "float",
           "defaultFromDescription": 0.0,
           "defaultFromSignature": 0.0,
           "description": "damping tangent (optional, default=0.0)",
@@ -28403,16 +28678,19 @@
           "required": false
         },
         "mattag": {
+          "declaredType": "int",
           "description": "integer tag identifying material",
           "name": "matTag",
           "required": true
         },
         "strain": {
+          "declaredType": "listf",
           "description": "list of strain points along stress-strain curve",
           "name": "strain",
           "required": true
         },
         "stress": {
+          "declaredType": "listf",
           "description": "list of stress points along stress-strain curve",
           "name": "stress",
           "required": true
@@ -28425,11 +28703,13 @@
     "elasticpp": {
       "args": {
         "e": {
+          "declaredType": "float",
           "description": "tangent",
           "name": "E",
           "required": true
         },
         "eps0": {
+          "declaredType": "float",
           "defaultFromDescription": "zero",
           "defaultFromSignature": 0.0,
           "description": "initial strain (optional, default: zero)",
@@ -28437,17 +28717,20 @@
           "required": false
         },
         "epsyn": {
+          "declaredType": "float",
           "defaultFromSignature": "epsyP",
           "description": "strain or deformation at which material reaches plastic state in compression. (optional, default is tension value)",
           "name": "epsyN",
           "required": false
         },
         "epsyp": {
+          "declaredType": "float",
           "description": "strain or deformation at which material reaches plastic state in tension",
           "name": "epsyP",
           "required": true
         },
         "mattag": {
+          "declaredType": "int",
           "description": "integer tag identifying material",
           "name": "matTag",
           "required": true
@@ -28460,33 +28743,39 @@
     "elasticppgap": {
       "args": {
         "damage": {
+          "declaredType": "str",
           "defaultFromSignature": "noDamage",
           "description": "an optional string to specify whether to accumulate damage or not in the material. With the default string, ``'noDamage'`` the gap material will re-center on load reversal. If the string ``'damage'`` is provided this recentering will not occur and gap will grow.",
           "name": "damage",
-          "required": true
+          "required": false
         },
         "e": {
+          "declaredType": "float",
           "description": "tangent",
           "name": "E",
           "required": true
         },
         "eta": {
+          "declaredType": "float",
           "defaultFromSignature": 0.0,
           "description": "hardening ratio (=Eh/E), which can be negative",
           "name": "eta",
           "required": true
         },
         "fy": {
+          "declaredType": "float",
           "description": "stress or force at which material reaches plastic state",
           "name": "Fy",
           "required": true
         },
         "gap": {
+          "declaredType": "float",
           "description": "initial gap (strain or deformation)",
           "name": "gap",
           "required": true
         },
         "mattag": {
+          "declaredType": "int",
           "description": "integer tag identifying material",
           "name": "matTag",
           "required": true
@@ -28499,11 +28788,13 @@
     "ent": {
       "args": {
         "e": {
+          "declaredType": "float",
           "description": "tangent",
           "name": "E",
           "required": true
         },
         "mattag": {
+          "declaredType": "int",
           "description": "integer tag identifying material",
           "name": "matTag",
           "required": true
@@ -28516,35 +28807,41 @@
     "fatigue": {
       "args": {
         "e0": {
+          "declaredType": "float",
           "defaultFromSignature": 0.191,
           "description": "Value of strain at which one cycle will cause failure (default 0.191)",
           "name": "E0",
           "required": true
         },
         "m": {
+          "declaredType": "float",
           "defaultFromSignature": -0.458,
           "description": "Slope of Coffin-Manson curve in log-log space (default -0.458)",
           "name": "m",
           "required": true
         },
         "mattag": {
+          "declaredType": "int",
           "description": "integer tag identifying material",
           "name": "matTag",
           "required": true
         },
         "max": {
+          "declaredType": "float",
           "defaultFromSignature": 1e+16,
           "description": "Global maximum value for strain or deformation (default 1e16)",
           "name": "max",
           "required": true
         },
         "min": {
+          "declaredType": "float",
           "defaultFromSignature": -1e+16,
           "description": "Global minimum value for strain or deformation (default -1e16)",
           "name": "min",
           "required": true
         },
         "othertag": {
+          "declaredType": "float",
           "description": "Unique material object integer tag for the material that is being wrapped",
           "name": "otherTag",
           "required": true
@@ -28557,96 +28854,115 @@
     "frpconfinedconcrete": {
       "args": {
         "c": {
+          "declaredType": "float",
           "description": "dimension of concrete cover (until the outer edge of steel stirrups)",
           "name": "c",
           "required": true
         },
         "d": {
+          "declaredType": "float",
           "description": "diameter of the circular section.",
           "name": "D",
           "required": true
         },
         "dlong": {
+          "declaredType": "float",
           "description": "diameter of the longitudinal bars of the circular section.",
           "name": "dlong",
           "required": true
         },
         "dtrans": {
+          "declaredType": "float",
           "description": "diameter of the steel spiral/stirrups.",
           "name": "dtrans",
           "required": true
         },
         "ej": {
+          "declaredType": "float",
           "description": "elastic modulus of the fiber reinforced polymer (FRP) jacket.",
           "name": "Ej",
           "required": true
         },
         "eju": {
+          "declaredType": "float",
           "description": "rupture strain of the FRP jacket from tensile coupons.",
           "name": "eju",
           "required": true
         },
         "epsc0": {
+          "declaredType": "float",
           "description": "strain corresponding to unconfined concrete strength.",
           "name": "epsc0",
           "required": true
         },
         "es": {
+          "declaredType": "float",
           "description": "elastic modulus of steel.",
           "name": "Es",
           "required": true
         },
         "fpc1": {
+          "declaredType": "float",
           "description": "concrete core compressive strength.",
           "name": "fpc1",
           "required": true
         },
         "fpc2": {
+          "declaredType": "float",
           "description": "concrete cover compressive strength.",
           "name": "fpc2",
           "required": true
         },
         "fyh": {
+          "declaredType": "float",
           "description": "yielding strength of the steel spiral/stirrups.",
           "name": "fyh",
           "required": true
         },
         "fyl": {
+          "declaredType": "float",
           "description": "yielding strength of longitudinal steel bars.",
           "name": "fyl",
           "required": true
         },
         "k": {
+          "declaredType": "float",
           "description": "reduction factor for the rupture strain of the FRP jacket, recommended values 0.5-0.8.",
           "name": "k",
           "required": true
         },
         "mattag": {
+          "declaredType": "int",
           "description": "integer tag identifying material",
           "name": "matTag",
           "required": true
         },
         "nu0": {
+          "declaredType": "float",
           "description": "initial Poisson's coefficient for concrete.",
           "name": "nu0",
           "required": true
         },
         "s": {
+          "declaredType": "float",
           "description": "spacing of the steel spiral/stirrups.",
           "name": "S",
           "required": true
         },
         "sj": {
+          "declaredType": "float",
           "description": "clear spacing of the FRP strips - zero if FRP jacket is continuous.",
           "name": "Sj",
           "required": true
         },
         "tj": {
+          "declaredType": "float",
           "description": "total thickness of the FRP jacket.",
           "name": "tj",
           "required": true
         },
         "usebuck": {
+          "declaredType": "float",
           "description": "FRP jacket failure criterion due to buckling of longitudinal compressive steel bars (0 = not include it, 1= to include it).",
           "name": "useBuck",
           "required": true
@@ -28659,76 +28975,91 @@
     "frpconfinedconcrete02": {
       "args": {
         "ec": {
+          "declaredType": "float",
           "description": "elastic modulus of unconfined concrete (=4730\u221a(-$fc0(MPa)))",
           "name": "Ec",
           "required": true
         },
         "ec0": {
+          "declaredType": "float",
           "description": "axial strain corresponding to unconfined concrete strength (\u2248 0.002)",
           "name": "ec0",
           "required": true
         },
         "ecu": {
+          "declaredType": "float",
           "description": "ultimate strain of FRP-confined concrete",
           "name": "ecu",
           "required": true
         },
         "efrp": {
+          "declaredType": "float",
           "description": "tensile elastic modulus of an FRP jacket",
           "name": "Efrp",
           "required": true
         },
         "erup": {
+          "declaredType": "float",
           "description": "hoop rupture strain of an FRP jacket",
           "name": "erup",
           "required": true
         },
         "ets": {
+          "declaredType": "float",
           "description": "stiffness of tensile softening (\u2248 0.05 Ec)",
           "name": "Ets",
           "required": true
         },
         "fc0": {
+          "declaredType": "float",
           "description": "compressive strength of unconfined concrete (compression is negative)",
           "name": "fc0",
           "required": true
         },
         "fcu": {
+          "declaredType": "float",
           "description": "ultimate stress of FRP-confined concrete ($fcu \u2265 $fc0)",
           "name": "fcu",
           "required": true
         },
         "ft": {
+          "declaredType": "float",
           "description": "tensile strength of unconfined concrete (=0.632\u221a(-$fc0(MPa)))",
           "name": "ft",
           "required": true
         },
         "jacketc": {
+          "declaredType": "str",
           "description": "input parameters of the FRP jacket in a circular section",
           "name": "'-JacketC'",
           "required": true
         },
         "mattag": {
+          "declaredType": "int",
           "description": "integer tag identifying material",
           "name": "matTag",
           "required": true
         },
         "r": {
+          "declaredType": "float",
           "description": "radius of circular column section",
           "name": "R",
           "required": true
         },
         "tfrp": {
+          "declaredType": "float",
           "description": "thickness of an FRP jacket",
           "name": "tfrp",
           "required": true
         },
         "ultimate": {
+          "declaredType": "str",
           "description": "input ultimate stress/strain directly",
           "name": "'-Ultimate'",
           "required": true
         },
         "unit": {
+          "declaredType": "float",
           "description": "unit indicator, Unit = 1 for SI Metric Units; Unit = 0 for US Customary Units",
           "name": "Unit",
           "required": true
@@ -28741,11 +29072,13 @@
     "hardening": {
       "args": {
         "e": {
+          "declaredType": "float",
           "description": "tangent stiffness",
           "name": "E",
           "required": true
         },
         "eta": {
+          "declaredType": "float",
           "defaultFromDescription": 0.0,
           "defaultFromSignature": 0.0,
           "description": "visco-plastic coefficient (optional, default=0.0)",
@@ -28753,21 +29086,25 @@
           "required": false
         },
         "hiso": {
+          "declaredType": "float",
           "description": "isotropic hardening Modulus",
           "name": "H_iso",
           "required": true
         },
         "hkin": {
+          "declaredType": "float",
           "description": "kinematic hardening Modulus",
           "name": "H_kin",
           "required": true
         },
         "mattag": {
+          "declaredType": "int",
           "description": "integer tag identifying material",
           "name": "matTag",
           "required": true
         },
         "sigmay": {
+          "declaredType": "float",
           "description": "yield stress or force",
           "name": "sigmaY",
           "required": true
@@ -28780,31 +29117,37 @@
     "hyperbolicgapmaterial": {
       "args": {
         "fult": {
+          "declaredType": "float",
           "description": "ultimate (maximum) passive resistance",
           "name": "Fult",
           "required": true
         },
         "gap": {
+          "declaredType": "float",
           "description": "initial gap",
           "name": "gap",
           "required": true
         },
         "kmax": {
+          "declaredType": "float",
           "description": "initial stiffness",
           "name": "Kmax",
           "required": true
         },
         "kur": {
+          "declaredType": "float",
           "description": "unloading/reloading stiffness",
           "name": "Kur",
           "required": true
         },
         "mattag": {
+          "declaredType": "int",
           "description": "integer tag identifying material",
           "name": "matTag",
           "required": true
         },
         "rf": {
+          "declaredType": "float",
           "description": "failure ratio",
           "name": "Rf",
           "required": true
@@ -28817,6 +29160,7 @@
     "hysteretic": {
       "args": {
         "beta": {
+          "declaredType": "float",
           "defaultFromDescription": 0.0,
           "defaultFromSignature": 0.0,
           "description": "power used to determine the degraded unloading stiffness based on ductility, mu-beta (optional, default=0.0)",
@@ -28824,58 +29168,69 @@
           "required": false
         },
         "damage1": {
+          "declaredType": "float",
           "description": "damage due to ductility: D1(mu-1)",
           "name": "damage1",
           "required": true
         },
         "damage2": {
+          "declaredType": "float",
           "description": "damage due to energy: D2(Eii/Eult)",
           "name": "damage2",
           "required": true
         },
         "mattag": {
+          "declaredType": "int",
           "description": "integer tag identifying material",
           "name": "matTag",
           "required": true
         },
         "n1": {
+          "declaredType": "listf",
           "description": "``n1=[s1n, e1n]``, stress and strain (or force & deformation) at first point of the envelope in the negative direction",
           "name": "n1",
           "required": true
         },
         "n2": {
+          "declaredType": "listf",
           "description": "``n2=[s2n, e2n]``, stress and strain (or force & deformation) at second point of the envelope in the negative direction",
           "name": "n2",
           "required": true
         },
         "n3": {
+          "declaredType": "listf",
           "defaultFromSignature": "n2",
           "description": "``n3=[s3n, e3n]``, stress and strain (or force & deformation) at third point of the envelope in the negative direction",
           "name": "n3",
           "required": true
         },
         "p1": {
+          "declaredType": "listf",
           "description": "``p1=[s1p, e1p]``, stress and strain (or force & deformation) at first point of the envelope in the positive direction",
           "name": "p1",
           "required": true
         },
         "p2": {
+          "declaredType": "listf",
           "description": "``p2=[s2p, e2p]``, stress and strain (or force & deformation) at second point of the envelope in the positive direction",
           "name": "p2",
           "required": true
         },
         "p3": {
+          "declaredType": "listf",
           "defaultFromSignature": "p2",
           "description": "``p3=[s3p, e3p]``, stress and strain (or force & deformation) at third point of the envelope in the positive direction",
           "name": "p3",
           "required": true
         },
         "pinchx": {
+          "declaredType": "float",
           "description": "pinching factor for strain (or deformation) during reloading",
           "name": "pinchX",
           "required": true
         },
         "pinchy": {
+          "declaredType": "float",
           "description": "pinching factor for stress (or force) during reloading",
           "name": "pinchY",
           "required": true
@@ -28888,26 +29243,31 @@
     "impactmaterial": {
       "args": {
         "gap": {
+          "declaredType": "float",
           "description": "initial gap",
           "name": "gap",
           "required": true
         },
         "k1": {
+          "declaredType": "float",
           "description": "initial stiffness",
           "name": "K1",
           "required": true
         },
         "k2": {
+          "declaredType": "float",
           "description": "secondary stiffness",
           "name": "K2",
           "required": true
         },
         "mattag": {
+          "declaredType": "int",
           "description": "integer tag identifying material",
           "name": "matTag",
           "required": true
         },
         "sigy": {
+          "declaredType": "float",
           "description": "yield displacement",
           "name": "sigy",
           "required": true
@@ -28920,16 +29280,19 @@
     "initstrainmaterial": {
       "args": {
         "initstrain": {
+          "declaredType": "float",
           "description": "initial strain",
           "name": "initStrain",
           "required": true
         },
         "mattag": {
+          "declaredType": "int",
           "description": "integer tag identifying material",
           "name": "matTag",
           "required": true
         },
         "othertag": {
+          "declaredType": "int",
           "description": "tag of the other material",
           "name": "otherTag",
           "required": true
@@ -28942,16 +29305,19 @@
     "initstressmaterial": {
       "args": {
         "initstress": {
+          "declaredType": "float",
           "description": "initial stress",
           "name": "initStress",
           "required": true
         },
         "mattag": {
+          "declaredType": "int",
           "description": "integer tag identifying material",
           "name": "matTag",
           "required": true
         },
         "othertag": {
+          "declaredType": "float",
           "description": "tag of the other material",
           "name": "otherTag",
           "required": true
@@ -28964,16 +29330,19 @@
     "kikuchiaikenhdr": {
       "args": {
         "ar": {
+          "declaredType": "float",
           "description": "area of rubber [unit: m^2] (see note 2)",
           "name": "ar",
           "required": true
         },
         "cg": {
+          "declaredType": "float",
           "description": "correction coefficients for equivalent shear modulus (``cg``), equivalent viscous daming ratio (``ch``), ratio of shear force at zero displacement (``cu``).",
           "name": "cg",
           "required": true
         },
         "ch": {
+          "declaredType": "float",
           "description": "correction coefficients for equivalent shear modulus (``cg``), equivalent viscous daming ratio (``ch``), ratio of shear force at zero displacement (``cu``).",
           "name": "ch",
           "required": true
@@ -28987,31 +29356,37 @@
           "required": true
         },
         "cu": {
+          "declaredType": "float",
           "description": "correction coefficients for equivalent shear modulus (``cg``), equivalent viscous daming ratio (``ch``), ratio of shear force at zero displacement (``cu``).",
           "name": "cu",
           "required": true
         },
         "hr": {
+          "declaredType": "float",
           "description": "total thickness of rubber [unit: m] (see note 2)",
           "name": "hr",
           "required": true
         },
         "mattag": {
+          "declaredType": "int",
           "description": "integer tag identifying material",
           "name": "matTag",
           "required": true
         },
         "rf": {
+          "declaredType": "float",
           "description": "reduction rate for stiffness (``rs``) and force (``rf``) (see note 3)",
           "name": "rf",
           "required": true
         },
         "rs": {
+          "declaredType": "float",
           "description": "reduction rate for stiffness (``rs``) and force (``rf``) (see note 3)",
           "name": "rs",
           "required": true
         },
         "tp": {
+          "declaredType": "str",
           "description": "rubber type (see note 1)",
           "name": "tp",
           "required": true
@@ -29024,21 +29399,25 @@
     "kikuchiaikenlrb": {
       "args": {
         "alph": {
+          "declaredType": "float",
           "description": "shear modulus of lead plug [unit: N/m^2]",
           "name": "alph",
           "required": true
         },
         "ap": {
+          "declaredType": "float",
           "description": "area of lead plug [unit: m^2]",
           "name": "ap",
           "required": true
         },
         "ar": {
+          "declaredType": "float",
           "description": "area of rubber [unit: m^2]",
           "name": "ar",
           "required": true
         },
         "beta": {
+          "declaredType": "float",
           "description": "ratio of initial stiffness to yielding stiffness",
           "name": "beta",
           "required": true
@@ -29052,36 +29431,43 @@
           "required": true
         },
         "gr": {
+          "declaredType": "float",
           "description": "shear modulus of rubber [unit: N/m^2]",
           "name": "gr",
           "required": true
         },
         "hr": {
+          "declaredType": "float",
           "description": "total thickness of rubber [unit: m]",
           "name": "hr",
           "required": true
         },
         "mattag": {
+          "declaredType": "int",
           "description": "integer tag identifying material",
           "name": "matTag",
           "required": true
         },
         "rf": {
+          "declaredType": "float",
           "description": "reduction rate for stiffness ( ``rs``) and force ( ``rf``) (see note 3)",
           "name": "rf",
           "required": true
         },
         "rk": {
+          "declaredType": "float",
           "description": "reduction rate for yielding stiffness ( ``rk``) and force at zero displacement ( ``rq``)",
           "name": "rk",
           "required": true
         },
         "rq": {
+          "declaredType": "float",
           "description": "reduction rate for yielding stiffness ( ``rk``) and force at zero displacement ( ``rq``)",
           "name": "rq",
           "required": true
         },
         "rs": {
+          "declaredType": "float",
           "description": "reduction rate for stiffness ( ``rs``) and force ( ``rf``) (see note 3)",
           "name": "rs",
           "required": true
@@ -29091,16 +29477,19 @@
           "required": true
         },
         "temp": {
+          "declaredType": "float",
           "description": "temperature [unit: \u00b0C]",
           "name": "temp",
           "required": true
         },
         "tp": {
+          "declaredType": "float",
           "description": "yield stress of lead plug [unit: N/m^2]",
           "name": "tp",
           "required": true
         },
         "type": {
+          "declaredType": "int",
           "description": "rubber type (see note 1)",
           "name": "type",
           "required": true
@@ -29113,102 +29502,122 @@
     "limitstate": {
       "args": {
         "beta": {
+          "declaredType": "float",
           "defaultFromDescription": 0.0,
           "description": "power used to determine the degraded unloading stiffness based on ductility, m-b (optional, default=0.0)",
           "name": "beta",
           "required": false
         },
         "curvetag": {
+          "declaredType": "int",
           "description": "an integer tag for the Limit Curve defining the limit surface",
           "name": "curveTag",
           "required": true
         },
         "curvetype": {
+          "declaredType": "int",
           "description": "an integer defining the type of LimitCurve (0 = no curve, 1 = axial curve, all other curves can be any other integer)",
           "name": "curveType",
           "required": true
         },
         "damage1": {
+          "declaredType": "float",
           "description": "damage due to ductility: D1(m-1)",
           "name": "damage1",
           "required": true
         },
         "damage2": {
+          "declaredType": "float",
           "description": "damage due to energy: D2(Ei/Eult)",
           "name": "damage2",
           "required": true
         },
         "e1n": {
+          "declaredType": "float",
           "description": "stress and strain (or force & deformation) at first point of the envelope in the negative direction",
           "name": "e1n",
           "required": true
         },
         "e1p": {
+          "declaredType": "float",
           "description": "stress and strain (or force & deformation) at first point of the envelope in the positive direction",
           "name": "e1p",
           "required": true
         },
         "e2n": {
+          "declaredType": "float",
           "description": "stress and strain (or force & deformation) at second point of the envelope in the negative direction",
           "name": "e2n",
           "required": true
         },
         "e2p": {
+          "declaredType": "float",
           "description": "stress and strain (or force & deformation) at second point of the envelope in the positive direction",
           "name": "e2p",
           "required": true
         },
         "e3n": {
+          "declaredType": "float",
           "description": "stress and strain (or force & deformation) at third point of the envelope in the negative direction",
           "name": "e3n",
           "required": true
         },
         "e3p": {
+          "declaredType": "float",
           "description": "stress and strain (or force & deformation) at third point of the envelope in the positive direction",
           "name": "e3p",
           "required": true
         },
         "mattag": {
+          "declaredType": "int",
           "description": "integer tag identifying material",
           "name": "matTag",
           "required": true
         },
         "pinchx": {
+          "declaredType": "float",
           "description": "pinching factor for strain (or deformation) during reloading",
           "name": "pinchX",
           "required": true
         },
         "pinchy": {
+          "declaredType": "float",
           "description": "pinching factor for stress (or force) during reloading",
           "name": "pinchY",
           "required": true
         },
         "s1n": {
+          "declaredType": "float",
           "description": "stress and strain (or force & deformation) at first point of the envelope in the negative direction",
           "name": "s1n",
           "required": true
         },
         "s1p": {
+          "declaredType": "float",
           "description": "stress and strain (or force & deformation) at first point of the envelope in the positive direction",
           "name": "s1p",
           "required": true
         },
         "s2n": {
+          "declaredType": "float",
           "description": "stress and strain (or force & deformation) at second point of the envelope in the negative direction",
           "name": "s2n",
           "required": true
         },
         "s2p": {
+          "declaredType": "float",
           "description": "stress and strain (or force & deformation) at second point of the envelope in the positive direction",
           "name": "s2p",
           "required": true
         },
         "s3n": {
+          "declaredType": "float",
           "description": "stress and strain (or force & deformation) at third point of the envelope in the negative direction",
           "name": "s3n",
           "required": true
         },
         "s3p": {
+          "declaredType": "float",
           "description": "stress and strain (or force & deformation) at third point of the envelope in the positive direction",
           "name": "s3p",
           "required": true
@@ -29221,26 +29630,31 @@
     "masonry": {
       "args": {
         "a1": {
+          "declaredType": "float",
           "description": "Initial strut area as ratio of initial area (=1)",
           "name": "a1",
           "required": true
         },
         "a2": {
+          "declaredType": "float",
           "description": "Ratio of residual strut area as inicitial strut area (Final area / Initial Area)",
           "name": "a2",
           "required": true
         },
         "ach": {
+          "declaredType": "float",
           "description": "Hysteresis parameter(0.3 to 0.6) See Crisafulli's thesis",
           "name": "Ach",
           "required": true
         },
         "are": {
+          "declaredType": "float",
           "description": "Strain reloading factor (0.2 to 0.4) See Crisafulli's thesis",
           "name": "Are",
           "required": true
         },
         "ba": {
+          "declaredType": "float",
           "description": "Hysteresis parameter(1.5 to 2.0) See Crisafulli's thesis",
           "name": "Ba",
           "required": true
@@ -29250,81 +29664,97 @@
           "required": true
         },
         "d1": {
+          "declaredType": "float",
           "description": "Strain where strut degradation starts (D1<0)(For strain>D1 Area/Initial Area=a1)",
           "name": "D1",
           "required": true
         },
         "d2": {
+          "declaredType": "float",
           "description": "Strain where strut degradation ends (D2<0) (For strain <D2 Area/Initial Area=a2)",
           "name": "D2",
           "required": true
         },
         "emo": {
+          "declaredType": "float",
           "description": "Initial Elastic Modulus",
           "name": "Emo",
           "required": true
         },
         "exp1": {
+          "declaredType": "float",
           "description": "Hysteresis parameter(1.5 to 2.0) See Crisafulli's thesis",
           "name": "Exp1",
           "required": true
         },
         "exp2": {
+          "declaredType": "float",
           "description": "Hysteresis parameter(1.0 to 1.5) See Crisafulli's thesis",
           "name": "Exp2",
           "required": true
         },
         "fm": {
+          "declaredType": "float",
           "description": "Compression strength of Masonry (Fm<0)",
           "name": "Fm",
           "required": true
         },
         "ft": {
+          "declaredType": "float",
           "description": "Tension Strength of Masonry (Ft>0)",
           "name": "Ft",
           "required": true
         },
         "gplr": {
+          "declaredType": "float",
           "description": "Hysteresis parameter(1.1 to 1.5) See Crisafulli's thesis",
           "name": "Gplr",
           "required": true
         },
         "gplu": {
+          "declaredType": "float",
           "description": "Hysteresis parameter(0.5 to 0.7) See Crisafulli's thesis",
           "name": "Gplu",
           "required": true
         },
         "gun": {
+          "declaredType": "float",
           "description": "Stiffness unloading factor (1.5 to 2.5) See Crisafulli's thesis",
           "name": "Gun",
           "required": true
         },
         "ienv": {
+          "declaredType": "int",
           "description": "Envelope: =0: Sargin stress-strain envelope descending branch; =1: Parabolic stress-strain envelope descending branch",
           "name": "IENV",
           "required": true
         },
         "l": {
+          "declaredType": "float",
           "description": "Initial Length (just add 1.0)",
           "name": "L",
           "required": true
         },
         "mattag": {
+          "declaredType": "int",
           "description": "integer tag identifying material",
           "name": "matTag",
           "required": true
         },
         "ucl": {
+          "declaredType": "float",
           "description": "Crack Closing strain (Ucl>0)",
           "name": "Ucl",
           "required": true
         },
         "um": {
+          "declaredType": "float",
           "description": "Strain at maximum Strength (Um<0)",
           "name": "Um",
           "required": true
         },
         "uult": {
+          "declaredType": "float",
           "description": "Maximum compression strain (Uult<0)",
           "name": "Uult",
           "required": true
@@ -29337,6 +29767,7 @@
     "minmax": {
       "args": {
         "mattag": {
+          "declaredType": "int",
           "description": "integer tag identifying material",
           "name": "matTag",
           "required": true
@@ -29346,24 +29777,27 @@
           "required": true
         },
         "maxstrain": {
+          "declaredType": "float",
           "defaultFromDescription": 1e+16,
           "defaultFromSignature": 1e+16,
           "description": "max value of strain. optional default = 1.0e16.",
           "name": "maxStrain",
-          "required": true
+          "required": false
         },
         "min": {
           "name": "'-min'",
           "required": true
         },
         "minstrain": {
+          "declaredType": "float",
           "defaultFromDescription": -1e+16,
           "defaultFromSignature": 1e-16,
           "description": "minimum value of strain. optional default = -1.0e16.",
           "name": "minStrain",
-          "required": true
+          "required": false
         },
         "othertag": {
+          "declaredType": "float",
           "description": "tag of the other material",
           "name": "otherTag",
           "required": true
@@ -29376,121 +29810,145 @@
     "modimkpeakoriented": {
       "args": {
         "asneg": {
+          "declaredType": "float",
           "description": "strain hardening ratio for negative loading direction",
           "name": "as_Neg",
           "required": true
         },
         "asplus": {
+          "declaredType": "float",
           "description": "strain hardening ratio for positive loading direction",
           "name": "as_Plus",
           "required": true
         },
         "ca": {
+          "declaredType": "float",
           "description": "rate of accelerated reloading deterioration. The default value is 1.0.",
           "name": "c_A",
           "required": true
         },
         "cc": {
+          "declaredType": "float",
           "description": "rate of post-capping strength deterioration. The default value is 1.0.",
           "name": "c_C",
           "required": true
         },
         "ck": {
+          "declaredType": "float",
           "description": "rate of unloading stiffness deterioration. The default value is 1.0.",
           "name": "c_K",
           "required": true
         },
         "cs": {
+          "declaredType": "float",
           "description": "rate of strength deterioration. The default value is 1.0.",
           "name": "c_S",
           "required": true
         },
         "dneg": {
+          "declaredType": "float",
           "description": "rate of cyclic deterioration in the negative loading direction (this parameter is used to create assymetric hysteretic behavior for the case of a composite beam). For symmetric hysteretic response use 1.0.",
           "name": "D_Neg",
           "required": true
         },
         "dplus": {
+          "declaredType": "float",
           "description": "rate of cyclic deterioration in the positive loading direction (this parameter is used to create assymetric hysteretic behavior for the case of a composite beam). For symmetric hysteretic response use 1.0.",
           "name": "D_Plus",
           "required": true
         },
         "k0": {
+          "declaredType": "float",
           "description": "elastic stiffness",
           "name": "K0",
           "required": true
         },
         "lamdaa": {
+          "declaredType": "float",
           "description": "Cyclic deterioration parameter for accelerated reloading stiffness deterioration [E_t=Lamda_A*M_y, see Lignos and Krawinkler (2011); set Lamda_A = 0 to disable this mode of deterioration]",
           "name": "Lamda_A",
           "required": true
         },
         "lamdac": {
+          "declaredType": "float",
           "description": "Cyclic deterioration parameter for post-capping strength deterioration [E_t=Lamda_C*M_y, see Lignos and Krawinkler (2011); set Lamda_C = 0 to disable this mode of deterioration]",
           "name": "Lamda_C",
           "required": true
         },
         "lamdak": {
+          "declaredType": "float",
           "description": "Cyclic deterioration parameter for unloading stiffness deterioration [E_t=Lamda_K*M_y, see Lignos and Krawinkler (2011); set Lamda_K = 0 to disable this mode of deterioration]",
           "name": "Lamda_K",
           "required": true
         },
         "lamdas": {
+          "declaredType": "float",
           "description": "Cyclic deterioration parameter for strength deterioration [E_t=Lamda_S*M_y, see Lignos and Krawinkler (2011); set Lamda_S = 0 to disable this mode of deterioration]",
           "name": "Lamda_S",
           "required": true
         },
         "mattag": {
+          "declaredType": "int",
           "description": "integer tag identifying material",
           "name": "matTag",
           "required": true
         },
         "myneg": {
+          "declaredType": "float",
           "description": "effective yield strength for negative loading direction (negative value)",
           "name": "My_Neg",
           "required": true
         },
         "myplus": {
+          "declaredType": "float",
           "description": "effective yield strength for positive loading direction",
           "name": "My_Plus",
           "required": true
         },
         "resneg": {
+          "declaredType": "float",
           "description": "residual strength ratio for negative loading direction (must be defined as a positive value)",
           "name": "Res_Neg",
           "required": true
         },
         "respos": {
+          "declaredType": "float",
           "description": "residual strength ratio for positive loading direction",
           "name": "Res_Pos",
           "required": true
         },
         "thetapcneg": {
+          "declaredType": "float",
           "description": "post-capping rotation for negative loading direction (must be defined as a positive value)",
           "name": "theta_pc_Neg",
           "required": true
         },
         "thetapcplus": {
+          "declaredType": "float",
           "description": "post-capping rotation for positive loading direction",
           "name": "theta_pc_Plus",
           "required": true
         },
         "thetapneg": {
+          "declaredType": "float",
           "description": "pre-capping rotation for negative loading direction (often noted as plastic rotation capacity) (must be defined as a positive value)",
           "name": "theta_p_Neg",
           "required": true
         },
         "thetapplus": {
+          "declaredType": "float",
           "description": "pre-capping rotation for positive loading direction (often noted as plastic rotation capacity)",
           "name": "theta_p_Plus",
           "required": true
         },
         "thetauneg": {
+          "declaredType": "float",
           "description": "ultimate rotation capacity for negative loading direction (must be defined as a positive value)",
           "name": "theta_u_Neg",
           "required": true
         },
         "thetauplus": {
+          "declaredType": "float",
           "description": "ultimate rotation capacity for positive loading direction",
           "name": "theta_u_Plus",
           "required": true
@@ -29503,136 +29961,163 @@
     "modimkpinching": {
       "args": {
         "apinch": {
+          "declaredType": "float",
           "description": "Ratio of reloading stiffness",
           "name": "A_pinch",
           "required": true
         },
         "asneg": {
+          "declaredType": "float",
           "description": "strain hardening ratio for negative loading direction",
           "name": "as_Neg",
           "required": true
         },
         "asplus": {
+          "declaredType": "float",
           "description": "strain hardening ratio for positive loading direction",
           "name": "as_Plus",
           "required": true
         },
         "ca": {
+          "declaredType": "float",
           "description": "rate of accelerated reloading deterioration. The default value is 1.0.",
           "name": "c_A",
           "required": true
         },
         "cc": {
+          "declaredType": "float",
           "description": "rate of post-capping strength deterioration. The default value is 1.0.",
           "name": "c_C",
           "required": true
         },
         "ck": {
+          "declaredType": "float",
           "description": "rate of unloading stiffness deterioration. The default value is 1.0.",
           "name": "c_K",
           "required": true
         },
         "cs": {
+          "declaredType": "float",
           "description": "rate of strength deterioration. The default value is 1.0.",
           "name": "c_S",
           "required": true
         },
         "dneg": {
+          "declaredType": "float",
           "description": "rate of cyclic deterioration in the negative loading direction (this parameter is used to create assymetric hysteretic behavior for the case of a composite beam). For symmetric hysteretic response use 1.0.",
           "name": "D_Neg",
           "required": true
         },
         "dplus": {
+          "declaredType": "float",
           "description": "rate of cyclic deterioration in the positive loading direction (this parameter is used to create assymetric hysteretic behavior for the case of a composite beam). For symmetric hysteretic response use 1.0.",
           "name": "D_Plus",
           "required": true
         },
         "fprneg": {
+          "declaredType": "float",
           "description": "Ratio of the force at which reloading begins to force corresponding to the absolute maximum historic deformation demand (negative loading direction)",
           "name": "FprNeg",
           "required": true
         },
         "fprpos": {
+          "declaredType": "float",
           "description": "Ratio of the force at which reloading begins to force corresponding to the maximum historic deformation demand (positive loading direction)",
           "name": "FprPos",
           "required": true
         },
         "k0": {
+          "declaredType": "float",
           "description": "elastic stiffness",
           "name": "K0",
           "required": true
         },
         "lamdaa": {
+          "declaredType": "float",
           "description": "Cyclic deterioration parameter for accelerated reloading stiffness deterioration [E_t=Lamda_A*M_y, see Lignos and Krawinkler (2011); set Lamda_A = 0 to disable this mode of deterioration]",
           "name": "Lamda_A",
           "required": true
         },
         "lamdac": {
+          "declaredType": "float",
           "description": "Cyclic deterioration parameter for post-capping strength deterioration [E_t=Lamda_C*M_y, see Lignos and Krawinkler (2011); set Lamda_C = 0 to disable this mode of deterioration]",
           "name": "Lamda_C",
           "required": true
         },
         "lamdak": {
+          "declaredType": "float",
           "description": "Cyclic deterioration parameter for unloading stiffness deterioration [E_t=Lamda_K*M_y, see Lignos and Krawinkler (2011); set Lamda_K = 0 to disable this mode of deterioration]",
           "name": "Lamda_K",
           "required": true
         },
         "lamdas": {
+          "declaredType": "float",
           "description": "Cyclic deterioration parameter for strength deterioration [E_t=Lamda_S*M_y, see Lignos and Krawinkler (2011); set Lamda_S = 0 to disable this mode of deterioration]",
           "name": "Lamda_S",
           "required": true
         },
         "mattag": {
+          "declaredType": "int",
           "description": "integer tag identifying material",
           "name": "matTag",
           "required": true
         },
         "myneg": {
+          "declaredType": "float",
           "description": "effective yield strength for negative loading direction (Must be defined as a negative value)",
           "name": "My_Neg",
           "required": true
         },
         "myplus": {
+          "declaredType": "float",
           "description": "effective yield strength for positive loading direction",
           "name": "My_Plus",
           "required": true
         },
         "resneg": {
+          "declaredType": "float",
           "description": "residual strength ratio for negative loading direction (must be defined as a positive value)",
           "name": "Res_Neg",
           "required": true
         },
         "respos": {
+          "declaredType": "float",
           "description": "residual strength ratio for positive loading direction",
           "name": "Res_Pos",
           "required": true
         },
         "thetapcneg": {
+          "declaredType": "float",
           "description": "post-capping rotation for negative loading direction (must be defined as a positive value)",
           "name": "theta_pc_Neg",
           "required": true
         },
         "thetapcplus": {
+          "declaredType": "float",
           "description": "post-capping rotation for positive loading direction",
           "name": "theta_pc_Plus",
           "required": true
         },
         "thetapneg": {
+          "declaredType": "float",
           "description": "pre-capping rotation for negative loading direction (often noted as plastic rotation capacity) (must be defined as a positive value)",
           "name": "theta_p_Neg",
           "required": true
         },
         "thetapplus": {
+          "declaredType": "float",
           "description": "pre-capping rotation for positive loading direction (often noted as plastic rotation capacity)",
           "name": "theta_p_Plus",
           "required": true
         },
         "thetauneg": {
+          "declaredType": "float",
           "description": "ultimate rotation capacity for negative loading direction (must be defined as a positive value)",
           "name": "theta_u_Neg",
           "required": true
         },
         "thetauplus": {
+          "declaredType": "float",
           "description": "ultimate rotation capacity for positive loading direction",
           "name": "theta_u_Plus",
           "required": true
@@ -29645,11 +30130,13 @@
     "multilinear": {
       "args": {
         "mattag": {
+          "declaredType": "int",
           "description": "integer tag identifying material",
           "name": "matTag",
           "required": true
         },
         "pts": {
+          "declaredType": "listf",
           "description": "a list of strain and stress points",
           "name": "pts",
           "required": true
@@ -29662,6 +30149,7 @@
     "parallel": {
       "args": {
         "factorargs": {
+          "declaredType": "listf",
           "defaultFromDescription": 1.0,
           "description": "factors to create a linear combination of the specified materials. Factors can be negative to subtract one material from an other. (optional, default = 1.0)",
           "name": "factorArgs",
@@ -29672,11 +30160,13 @@
           "required": true
         },
         "mattag": {
+          "declaredType": "int",
           "description": "integer tag identifying material",
           "name": "matTag",
           "required": true
         },
         "mattags": {
+          "declaredType": "listi",
           "description": "identification tags of materials making up the material model",
           "name": "MatTags",
           "required": true
@@ -29689,11 +30179,13 @@
     "pathindependent": {
       "args": {
         "mattag": {
+          "declaredType": "int",
           "description": "integer tag identifying material",
           "name": "matTag",
           "required": true
         },
         "othertag": {
+          "declaredType": "int",
           "description": "a pre-defined material",
           "name": "OtherTag",
           "required": true
@@ -29706,181 +30198,217 @@
     "pinching4": {
       "args": {
         "dmgtype": {
+          "declaredType": "str",
           "description": "string to indicate type of damage (option: ``'cycle'``, ``'energy'``)",
           "name": "dmgType",
           "required": true
         },
         "end1": {
+          "declaredType": "float",
           "description": "floating point values defining deformation points on the negative response envelope",
           "name": "eNd1",
           "required": true
         },
         "end2": {
+          "declaredType": "float",
           "description": "floating point values defining deformation points on the negative response envelope",
           "name": "eNd2",
           "required": true
         },
         "end3": {
+          "declaredType": "float",
           "description": "floating point values defining deformation points on the negative response envelope",
           "name": "eNd3",
           "required": true
         },
         "end4": {
+          "declaredType": "float",
           "description": "floating point values defining deformation points on the negative response envelope",
           "name": "eNd4",
           "required": true
         },
         "enf1": {
+          "declaredType": "float",
           "description": "floating point values defining force points on the negative response envelope",
           "name": "eNf1",
           "required": true
         },
         "enf2": {
+          "declaredType": "float",
           "description": "floating point values defining force points on the negative response envelope",
           "name": "eNf2",
           "required": true
         },
         "enf3": {
+          "declaredType": "float",
           "description": "floating point values defining force points on the negative response envelope",
           "name": "eNf3",
           "required": true
         },
         "enf4": {
+          "declaredType": "float",
           "description": "floating point values defining force points on the negative response envelope",
           "name": "eNf4",
           "required": true
         },
         "epd1": {
+          "declaredType": "float",
           "description": "floating point values defining deformation points on the positive response envelope",
           "name": "ePd1",
           "required": true
         },
         "epd2": {
+          "declaredType": "float",
           "description": "floating point values defining deformation points on the positive response envelope",
           "name": "ePd2",
           "required": true
         },
         "epd3": {
+          "declaredType": "float",
           "description": "floating point values defining deformation points on the positive response envelope",
           "name": "ePd3",
           "required": true
         },
         "epd4": {
+          "declaredType": "float",
           "description": "floating point values defining deformation points on the positive response envelope",
           "name": "ePd4",
           "required": true
         },
         "epf1": {
+          "declaredType": "float",
           "description": "floating point values defining force points on the positive response envelope",
           "name": "ePf1",
           "required": true
         },
         "epf2": {
+          "declaredType": "float",
           "description": "floating point values defining force points on the positive response envelope",
           "name": "ePf2",
           "required": true
         },
         "epf3": {
+          "declaredType": "float",
           "description": "floating point values defining force points on the positive response envelope",
           "name": "ePf3",
           "required": true
         },
         "epf4": {
+          "declaredType": "float",
           "description": "floating point values defining force points on the positive response envelope",
           "name": "ePf4",
           "required": true
         },
         "gd1": {
+          "declaredType": "float",
           "description": "floating point values controlling cyclic degradation model for reloading stiffness degradation",
           "name": "gD1",
           "required": true
         },
         "gd2": {
+          "declaredType": "float",
           "description": "floating point values controlling cyclic degradation model for reloading stiffness degradation",
           "name": "gD2",
           "required": true
         },
         "gd3": {
+          "declaredType": "float",
           "description": "floating point values controlling cyclic degradation model for reloading stiffness degradation",
           "name": "gD3",
           "required": true
         },
         "gd4": {
+          "declaredType": "float",
           "description": "floating point values controlling cyclic degradation model for reloading stiffness degradation",
           "name": "gD4",
           "required": true
         },
         "gdlim": {
+          "declaredType": "float",
           "description": "floating point values controlling cyclic degradation model for reloading stiffness degradation",
           "name": "gDLim",
           "required": true
         },
         "ge": {
+          "declaredType": "float",
           "description": "floating point value used to define maximum energy dissipation under cyclic loading. Total energy dissipation capacity is defined as this factor multiplied by the energy dissipated under monotonic loading.",
           "name": "gE",
           "required": true
         },
         "gf1": {
+          "declaredType": "float",
           "description": "floating point values controlling cyclic degradation model for strength degradation",
           "name": "gF1",
           "required": true
         },
         "gf2": {
+          "declaredType": "float",
           "description": "floating point values controlling cyclic degradation model for strength degradation",
           "name": "gF2",
           "required": true
         },
         "gf3": {
+          "declaredType": "float",
           "description": "floating point values controlling cyclic degradation model for strength degradation",
           "name": "gF3",
           "required": true
         },
         "gf4": {
+          "declaredType": "float",
           "description": "floating point values controlling cyclic degradation model for strength degradation",
           "name": "gF4",
           "required": true
         },
         "gflim": {
+          "declaredType": "float",
           "description": "floating point values controlling cyclic degradation model for strength degradation",
           "name": "gFLim",
           "required": true
         },
         "gk1": {
+          "declaredType": "float",
           "description": "floating point values controlling cyclic degradation model for unloading stiffness degradation",
           "name": "gK1",
           "required": true
         },
         "gk2": {
+          "declaredType": "float",
           "description": "floating point values controlling cyclic degradation model for unloading stiffness degradation",
           "name": "gK2",
           "required": true
         },
         "gk3": {
+          "declaredType": "float",
           "description": "floating point values controlling cyclic degradation model for unloading stiffness degradation",
           "name": "gK3",
           "required": true
         },
         "gk4": {
+          "declaredType": "float",
           "description": "floating point values controlling cyclic degradation model for unloading stiffness degradation",
           "name": "gK4",
           "required": true
         },
         "gklim": {
+          "declaredType": "float",
           "description": "floating point values controlling cyclic degradation model for unloading stiffness degradation",
           "name": "gKLim",
           "required": true
         },
         "mattag": {
+          "declaredType": "int",
           "description": "integer tag identifying material",
           "name": "matTag",
           "required": true
         },
         "rdispn": {
+          "declaredType": "float",
           "description": "floating point value defining the ratio of the deformation at which reloading occurs to the minimum historic deformation demand",
           "name": "rDispN",
           "required": true
         },
         "rdispp": {
+          "declaredType": "float",
           "description": "floating point value defining the ratio of the deformation at which reloading occurs to the maximum historic deformation demand",
           "name": "rDispP",
           "required": true
@@ -29894,11 +30422,13 @@
           "required": true
         },
         "uforcen": {
+          "declaredType": "float",
           "description": "floating point value defining the ratio of strength developed upon unloading from negative load to the minimum strength developed under monotonic loading",
           "name": "uForceN",
           "required": true
         },
         "uforcep": {
+          "declaredType": "float",
           "description": "floating point value defining the ratio of strength developed upon unloading from negative load to the maximum strength developed under monotonic loading",
           "name": "uForceP",
           "required": true
@@ -29911,161 +30441,193 @@
     "pinchinglimitstatematerial": {
       "args": {
         "crvtag": {
+          "declaredType": "int",
           "description": "integer tag for the unique limit curve object associated with this material",
           "name": "crvTag",
           "required": true
         },
         "crvtyp": {
+          "declaredType": "int",
           "description": "integer flag to indicate the type of limit curve associated with this material.",
           "name": "crvTyp",
           "required": true
         },
         "dmgdispmax": {
+          "declaredType": "float",
           "description": "floating point for ultimate drift at failure (\u03b4max Eq. 1) and is used for strength and stiffness damage. This value is used to compute the monotonic energy at axial failure (Emono Eq. 2) by computing the area under the backbone in the positive loading direction up to \u03b4max. Input 1 if this type of damage is not required and set ``dmgR1``, ``dmgR2``, ``dmgR3``, ``dmgR4``, and ``dmgRLim`` to zero for reloading stiffness damage. Similarly set ``dmgS1``, ``dmgS2``, ``dmgS3``, ``dmgS4``, and ``dmgSLim`` to zero if reloading strength damage is not required",
           "name": "dmgDispMax",
           "required": true
         },
         "dmge1": {
+          "declaredType": "float",
           "description": "floating point elastic stiffness damage factors \u03b11,\u03b12,\u03b13,\u03b14 shown in Eq. 1",
           "name": "dmgE1",
           "required": true
         },
         "dmge2": {
+          "declaredType": "float",
           "description": "floating point elastic stiffness damage factors \u03b11,\u03b12,\u03b13,\u03b14 shown in Eq. 1",
           "name": "dmgE2",
           "required": true
         },
         "dmge3": {
+          "declaredType": "float",
           "description": "floating point elastic stiffness damage factors \u03b11,\u03b12,\u03b13,\u03b14 shown in Eq. 1",
           "name": "dmgE3",
           "required": true
         },
         "dmge4": {
+          "declaredType": "float",
           "description": "floating point elastic stiffness damage factors \u03b11,\u03b12,\u03b13,\u03b14 shown in Eq. 1",
           "name": "dmgE4",
           "required": true
         },
         "dmgelim": {
+          "declaredType": "float",
           "description": "floating point elastic stiffness damage limit Dlim shown in Eq. 1; **Note: This value must be between zero and unity**",
           "name": "dmgELim",
           "required": true
         },
         "dmgr1": {
+          "declaredType": "float",
           "description": "floating point reloading stiffness damage factors \u03b11,\u03b12,\u03b13,\u03b14 shown in Eq. 1",
           "name": "dmgR1",
           "required": true
         },
         "dmgr2": {
+          "declaredType": "float",
           "description": "floating point reloading stiffness damage factors \u03b11,\u03b12,\u03b13,\u03b14 shown in Eq. 1",
           "name": "dmgR2",
           "required": true
         },
         "dmgr3": {
+          "declaredType": "float",
           "description": "floating point reloading stiffness damage factors \u03b11,\u03b12,\u03b13,\u03b14 shown in Eq. 1",
           "name": "dmgR3",
           "required": true
         },
         "dmgr4": {
+          "declaredType": "float",
           "description": "floating point reloading stiffness damage factors \u03b11,\u03b12,\u03b13,\u03b14 shown in Eq. 1",
           "name": "dmgR4",
           "required": true
         },
         "dmgrcyc": {
+          "declaredType": "float",
           "description": "floating point cyclic reloading stiffness damage index; **Note: This value must be between zero and unity**",
           "name": "dmgRCyc",
           "required": true
         },
         "dmgrlim": {
+          "declaredType": "float",
           "description": "floating point reloading stiffness damage limit Dlim shown in Eq. 1; **Note: This value must be between zero and unity**",
           "name": "dmgRLim",
           "required": true
         },
         "dmgs1": {
+          "declaredType": "float",
           "description": "floating point backbone strength damage factors \u03b11,\u03b12,\u03b13,\u03b14 shown in Eq. 1",
           "name": "dmgS1",
           "required": true
         },
         "dmgs2": {
+          "declaredType": "float",
           "description": "floating point backbone strength damage factors \u03b11,\u03b12,\u03b13,\u03b14 shown in Eq. 1",
           "name": "dmgS2",
           "required": true
         },
         "dmgs3": {
+          "declaredType": "float",
           "description": "floating point backbone strength damage factors \u03b11,\u03b12,\u03b13,\u03b14 shown in Eq. 1",
           "name": "dmgS3",
           "required": true
         },
         "dmgs4": {
+          "declaredType": "float",
           "description": "floating point backbone strength damage factors \u03b11,\u03b12,\u03b13,\u03b14 shown in Eq. 1",
           "name": "dmgS4",
           "required": true
         },
         "dmgscyc": {
+          "declaredType": "float",
           "description": "floating point cyclic backbone strength damage index; **Note: This value must be between zero and unity**",
           "name": "dmgSCyc",
           "required": true
         },
         "dmgslim": {
+          "declaredType": "float",
           "description": "floating point backbone strength damage limit Dlim shown in Eq. 1; **Note: This value must be between zero and unity**",
           "name": "dmgSLim",
           "required": true
         },
         "dmgstrslime": {
+          "declaredType": "float",
           "description": "floating point force limit for elastic stiffness damage (typically defined as the lowest of shear strength or shear at flexrual yielding). This value is used to compute the maximum deformation at flexural yield (\u03b4max Eq. 1) and using the initial elastic stiffness (Kelastic) the monotonic energy (Emono Eq. 1) to yield. Input 1 if this type of damage is not required and set ``dmgE1``, ``dmgE2``, ``dmgE3``, ``dmgE4``, and ``dmgELim`` to zero",
           "name": "dmgStrsLimE",
           "required": true
         },
         "driftaxis": {
+          "declaredType": "int",
           "description": "integer to indicate the drift axis in which lateral-strength degradation will occur. This axis should be orthogonal to the axis of measured rotation (see ``rotAxis`` in Rotation Shear Curve definition)",
           "name": "driftAxis",
           "required": true
         },
         "kelas": {
+          "declaredType": "float",
           "description": "floating point value to define the initial material elastic stiffness (Kelastic); Kelas > 0",
           "name": "Kelas",
           "required": true
         },
         "mattag": {
+          "declaredType": "int",
           "description": "integer tag identifying material",
           "name": "matTag",
           "required": true
         },
         "nodeb": {
+          "declaredType": "int",
           "description": "integer node tag to define the last node at the extreme end of the associated flexural frame member (L2 or D2 in Figure)",
           "name": "nodeB",
           "required": true
         },
         "nodet": {
+          "declaredType": "int",
           "description": "integer node tag to define the first node at the extreme end of the associated flexural frame member (L3 or D5 in Figure)",
           "name": "nodeT",
           "required": true
         },
         "xpinchrnp": {
+          "declaredType": "float",
           "description": "floating point reloading displacement pinching factor for loading in the positive direction. **Note: This value must be between negative one and unity**",
           "name": "XpinchRNP",
           "required": true
         },
         "xpinchrpn": {
+          "declaredType": "float",
           "description": "floating point reloading displacement pinching factor for loading in the negative direction. **Note: This value must be between negative one and unity**",
           "name": "XpinchRPN",
           "required": true
         },
         "ypinchrnp": {
+          "declaredType": "float",
           "description": "floating point reloading force pinching factor for loading in the positive direction. **Note: This value must be between negative one and unity**",
           "name": "YpinchRNP",
           "required": true
         },
         "ypinchrpn": {
+          "declaredType": "float",
           "description": "floating point reloading force pinching factor for loading in the negative direction. **Note: This value must be between negative one and unity**",
           "name": "YpinchRPN",
           "required": true
         },
         "ypinchunp": {
+          "declaredType": "float",
           "description": "floating point unloading force pinching factor for loading in the positive direction. **Note: This value must be between zero and unity**",
           "name": "YpinchUNP",
           "required": true
         },
         "ypinchupn": {
+          "declaredType": "float",
           "description": "floating point unloading force pinching factor for loading in the negative direction. **Note: This value must be between zero and unity**",
           "name": "YpinchUPN",
           "required": true
@@ -30078,6 +30640,7 @@
     "pipe": {
       "args": {
         "alpt1": {
+          "declaredType": "float",
           "description": "the thermal expansion coefficient for point 1",
           "name": "alpT1",
           "required": true
@@ -30087,6 +30650,7 @@
           "required": true
         },
         "e1": {
+          "declaredType": "float",
           "description": "the Young's modulus for point 1",
           "name": "E1",
           "required": true
@@ -30096,16 +30660,19 @@
           "required": true
         },
         "mattag": {
+          "declaredType": "int",
           "description": "integer tag identifying material",
           "name": "matTag",
           "required": true
         },
         "nt": {
+          "declaredType": "float",
           "description": "the number of temperature points for the material. If two or more points are provided, the expected range of average temperatures in the element must be covered.",
           "name": "nt",
           "required": true
         },
         "t1": {
+          "declaredType": "float",
           "description": "the temperature for point 1",
           "name": "T1",
           "required": true
@@ -30115,6 +30682,7 @@
           "required": true
         },
         "xnu1": {
+          "declaredType": "float",
           "description": "the Poisson's ratio for point 1",
           "name": "xnu1",
           "required": true
@@ -30131,47 +30699,56 @@
     "pyliq1": {
       "args": {
         "c": {
+          "declaredType": "float",
           "defaultFromDescription": 0.0,
           "description": "The viscous damping term (dashpot) on the far-field (elastic) component of the displacement rate (velocity). (optional Default = 0.0). Nonzero c values are used to represent radiation damping effects",
           "name": "c",
           "required": false
         },
         "cd": {
+          "declaredType": "float",
           "description": "Variable that sets the drag resistance within a fully-mobilized gap as Cd*pult.",
           "name": "Cd",
           "required": true
         },
         "ele1": {
+          "declaredType": "int",
           "description": "are the eleTag (element numbers) for the two solid elements from which PyLiq1 will obtain mean effective stresses and excess pore pressures",
           "name": "ele1",
           "required": true
         },
         "ele2": {
+          "declaredType": "int",
           "description": "are the eleTag (element numbers) for the two solid elements from which PyLiq1 will obtain mean effective stresses and excess pore pressures",
           "name": "ele2",
           "required": true
         },
         "mattag": {
+          "declaredType": "int",
           "description": "integer tag identifying material",
           "name": "matTag",
           "required": true
         },
         "pres": {
+          "declaredType": "float",
           "description": "sets the minimum (or residual) peak resistance that the material retains as the adjacent solid soil elements liquefy",
           "name": "pRes",
           "required": true
         },
         "pult": {
+          "declaredType": "float",
           "description": "Ultimate capacity of the p-y material. Note that \"p\" or \"pult\" are distributed loads [force per length of pile] in common design equations, but are both loads for this uniaxialMaterial [i.e., distributed load times the tributary length of the pile].",
           "name": "pult",
           "required": true
         },
         "soiltype": {
+          "declaredType": "int",
           "description": "soilType = 1 Backbone of p-y curve approximates Matlock (1970) soft clay relation. soilType = 2 Backbone of p-y curve approximates API (1993) sand relation.",
           "name": "soilType",
           "required": true
         },
         "y50": {
+          "declaredType": "float",
           "description": "Displacement at which 50% of pult is mobilized in monotonic loading.",
           "name": "Y50",
           "required": true
@@ -30184,6 +30761,7 @@
     "pysimple1": {
       "args": {
         "c": {
+          "declaredType": "float",
           "defaultFromDescription": 0.0,
           "defaultFromSignature": 0.0,
           "description": "The viscous damping term (dashpot) on the far-field (elastic) component of the displacement rate (velocity). (optional Default = 0.0). Nonzero c values are used to represent radiation damping effects",
@@ -30191,26 +30769,31 @@
           "required": false
         },
         "cd": {
+          "declaredType": "float",
           "description": "Variable that sets the drag resistance within a fully-mobilized gap as Cd*pult.",
           "name": "Cd",
           "required": true
         },
         "mattag": {
+          "declaredType": "int",
           "description": "integer tag identifying material",
           "name": "matTag",
           "required": true
         },
         "pult": {
+          "declaredType": "float",
           "description": "Ultimate capacity of the p-y material. Note that \"p\" or \"pult\" are distributed loads [force per length of pile] in common design equations, but are both loads for this uniaxialMaterial [i.e., distributed load times the tributary length of the pile].",
           "name": "pult",
           "required": true
         },
         "soiltype": {
+          "declaredType": "int",
           "description": "soilType = 1 Backbone of p-y curve approximates Matlock (1970) soft clay relation.",
           "name": "soilType",
           "required": true
         },
         "y50": {
+          "declaredType": "float",
           "description": "Displacement at which 50% of pult is mobilized in monotonic loading.",
           "name": "Y50",
           "required": true
@@ -30223,11 +30806,13 @@
     "qzliq1": {
       "args": {
         "alpha": {
+          "declaredType": "float",
           "description": "The constant ``alpha`` defines the extent of non-linearity in element\u2019s capacity and stiffness with excess pore pressure ratio (:math:`r_u`).",
           "name": "alpha",
           "required": true
         },
         "c": {
+          "declaredType": "float",
           "defaultFromDescription": 0.0,
           "description": "The viscous damping term (optional Default = 0.0).",
           "name": "c",
@@ -30238,31 +30823,37 @@
           "required": true
         },
         "ele1": {
+          "declaredType": "int",
           "description": "are the eleTag (element numbers) for the two solid elements from which QzLiq1 will obtain mean effective stresses and excess pore alphasures",
           "name": "ele1",
           "required": true
         },
         "ele2": {
+          "declaredType": "int",
           "description": "are the eleTag (element numbers) for the two solid elements from which QzLiq1 will obtain mean effective stresses and excess pore alphasures",
           "name": "ele2",
           "required": true
         },
         "mattag": {
+          "declaredType": "int",
           "description": "integer tag identifying material",
           "name": "matTag",
           "required": true
         },
         "qult": {
+          "declaredType": "float",
           "description": "Ultimate capacity of the q-z material.",
           "name": "qult",
           "required": true
         },
         "soiltype": {
+          "declaredType": "int",
           "description": "soilType = 1 Backbone of q-z curve approximates Matlock (1970) soft clay relation.",
           "name": "soilType",
           "required": true
         },
         "z50": {
+          "declaredType": "float",
           "description": "Displacement at which 50% of qult is mobilized in monotonic loading.",
           "name": "Z50",
           "required": true
@@ -30275,6 +30866,7 @@
     "qzsimple1": {
       "args": {
         "c": {
+          "declaredType": "float",
           "defaultFromDescription": 0.0,
           "defaultFromSignature": 0.0,
           "description": "The viscous damping term (dashpot) on the far-field (elastic) component of the displacement rate (velocity). Default = 0.0. Nonzero c values are used to represent radiation damping effects.*",
@@ -30282,21 +30874,25 @@
           "required": true
         },
         "mattag": {
+          "declaredType": "int",
           "description": "integer tag identifying material",
           "name": "matTag",
           "required": true
         },
         "qult": {
+          "declaredType": "float",
           "description": "Ultimate capacity of the q-z material. SEE NOTE 1.",
           "name": "qult",
           "required": true
         },
         "qztype": {
+          "declaredType": "int",
           "description": "qzType = 1 Backbone of q-z curve approximates Reese and O'Neill's (1987) relation for drilled shafts in clay.",
           "name": "qzType",
           "required": true
         },
         "suction": {
+          "declaredType": "float",
           "defaultFromDescription": 0.0,
           "defaultFromSignature": 0.0,
           "description": "Uplift resistance is equal to suction*qult. Default = 0.0. The value of suction must be 0.0 to 0.1.",
@@ -30304,6 +30900,7 @@
           "required": true
         },
         "z50": {
+          "declaredType": "float",
           "description": "Displacement at which 50% of qult is mobilized in monotonic loading. SEE NOTE 2.",
           "name": "Z50",
           "required": true
@@ -30316,26 +30913,31 @@
     "rambergosgoodsteel": {
       "args": {
         "a": {
+          "declaredType": "float",
           "description": "\"yield offset\" and the Commonly used value for a is 0.002",
           "name": "a",
           "required": true
         },
         "e0": {
+          "declaredType": "float",
           "description": "initial elastic tangent",
           "name": "E0",
           "required": true
         },
         "fy": {
+          "declaredType": "float",
           "description": "Yield strength",
           "name": "fy",
           "required": true
         },
         "mattag": {
+          "declaredType": "int",
           "description": "integer tag identifying material",
           "name": "matTag",
           "required": true
         },
         "n": {
+          "declaredType": "float",
           "description": "Parameters to control the transition from elastic to plastic branches. And controls the hardening of the material by increasing the \"n\" hardening ratio will be decreased. Commonly used values for n are ~5 or greater.",
           "name": "n",
           "required": true
@@ -30348,6 +30950,7 @@
     "reinforcingsteel": {
       "args": {
         "a1": {
+          "declaredType": "float",
           "defaultFromDescription": 4.3,
           "defaultFromSignature": 4.3,
           "description": "Hardening constant (default = 4.3)",
@@ -30355,6 +30958,7 @@
           "required": true
         },
         "alpha": {
+          "declaredType": "float",
           "defaultFromDescription": "alpha=1.0",
           "defaultFromSignature": 1.0,
           "description": "Adjustment Constant usually between 0.75 and 1.0 Default: alpha=1.0, this parameter is optional.",
@@ -30362,76 +30966,91 @@
           "required": true
         },
         "beta": {
+          "declaredType": "float",
           "description": "Amplification factor for the buckled stress strain curve.",
           "name": "beta",
           "required": true
         },
         "cd": {
+          "declaredType": "float",
           "description": "Cyclic strength reduction constant",
           "name": "Cd",
           "required": true
         },
         "cf": {
+          "declaredType": "float",
           "description": "Coffin-Manson constant C",
           "name": "Cf",
           "required": true
         },
         "cmfatigue": {
+          "declaredType": "str",
           "description": "Coffin-Manson Fatigue and Strength Reduction",
           "name": "'-CMFatigue'",
           "required": true
         },
         "dmbuck": {
+          "declaredType": "str",
           "description": "Buckling model based on Dhakal and Maekawa (2002)",
           "name": "'-DMBuck'",
           "required": true
         },
         "epssh": {
+          "declaredType": "float",
           "description": "Strain corresponding to initial strain hardening",
           "name": "eps_sh",
           "required": true
         },
         "epsult": {
+          "declaredType": "float",
           "description": "Strain at peak stress",
           "name": "eps_ult",
           "required": true
         },
         "es": {
+          "declaredType": "float",
           "description": "Initial elastic tangent",
           "name": "Es",
           "required": true
         },
         "esh": {
+          "declaredType": "float",
           "description": "Tangent at initial strain hardening",
           "name": "Esh",
           "required": true
         },
         "fu": {
+          "declaredType": "float",
           "description": "Ultimate stress in tension",
           "name": "fu",
           "required": true
         },
         "fy": {
+          "declaredType": "float",
           "description": "Yield stress in tension",
           "name": "fy",
           "required": true
         },
         "gabuck": {
+          "declaredType": "str",
           "description": "Buckling Model Based on Gomes and Appleton (1997)",
           "name": "'-GABuck'",
           "required": true
         },
         "gamma": {
+          "declaredType": "float",
           "description": "Buckling constant",
           "name": "gamma",
           "required": true
         },
         "isohard": {
+          "declaredType": "str",
           "description": "Isotropic Hardening / Diminishing Yield Plateau",
           "name": "'-IsoHard'",
           "required": true
         },
         "limit": {
+          "declaredType": "float",
           "defaultFromDescription": 0.01,
           "defaultFromSignature": 1.0,
           "description": "Limit for the reduction of the yield plateau. % of original plateau length to remain (0.01 < limit < 1.0 ) Limit =1.0, then no reduction takes place (default =0.01)",
@@ -30439,26 +31058,31 @@
           "required": true
         },
         "lsr": {
+          "declaredType": "float",
           "description": "Slenderness Ratio",
           "name": "lsr",
           "required": true
         },
         "mattag": {
+          "declaredType": "int",
           "description": "integer tag identifying material",
           "name": "matTag",
           "required": true
         },
         "mpcurveparams": {
+          "declaredType": "str",
           "description": "Menegotto and Pinto Curve Parameters",
           "name": "'-MPCurveParams'",
           "required": true
         },
         "r": {
+          "declaredType": "float",
           "description": "Buckling reduction factor",
           "name": "r",
           "required": true
         },
         "r1": {
+          "declaredType": "float",
           "defaultFromDescription": 0.333,
           "defaultFromSignature": 0.333,
           "description": "(default = 0.333)",
@@ -30466,6 +31090,7 @@
           "required": true
         },
         "r2": {
+          "declaredType": "float",
           "defaultFromDescription": 18,
           "defaultFromSignature": 18.0,
           "description": "(default = 18)",
@@ -30473,6 +31098,7 @@
           "required": true
         },
         "r3": {
+          "declaredType": "float",
           "defaultFromDescription": 4,
           "defaultFromSignature": 4.0,
           "description": "(default = 4)",
@@ -30487,56 +31113,67 @@
     "saws": {
       "args": {
         "alpha": {
+          "declaredType": "float",
           "description": "Stiffness degradation parameter for the shear wall spring element. (ALPHA > 0).",
           "name": "alpha",
           "required": true
         },
         "beta": {
+          "declaredType": "float",
           "description": "Stiffness degradation parameter for the spring element. (BETA > 0).",
           "name": "beta",
           "required": true
         },
         "du": {
+          "declaredType": "float",
           "description": "Spring element displacement at ultimate load. (DU > 0).",
           "name": "DU",
           "required": true
         },
         "f0": {
+          "declaredType": "float",
           "description": "Intercept strength of the shear wall spring element for the asymtotic line to the envelope curve F0 > FI > 0",
           "name": "F0",
           "required": true
         },
         "fi": {
+          "declaredType": "float",
           "description": "Intercept strength of the spring element for the pinching branch of the hysteretic curve. (FI > 0).",
           "name": "FI",
           "required": true
         },
         "mattag": {
+          "declaredType": "int",
           "description": "integer tag identifying material",
           "name": "matTag",
           "required": true
         },
         "r1": {
+          "declaredType": "float",
           "description": "Stiffness ratio of the asymptotic line to the spring element envelope curve. The slope of this line is R1 S0. (0 < R1 < 1.0).",
           "name": "R1",
           "required": true
         },
         "r2": {
+          "declaredType": "float",
           "description": "Stiffness ratio of the descending branch of the spring element envelope curve. The slope of this line is R2 S0. ( R2 < 0).",
           "name": "R2",
           "required": true
         },
         "r3": {
+          "declaredType": "float",
           "description": "Stiffness ratio of the unloading branch off the spring element envelope curve. The slope of this line is R3 S0. ( R3 1).",
           "name": "R3",
           "required": true
         },
         "r4": {
+          "declaredType": "float",
           "description": "Stiffness ratio of the pinching branch for the spring element. The slope of this line is R4 S0. ( R4 > 0).",
           "name": "R4",
           "required": true
         },
         "s0": {
+          "declaredType": "float",
           "description": "Initial stiffness of the shear wall spring element (S0 > 0).",
           "name": "S0",
           "required": true
@@ -30549,44 +31186,52 @@
     "selfcentering": {
       "args": {
         "beta": {
+          "declaredType": "float",
           "description": "Ratio of Forward to Reverse Activation Stress/Force",
           "name": "beta",
           "required": true
         },
         "epsbear": {
+          "declaredType": "float",
           "defaultFromSignature": 0,
           "description": "Bearing Strain/Deformation (if ``epsBear`` = 0, there will be no bearing)",
           "name": "epsBear",
           "required": true
         },
         "epsslip": {
+          "declaredType": "float",
           "defaultFromSignature": 0,
           "description": "slip Strain/Deformation (if ``epsSlip`` = 0, there will be no slippage)",
           "name": "epsSlip",
           "required": true
         },
         "k1": {
+          "declaredType": "float",
           "description": "Initial Stiffness",
           "name": "k1",
           "required": true
         },
         "k2": {
+          "declaredType": "float",
           "description": "Post-Activation Stiffness (0< ``k2``< ``k1``)",
           "name": "k2",
           "required": true
         },
         "mattag": {
+          "declaredType": "int",
           "description": "integer tag identifying material",
           "name": "matTag",
           "required": true
         },
         "rbear": {
+          "declaredType": "float",
           "defaultFromSignature": "k1",
           "description": "Ratio of Bearing Stiffness to Initial Stiffness ``k1``",
           "name": "rBear",
           "required": true
         },
         "sigact": {
+          "declaredType": "float",
           "description": "Forward Activation Stress/Force",
           "name": "sigAct",
           "required": true
@@ -30599,11 +31244,13 @@
     "series": {
       "args": {
         "mattag": {
+          "declaredType": "int",
           "description": "integer tag identifying material",
           "name": "matTag",
           "required": true
         },
         "mattags": {
+          "declaredType": "listi",
           "description": "identification tags of materials making up the material model",
           "name": "matTags",
           "required": true
@@ -30616,41 +31263,49 @@
     "steel01": {
       "args": {
         "a1": {
+          "declaredType": "float",
           "description": "isotropic hardening parameter, increase of compression yield envelope as proportion of yield strength after a plastic strain of",
           "name": "a1",
           "required": true
         },
         "a2": {
+          "declaredType": "float",
           "description": "isotropic hardening parameter (see explanation under ``a1``). (optional).",
           "name": "a2",
           "required": false
         },
         "a3": {
+          "declaredType": "float",
           "description": "isotropic hardening parameter, increase of tension yield envelope as proportion of yield strength after a plastic strain of :math:`a_4*(F_y/E_0)`. (optional)",
           "name": "a3",
           "required": false
         },
         "a4": {
+          "declaredType": "float",
           "description": "isotropic hardening parameter (see explanation under ``a3``). (optional)",
           "name": "a4",
           "required": false
         },
         "b": {
+          "declaredType": "float",
           "description": "strain-hardening ratio (ratio between post-yield tangent and initial elastic tangent)",
           "name": "b",
           "required": true
         },
         "e0": {
+          "declaredType": "float",
           "description": "initial elastic tangent",
           "name": "E0",
           "required": true
         },
         "fy": {
+          "declaredType": "float",
           "description": "yield strength",
           "name": "Fy",
           "required": true
         },
         "mattag": {
+          "declaredType": "int",
           "description": "integer tag identifying material",
           "name": "matTag",
           "required": true
@@ -30663,41 +31318,49 @@
     "steel01thermal": {
       "args": {
         "a1": {
+          "declaredType": "float",
           "description": "isotropic hardening parameter, increase of compression yield envelope as proportion of yield strength after a plastic strain of",
           "name": "a1",
           "required": true
         },
         "a2": {
+          "declaredType": "float",
           "description": "isotropic hardening parameter (see explanation under ``a1``). (optional).",
           "name": "a2",
           "required": false
         },
         "a3": {
+          "declaredType": "float",
           "description": "isotropic hardening parameter, increase of tension yield envelope as proportion of yield strength after a plastic strain of :math:`a_4*(F_y/E_0)`. (optional)",
           "name": "a3",
           "required": false
         },
         "a4": {
+          "declaredType": "float",
           "description": "isotropic hardening parameter (see explanation under ``a3``). (optional)",
           "name": "a4",
           "required": false
         },
         "b": {
+          "declaredType": "float",
           "description": "strain-hardening ratio (ratio between post-yield tangent and initial elastic tangent)",
           "name": "b",
           "required": true
         },
         "e0": {
+          "declaredType": "float",
           "description": "initial elastic tangent",
           "name": "E0",
           "required": true
         },
         "fy": {
+          "declaredType": "float",
           "description": "yield strength",
           "name": "Fy",
           "required": true
         },
         "mattag": {
+          "declaredType": "int",
           "description": "integer tag identifying material",
           "name": "matTag",
           "required": true
@@ -30710,55 +31373,65 @@
     "steel02": {
       "args": {
         "a1": {
+          "declaredType": "float",
           "defaultFromSignature": "a2*Fy/E0",
           "description": "isotropic hardening parameter, increase of compression yield envelope as proportion of yield strength after a plastic strain of",
           "name": "a1",
           "required": true
         },
         "a2": {
+          "declaredType": "float",
           "defaultFromSignature": 1.0,
           "description": "isotropic hardening parameter (see explanation under ``a1``). (optional).",
           "name": "a2",
           "required": false
         },
         "a3": {
+          "declaredType": "float",
           "defaultFromSignature": "a4*Fy/E0",
           "description": "isotropic hardening parameter, increase of tension yield envelope as proportion of yield strength after a plastic strain of :math:`a_4*(F_y/E_0)`. (optional)",
           "name": "a3",
           "required": false
         },
         "a4": {
+          "declaredType": "float",
           "defaultFromSignature": 1.0,
           "description": "isotropic hardening parameter (see explanation under ``a3``). (optional)",
           "name": "a4",
           "required": false
         },
         "b": {
+          "declaredType": "float",
           "description": "strain-hardening ratio (ratio between post-yield tangent and initial elastic tangent)",
           "name": "b",
           "required": true
         },
         "e0": {
+          "declaredType": "float",
           "description": "initial elastic tangent",
           "name": "E0",
           "required": true
         },
         "fy": {
+          "declaredType": "float",
           "description": "yield strength",
           "name": "Fy",
           "required": true
         },
         "mattag": {
+          "declaredType": "int",
           "description": "integer tag identifying material",
           "name": "matTag",
           "required": true
         },
         "params": {
+          "declaredType": "listf",
           "description": "parameters to control the transition from elastic to plastic branches.",
           "name": "params",
           "required": true
         },
         "siginit": {
+          "declaredType": "float",
           "defaultFromDescription": 0.0,
           "defaultFromSignature": 0.0,
           "description": "Initial Stress Value (optional, default: 0.0) the strain is calculated from ``epsP=sigInit/E``",
@@ -30773,11 +31446,13 @@
     "steel4": {
       "args": {
         "asym": {
+          "declaredType": "str",
           "description": "assume non-symmetric behavior",
           "name": "'-asym'",
           "required": true
         },
         "bi": {
+          "declaredType": "float",
           "description": "initial hardening ratio (E_i/E_0)",
           "name": "b_i",
           "required": true
@@ -30787,6 +31462,7 @@
           "required": true
         },
         "bk": {
+          "declaredType": "float",
           "description": "hardening ratio (E_k/E_0)",
           "name": "b_k",
           "required": true
@@ -30796,6 +31472,7 @@
           "required": true
         },
         "bl": {
+          "declaredType": "float",
           "description": "saturated hardening ratio (E_is/E_0)",
           "name": "b_l",
           "required": true
@@ -30805,16 +31482,19 @@
           "required": true
         },
         "cycnum": {
+          "declaredType": "float",
           "description": "expected number of half-cycles during the loading process Efficiency of the material can be slightly increased by correctly setting this value. The default value is ``cycNum = 50`` Load history memory can be turned off by setting ``cycNum = 0``.",
           "name": "cycNum",
           "required": true
         },
         "e0": {
+          "declaredType": "float",
           "description": "initial elastic tangent",
           "name": "E0",
           "required": true
         },
         "fu": {
+          "declaredType": "float",
           "description": "ultimate strength",
           "name": "f_u",
           "required": true
@@ -30824,41 +31504,49 @@
           "required": true
         },
         "fy": {
+          "declaredType": "float",
           "description": "yield strength",
           "name": "Fy",
           "required": true
         },
         "init": {
+          "declaredType": "str",
           "description": "apply initial stress",
           "name": "'-init'",
           "required": true
         },
         "iso": {
+          "declaredType": "str",
           "description": "apply isotropic hardening",
           "name": "'-iso'",
           "required": true
         },
         "kin": {
+          "declaredType": "str",
           "description": "apply kinematic hardening",
           "name": "'-kin'",
           "required": true
         },
         "lyp": {
+          "declaredType": "float",
           "description": "length of the yield plateau in eps_y0 = f_y / E_0 units",
           "name": "l_yp",
           "required": true
         },
         "mattag": {
+          "declaredType": "int",
           "description": "integer tag identifying material",
           "name": "matTag",
           "required": true
         },
         "mem": {
+          "declaredType": "str",
           "description": "configure the load history memory",
           "name": "'-mem'",
           "required": true
         },
         "params": {
+          "declaredType": "listf",
           "description": "control the exponential transition from linear elastic to hardening asymptote",
           "name": "params",
           "required": true
@@ -30876,6 +31564,7 @@
           "required": true
         },
         "rhoi": {
+          "declaredType": "float",
           "description": "specifies the position of the intersection point between initial and saturated hardening asymptotes",
           "name": "rho_i",
           "required": true
@@ -30885,6 +31574,7 @@
           "required": true
         },
         "ri": {
+          "declaredType": "float",
           "description": "control the exponential transition from initial to saturated asymptote",
           "name": "R_i",
           "required": true
@@ -30894,6 +31584,7 @@
           "required": true
         },
         "ru": {
+          "declaredType": "float",
           "description": "control the exponential transition from kinematic hardening to perfectly plastic asymptote",
           "name": "R_u",
           "required": true
@@ -30903,11 +31594,13 @@
           "required": true
         },
         "siginit": {
+          "declaredType": "float",
           "description": "initial stress value",
           "name": "sig_init",
           "required": true
         },
         "ult": {
+          "declaredType": "str",
           "description": "apply an ultimate strength limit",
           "name": "'-ult'",
           "required": true
@@ -30920,6 +31613,7 @@
     "steelmpf": {
       "args": {
         "a1": {
+          "declaredType": "float",
           "defaultFromDescription": 0.0,
           "defaultFromSignature": 0.0,
           "description": "Isotropic hardening in compression parameter (optional, default = 0.0). Shifts compression yield envelope by a proportion of compressive yield strength after a maximum plastic tensile strain of a2(fyp/E0)",
@@ -30927,6 +31621,7 @@
           "required": false
         },
         "a2": {
+          "declaredType": "float",
           "defaultFromDescription": 1.0,
           "defaultFromSignature": 1.0,
           "description": "Isotropic hardening in compression parameter (optional, default = 1.0).",
@@ -30934,6 +31629,7 @@
           "required": false
         },
         "a3": {
+          "declaredType": "float",
           "defaultFromDescription": 0.0,
           "defaultFromSignature": 0.0,
           "description": "Isotropic hardening in tension parameter (optional, default = 0.0). Shifts tension yield envelope by a proportion of tensile yield strength after a maximum plastic compressive strain of a3(fyn/E0).",
@@ -30941,6 +31637,7 @@
           "required": false
         },
         "a4": {
+          "declaredType": "float",
           "defaultFromDescription": 1.0,
           "defaultFromSignature": 1.0,
           "description": "Isotropic hardening in tension parameter (optional, default = 1.0). See explanation of a3.",
@@ -30948,36 +31645,43 @@
           "required": false
         },
         "bn": {
+          "declaredType": "float",
           "description": "Strain hardening ratio in compression (negative loading direction)",
           "name": "bn",
           "required": true
         },
         "bp": {
+          "declaredType": "float",
           "description": "Strain hardening ratio in tension (positive loading direction)",
           "name": "bp",
           "required": true
         },
         "e0": {
+          "declaredType": "float",
           "description": "Initial tangent modulus",
           "name": "E0",
           "required": true
         },
         "fyn": {
+          "declaredType": "float",
           "description": "Yield strength in compression (negative loading direction)",
           "name": "fyn",
           "required": true
         },
         "fyp": {
+          "declaredType": "float",
           "description": "Yield strength in tension (positive loading direction)",
           "name": "fyp",
           "required": true
         },
         "mattag": {
+          "declaredType": "int",
           "description": "integer tag identifying material",
           "name": "matTag",
           "required": true
         },
         "params": {
+          "declaredType": "listf",
           "description": "parameters to control the transition from elastic to plastic branches.",
           "name": "params",
           "required": true
@@ -30990,66 +31694,79 @@
     "tdconcrete": {
       "args": {
         "beta": {
+          "declaredType": "float",
           "description": "tension softening parameter (tension softening exponent)",
           "name": "beta",
           "required": true
         },
         "ec": {
+          "declaredType": "float",
           "description": "concrete modulus of elasticity",
           "name": "Ec",
           "required": true
         },
         "epsshu": {
+          "declaredType": "float",
           "description": "ultimate shrinkage strain as per ACI 209R-92 (shrinkage is negative)",
           "name": "epsshu",
           "required": true
         },
         "fc": {
+          "declaredType": "float",
           "description": "concrete compressive strength (compression is negative)",
           "name": "fc",
           "required": true
         },
         "fct": {
+          "declaredType": "float",
           "description": "concrete tensile strength (tension is positive)",
           "name": "fct",
           "required": true
         },
         "mattag": {
+          "declaredType": "int",
           "description": "integer tag identifying material",
           "name": "matTag",
           "required": true
         },
         "phiu": {
+          "declaredType": "float",
           "description": "ultimate creep coefficient as per ACI 209R-92",
           "name": "phiu",
           "required": true
         },
         "psicr1": {
+          "declaredType": "float",
           "description": "fitting parameter of the creep time evolution function as per ACI 209R-92",
           "name": "psicr1",
           "required": true
         },
         "psicr2": {
+          "declaredType": "float",
           "description": "fitting parameter of the creep time evolution function as per ACI 209R-92",
           "name": "psicr2",
           "required": true
         },
         "psish": {
+          "declaredType": "float",
           "description": "fitting parameter of the shrinkage time evolution function as per ACI 209R-92",
           "name": "psish",
           "required": true
         },
         "tcast": {
+          "declaredType": "float",
           "description": "analysis time corresponding to concrete casting (in days; minimum value 2.0)",
           "name": "tcast",
           "required": true
         },
         "tcr": {
+          "declaredType": "float",
           "description": "creep model age (in days)",
           "name": "Tcr",
           "required": true
         },
         "td": {
+          "declaredType": "float",
           "description": "analysis time at initiation of drying (in days)",
           "name": "tD",
           "required": true
@@ -31062,71 +31779,85 @@
     "tdconcreteexp": {
       "args": {
         "beta": {
+          "declaredType": "float",
           "description": "tension softening parameter (tension softening exponent)",
           "name": "beta",
           "required": true
         },
         "ec": {
+          "declaredType": "float",
           "description": "concrete modulus of elasticity",
           "name": "Ec",
           "required": true
         },
         "epscru": {
+          "declaredType": "float",
           "description": "ultimate creep strain (e.g., taken from experimental measurements)",
           "name": "epscru",
           "required": true
         },
         "epsshu": {
+          "declaredType": "float",
           "description": "ultimate shrinkage strain as per ACI 209R-92 (shrinkage is negative)",
           "name": "epsshu",
           "required": true
         },
         "fc": {
+          "declaredType": "float",
           "description": "concrete compressive strength (compression is negative)",
           "name": "fc",
           "required": true
         },
         "fct": {
+          "declaredType": "float",
           "description": "concrete tensile strength (tension is positive)",
           "name": "fct",
           "required": true
         },
         "mattag": {
+          "declaredType": "int",
           "description": "integer tag identifying material",
           "name": "matTag",
           "required": true
         },
         "psicr1": {
+          "declaredType": "float",
           "description": "fitting parameter of the creep time evolution function as per ACI 209R-92",
           "name": "psicr1",
           "required": true
         },
         "psicr2": {
+          "declaredType": "float",
           "description": "fitting parameter of the creep time evolution function as per ACI 209R-92",
           "name": "psicr2",
           "required": true
         },
         "psish": {
+          "declaredType": "float",
           "description": "fitting parameter of the shrinkage time evolution function as per ACI 209R-92",
           "name": "psish",
           "required": true
         },
         "sigcr": {
+          "declaredType": "float",
           "description": "concrete compressive stress (input as negative) associated with $epscru (e.g., experimentally applied)",
           "name": "sigCr",
           "required": true
         },
         "tcast": {
+          "declaredType": "float",
           "description": "analysis time corresponding to concrete casting (in days; minimum value 2.0)",
           "name": "tcast",
           "required": true
         },
         "tcr": {
+          "declaredType": "float",
           "description": "creep model age (in days)",
           "name": "Tcr",
           "required": true
         },
         "td": {
+          "declaredType": "float",
           "description": "analysis time at initiation of drying (in days)",
           "name": "tD",
           "required": true
@@ -31139,86 +31870,103 @@
     "tdconcretemc10": {
       "args": {
         "beta": {
+          "declaredType": "float",
           "description": "tension softening parameter (tension softening exponent)",
           "name": "beta",
           "required": true
         },
         "cem": {
+          "declaredType": "float",
           "description": "coefficient dependent on the type of cement as per fib Model Code 2010",
           "name": "cem",
           "required": true
         },
         "ec": {
+          "declaredType": "float",
           "description": "concrete modulus of elasticity at loading age",
           "name": "Ec",
           "required": true
         },
         "ecm": {
+          "declaredType": "float",
           "description": "concrete modulus of elasticity at 28 days",
           "name": "Ecm",
           "required": true
         },
         "epsba": {
+          "declaredType": "float",
           "description": "ultimate basic shrinkage strain (input as negative) as per fib Model Code 2010",
           "name": "epsba",
           "required": true
         },
         "epsbb": {
+          "declaredType": "float",
           "description": "fitting parameter of the basic shrinkage time evolution function as per fib Model Code 2010",
           "name": "epsbb",
           "required": true
         },
         "epsda": {
+          "declaredType": "float",
           "description": "product of ultimate drying shrinkage strain and relative humidity function as per fib Model Code 2010",
           "name": "epsda",
           "required": true
         },
         "epsdb": {
+          "declaredType": "float",
           "description": "fitting parameter of the basic shrinkage time evolution function as per fib Model Code 2010",
           "name": "epsdb",
           "required": true
         },
         "fc": {
+          "declaredType": "float",
           "description": "concrete compressive strength (compression is negative)",
           "name": "fc",
           "required": true
         },
         "fct": {
+          "declaredType": "float",
           "description": "concrete tensile strength (tension is positive)",
           "name": "fct",
           "required": true
         },
         "mattag": {
+          "declaredType": "int",
           "description": "integer tag identifying material",
           "name": "matTag",
           "required": true
         },
         "phiba": {
+          "declaredType": "float",
           "description": "parameter for the effect of compressive strength on basic creep as per fib Model Code 2010",
           "name": "phiba",
           "required": true
         },
         "phibb": {
+          "declaredType": "float",
           "description": "fitting parameter of the basic creep time evolution function as per fib Model Code 2010",
           "name": "phibb",
           "required": true
         },
         "phida": {
+          "declaredType": "float",
           "description": "product of the effect of compressive strength and relative humidity on drying creep as per fib Model Code 2010",
           "name": "phida",
           "required": true
         },
         "phidb": {
+          "declaredType": "float",
           "description": "fitting parameter of the drying creep time evolution function as per fib Model Code 2010",
           "name": "phidb",
           "required": true
         },
         "tcast": {
+          "declaredType": "float",
           "description": "analysis time corresponding to concrete casting (in days; minimum value 2.0)",
           "name": "tcast",
           "required": true
         },
         "td": {
+          "declaredType": "float",
           "description": "analysis time at initiation of drying (in days)",
           "name": "tD",
           "required": true
@@ -31231,96 +31979,115 @@
     "tdconcretemc10nl": {
       "args": {
         "beta": {
+          "declaredType": "float",
           "description": "tension softening parameter (tension softening exponent)",
           "name": "beta",
           "required": true
         },
         "cem": {
+          "declaredType": "float",
           "description": "coefficient dependent on the type of cement as per fib Model Code 2010",
           "name": "cem",
           "required": true
         },
         "ec": {
+          "declaredType": "float",
           "description": "concrete modulus of elasticity at loading age",
           "name": "Ec",
           "required": true
         },
         "ecm": {
+          "declaredType": "float",
           "description": "concrete modulus of elasticity at 28 days",
           "name": "Ecm",
           "required": true
         },
         "epsba": {
+          "declaredType": "float",
           "description": "ultimate basic shrinkage strain (input as negative) as per fib Model Code 2010",
           "name": "epsba",
           "required": true
         },
         "epsbb": {
+          "declaredType": "float",
           "description": "fitting parameter of the basic shrinkage time evolution function as per fib Model Code 2010",
           "name": "epsbb",
           "required": true
         },
         "epscu": {
+          "declaredType": "float",
           "description": "concrete strain at crushing strength (input as negative)",
           "name": "epscu",
           "required": true
         },
         "epsda": {
+          "declaredType": "float",
           "description": "product of ultimate drying shrinkage strain and relative humidity function as per fib Model Code 2010",
           "name": "epsda",
           "required": true
         },
         "epsdb": {
+          "declaredType": "float",
           "description": "fitting parameter of the basic shrinkage time evolution function as per fib Model Code 2010",
           "name": "epsdb",
           "required": true
         },
         "fc": {
+          "declaredType": "float",
           "description": "concrete compressive strength (compression is negative)",
           "name": "fc",
           "required": true
         },
         "fct": {
+          "declaredType": "float",
           "description": "concrete tensile strength (tension is positive)",
           "name": "fct",
           "required": true
         },
         "fcu": {
+          "declaredType": "float",
           "description": "concrete crushing strength (compression is negative)",
           "name": "fcu",
           "required": true
         },
         "mattag": {
+          "declaredType": "int",
           "description": "integer tag identifying material",
           "name": "matTag",
           "required": true
         },
         "phiba": {
+          "declaredType": "float",
           "description": "parameter for the effect of compressive strength on basic creep as per fib Model Code 2010",
           "name": "phiba",
           "required": true
         },
         "phibb": {
+          "declaredType": "float",
           "description": "fitting parameter of the basic creep time evolution function as per fib Model Code 2010",
           "name": "phibb",
           "required": true
         },
         "phida": {
+          "declaredType": "float",
           "description": "product of the effect of compressive strength and relative humidity on drying creep as per fib Model Code 2010",
           "name": "phida",
           "required": true
         },
         "phidb": {
+          "declaredType": "float",
           "description": "fitting parameter of the drying creep time evolution function as per fib Model Code 2010",
           "name": "phidb",
           "required": true
         },
         "tcast": {
+          "declaredType": "float",
           "description": "analysis time corresponding to concrete casting (in days; minimum value 2.0)",
           "name": "tcast",
           "required": true
         },
         "td": {
+          "declaredType": "float",
           "description": "analysis time at initiation of drying (in days)",
           "name": "tD",
           "required": true
@@ -31333,36 +32100,43 @@
     "tzliq1": {
       "args": {
         "c": {
+          "declaredType": "float",
           "description": "The viscous damping term (dashpot) on the far-field (elastic) component of the displacement rate (velocity).",
           "name": "c",
           "required": true
         },
         "ele1": {
+          "declaredType": "int",
           "description": "are the eleTag (element numbers) for the two solid elements from which PyLiq1 will obtain mean effective stresses and excess pore pressures",
           "name": "ele1",
           "required": true
         },
         "ele2": {
+          "declaredType": "int",
           "description": "are the eleTag (element numbers) for the two solid elements from which PyLiq1 will obtain mean effective stresses and excess pore pressures",
           "name": "ele2",
           "required": true
         },
         "mattag": {
+          "declaredType": "int",
           "description": "integer tag identifying material",
           "name": "matTag",
           "required": true
         },
         "tult": {
+          "declaredType": "float",
           "description": "Ultimate capacity of the t-z material. SEE NOTE 1.",
           "name": "tult",
           "required": true
         },
         "tztype": {
+          "declaredType": "int",
           "description": "tzType = 1 Backbone of t-z curve approximates Reese and O'Neill (1987). tzType = 2 Backbone of t-z curve approximates Mosher (1984) relation.",
           "name": "tzType",
           "required": true
         },
         "z50": {
+          "declaredType": "float",
           "description": "Displacement at which 50% of tult is mobilized in monotonic loading.",
           "name": "z50",
           "required": true
@@ -31375,6 +32149,7 @@
     "tzsimple1": {
       "args": {
         "c": {
+          "declaredType": "float",
           "defaultFromDescription": 0.0,
           "defaultFromSignature": 0.0,
           "description": "The viscous damping term (dashpot) on the far-field (elastic) component of the displacement rate (velocity). (optional Default = 0.0). See NOTE 2.",
@@ -31382,21 +32157,25 @@
           "required": false
         },
         "mattag": {
+          "declaredType": "int",
           "description": "integer tag identifying material",
           "name": "matTag",
           "required": true
         },
         "soiltype": {
+          "declaredType": "int",
           "description": "soilType = 1 Backbone of t-z curve approximates Reese and O'Neill (1987).",
           "name": "soilType",
           "required": true
         },
         "tult": {
+          "declaredType": "float",
           "description": "Ultimate capacity of the t-z material. SEE NOTE 1.",
           "name": "tult",
           "required": true
         },
         "z50": {
+          "declaredType": "float",
           "description": "Displacement at which 50% of tult is mobilized in monotonic loading.",
           "name": "z50",
           "required": true
@@ -31409,16 +32188,19 @@
     "viscous": {
       "args": {
         "alpha": {
+          "declaredType": "float",
           "description": "power factor (=1 means linear damping)",
           "name": "alpha",
           "required": true
         },
         "c": {
+          "declaredType": "float",
           "description": "damping coeficient",
           "name": "C",
           "required": true
         },
         "mattag": {
+          "declaredType": "int",
           "description": "integer tag identifying material",
           "name": "matTag",
           "required": true
@@ -31431,50 +32213,59 @@
     "viscousdamper": {
       "args": {
         "abstol": {
+          "declaredType": "float",
           "defaultFromSignature": 1e-10,
           "description": "Tolerance for absolute error control of adaptive iterative algorithm (default value 10^-10)",
           "name": "AbsTol",
           "required": true
         },
         "alpha": {
+          "declaredType": "float",
           "description": "Velocity exponent",
           "name": "alpha",
           "required": true
         },
         "cd": {
+          "declaredType": "float",
           "description": "Damping coefficient",
           "name": "Cd",
           "required": true
         },
         "kel": {
+          "declaredType": "float",
           "description": "Elastic stiffness of linear spring to model the axial flexibility of a viscous damper (e.g. combined stiffness of the supporting brace and internal damper portion)",
           "name": "K_el",
           "required": true
         },
         "lgap": {
+          "declaredType": "float",
           "defaultFromSignature": 0.0,
           "description": "Gap length to simulate the gap length due to the pin tolerance",
           "name": "LGap",
           "required": true
         },
         "mattag": {
+          "declaredType": "int",
           "description": "integer tag identifying material",
           "name": "matTag",
           "required": true
         },
         "maxhalf": {
+          "declaredType": "int",
           "defaultFromSignature": 15,
           "description": "Maximum number of sub-step iterations within an integration step (default value 15)",
           "name": "MaxHalf",
           "required": true
         },
         "nm": {
+          "declaredType": "int",
           "defaultFromSignature": 1,
           "description": "Employed adaptive numerical algorithm (default value NM = 1; * ``1`` = Dormand-Prince54, * ``2`` = 6th order Adams-Bashforth-Moulton, * ``3`` = modified Rosenbrock Triple)",
           "name": "NM",
           "required": true
         },
         "reltol": {
+          "declaredType": "float",
           "defaultFromSignature": 1e-06,
           "description": "Tolerance for absolute relative error control of the adaptive iterative algorithm (default value 10^-6)",
           "name": "RelTol",

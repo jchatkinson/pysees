@@ -24,10 +24,10 @@ CALL_RE = re.compile(r"(?:^|[^A-Za-z0-9_])(?:ops\.)?([A-Za-z_]\w*)\s*\((.*)\)\s*
 FUNCTION_DIRECTIVE_RE = re.compile(r"^\s*\.\.\s+function::\s*(.+?)\s*$")
 PY_FUNCTION_DIRECTIVE_RE = re.compile(r"^\s*\.\.\s+py:function::\s*(.+?)\s*$")
 PARAM_ROW_RE = re.compile(r"^\s*``")
-PARAM_TYPE_RE = re.compile(r"\|[^|]+\|\s+(.*)$")
+PARAM_TYPE_RE = re.compile(r"\|([^|]+)\|\s+(.*)$")
 PARAM_NAME_RE = re.compile(r"``([^`]+)``")
 DEFAULT_TEXT_RE = re.compile(r"default\s*[=:]\s*([^\s,;)\]]+)", re.IGNORECASE)
-OPTIONAL_TEXT_RE = re.compile(r"\(\s*optional\b", re.IGNORECASE)
+OPTIONAL_TEXT_RE = re.compile(r"\boptional\b", re.IGNORECASE)
 
 
 @dataclass(frozen=True)
@@ -126,7 +126,7 @@ def normalize_key(value: str) -> str:
 
 
 def parse_default_scalar(raw: str) -> Any | None:
-  token = raw.strip().strip(">").strip("<").strip(".,;:")
+  token = raw.strip().strip(">").strip("<").strip(".,;:").strip("`")
   if not token:
     return None
   if (token.startswith("'") and token.endswith("'")) or (token.startswith('"') and token.endswith('"')):
@@ -209,12 +209,14 @@ def parse_param_table(lines: list[str]) -> dict[str, dict[str, Any]]:
     if not PARAM_ROW_RE.match(line):
       i += 1
       continue
-    names = [n.strip() for n in PARAM_NAME_RE.findall(line)]
+    left_col = line.split("|", 1)[0]
+    names = [n.strip() for n in PARAM_NAME_RE.findall(left_col)]
     if not names:
       i += 1
       continue
     desc_match = PARAM_TYPE_RE.search(line)
-    desc = desc_match.group(1).strip() if desc_match else line.split("``")[-1].strip()
+    declared_type = desc_match.group(1).strip().lower() if desc_match else ""
+    desc = desc_match.group(2).strip() if desc_match else line.split("``")[-1].strip()
     j = i + 1
     while j < len(lines):
       cont = lines[j]
@@ -240,6 +242,8 @@ def parse_param_table(lines: list[str]) -> dict[str, dict[str, Any]]:
       existing = out.get(normalized, {})
       if not existing.get("description") and clean_desc:
         existing["description"] = clean_desc
+      if declared_type:
+        existing["declaredType"] = declared_type
       existing["required"] = not optional
       if default_from_desc is not None:
         existing["defaultFromDescription"] = default_from_desc

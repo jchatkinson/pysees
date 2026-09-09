@@ -146,11 +146,21 @@ def apply_uniaxial_arg_metadata(
   mat_meta = docs_meta.get(normalize_key(mat_type), {})
   arg_meta = (mat_meta.get("args", {}) if isinstance(mat_meta, dict) else {}).get(normalize_key(str(arg.get("name", ""))), {})
   if isinstance(arg_meta, dict):
+    declared = str(arg_meta.get("declaredType", "")).lower()
+    if declared in ("float", "listf"):
+      out["kind"] = "float" if out.get("kind") != "vec" else out.get("kind")
+    elif declared in ("int", "listi"):
+      out["kind"] = "int" if out.get("kind") != "vec" else out.get("kind")
+    elif declared in ("str", "string"):
+      out["kind"] = "str"
     description = short_description(str(arg_meta.get("description", "")))
     if description:
       out["description"] = description
     if "required" in arg_meta:
       out["required"] = bool(arg_meta["required"])
+  is_required = bool(out.get("required", True))
+  if not is_required:
+    return out
   kind = str(out.get("kind", "str"))
   default_source = None
   default_value: Any | None = None

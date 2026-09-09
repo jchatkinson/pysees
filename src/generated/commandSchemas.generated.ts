@@ -14767,7 +14767,7 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
             },
             {
               description: "compressive modulus",
-              kind: "str",
+              kind: "float",
               name: "sce",
               required: true
             },
@@ -14785,7 +14785,7 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
             },
             {
               description: "reduction rate for tensile elastic range ( ``bte``), tensile yielding ( ``bty``) and compressive yielding ( ``bcy``) (see note 1)",
-              kind: "str",
+              kind: "float",
               name: "bte",
               required: true
             },
@@ -14803,7 +14803,7 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
             },
             {
               description: "target point stress (see note 1)",
-              kind: "str",
+              kind: "float",
               name: "fcr",
               required: true
             }
@@ -14817,7 +14817,7 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
             },
             {
               description: "compressive modulus",
-              kind: "str",
+              kind: "float",
               name: "sce",
               required: true
             },
@@ -14835,7 +14835,7 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
             },
             {
               description: "reduction rate for tensile elastic range (``bte``), tensile yielding (``bty``), tensile hardening ( ``bth``) and compressive yielding (``bcy``) (see note 1)",
-              kind: "str",
+              kind: "float",
               name: "bte",
               required: true
             },
@@ -14847,7 +14847,7 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
             },
             {
               description: "reduction rate for tensile elastic range (``bte``), tensile yielding (``bty``), tensile hardening ( ``bth``) and compressive yielding (``bcy``) (see note 1)",
-              kind: "str",
+              kind: "float",
               name: "bth",
               required: true
             },
@@ -14859,13 +14859,13 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
             },
             {
               description: "target point stress (see note 1)",
-              kind: "str",
+              kind: "float",
               name: "fcr",
               required: true
             },
             {
               description: "hardening strain ratio to yield strain",
-              kind: "str",
+              kind: "float",
               name: "ath",
               required: true
             }
@@ -14879,43 +14879,43 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
             },
             {
               description: "ratio of post-yield stiffness to the initial elastic stiffenss (0< alpha <1)",
-              kind: "str",
+              kind: "float",
               name: "alpha",
               required: true
             },
             {
               description: "initial elastic stiffness",
-              kind: "str",
+              kind: "float",
               name: "ko",
               required: true
             },
             {
               description: "parameter that controls transition from linear to nonlinear range (as n increases the transition becomes sharper; n is usually grater or equal to 1)",
-              kind: "str",
+              kind: "float",
               name: "n",
               required: true
             },
             {
               description: "parameters that control shape of hysteresis loop; depending on the values of gamma and beta softening, hardening or quasi-linearity can be simulated (look at the BoucWen Material)",
-              kind: "str",
+              kind: "float",
               name: "gamma",
               required: true
             },
             {
               description: "parameters that control shape of hysteresis loop; depending on the values of gamma and beta softening, hardening or quasi-linearity can be simulated (look at the BoucWen Material)",
-              kind: "str",
+              kind: "float",
               name: "beta",
               required: true
             },
             {
               description: "parameter that controls tangent stiffness",
-              kind: "str",
+              kind: "float",
               name: "ao",
               required: true
             },
             {
               description: "parameters that control pinching",
-              kind: "str",
+              kind: "float",
               name: "q",
               required: true
             },
@@ -14927,33 +14927,33 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
             },
             {
               description: "parameters that control pinching",
-              kind: "str",
+              kind: "float",
               name: "p",
               required: true
             },
             {
               description: "parameters that control pinching",
-              kind: "str",
+              kind: "float",
               name: "shi",
               required: true
             },
             {
               description: "parameters that control pinching",
-              kind: "str",
+              kind: "float",
               name: "deltaShi",
               required: true
             },
             {
               defaultSource: "curated",
-              defaultValue: "0.1",
+              defaultValue: 0.1,
               description: "parameters that control pinching",
-              kind: "str",
+              kind: "float",
               name: "lambda",
               required: true
             },
             {
               description: "tolerance",
-              kind: "str",
+              kind: "float",
               name: "tol",
               required: true
             },
@@ -14987,9 +14987,9 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
             },
             {
               defaultSource: "curated",
-              defaultValue: "-30.0",
+              defaultValue: -30.0,
               description: "positive floating point value defining the compressive strength of the concrete in which the reinforcing bar is anchored",
-              kind: "str",
+              kind: "float",
               name: "fc",
               required: true
             },
@@ -15003,59 +15003,57 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
             },
             {
               defaultSource: "curated",
-              defaultValue: "200000.0",
+              defaultValue: 200000.0,
               description: "floating point value defining the modulus of elasticity of the reinforcing steel",
-              kind: "str",
+              kind: "float",
               name: "es",
               required: true
             },
             {
               description: "positive floating point value defining the ultimate strength of the reinforcing steel",
-              kind: "str",
+              kind: "float",
               name: "fu",
               required: true
             },
             {
               description: "floating point value defining the hardening modulus of the reinforcing steel",
-              kind: "str",
+              kind: "float",
               name: "eh",
               required: true
             },
             {
               description: "point value defining the diameter of reinforcing steel",
-              kind: "str",
+              kind: "float",
               name: "db",
               required: true
             },
             {
               description: "floating point value defining the development length of the reinforcing steel",
-              kind: "str",
+              kind: "float",
               name: "ld",
               required: true
             },
             {
               description: "an integer defining the number of anchored bars",
-              kind: "str",
+              kind: "int",
               name: "nb",
               required: true
             },
             {
               description: "floating point value defining the dimension of the member (beam or column) perpendicular to the dimension of the plane of the paper",
-              kind: "str",
+              kind: "float",
               name: "depth",
               required: true
             },
             {
               description: "floating point value defining the height of the flexural member, perpendicular to direction in which the reinforcing steel is placed, but in the plane of the paper",
-              kind: "str",
+              kind: "float",
               name: "height",
               required: true
             },
             {
-              defaultSource: "signature",
-              defaultValue: "1.0",
               description: "floating point value defining the ratio of anchorage length used for the reinforcing bar to the dimension of the joint in the direction of the reinforcing bar (optional, default...",
-              kind: "str",
+              kind: "float",
               name: "ancLratio",
               required: false
             },
@@ -15072,16 +15070,12 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
               required: true
             },
             {
-              defaultSource: "signature",
-              defaultValue: "Damage",
               description: "string indicating type of damage:whether there is full damage in the material or no damage (optional, options: ``'Damage'``, ``'NoDamage'`` ; default: ``'Damage'``)",
               kind: "str",
               name: "damage",
               required: false
             },
             {
-              defaultSource: "signature",
-              defaultValue: "psi",
               description: "string indicating the type of unit system used (optional, options: ``'psi'``, ``'MPa'``, ``'Pa'``, ``'psf'``, ``'ksi'``, ``'ksf'``) (default: ``'psi'`` / ``'MPa'``)",
               kind: "str",
               name: "unit",
@@ -15097,19 +15091,19 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
             },
             {
               description: "elastic stiffness",
-              kind: "str",
+              kind: "float",
               name: "k0",
               required: true
             },
             {
               description: "strain hardening ratio for positive loading direction",
-              kind: "str",
+              kind: "float",
               name: "asPlus",
               required: true
             },
             {
               description: "strain hardening ratio for negative loading direction",
-              kind: "str",
+              kind: "float",
               name: "asNeg",
               required: true
             },
@@ -15127,117 +15121,115 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
             },
             {
               description: "Cyclic deterioration parameter for strength deterioration [E_t=Lamda_S*M_y; set Lamda_S = 0 to disable this mode of deterioration]",
-              kind: "str",
+              kind: "float",
               name: "lamdaS",
               required: true
             },
             {
               description: "Cyclic deterioration parameter for post-capping strength deterioration [E_t=Lamda_C*M_y; set Lamda_C = 0 to disable this mode of deterioration]",
-              kind: "str",
+              kind: "float",
               name: "lamdaC",
               required: true
             },
             {
               description: "Cyclic deterioration parameter for acceleration reloading stiffness deterioration (is not a deterioration mode for a component with Bilinear hysteretic response) [Input value is...",
-              kind: "str",
+              kind: "float",
               name: "lamdaA",
               required: true
             },
             {
               description: "Cyclic deterioration parameter for unloading stiffness deterioration [E_t=Lamda_K*M_y; set Lamda_k = 0 to disable this mode of deterioration]",
-              kind: "str",
+              kind: "float",
               name: "lamdaK",
               required: true
             },
             {
               description: "rate of strength deterioration.",
-              kind: "str",
+              kind: "float",
               name: "cS",
               required: true
             },
             {
               description: "rate of post-capping strength deterioration.",
-              kind: "str",
+              kind: "float",
               name: "cC",
               required: true
             },
             {
               description: "rate of accelerated reloading deterioration.",
-              kind: "str",
+              kind: "float",
               name: "cA",
               required: true
             },
             {
               description: "rate of unloading stiffness deterioration.",
-              kind: "str",
+              kind: "float",
               name: "cK",
               required: true
             },
             {
               description: "pre-capping rotation for positive loading direction (often noted as plastic rotation capacity)",
-              kind: "str",
+              kind: "float",
               name: "thetaPPlus",
               required: true
             },
             {
               description: "pre-capping rotation for negative loading direction (often noted as plastic rotation capacity) (positive value)",
-              kind: "str",
+              kind: "float",
               name: "thetaPNeg",
               required: true
             },
             {
               description: "post-capping rotation for positive loading direction",
-              kind: "str",
+              kind: "float",
               name: "thetaPcPlus",
               required: true
             },
             {
               description: "post-capping rotation for negative loading direction (positive value)",
-              kind: "str",
+              kind: "float",
               name: "thetaPcNeg",
               required: true
             },
             {
               description: "residual strength ratio for positive loading direction",
-              kind: "str",
+              kind: "float",
               name: "resPos",
               required: true
             },
             {
               description: "residual strength ratio for negative loading direction (positive value)",
-              kind: "str",
+              kind: "float",
               name: "resNeg",
               required: true
             },
             {
               description: "ultimate rotation capacity for positive loading direction",
-              kind: "str",
+              kind: "float",
               name: "thetaUPlus",
               required: true
             },
             {
               description: "ultimate rotation capacity for negative loading direction (positive value)",
-              kind: "str",
+              kind: "float",
               name: "thetaUNeg",
               required: true
             },
             {
               description: "rate of cyclic deterioration in the positive loading direction (this parameter is used to create assymetric hysteretic behavior for the case of a composite beam).",
-              kind: "str",
+              kind: "float",
               name: "dPlus",
               required: true
             },
             {
               description: "rate of cyclic deterioration in the negative loading direction (this parameter is used to create assymetric hysteretic behavior for the case of a composite beam).",
-              kind: "str",
+              kind: "float",
               name: "dNeg",
               required: true
             },
             {
-              defaultSource: "signature",
-              defaultValue: "0.0",
               description: "elastic stiffness amplification factor, mainly for use with concentrated plastic hinge elements (optional, default = 0).",
-              kind: "str",
+              kind: "float",
               name: "nFactor",
               required: false
             }
@@ -15251,69 +15243,69 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
             },
             {
               description: "Elastic stiffness of linear spring to model the axial flexibility of a viscous damper (e.g.",
-              kind: "str",
+              kind: "float",
               name: "kEl",
               required: true
             },
             {
               description: "Damping coefficient",
-              kind: "str",
+              kind: "float",
               name: "cd",
               required: true
             },
             {
               defaultSource: "signature",
-              defaultValue: "1.0",
+              defaultValue: 1.0,
               description: "Damper relief load (default=1.0, Damper property)",
-              kind: "str",
+              kind: "float",
               name: "fr",
               required: true
             },
             {
               defaultSource: "signature",
-              defaultValue: "1.0",
+              defaultValue: 1.0,
               description: "Post-relief viscous damping coefficient ratio (default=1.0, linear oil damper)",
-              kind: "str",
+              kind: "float",
               name: "p",
               required: true
             },
             {
               defaultSource: "signature",
-              defaultValue: "0.0",
+              defaultValue: 0.0,
               description: "Gap length to simulate the gap length due to the pin tolerance",
-              kind: "str",
+              kind: "float",
               name: "lGap",
               required: true
             },
             {
               defaultSource: "signature",
-              defaultValue: "1",
+              defaultValue: 1,
               description: "Employed adaptive numerical algorithm (default value NM = 1;",
-              kind: "str",
+              kind: "int",
               name: "nM",
               required: true
             },
             {
               defaultSource: "signature",
-              defaultValue: "1e-06",
+              defaultValue: 1e-06,
               description: "Tolerance for absolute relative error control of the adaptive iterative algorithm (default value 10^-6)",
-              kind: "str",
+              kind: "float",
               name: "relTol",
               required: true
             },
             {
               defaultSource: "signature",
-              defaultValue: "1e-10",
+              defaultValue: 1e-10,
               description: "Tolerance for absolute error control of adaptive iterative algorithm (default value 10^-10)",
-              kind: "str",
+              kind: "float",
               name: "absTol",
               required: true
             },
             {
               defaultSource: "signature",
-              defaultValue: 15.0,
+              defaultValue: 15,
               description: "Maximum number of sub-step iterations within an integration step (default value 15)",
-              kind: "float",
+              kind: "int",
               name: "maxHalf",
               required: true
             }
@@ -15341,27 +15333,27 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
             },
             {
               description: "Ultimate strength of the reinforcement steel",
-              kind: "str",
+              kind: "float",
               name: "fu",
               required: true
             },
             {
               description: "Rebar slip at the loaded end at the bar fracture strength",
-              kind: "str",
+              kind: "float",
               name: "su",
               required: true
             },
             {
               defaultSource: "curated",
-              defaultValue: "0.01",
+              defaultValue: 0.01,
               description: "Initial hardening ratio in the monotonic slip vs.",
-              kind: "str",
+              kind: "float",
               name: "b",
               required: true
             },
             {
               description: "Pinching factor for the cyclic slip vs.",
-              kind: "str",
+              kind: "float",
               name: "r",
               required: true
             }
@@ -15375,55 +15367,55 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
             },
             {
               description: "ratio of post-yield stiffness to the initial elastic stiffenss (0< alpha <1)",
-              kind: "str",
+              kind: "float",
               name: "alpha",
               required: true
             },
             {
               description: "initial elastic stiffness",
-              kind: "str",
+              kind: "float",
               name: "ko",
               required: true
             },
             {
               description: "parameter that controls transition from linear to nonlinear range (as n increases the transition becomes sharper; n is usually grater or equal to 1)",
-              kind: "str",
+              kind: "float",
               name: "n",
               required: true
             },
             {
               description: "parameters that control shape of hysteresis loop; depending on the values of gamma and beta softening, hardening or quasi-linearity can be simulated (look at the NOTES)",
-              kind: "str",
+              kind: "float",
               name: "gamma",
               required: true
             },
             {
               description: "parameters that control shape of hysteresis loop; depending on the values of gamma and beta softening, hardening or quasi-linearity can be simulated (look at the NOTES)",
-              kind: "str",
+              kind: "float",
               name: "beta",
               required: true
             },
             {
               description: "parameters that control tangent stiffness",
-              kind: "str",
+              kind: "float",
               name: "ao",
               required: true
             },
             {
               description: "parameters that control tangent stiffness",
-              kind: "str",
+              kind: "float",
               name: "deltaA",
               required: true
             },
             {
               description: "parameters that control material degradation",
-              kind: "str",
+              kind: "float",
               name: "deltaNu",
               required: true
             },
             {
               description: "parameters that control material degradation",
-              kind: "str",
+              kind: "float",
               name: "deltaEta",
               required: true
             }
@@ -15437,19 +15429,19 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
             },
             {
               description: "SWP's height (mm)",
-              kind: "str",
+              kind: "float",
               name: "height",
               required: true
             },
             {
               description: "SWP's width (mm)",
-              kind: "int",
+              kind: "float",
               name: "width",
               required: true
             },
             {
               description: "Tensile strength of framing members (MPa)",
-              kind: "str",
+              kind: "float",
               name: "fuf",
               required: true
             },
@@ -15461,19 +15453,19 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
             },
             {
               description: "Framing thickness (mm)",
-              kind: "str",
+              kind: "float",
               name: "tf",
               required: true
             },
             {
               description: "Framing cross section area (mm2)",
-              kind: "str",
+              kind: "float",
               name: "af",
               required: true
             },
             {
               description: "Tensile strength of steel sheet sheathing (MPa)",
-              kind: "str",
+              kind: "float",
               name: "fus",
               required: true
             },
@@ -15485,49 +15477,49 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
             },
             {
               description: "Sheathing thickness (mm)",
-              kind: "str",
+              kind: "float",
               name: "ts",
               required: true
             },
             {
               description: "Sheathing number (one or two sides sheathed)",
-              kind: "str",
+              kind: "float",
               name: "np",
               required: true
             },
             {
               description: "Screws diameter (mm)",
-              kind: "str",
+              kind: "float",
               name: "ds",
               required: true
             },
             {
               description: "Screws shear strength (N)",
-              kind: "str",
+              kind: "float",
               name: "vs",
               required: true
             },
             {
               description: "Screw spacing on the SWP perimeter (mm)",
-              kind: "str",
+              kind: "float",
               name: "sc",
               required: true
             },
             {
               description: "Anchor bolt's diameter (mm)",
-              kind: "str",
+              kind: "float",
               name: "dt",
               required: true
             },
             {
               description: "Total area of openings (mm2)",
-              kind: "str",
+              kind: "float",
               name: "openingArea",
               required: true
             },
             {
               description: "Cumulative length of openings (mm)",
-              kind: "str",
+              kind: "float",
               name: "openingLength",
               required: true
             }
@@ -15541,91 +15533,91 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
             },
             {
               description: "SWP's height (mm)",
-              kind: "str",
+              kind: "float",
               name: "height",
               required: true
             },
             {
               description: "SWP's width (mm)",
-              kind: "int",
+              kind: "float",
               name: "width",
               required: true
             },
             {
               description: "Tensile strength of framing members (MPa)",
-              kind: "str",
+              kind: "float",
               name: "fut",
               required: true
             },
             {
               description: "Framing thickness (mm)",
-              kind: "str",
+              kind: "float",
               name: "tf",
               required: true
             },
             {
               description: "Moment of inertia of the double end-stud (mm4)",
-              kind: "str",
+              kind: "float",
               name: "ife",
               required: true
             },
             {
               description: "Moment of inertia of the intermediate stud (mm4)",
-              kind: "str",
+              kind: "float",
               name: "ifi",
               required: true
             },
             {
               description: "Sheathing thickness (mm)",
-              kind: "str",
+              kind: "float",
               name: "ts",
               required: true
             },
             {
               description: "Sheathing number (one or two sides sheathed)",
-              kind: "str",
+              kind: "float",
               name: "np",
               required: true
             },
             {
               description: "Screws diameter (mm)",
-              kind: "str",
+              kind: "float",
               name: "ds",
               required: true
             },
             {
               description: "Screws shear strength (N)",
-              kind: "str",
+              kind: "float",
               name: "vs",
               required: true
             },
             {
               description: "Screw spacing on the SWP perimeter (mm)",
-              kind: "str",
+              kind: "float",
               name: "sc",
               required: true
             },
             {
               description: "Total number of screws located on the SWP perimeter",
-              kind: "str",
+              kind: "float",
               name: "nc",
               required: true
             },
             {
               description: "Integer identifier used to define wood sheathing type (DFP=1, OSB=2, CSP=3)",
-              kind: "str",
+              kind: "int",
               name: "type",
               required: true
             },
             {
               description: "Total area of openings (mm2)",
-              kind: "str",
+              kind: "float",
               name: "openingArea",
               required: true
             },
             {
               description: "Cumulative length of openings (mm)",
-              kind: "str",
+              kind: "float",
               name: "openingLength",
               required: true
             }
@@ -15639,19 +15631,19 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
             },
             {
               description: "Number of yield fingers of the CSF-brace",
-              kind: "str",
+              kind: "int",
               name: "n",
               required: true
             },
             {
               description: "Width of an individual yielding finger at its base of the CSF-brace",
-              kind: "str",
+              kind: "float",
               name: "bo",
               required: true
             },
             {
               description: "Thickness of an individual yielding finger",
-              kind: "str",
+              kind: "float",
               name: "h",
               required: true
             },
@@ -15665,73 +15657,65 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
             },
             {
               defaultSource: "curated",
-              defaultValue: "200000.0",
+              defaultValue: 200000.0,
               description: "Modulus of elasticity of the steel material of the yielding finger",
-              kind: "str",
+              kind: "float",
               name: "e",
               required: true
             },
             {
               description: "Height of an individual yielding finger",
-              kind: "str",
+              kind: "float",
               name: "l",
               required: true
             },
             {
               defaultSource: "curated",
-              defaultValue: "0.01",
+              defaultValue: 0.01,
               description: "Strain hardening ratio",
-              kind: "str",
+              kind: "float",
               name: "b",
               required: true
             },
             {
               description: "Parameter that controls the Bauschinger effect.",
-              kind: "str",
+              kind: "float",
               name: "ro",
               required: true
             },
             {
               description: "Parameter that controls the Bauschinger effect.",
-              kind: "str",
+              kind: "float",
               name: "cR1",
               required: true
             },
             {
               description: "Parameter that controls the Bauschinger effect.",
-              kind: "str",
+              kind: "float",
               name: "cR2",
               required: true
             },
             {
-              defaultSource: "signature",
-              defaultValue: "s2*Pp/Kp",
               description: "isotropic hardening parameter, increase of compression yield envelope as proportion of yield strength after a plastic deformation of a2*(Pp/Kp)",
-              kind: "str",
+              kind: "float",
               name: "a1",
               required: true
             },
             {
-              defaultSource: "signature",
-              defaultValue: "1.0",
               description: "isotropic hardening parameter (see explanation under a1).",
-              kind: "str",
+              kind: "float",
               name: "a2",
               required: false
             },
             {
-              defaultSource: "signature",
-              defaultValue: "a4*Pp/Kp",
               description: "isotropic hardening parameter, increase of tension yield envelope as proportion of yield strength after a plastic deformation of a4*(Pp/Kp)",
-              kind: "str",
+              kind: "float",
               name: "a3",
               required: true
             },
             {
-              defaultSource: "signature",
-              defaultValue: "1.0",
               description: "isotropic hardening parameter (see explanation under a3).",
-              kind: "str",
+              kind: "float",
               name: "a4",
               required: false
             }
@@ -15745,33 +15729,33 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
             },
             {
               defaultSource: "curated",
-              defaultValue: "-30.0",
+              defaultValue: -30.0,
               description: "concrete compressive strength at 28 days (compression is negative)",
-              kind: "str",
+              kind: "float",
               name: "fpc",
               required: true
             },
             {
               defaultSource: "curated",
-              defaultValue: "-0.002",
+              defaultValue: -0.002,
               description: "concrete strain at maximum strength",
-              kind: "str",
+              kind: "float",
               name: "epsc0",
               required: true
             },
             {
               defaultSource: "curated",
-              defaultValue: "-20.0",
+              defaultValue: -20.0,
               description: "concrete crushing strength",
-              kind: "str",
+              kind: "float",
               name: "fpcu",
               required: true
             },
             {
               defaultSource: "curated",
-              defaultValue: "-0.006",
+              defaultValue: -0.006,
               description: "concrete strain at crushing strength",
-              kind: "str",
+              kind: "float",
               name: "epsU",
               required: true
             }
@@ -15785,43 +15769,41 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
             },
             {
               defaultSource: "curated",
-              defaultValue: "-30.0",
+              defaultValue: -30.0,
               description: "concrete compressive strength at 28 days (compression is negative)",
-              kind: "str",
+              kind: "float",
               name: "fpc",
               required: true
             },
             {
               defaultSource: "curated",
-              defaultValue: "-0.002",
+              defaultValue: -0.002,
               description: "concrete strain at maximum strength",
-              kind: "str",
+              kind: "float",
               name: "epsc0",
               required: true
             },
             {
               defaultSource: "curated",
-              defaultValue: "-20.0",
+              defaultValue: -20.0,
               description: "concrete crushing strength",
-              kind: "str",
+              kind: "float",
               name: "fpcu",
               required: true
             },
             {
               defaultSource: "curated",
-              defaultValue: "-0.006",
+              defaultValue: -0.006,
               description: "concrete strain at crushing strength",
-              kind: "str",
+              kind: "float",
               name: "epsU",
               required: true
             },
             {
-              defaultSource: "signature",
-              defaultValue: "0.01",
               description: "optional, default = 0.03",
-              kind: "str",
+              kind: "float",
               name: "endStrainSITC",
-              required: true
+              required: false
             }
           ],
           Concrete02: [
@@ -15833,57 +15815,57 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
             },
             {
               defaultSource: "curated",
-              defaultValue: "-30.0",
+              defaultValue: -30.0,
               description: "concrete compressive strength at 28 days (compression is negative)",
-              kind: "str",
+              kind: "float",
               name: "fpc",
               required: true
             },
             {
               defaultSource: "curated",
-              defaultValue: "-0.002",
+              defaultValue: -0.002,
               description: "concrete strain at maximum strength",
-              kind: "str",
+              kind: "float",
               name: "epsc0",
               required: true
             },
             {
               defaultSource: "curated",
-              defaultValue: "-20.0",
+              defaultValue: -20.0,
               description: "concrete crushing strength",
-              kind: "str",
+              kind: "float",
               name: "fpcu",
               required: true
             },
             {
               defaultSource: "curated",
-              defaultValue: "-0.006",
+              defaultValue: -0.006,
               description: "concrete strain at crushing strength",
-              kind: "str",
+              kind: "float",
               name: "epsU",
               required: true
             },
             {
               defaultSource: "curated",
-              defaultValue: "0.1",
+              defaultValue: 0.1,
               description: "ratio between unloading slope at $epscu and initial slope",
-              kind: "str",
+              kind: "float",
               name: "lambda",
               required: true
             },
             {
               defaultSource: "curated",
-              defaultValue: "3.0",
+              defaultValue: 3.0,
               description: "tensile strength",
-              kind: "str",
+              kind: "float",
               name: "ft",
               required: true
             },
             {
               defaultSource: "curated",
-              defaultValue: "200.0",
+              defaultValue: 200.0,
               description: "tension softening stiffness (absolute value) (slope of the linear tension softening branch)",
-              kind: "str",
+              kind: "float",
               name: "ets",
               required: true
             }
@@ -15897,47 +15879,47 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
             },
             {
               defaultSource: "curated",
-              defaultValue: "-30.0",
+              defaultValue: -30.0,
               description: "floating point values defining concrete compressive strength at 28 days (compression is negative)",
-              kind: "str",
+              kind: "float",
               name: "fc",
               required: true
             },
             {
               description: "floating point values defining concrete strain at maximum strength",
-              kind: "str",
+              kind: "float",
               name: "epsc",
               required: true
             },
             {
               description: "floating point values defining concrete strain at crushing strength",
-              kind: "str",
+              kind: "float",
               name: "epscu",
               required: true
             },
             {
               defaultSource: "curated",
-              defaultValue: "30000.0",
+              defaultValue: 30000.0,
               description: "floating point values defining initial stiffness",
-              kind: "str",
+              kind: "float",
               name: "ec",
               required: true
             },
             {
               description: "floating point value defining the maximum tensile strength of concrete (optional)",
-              kind: "str",
+              kind: "float",
               name: "fct",
               required: false
             },
             {
               description: "floating point value defining ultimate tensile strain of concrete (optional)",
-              kind: "str",
+              kind: "float",
               name: "et",
               required: false
             },
             {
               description: "loating point value defining the exponential curve parameter to define the residual stress (as a factor of ft) at etu",
-              kind: "str",
+              kind: "float",
               name: "beta",
               required: true
             }
@@ -15951,61 +15933,61 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
             },
             {
               defaultSource: "curated",
-              defaultValue: "-30.0",
+              defaultValue: -30.0,
               description: "concrete compressive strength (compression is negative)",
-              kind: "str",
+              kind: "float",
               name: "fc",
               required: true
             },
             {
               defaultSource: "curated",
-              defaultValue: "200000.0",
+              defaultValue: 200000.0,
               description: "strain at compressive strength",
-              kind: "str",
+              kind: "float",
               name: "e0",
               required: true
             },
             {
               description: "compressive shape factor",
-              kind: "str",
+              kind: "float",
               name: "n",
               required: true
             },
             {
               description: "post-peak compressive shape factor",
-              kind: "str",
+              kind: "float",
               name: "k",
               required: true
             },
             {
               description: ":math:`\\alpha_1` parameter for compressive plastic strain definition",
-              kind: "str",
+              kind: "float",
               name: "alpha1",
               required: true
             },
             {
               description: "tensile strength",
-              kind: "str",
+              kind: "float",
               name: "fcr",
               required: true
             },
             {
               description: "tensile strain at peak stress (fcr)",
-              kind: "str",
+              kind: "float",
               name: "ecr",
               required: true
             },
             {
               defaultSource: "curated",
-              defaultValue: "0.01",
+              defaultValue: 0.01,
               description: "exponent of the tension stiffening curve",
-              kind: "str",
+              kind: "float",
               name: "b",
               required: true
             },
             {
               description: ":math:`\\alpha_2` parameter for tensile plastic strain definition",
-              kind: "str",
+              kind: "float",
               name: "alpha2",
               required: true
             }
@@ -16019,37 +16001,37 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
             },
             {
               defaultSource: "curated",
-              defaultValue: "-30.0",
+              defaultValue: -30.0,
               description: "concrete compressive strength (compression is negative)",
-              kind: "str",
+              kind: "float",
               name: "fc",
               required: true
             },
             {
               description: "concrete strain at maximum compressive strength",
-              kind: "str",
+              kind: "float",
               name: "epsc",
               required: true
             },
             {
               defaultSource: "curated",
-              defaultValue: "30000.0",
+              defaultValue: 30000.0,
               description: "Initial Elastic modulus of the concrete",
-              kind: "str",
+              kind: "float",
               name: "ec",
               required: true
             },
             {
               defaultSource: "curated",
-              defaultValue: "3.0",
+              defaultValue: 3.0,
               description: "tensile strength of concrete (tension is positive)",
-              kind: "str",
+              kind: "float",
               name: "ft",
               required: true
             },
             {
               description: "tensile strain at max tensile strength of concrete",
-              kind: "str",
+              kind: "float",
               name: "et",
               required: true
             },
@@ -16067,7 +16049,7 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
             },
             {
               description: "Parameter that controls the nonlinear descending branch",
-              kind: "str",
+              kind: "float",
               name: "r",
               required: true
             }
@@ -16081,27 +16063,27 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
             },
             {
               description: "Compressive strength (:math:`f'_c`)",
-              kind: "str",
+              kind: "float",
               name: "fpcc",
               required: true
             },
             {
               description: "Strain at compressive strength (:math:`\\epsilon'_c`)",
-              kind: "str",
+              kind: "float",
               name: "epcc",
               required: true
             },
             {
               defaultSource: "curated",
-              defaultValue: "30000.0",
+              defaultValue: 30000.0,
               description: "Initial tangent modulus (:math:`E_c`)",
-              kind: "str",
+              kind: "float",
               name: "ec",
               required: true
             },
             {
               description: "Shape parameter in Tsai's equation defined for compression (:math:`r_c`)",
-              kind: "str",
+              kind: "float",
               name: "rc",
               required: true
             },
@@ -16113,21 +16095,21 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
             },
             {
               defaultSource: "curated",
-              defaultValue: "3.0",
+              defaultValue: 3.0,
               description: "Tensile strength (:math:`f_t`)",
-              kind: "str",
+              kind: "float",
               name: "ft",
               required: true
             },
             {
               description: "Strain at tensile strength (:math:`\\epsilon_t`)",
-              kind: "str",
+              kind: "float",
               name: "et",
               required: true
             },
             {
               description: "Shape parameter in Tsai's equation defined for tension (:math:`r_t`)",
-              kind: "str",
+              kind: "float",
               name: "rt",
               required: true
             },
@@ -16141,7 +16123,7 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
               description: "optional, monotonic stress-strain relationship only: mon=1 (invoked in FSAM only), mon=0 (no impact since monotonic)",
               kind: "str",
               name: "mon",
-              required: true
+              required: false
             },
             {
               kind: "str",
@@ -16149,12 +16131,10 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
               name: "literal"
             },
             {
-              defaultSource: "signature",
-              defaultValue: "0",
               description: "optional, denote next parameter is ``GapClose``",
-              kind: "str",
+              kind: "float",
               name: "gapClose",
-              required: true
+              required: false
             }
           ],
           ConcreteD: [
@@ -16166,65 +16146,65 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
             },
             {
               defaultSource: "curated",
-              defaultValue: "-30.0",
+              defaultValue: -30.0,
               description: "concrete compressive strength",
-              kind: "str",
+              kind: "float",
               name: "fc",
               required: true
             },
             {
               description: "concrete strain at corresponding to compressive strength",
-              kind: "str",
+              kind: "float",
               name: "epsc",
               required: true
             },
             {
               defaultSource: "curated",
-              defaultValue: "3.0",
+              defaultValue: 3.0,
               description: "concrete tensile strength",
-              kind: "str",
+              kind: "float",
               name: "ft",
               required: true
             },
             {
               description: "concrete strain at corresponding to tensile strength",
-              kind: "str",
+              kind: "float",
               name: "epst",
               required: true
             },
             {
               defaultSource: "curated",
-              defaultValue: "30000.0",
+              defaultValue: 30000.0,
               description: "concrete initial Elastic modulus",
-              kind: "str",
+              kind: "float",
               name: "ec",
               required: true
             },
             {
               description: "compressive descending parameter",
-              kind: "str",
+              kind: "float",
               name: "alphac",
               required: true
             },
             {
               description: "tensile descending parameter",
-              kind: "str",
+              kind: "float",
               name: "alphat",
               required: true
             },
             {
               defaultSource: "signature",
-              defaultValue: "0.25",
+              defaultValue: 0.25,
               description: "plastic parameter, recommended values: 0.2~0.3",
-              kind: "str",
+              kind: "float",
               name: "cesp",
               required: true
             },
             {
               defaultSource: "signature",
-              defaultValue: "1.15",
+              defaultValue: 1.15,
               description: "plastic parameter, recommended values: 1.0~1.3",
-              kind: "str",
+              kind: "float",
               name: "etap",
               required: true
             }
@@ -16244,23 +16224,21 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
             },
             {
               defaultSource: "curated",
-              defaultValue: "-30.0",
+              defaultValue: -30.0,
               description: "unconfined cylindrical strength of concrete specimen.",
-              kind: "str",
+              kind: "float",
               name: "fpc",
               required: true
             },
             {
               defaultSource: "curated",
-              defaultValue: "30000.0",
+              defaultValue: 30000.0,
               description: "initial elastic modulus of unconfined concrete.",
-              kind: "str",
+              kind: "float",
               name: "ec",
               required: true
             },
             {
-              defaultSource: "doc_text",
-              defaultValue: "0.05",
               description: "Method to define confined concrete ultimate strain - ``-epscu`` then value is confined concrete ultimate strain, - ``-gamma`` then value is the ratio of the strength corresponding to ultimate strain to the peak strength of the confined concrete stress-strain curve.",
               kind: "str",
               name: "epscuType",
@@ -16268,7 +16246,7 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
             },
             {
               description: "Value for the definition of the concrete ultimate strain",
-              kind: "str",
+              kind: "float",
               name: "epscuVal",
               required: true
             },
@@ -16280,31 +16258,31 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
             },
             {
               description: "length/diameter of square/circular core section measured respect to the hoop center line.",
-              kind: "str",
+              kind: "float",
               name: "l1",
               required: true
             },
             {
               description: "additional dimensions when multiple hoops are being used.",
-              kind: "str",
+              kind: "float",
               name: "l2",
               required: true
             },
             {
               description: "additional dimensions when multiple hoops are being used.",
-              kind: "str",
+              kind: "float",
               name: "l3",
               required: true
             },
             {
               description: "hoop diameter.",
-              kind: "str",
+              kind: "float",
               name: "phis",
               required: true
             },
             {
               description: "hoop spacing.",
-              kind: "str",
+              kind: "float",
               name: "s",
               required: true
             },
@@ -16316,25 +16294,25 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
             },
             {
               description: "elastic modulus of the hoop steel.",
-              kind: "str",
+              kind: "float",
               name: "es0",
               required: true
             },
             {
               description: "hardening ratio of the hoop steel.",
-              kind: "str",
+              kind: "float",
               name: "haRatio",
               required: true
             },
             {
               description: "ductility factor of the hoop steel.",
-              kind: "str",
+              kind: "float",
               name: "mu",
               required: true
             },
             {
               description: "diameter of longitudinal bars.",
-              kind: "str",
+              kind: "float",
               name: "phiLon",
               required: true
             },
@@ -16348,7 +16326,7 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
               kind: "vec",
               length: "dynamic",
               name: "internalArgs",
-              required: true
+              required: false
             },
             {
               kind: "str",
@@ -16360,7 +16338,7 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
               kind: "vec",
               length: "dynamic",
               name: "wrapArgs",
-              required: true
+              required: false
             },
             {
               kind: "str",
@@ -16379,7 +16357,7 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
             },
             {
               description: "Unknown",
-              kind: "str",
+              kind: "float",
               name: "tol",
               required: true
             },
@@ -16401,7 +16379,7 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
             },
             {
               description: "Unknown",
-              kind: "str",
+              kind: "float",
               name: "epscuLimit",
               required: true
             },
@@ -16434,19 +16412,19 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
             },
             {
               description: "Ultimate tensile strength (UTS)",
-              kind: "str",
+              kind: "float",
               name: "fsu",
               required: true
             },
             {
               description: "Tensile strain at initiation of strain hardening",
-              kind: "str",
+              kind: "float",
               name: "eSH",
               required: true
             },
             {
               description: "Tensile strain at the UTS",
-              kind: "str",
+              kind: "float",
               name: "eSU",
               required: true
             },
@@ -16458,21 +16436,21 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
             },
             {
               description: "Tensile strain for a point on strain hardening curve, recommended range of values for ESHI: [ (ESU + 5*ESH)/6, (ESU + 3*ESH)/4]",
-              kind: "str",
+              kind: "float",
               name: "eSHI",
               required: true
             },
             {
               description: "Tensile stress at point on strain hardening curve corresponding to ESHI",
-              kind: "str",
+              kind: "float",
               name: "fSHI",
               required: true
             },
             {
               defaultSource: "signature",
-              defaultValue: "1.0",
+              defaultValue: 1.0,
               description: "Roundedness factor for Bauschinger curve in cycle reversals from the strain hardening curve.",
-              kind: "str",
+              kind: "float",
               name: "omegaFac",
               required: true
             }
@@ -16486,87 +16464,87 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
             },
             {
               description: "tensile cracking stress",
-              kind: "str",
+              kind: "float",
               name: "sigt0",
               required: true
             },
             {
               description: "strain at tensile cracking stress",
-              kind: "str",
+              kind: "float",
               name: "epst0",
               required: true
             },
             {
               description: "peak tensile stress",
-              kind: "str",
+              kind: "float",
               name: "sigt1",
               required: true
             },
             {
               description: "strain at peak tensile stress",
-              kind: "str",
+              kind: "float",
               name: "epst1",
               required: true
             },
             {
               description: "ultimate tensile strain",
-              kind: "str",
+              kind: "float",
               name: "epst2",
               required: true
             },
             {
               description: "compressive strength (see NOTES)",
-              kind: "str",
+              kind: "float",
               name: "sigc0",
               required: true
             },
             {
               defaultSource: "curated",
-              defaultValue: "-0.002",
+              defaultValue: -0.002,
               description: "strain at compressive strength (see NOTES)",
-              kind: "str",
+              kind: "float",
               name: "epsc0",
               required: true
             },
             {
               description: "ultimate compressive strain (see NOTES)",
-              kind: "str",
+              kind: "float",
               name: "epsc1",
               required: true
             },
             {
               description: "exponent of the unloading curve in tensile strain hardening region",
-              kind: "str",
+              kind: "float",
               name: "alphaT1",
               required: true
             },
             {
               description: "exponent of the unloading curve in tensile softening region",
-              kind: "str",
+              kind: "float",
               name: "alphaT2",
               required: true
             },
             {
               description: "exponent of the unloading curve in the compressive softening",
-              kind: "str",
+              kind: "float",
               name: "alphaC",
               required: true
             },
             {
               description: "exponent of the compressive softening curve (use 1 for linear softening)",
-              kind: "str",
+              kind: "float",
               name: "alphaCU",
               required: true
             },
             {
               description: "parameter to determine permanent strain in tension",
-              kind: "str",
+              kind: "float",
               name: "betaT",
               required: true
             },
             {
               description: "parameter to determine permanent strain in compression",
-              kind: "str",
+              kind: "float",
               name: "betaC",
               required: true
             }
@@ -16580,9 +16558,9 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
             },
             {
               defaultSource: "curated",
-              defaultValue: "200000.0",
+              defaultValue: 200000.0,
               description: "tangent",
-              kind: "str",
+              kind: "float",
               name: "e",
               required: true
             }
@@ -16596,25 +16574,21 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
             },
             {
               defaultSource: "curated",
-              defaultValue: "200000.0",
+              defaultValue: 200000.0,
               description: "tangent",
-              kind: "str",
+              kind: "float",
               name: "e",
               required: true
             },
             {
-              defaultSource: "signature",
-              defaultValue: "0.0",
               description: "damping tangent (optional, default=0.0)",
-              kind: "str",
+              kind: "float",
               name: "eta",
               required: false
             },
             {
-              defaultSource: "signature",
-              defaultValue: "E",
               description: "tangent in compression (optional, default=E)",
-              kind: "str",
+              kind: "float",
               name: "eneg",
               required: false
             }
@@ -16627,52 +16601,40 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
               required: true
             },
             {
-              defaultSource: "doc_text",
-              defaultValue: "``EP1``",
               description: "tangent in tension for stains: 0 <= strains <= ``epsP2``",
-              kind: "str",
+              kind: "float",
               name: "eP1",
               required: true
             },
             {
-              defaultSource: "doc_text",
-              defaultValue: "``EP2``",
               description: "tangent when material in tension with strains > ``epsP2``",
-              kind: "str",
+              kind: "float",
               name: "eP2",
               required: true
             },
             {
-              defaultSource: "doc_text",
-              defaultValue: "``-epsP2``",
-              description: "tangent in tension for stains: 0 <= strains <= ``epsP2``",
-              kind: "str",
+              description: "strain at which material changes tangent in tension.",
+              kind: "float",
               name: "epsP2",
               required: true
             },
             {
-              defaultSource: "signature",
-              defaultValue: "EP1",
               description: "optional, default = ``EP1``.",
-              kind: "str",
+              kind: "float",
               name: "eN1",
-              required: true
+              required: false
             },
             {
-              defaultSource: "signature",
-              defaultValue: "EP2",
               description: "optional, default = ``EP2``.",
-              kind: "str",
+              kind: "float",
               name: "eN2",
-              required: true
+              required: false
             },
             {
-              defaultSource: "signature",
-              defaultValue: "-epsP2",
-              description: "optional, default = ``EP1``.",
-              kind: "str",
+              description: "optional, default = ``-epsP2``.",
+              kind: "float",
               name: "epsN2",
-              required: true
+              required: false
             }
           ],
           ElasticMultiLinear: [
@@ -16683,10 +16645,8 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
               required: true
             },
             {
-              defaultSource: "signature",
-              defaultValue: "0.0",
               description: "damping tangent (optional, default=0.0)",
-              kind: "str",
+              kind: "float",
               name: "eta",
               required: false
             },
@@ -16724,9 +16684,9 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
             },
             {
               defaultSource: "curated",
-              defaultValue: "200000.0",
+              defaultValue: 200000.0,
               description: "tangent",
-              kind: "str",
+              kind: "float",
               name: "e",
               required: true
             },
@@ -16745,10 +16705,8 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
               required: false
             },
             {
-              defaultSource: "signature",
-              defaultValue: "0.0",
               description: "initial strain (optional, default: zero)",
-              kind: "str",
+              kind: "float",
               name: "eps0",
               required: false
             }
@@ -16762,9 +16720,9 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
             },
             {
               defaultSource: "curated",
-              defaultValue: "200000.0",
+              defaultValue: 200000.0,
               description: "tangent",
-              kind: "str",
+              kind: "float",
               name: "e",
               required: true
             },
@@ -16778,27 +16736,25 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
             },
             {
               defaultSource: "curated",
-              defaultValue: "0.0",
+              defaultValue: 0.0,
               description: "initial gap (strain or deformation)",
-              kind: "str",
+              kind: "float",
               name: "gap",
               required: true
             },
             {
               defaultSource: "signature",
-              defaultValue: "0.0",
+              defaultValue: 0.0,
               description: "hardening ratio (=Eh/E), which can be negative",
-              kind: "str",
+              kind: "float",
               name: "eta",
               required: true
             },
             {
-              defaultSource: "signature",
-              defaultValue: "noDamage",
               description: "an optional string to specify whether to accumulate damage or not in the material.",
               kind: "str",
               name: "damage",
-              required: true
+              required: false
             }
           ],
           FRPConfinedConcrete: [
@@ -16810,63 +16766,63 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
             },
             {
               description: "concrete core compressive strength.",
-              kind: "str",
+              kind: "float",
               name: "fpc1",
               required: true
             },
             {
               description: "concrete cover compressive strength.",
-              kind: "str",
+              kind: "float",
               name: "fpc2",
               required: true
             },
             {
               defaultSource: "curated",
-              defaultValue: "-0.002",
+              defaultValue: -0.002,
               description: "strain corresponding to unconfined concrete strength.",
-              kind: "str",
+              kind: "float",
               name: "epsc0",
               required: true
             },
             {
               description: "diameter of the circular section.",
-              kind: "str",
+              kind: "float",
               name: "d",
               required: true
             },
             {
               description: "dimension of concrete cover (until the outer edge of steel stirrups)",
-              kind: "str",
+              kind: "float",
               name: "c",
               required: true
             },
             {
               description: "elastic modulus of the fiber reinforced polymer (FRP) jacket.",
-              kind: "str",
+              kind: "float",
               name: "ej",
               required: true
             },
             {
               description: "clear spacing of the FRP strips - zero if FRP jacket is continuous.",
-              kind: "str",
+              kind: "float",
               name: "sj",
               required: true
             },
             {
               description: "total thickness of the FRP jacket.",
-              kind: "str",
+              kind: "float",
               name: "tj",
               required: true
             },
             {
               description: "rupture strain of the FRP jacket from tensile coupons.",
-              kind: "str",
+              kind: "float",
               name: "eju",
               required: true
             },
             {
               description: "spacing of the steel spiral/stirrups.",
-              kind: "str",
+              kind: "float",
               name: "s",
               required: true
             },
@@ -16884,39 +16840,39 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
             },
             {
               description: "diameter of the longitudinal bars of the circular section.",
-              kind: "str",
+              kind: "float",
               name: "dlong",
               required: true
             },
             {
               description: "diameter of the steel spiral/stirrups.",
-              kind: "str",
+              kind: "float",
               name: "dtrans",
               required: true
             },
             {
               defaultSource: "curated",
-              defaultValue: "200000.0",
+              defaultValue: 200000.0,
               description: "elastic modulus of steel.",
-              kind: "str",
+              kind: "float",
               name: "es",
               required: true
             },
             {
               description: "initial Poisson's coefficient for concrete.",
-              kind: "str",
+              kind: "float",
               name: "nu0",
               required: true
             },
             {
               description: "reduction factor for the rupture strain of the FRP jacket, recommended values 0.5-0.8.",
-              kind: "str",
+              kind: "float",
               name: "k",
               required: true
             },
             {
               description: "FRP jacket failure criterion due to buckling of longitudinal compressive steel bars (0 = not include it, 1= to include it).",
-              kind: "str",
+              kind: "float",
               name: "useBuck",
               required: true
             }
@@ -16930,21 +16886,21 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
             },
             {
               description: "compressive strength of unconfined concrete (compression is negative)",
-              kind: "str",
+              kind: "float",
               name: "fc0",
               required: true
             },
             {
               defaultSource: "curated",
-              defaultValue: "30000.0",
+              defaultValue: 30000.0,
               description: "elastic modulus of unconfined concrete (=4730\u221a(-$fc0(MPa)))",
-              kind: "str",
+              kind: "float",
               name: "ec",
               required: true
             },
             {
               description: "axial strain corresponding to unconfined concrete strength (\u2248 0.002)",
-              kind: "str",
+              kind: "float",
               name: "ec0",
               required: true
             },
@@ -16956,65 +16912,65 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
             },
             {
               description: "thickness of an FRP jacket",
-              kind: "str",
+              kind: "float",
               name: "tfrp",
               required: true
             },
             {
               description: "tensile elastic modulus of an FRP jacket",
-              kind: "str",
+              kind: "float",
               name: "efrp",
               required: true
             },
             {
               description: "hoop rupture strain of an FRP jacket",
-              kind: "str",
+              kind: "float",
               name: "erup",
               required: true
             },
             {
               description: "radius of circular column section",
-              kind: "str",
+              kind: "float",
               name: "r",
               required: true
             },
             {
               description: "input ultimate stress/strain directly",
-              kind: "int",
+              kind: "str",
               name: "ultimate",
               required: true
             },
             {
               description: "ultimate stress of FRP-confined concrete ($fcu \u2265 $fc0)",
-              kind: "str",
+              kind: "float",
               name: "fcu",
               required: true
             },
             {
               description: "ultimate strain of FRP-confined concrete",
-              kind: "str",
+              kind: "float",
               name: "ecu",
               required: true
             },
             {
               defaultSource: "curated",
-              defaultValue: "3.0",
+              defaultValue: 3.0,
               description: "tensile strength of unconfined concrete (=0.632\u221a(-$fc0(MPa)))",
-              kind: "str",
+              kind: "float",
               name: "ft",
               required: true
             },
             {
               defaultSource: "curated",
-              defaultValue: "200.0",
+              defaultValue: 200.0,
               description: "stiffness of tensile softening (\u2248 0.05 Ec)",
-              kind: "str",
+              kind: "float",
               name: "ets",
               required: true
             },
             {
               description: "unit indicator, Unit = 1 for SI Metric Units; Unit = 0 for US Customary Units",
-              kind: "str",
+              kind: "float",
               name: "unit",
               required: true
             }
@@ -17028,7 +16984,7 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
             },
             {
               description: "Unique material object integer tag for the material that is being wrapped",
-              kind: "int",
+              kind: "float",
               name: "otherTag",
               required: true
             },
@@ -17039,9 +16995,9 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
             },
             {
               defaultSource: "signature",
-              defaultValue: "0.191",
+              defaultValue: 0.191,
               description: "Value of strain at which one cycle will cause failure (default 0.191)",
-              kind: "str",
+              kind: "float",
               name: "e0",
               required: true
             },
@@ -17052,9 +17008,9 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
             },
             {
               defaultSource: "signature",
-              defaultValue: "-0.458",
+              defaultValue: -0.458,
               description: "Slope of Coffin-Manson curve in log-log space (default -0.458)",
-              kind: "str",
+              kind: "float",
               name: "m",
               required: true
             },
@@ -17065,9 +17021,9 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
             },
             {
               defaultSource: "signature",
-              defaultValue: "-1e+16",
+              defaultValue: -1e+16,
               description: "Global minimum value for strain or deformation (default -1e16)",
-              kind: "str",
+              kind: "float",
               name: "min",
               required: true
             },
@@ -17094,9 +17050,9 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
             },
             {
               defaultSource: "curated",
-              defaultValue: "200000.0",
+              defaultValue: 200000.0,
               description: "tangent stiffness",
-              kind: "str",
+              kind: "float",
               name: "e",
               required: true
             },
@@ -17108,21 +17064,19 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
             },
             {
               description: "isotropic hardening Modulus",
-              kind: "str",
+              kind: "float",
               name: "hIso",
               required: true
             },
             {
               description: "kinematic hardening Modulus",
-              kind: "str",
+              kind: "float",
               name: "hKin",
               required: true
             },
             {
-              defaultSource: "signature",
-              defaultValue: "0.0",
               description: "visco-plastic coefficient (optional, default=0.0)",
-              kind: "str",
+              kind: "float",
               name: "eta",
               required: false
             }
@@ -17142,25 +17096,25 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
             },
             {
               description: "unloading/reloading stiffness",
-              kind: "str",
+              kind: "float",
               name: "kur",
               required: true
             },
             {
               description: "failure ratio",
-              kind: "str",
+              kind: "float",
               name: "rf",
               required: true
             },
             {
               description: "ultimate (maximum) passive resistance",
-              kind: "str",
+              kind: "float",
               name: "fult",
               required: true
             },
             {
               description: "initial gap",
-              kind: "str",
+              kind: "float",
               name: "gap",
               required: true
             }
@@ -17228,21 +17182,19 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
             },
             {
               description: "damage due to ductility: D1(mu-1)",
-              kind: "str",
+              kind: "float",
               name: "damage1",
               required: true
             },
             {
               description: "damage due to energy: D2(Eii/Eult)",
-              kind: "str",
+              kind: "float",
               name: "damage2",
               required: true
             },
             {
-              defaultSource: "signature",
-              defaultValue: "0.0",
               description: "power used to determine the degraded unloading stiffness based on ductility, mu-beta (optional, default=0.0)",
-              kind: "str",
+              kind: "float",
               name: "beta",
               required: false
             }
@@ -17256,13 +17208,13 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
             },
             {
               description: "initial stiffness",
-              kind: "str",
+              kind: "float",
               name: "k1",
               required: true
             },
             {
               description: "secondary stiffness",
-              kind: "str",
+              kind: "float",
               name: "k2",
               required: true
             },
@@ -17274,7 +17226,7 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
             },
             {
               description: "initial gap",
-              kind: "str",
+              kind: "float",
               name: "gap",
               required: true
             }
@@ -17294,7 +17246,7 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
             },
             {
               description: "initial strain",
-              kind: "str",
+              kind: "float",
               name: "initStrain",
               required: true
             }
@@ -17308,13 +17260,13 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
             },
             {
               description: "tag of the other material",
-              kind: "int",
+              kind: "float",
               name: "otherTag",
               required: true
             },
             {
               description: "initial stress",
-              kind: "str",
+              kind: "float",
               name: "initStress",
               required: true
             }
@@ -17334,13 +17286,13 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
             },
             {
               description: "area of rubber [unit: m^2] (see note 2)",
-              kind: "str",
+              kind: "float",
               name: "ar",
               required: true
             },
             {
               description: "total thickness of rubber [unit: m] (see note 2)",
-              kind: "str",
+              kind: "float",
               name: "hr",
               required: true
             },
@@ -17351,19 +17303,19 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
             },
             {
               description: "correction coefficients for equivalent shear modulus (``cg``), equivalent viscous daming ratio (``ch``), ratio of shear force at zero displacement (``cu``).",
-              kind: "str",
+              kind: "float",
               name: "cg",
               required: true
             },
             {
               description: "correction coefficients for equivalent shear modulus (``cg``), equivalent viscous daming ratio (``ch``), ratio of shear force at zero displacement (``cu``).",
-              kind: "str",
+              kind: "float",
               name: "ch",
               required: true
             },
             {
               description: "correction coefficients for equivalent shear modulus (``cg``), equivalent viscous daming ratio (``ch``), ratio of shear force at zero displacement (``cu``).",
-              kind: "str",
+              kind: "float",
               name: "cu",
               required: true
             },
@@ -17374,13 +17326,13 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
             },
             {
               description: "reduction rate for stiffness (``rs``) and force (``rf``) (see note 3)",
-              kind: "str",
+              kind: "float",
               name: "rs",
               required: true
             },
             {
               description: "reduction rate for stiffness (``rs``) and force (``rf``) (see note 3)",
-              kind: "str",
+              kind: "float",
               name: "rf",
               required: true
             }
@@ -17394,49 +17346,49 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
             },
             {
               description: "rubber type (see note 1)",
-              kind: "str",
+              kind: "int",
               name: "type",
               required: true
             },
             {
               description: "area of rubber [unit: m^2]",
-              kind: "str",
+              kind: "float",
               name: "ar",
               required: true
             },
             {
               description: "total thickness of rubber [unit: m]",
-              kind: "str",
+              kind: "float",
               name: "hr",
               required: true
             },
             {
               description: "shear modulus of rubber [unit: N/m^2]",
-              kind: "str",
+              kind: "float",
               name: "gr",
               required: true
             },
             {
               description: "area of lead plug [unit: m^2]",
-              kind: "str",
+              kind: "float",
               name: "ap",
               required: true
             },
             {
               description: "yield stress of lead plug [unit: N/m^2]",
-              kind: "str",
+              kind: "float",
               name: "tp",
               required: true
             },
             {
               description: "shear modulus of lead plug [unit: N/m^2]",
-              kind: "str",
+              kind: "float",
               name: "alph",
               required: true
             },
             {
               description: "ratio of initial stiffness to yielding stiffness",
-              kind: "str",
+              kind: "float",
               name: "beta",
               required: true
             },
@@ -17447,7 +17399,7 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
             },
             {
               description: "temperature [unit: \u00b0C]",
-              kind: "str",
+              kind: "float",
               name: "temp",
               required: true
             },
@@ -17458,13 +17410,13 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
             },
             {
               description: "reduction rate for yielding stiffness ( ``rk``) and force at zero displacement ( ``rq``)",
-              kind: "str",
+              kind: "float",
               name: "rk",
               required: true
             },
             {
               description: "reduction rate for yielding stiffness ( ``rk``) and force at zero displacement ( ``rq``)",
-              kind: "str",
+              kind: "float",
               name: "rq",
               required: true
             },
@@ -17475,13 +17427,13 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
             },
             {
               description: "reduction rate for stiffness ( ``rs``) and force ( ``rf``) (see note 3)",
-              kind: "str",
+              kind: "float",
               name: "rs",
               required: true
             },
             {
               description: "reduction rate for stiffness ( ``rs``) and force ( ``rf``) (see note 3)",
-              kind: "str",
+              kind: "float",
               name: "rf",
               required: true
             }
@@ -17495,73 +17447,73 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
             },
             {
               description: "stress and strain (or force & deformation) at first point of the envelope in the positive direction",
-              kind: "str",
+              kind: "float",
               name: "s1p",
               required: true
             },
             {
               description: "stress and strain (or force & deformation) at first point of the envelope in the positive direction",
-              kind: "str",
+              kind: "float",
               name: "e1p",
               required: true
             },
             {
               description: "stress and strain (or force & deformation) at second point of the envelope in the positive direction",
-              kind: "str",
+              kind: "float",
               name: "s2p",
               required: true
             },
             {
               description: "stress and strain (or force & deformation) at second point of the envelope in the positive direction",
-              kind: "str",
+              kind: "float",
               name: "e2p",
               required: true
             },
             {
               description: "stress and strain (or force & deformation) at third point of the envelope in the positive direction",
-              kind: "str",
+              kind: "float",
               name: "s3p",
               required: true
             },
             {
               description: "stress and strain (or force & deformation) at third point of the envelope in the positive direction",
-              kind: "str",
+              kind: "float",
               name: "e3p",
               required: true
             },
             {
               description: "stress and strain (or force & deformation) at first point of the envelope in the negative direction",
-              kind: "str",
+              kind: "float",
               name: "s1n",
               required: true
             },
             {
               description: "stress and strain (or force & deformation) at first point of the envelope in the negative direction",
-              kind: "str",
+              kind: "float",
               name: "e1n",
               required: true
             },
             {
               description: "stress and strain (or force & deformation) at second point of the envelope in the negative direction",
-              kind: "str",
+              kind: "float",
               name: "s2n",
               required: true
             },
             {
               description: "stress and strain (or force & deformation) at second point of the envelope in the negative direction",
-              kind: "str",
+              kind: "float",
               name: "e2n",
               required: true
             },
             {
               description: "stress and strain (or force & deformation) at third point of the envelope in the negative direction",
-              kind: "str",
+              kind: "float",
               name: "s3n",
               required: true
             },
             {
               description: "stress and strain (or force & deformation) at third point of the envelope in the negative direction",
-              kind: "str",
+              kind: "float",
               name: "e3n",
               required: true
             },
@@ -17579,21 +17531,19 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
             },
             {
               description: "damage due to ductility: D1(m-1)",
-              kind: "str",
+              kind: "float",
               name: "damage1",
               required: true
             },
             {
               description: "damage due to energy: D2(Ei/Eult)",
-              kind: "str",
+              kind: "float",
               name: "damage2",
               required: true
             },
             {
-              defaultSource: "doc_text",
-              defaultValue: "0.0",
               description: "power used to determine the degraded unloading stiffness based on ductility, m-b (optional, default=0.0)",
-              kind: "str",
+              kind: "float",
               name: "beta",
               required: false
             },
@@ -17605,7 +17555,7 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
             },
             {
               description: "an integer defining the type of LimitCurve (0 = no curve, 1 = axial curve, all other curves can be any other integer)",
-              kind: "str",
+              kind: "int",
               name: "curveType",
               required: true
             }
@@ -17619,87 +17569,87 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
             },
             {
               description: "Compression strength of Masonry (Fm<0)",
-              kind: "str",
+              kind: "float",
               name: "fm",
               required: true
             },
             {
               defaultSource: "curated",
-              defaultValue: "3.0",
+              defaultValue: 3.0,
               description: "Tension Strength of Masonry (Ft>0)",
-              kind: "str",
+              kind: "float",
               name: "ft",
               required: true
             },
             {
               description: "Strain at maximum Strength (Um<0)",
-              kind: "str",
+              kind: "float",
               name: "um",
               required: true
             },
             {
               description: "Maximum compression strain (Uult<0)",
-              kind: "str",
+              kind: "float",
               name: "uult",
               required: true
             },
             {
               description: "Crack Closing strain (Ucl>0)",
-              kind: "str",
+              kind: "float",
               name: "ucl",
               required: true
             },
             {
               description: "Initial Elastic Modulus",
-              kind: "str",
+              kind: "float",
               name: "emo",
               required: true
             },
             {
               description: "Initial Length (just add 1.0)",
-              kind: "str",
+              kind: "float",
               name: "l",
               required: true
             },
             {
               description: "Initial strut area as ratio of initial area (=1)",
-              kind: "str",
+              kind: "float",
               name: "a1",
               required: true
             },
             {
               description: "Ratio of residual strut area as inicitial strut area (Final area / Initial Area)",
-              kind: "str",
+              kind: "float",
               name: "a2",
               required: true
             },
             {
               description: "Strain where strut degradation starts (D1<0)(For strain>D1 Area/Initial Area=a1)",
-              kind: "str",
+              kind: "float",
               name: "d1",
               required: true
             },
             {
               description: "Strain where strut degradation ends (D2<0) (For strain <D2 Area/Initial Area=a2)",
-              kind: "str",
+              kind: "float",
               name: "d2",
               required: true
             },
             {
               description: "Hysteresis parameter(0.3 to 0.6) See Crisafulli's thesis",
-              kind: "str",
+              kind: "float",
               name: "ach",
               required: true
             },
             {
               description: "Strain reloading factor (0.2 to 0.4) See Crisafulli's thesis",
-              kind: "str",
+              kind: "float",
               name: "are",
               required: true
             },
             {
               description: "Hysteresis parameter(1.5 to 2.0) See Crisafulli's thesis",
-              kind: "str",
+              kind: "float",
               name: "ba",
               required: true
             },
@@ -17710,19 +17660,19 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
             },
             {
               description: "Stiffness unloading factor (1.5 to 2.5) See Crisafulli's thesis",
-              kind: "str",
+              kind: "float",
               name: "gun",
               required: true
             },
             {
               description: "Hysteresis parameter(0.5 to 0.7) See Crisafulli's thesis",
-              kind: "str",
+              kind: "float",
               name: "gplu",
               required: true
             },
             {
               description: "Hysteresis parameter(1.1 to 1.5) See Crisafulli's thesis",
-              kind: "str",
+              kind: "float",
               name: "gplr",
               required: true
             },
@@ -17740,7 +17690,7 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
             },
             {
               description: "Envelope: =0: Sargin stress-strain envelope descending branch; =1: Parabolic stress-strain envelope descending branch",
-              kind: "str",
+              kind: "int",
               name: "iENV",
               required: true
             }
@@ -17754,7 +17704,7 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
             },
             {
               description: "tag of the other material",
-              kind: "int",
+              kind: "float",
               name: "otherTag",
               required: true
             },
@@ -17764,12 +17714,10 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
               name: "literal"
             },
             {
-              defaultSource: "signature",
-              defaultValue: "1e-16",
               description: "minimum value of strain.",
-              kind: "str",
+              kind: "float",
               name: "minStrain",
-              required: true
+              required: false
             },
             {
               kind: "str",
@@ -17777,12 +17725,10 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
               name: "literal"
             },
             {
-              defaultSource: "signature",
-              defaultValue: 1e+16,
               description: "max value of strain.",
               kind: "float",
               name: "maxStrain",
-              required: true
+              required: false
             }
           ],
           ModIMKPeakOriented: [
@@ -17794,19 +17740,19 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
             },
             {
               description: "elastic stiffness",
-              kind: "str",
+              kind: "float",
               name: "k0",
               required: true
             },
             {
               description: "strain hardening ratio for positive loading direction",
-              kind: "str",
+              kind: "float",
               name: "asPlus",
               required: true
             },
             {
               description: "strain hardening ratio for negative loading direction",
-              kind: "str",
+              kind: "float",
               name: "asNeg",
               required: true
             },
@@ -17824,109 +17770,109 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
             },
             {
               description: "Cyclic deterioration parameter for strength deterioration [E_t=Lamda_S*M_y, see Lignos and Krawinkler (2011); set Lamda_S = 0 to disable this mode of deterioration]",
-              kind: "str",
+              kind: "float",
               name: "lamdaS",
               required: true
             },
             {
               description: "Cyclic deterioration parameter for post-capping strength deterioration [E_t=Lamda_C*M_y, see Lignos and Krawinkler (2011); set Lamda_C = 0 to disable this mode of deterioration]",
-              kind: "str",
+              kind: "float",
               name: "lamdaC",
               required: true
             },
             {
               description: "Cyclic deterioration parameter for accelerated reloading stiffness deterioration [E_t=Lamda_A*M_y, see Lignos and Krawinkler (2011); set Lamda_A = 0 to disable this mode of dete...",
-              kind: "str",
+              kind: "float",
               name: "lamdaA",
               required: true
             },
             {
               description: "Cyclic deterioration parameter for unloading stiffness deterioration [E_t=Lamda_K*M_y, see Lignos and Krawinkler (2011); set Lamda_K = 0 to disable this mode of deterioration]",
-              kind: "str",
+              kind: "float",
               name: "lamdaK",
               required: true
             },
             {
               description: "rate of strength deterioration.",
-              kind: "str",
+              kind: "float",
               name: "cS",
               required: true
             },
             {
               description: "rate of post-capping strength deterioration.",
-              kind: "str",
+              kind: "float",
               name: "cC",
               required: true
             },
             {
               description: "rate of accelerated reloading deterioration.",
-              kind: "str",
+              kind: "float",
               name: "cA",
               required: true
             },
             {
               description: "rate of unloading stiffness deterioration.",
-              kind: "str",
+              kind: "float",
               name: "cK",
               required: true
             },
             {
               description: "pre-capping rotation for positive loading direction (often noted as plastic rotation capacity)",
-              kind: "str",
+              kind: "float",
               name: "thetaPPlus",
               required: true
             },
             {
               description: "pre-capping rotation for negative loading direction (often noted as plastic rotation capacity) (must be defined as a positive value)",
-              kind: "str",
+              kind: "float",
               name: "thetaPNeg",
               required: true
             },
             {
               description: "post-capping rotation for positive loading direction",
-              kind: "str",
+              kind: "float",
               name: "thetaPcPlus",
               required: true
             },
             {
               description: "post-capping rotation for negative loading direction (must be defined as a positive value)",
-              kind: "str",
+              kind: "float",
               name: "thetaPcNeg",
               required: true
             },
             {
               description: "residual strength ratio for positive loading direction",
-              kind: "str",
+              kind: "float",
               name: "resPos",
               required: true
             },
             {
               description: "residual strength ratio for negative loading direction (must be defined as a positive value)",
-              kind: "str",
+              kind: "float",
               name: "resNeg",
               required: true
             },
             {
               description: "ultimate rotation capacity for positive loading direction",
-              kind: "str",
+              kind: "float",
               name: "thetaUPlus",
               required: true
             },
             {
               description: "ultimate rotation capacity for negative loading direction (must be defined as a positive value)",
-              kind: "str",
+              kind: "float",
               name: "thetaUNeg",
               required: true
             },
             {
               description: "rate of cyclic deterioration in the positive loading direction (this parameter is used to create assymetric hysteretic behavior for the case of a composite beam).",
-              kind: "str",
+              kind: "float",
               name: "dPlus",
               required: true
             },
             {
               description: "rate of cyclic deterioration in the negative loading direction (this parameter is used to create assymetric hysteretic behavior for the case of a composite beam).",
-              kind: "str",
+              kind: "float",
               name: "dNeg",
               required: true
             }
@@ -17940,19 +17886,19 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
             },
             {
               description: "elastic stiffness",
-              kind: "str",
+              kind: "float",
               name: "k0",
               required: true
             },
             {
               description: "strain hardening ratio for positive loading direction",
-              kind: "str",
+              kind: "float",
               name: "asPlus",
               required: true
             },
             {
               description: "strain hardening ratio for negative loading direction",
-              kind: "str",
+              kind: "float",
               name: "asNeg",
               required: true
             },
@@ -17970,127 +17916,127 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
             },
             {
               description: "Ratio of the force at which reloading begins to force corresponding to the maximum historic deformation demand (positive loading direction)",
-              kind: "str",
+              kind: "float",
               name: "fprPos",
               required: true
             },
             {
               description: "Ratio of the force at which reloading begins to force corresponding to the absolute maximum historic deformation demand (negative loading direction)",
-              kind: "str",
+              kind: "float",
               name: "fprNeg",
               required: true
             },
             {
               description: "Ratio of reloading stiffness",
-              kind: "str",
+              kind: "float",
               name: "aPinch",
               required: true
             },
             {
               description: "Cyclic deterioration parameter for strength deterioration [E_t=Lamda_S*M_y, see Lignos and Krawinkler (2011); set Lamda_S = 0 to disable this mode of deterioration]",
-              kind: "str",
+              kind: "float",
               name: "lamdaS",
               required: true
             },
             {
               description: "Cyclic deterioration parameter for post-capping strength deterioration [E_t=Lamda_C*M_y, see Lignos and Krawinkler (2011); set Lamda_C = 0 to disable this mode of deterioration]",
-              kind: "str",
+              kind: "float",
               name: "lamdaC",
               required: true
             },
             {
               description: "Cyclic deterioration parameter for accelerated reloading stiffness deterioration [E_t=Lamda_A*M_y, see Lignos and Krawinkler (2011); set Lamda_A = 0 to disable this mode of dete...",
-              kind: "str",
+              kind: "float",
               name: "lamdaA",
               required: true
             },
             {
               description: "Cyclic deterioration parameter for unloading stiffness deterioration [E_t=Lamda_K*M_y, see Lignos and Krawinkler (2011); set Lamda_K = 0 to disable this mode of deterioration]",
-              kind: "str",
+              kind: "float",
               name: "lamdaK",
               required: true
             },
             {
               description: "rate of strength deterioration.",
-              kind: "str",
+              kind: "float",
               name: "cS",
               required: true
             },
             {
               description: "rate of post-capping strength deterioration.",
-              kind: "str",
+              kind: "float",
               name: "cC",
               required: true
             },
             {
               description: "rate of accelerated reloading deterioration.",
-              kind: "str",
+              kind: "float",
               name: "cA",
               required: true
             },
             {
               description: "rate of unloading stiffness deterioration.",
-              kind: "str",
+              kind: "float",
               name: "cK",
               required: true
             },
             {
               description: "pre-capping rotation for positive loading direction (often noted as plastic rotation capacity)",
-              kind: "str",
+              kind: "float",
               name: "thetaPPlus",
               required: true
             },
             {
               description: "pre-capping rotation for negative loading direction (often noted as plastic rotation capacity) (must be defined as a positive value)",
-              kind: "str",
+              kind: "float",
               name: "thetaPNeg",
               required: true
             },
             {
               description: "post-capping rotation for positive loading direction",
-              kind: "str",
+              kind: "float",
               name: "thetaPcPlus",
               required: true
             },
             {
               description: "post-capping rotation for negative loading direction (must be defined as a positive value)",
-              kind: "str",
+              kind: "float",
               name: "thetaPcNeg",
               required: true
             },
             {
               description: "residual strength ratio for positive loading direction",
-              kind: "str",
+              kind: "float",
               name: "resPos",
               required: true
             },
             {
               description: "residual strength ratio for negative loading direction (must be defined as a positive value)",
-              kind: "str",
+              kind: "float",
               name: "resNeg",
               required: true
             },
             {
               description: "ultimate rotation capacity for positive loading direction",
-              kind: "str",
+              kind: "float",
               name: "thetaUPlus",
               required: true
             },
             {
               description: "ultimate rotation capacity for negative loading direction (must be defined as a positive value)",
-              kind: "str",
+              kind: "float",
               name: "thetaUNeg",
               required: true
             },
             {
               description: "rate of cyclic deterioration in the positive loading direction (this parameter is used to create assymetric hysteretic behavior for the case of a composite beam).",
-              kind: "str",
+              kind: "float",
               name: "dPlus",
               required: true
             },
             {
               description: "rate of cyclic deterioration in the negative loading direction (this parameter is used to create assymetric hysteretic behavior for the case of a composite beam).",
-              kind: "str",
+              kind: "float",
               name: "dNeg",
               required: true
             }
@@ -18160,103 +18106,103 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
             },
             {
               description: "floating point values defining force points on the positive response envelope",
-              kind: "str",
+              kind: "float",
               name: "ePf1",
               required: true
             },
             {
               description: "floating point values defining deformation points on the positive response envelope",
-              kind: "str",
+              kind: "float",
               name: "ePd1",
               required: true
             },
             {
               description: "floating point values defining force points on the positive response envelope",
-              kind: "str",
+              kind: "float",
               name: "ePf2",
               required: true
             },
             {
               description: "floating point values defining deformation points on the positive response envelope",
-              kind: "str",
+              kind: "float",
               name: "ePd2",
               required: true
             },
             {
               description: "floating point values defining force points on the positive response envelope",
-              kind: "str",
+              kind: "float",
               name: "ePf3",
               required: true
             },
             {
               description: "floating point values defining deformation points on the positive response envelope",
-              kind: "str",
+              kind: "float",
               name: "ePd3",
               required: true
             },
             {
               description: "floating point values defining force points on the positive response envelope",
-              kind: "str",
+              kind: "float",
               name: "ePf4",
               required: true
             },
             {
               description: "floating point values defining deformation points on the positive response envelope",
-              kind: "str",
+              kind: "float",
               name: "ePd4",
               required: true
             },
             {
               description: "floating point values defining force points on the negative response envelope",
-              kind: "str",
+              kind: "float",
               name: "eNf1",
               required: true
             },
             {
               description: "floating point values defining deformation points on the negative response envelope",
-              kind: "str",
+              kind: "float",
               name: "eNd1",
               required: true
             },
             {
               description: "floating point values defining force points on the negative response envelope",
-              kind: "str",
+              kind: "float",
               name: "eNf2",
               required: true
             },
             {
               description: "floating point values defining deformation points on the negative response envelope",
-              kind: "str",
+              kind: "float",
               name: "eNd2",
               required: true
             },
             {
               description: "floating point values defining force points on the negative response envelope",
-              kind: "str",
+              kind: "float",
               name: "eNf3",
               required: true
             },
             {
               description: "floating point values defining deformation points on the negative response envelope",
-              kind: "str",
+              kind: "float",
               name: "eNd3",
               required: true
             },
             {
               description: "floating point values defining force points on the negative response envelope",
-              kind: "str",
+              kind: "float",
               name: "eNf4",
               required: true
             },
             {
               description: "floating point values defining deformation points on the negative response envelope",
-              kind: "str",
+              kind: "float",
               name: "eNd4",
               required: true
             },
             {
               description: "floating point value defining the ratio of the deformation at which reloading occurs to the maximum historic deformation demand",
-              kind: "str",
+              kind: "float",
               name: "rDispP",
               required: true
             },
@@ -18267,13 +18213,13 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
             },
             {
               description: "floating point value defining the ratio of strength developed upon unloading from negative load to the maximum strength developed under monotonic loading",
-              kind: "str",
+              kind: "float",
               name: "uForceP",
               required: true
             },
             {
               description: "floating point value defining the ratio of the deformation at which reloading occurs to the minimum historic deformation demand",
-              kind: "str",
+              kind: "float",
               name: "rDispN",
               required: true
             },
@@ -18284,103 +18230,103 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
             },
             {
               description: "floating point value defining the ratio of strength developed upon unloading from negative load to the minimum strength developed under monotonic loading",
-              kind: "str",
+              kind: "float",
               name: "uForceN",
               required: true
             },
             {
               description: "floating point values controlling cyclic degradation model for unloading stiffness degradation",
-              kind: "str",
+              kind: "float",
               name: "gK1",
               required: true
             },
             {
               description: "floating point values controlling cyclic degradation model for unloading stiffness degradation",
-              kind: "str",
+              kind: "float",
               name: "gK2",
               required: true
             },
             {
               description: "floating point values controlling cyclic degradation model for unloading stiffness degradation",
-              kind: "str",
+              kind: "float",
               name: "gK3",
               required: true
             },
             {
               description: "floating point values controlling cyclic degradation model for unloading stiffness degradation",
-              kind: "str",
+              kind: "float",
               name: "gK4",
               required: true
             },
             {
               description: "floating point values controlling cyclic degradation model for unloading stiffness degradation",
-              kind: "str",
+              kind: "float",
               name: "gKLim",
               required: true
             },
             {
               description: "floating point values controlling cyclic degradation model for reloading stiffness degradation",
-              kind: "str",
+              kind: "float",
               name: "gD1",
               required: true
             },
             {
               description: "floating point values controlling cyclic degradation model for reloading stiffness degradation",
-              kind: "str",
+              kind: "float",
               name: "gD2",
               required: true
             },
             {
               description: "floating point values controlling cyclic degradation model for reloading stiffness degradation",
-              kind: "str",
+              kind: "float",
               name: "gD3",
               required: true
             },
             {
               description: "floating point values controlling cyclic degradation model for reloading stiffness degradation",
-              kind: "str",
+              kind: "float",
               name: "gD4",
               required: true
             },
             {
               description: "floating point values controlling cyclic degradation model for reloading stiffness degradation",
-              kind: "str",
+              kind: "float",
               name: "gDLim",
               required: true
             },
             {
               description: "floating point values controlling cyclic degradation model for strength degradation",
-              kind: "str",
+              kind: "float",
               name: "gF1",
               required: true
             },
             {
               description: "floating point values controlling cyclic degradation model for strength degradation",
-              kind: "str",
+              kind: "float",
               name: "gF2",
               required: true
             },
             {
               description: "floating point values controlling cyclic degradation model for strength degradation",
-              kind: "str",
+              kind: "float",
               name: "gF3",
               required: true
             },
             {
               description: "floating point values controlling cyclic degradation model for strength degradation",
-              kind: "str",
+              kind: "float",
               name: "gF4",
               required: true
             },
             {
               description: "floating point values controlling cyclic degradation model for strength degradation",
-              kind: "str",
+              kind: "float",
               name: "gFLim",
               required: true
             },
             {
               description: "floating point value used to define maximum energy dissipation under cyclic loading.",
-              kind: "str",
+              kind: "float",
               name: "gE",
               required: true
             },
@@ -18410,19 +18356,19 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
             },
             {
               description: "integer to indicate the drift axis in which lateral-strength degradation will occur.",
-              kind: "float",
+              kind: "int",
               name: "driftAxis",
               required: true
             },
             {
               description: "floating point value to define the initial material elastic stiffness (Kelastic); Kelas > 0",
-              kind: "str",
+              kind: "float",
               name: "kelas",
               required: true
             },
             {
               description: "integer flag to indicate the type of limit curve associated with this material.",
-              kind: "float",
+              kind: "int",
               name: "crvTyp",
               required: true
             },
@@ -18538,7 +18484,7 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
             },
             {
               description: "floating point force limit for elastic stiffness damage (typically defined as the lowest of shear strength or shear at flexrual yielding).",
-              kind: "str",
+              kind: "float",
               name: "dmgStrsLimE",
               required: true
             },
@@ -18550,61 +18496,61 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
             },
             {
               description: "floating point elastic stiffness damage factors \u03b11,\u03b12,\u03b13,\u03b14 shown in Eq.",
-              kind: "str",
+              kind: "float",
               name: "dmgE1",
               required: true
             },
             {
               description: "floating point elastic stiffness damage factors \u03b11,\u03b12,\u03b13,\u03b14 shown in Eq.",
-              kind: "str",
+              kind: "float",
               name: "dmgE2",
               required: true
             },
             {
               description: "floating point elastic stiffness damage factors \u03b11,\u03b12,\u03b13,\u03b14 shown in Eq.",
-              kind: "str",
+              kind: "float",
               name: "dmgE3",
               required: true
             },
             {
               description: "floating point elastic stiffness damage factors \u03b11,\u03b12,\u03b13,\u03b14 shown in Eq.",
-              kind: "str",
+              kind: "float",
               name: "dmgE4",
               required: true
             },
             {
               description: "floating point elastic stiffness damage limit Dlim shown in Eq.",
-              kind: "str",
+              kind: "float",
               name: "dmgELim",
               required: true
             },
             {
               description: "floating point reloading stiffness damage factors \u03b11,\u03b12,\u03b13,\u03b14 shown in Eq.",
-              kind: "str",
+              kind: "float",
               name: "dmgR1",
               required: true
             },
             {
               description: "floating point reloading stiffness damage factors \u03b11,\u03b12,\u03b13,\u03b14 shown in Eq.",
-              kind: "str",
+              kind: "float",
               name: "dmgR2",
               required: true
             },
             {
               description: "floating point reloading stiffness damage factors \u03b11,\u03b12,\u03b13,\u03b14 shown in Eq.",
-              kind: "str",
+              kind: "float",
               name: "dmgR3",
               required: true
             },
             {
               description: "floating point reloading stiffness damage factors \u03b11,\u03b12,\u03b13,\u03b14 shown in Eq.",
-              kind: "str",
+              kind: "float",
               name: "dmgR4",
               required: true
             },
             {
               description: "floating point reloading stiffness damage limit Dlim shown in Eq.",
-              kind: "str",
+              kind: "float",
               name: "dmgRLim",
               required: true
             },
@@ -18616,31 +18562,31 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
             },
             {
               description: "floating point backbone strength damage factors \u03b11,\u03b12,\u03b13,\u03b14 shown in Eq.",
-              kind: "str",
+              kind: "float",
               name: "dmgS1",
               required: true
             },
             {
               description: "floating point backbone strength damage factors \u03b11,\u03b12,\u03b13,\u03b14 shown in Eq.",
-              kind: "str",
+              kind: "float",
               name: "dmgS2",
               required: true
             },
             {
               description: "floating point backbone strength damage factors \u03b11,\u03b12,\u03b13,\u03b14 shown in Eq.",
-              kind: "str",
+              kind: "float",
               name: "dmgS3",
               required: true
             },
             {
               description: "floating point backbone strength damage factors \u03b11,\u03b12,\u03b13,\u03b14 shown in Eq.",
-              kind: "str",
+              kind: "float",
               name: "dmgS4",
               required: true
             },
             {
               description: "floating point backbone strength damage limit Dlim shown in Eq.",
-              kind: "str",
+              kind: "float",
               name: "dmgSLim",
               required: true
             },
@@ -18660,19 +18606,19 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
             },
             {
               description: "the number of temperature points for the material.",
-              kind: "str",
+              kind: "float",
               name: "nt",
               required: true
             },
             {
               description: "the temperature for point 1",
-              kind: "str",
+              kind: "float",
               name: "t1",
               required: true
             },
             {
               description: "the Young's modulus for point 1",
-              kind: "str",
+              kind: "float",
               name: "e1",
               required: true
             },
@@ -18684,7 +18630,7 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
             },
             {
               description: "the thermal expansion coefficient for point 1",
-              kind: "str",
+              kind: "float",
               name: "alpT1",
               required: true
             },
@@ -18722,13 +18668,13 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
             },
             {
               description: "soilType = 1 Backbone of p-y curve approximates Matlock (1970) soft clay relation.",
-              kind: "str",
+              kind: "int",
               name: "soilType",
               required: true
             },
             {
               description: "Ultimate capacity of the p-y material.",
-              kind: "str",
+              kind: "float",
               name: "pult",
               required: true
             },
@@ -18740,21 +18686,19 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
             },
             {
               description: "Variable that sets the drag resistance within a fully-mobilized gap as Cd*pult.",
-              kind: "str",
+              kind: "float",
               name: "cd",
               required: true
             },
             {
-              defaultSource: "doc_text",
-              defaultValue: "0.0",
               description: "The viscous damping term (dashpot) on the far-field (elastic) component of the displacement rate (velocity).",
-              kind: "str",
+              kind: "float",
               name: "c",
               required: false
             },
             {
               description: "sets the minimum (or residual) peak resistance that the material retains as the adjacent solid soil elements liquefy",
-              kind: "str",
+              kind: "float",
               name: "pRes",
               required: true
             },
@@ -18789,13 +18733,13 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
             },
             {
               description: "soilType = 1 Backbone of p-y curve approximates Matlock (1970) soft clay relation.",
-              kind: "str",
+              kind: "int",
               name: "soilType",
               required: true
             },
             {
               description: "Ultimate capacity of the p-y material.",
-              kind: "str",
+              kind: "float",
               name: "pult",
               required: true
             },
@@ -18807,15 +18751,13 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
             },
             {
               description: "Variable that sets the drag resistance within a fully-mobilized gap as Cd*pult.",
-              kind: "str",
+              kind: "float",
               name: "cd",
               required: true
             },
             {
-              defaultSource: "signature",
-              defaultValue: "0.0",
               description: "The viscous damping term (dashpot) on the far-field (elastic) component of the displacement rate (velocity).",
-              kind: "str",
+              kind: "float",
               name: "c",
               required: false
             }
@@ -18829,13 +18771,13 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
             },
             {
               description: "soilType = 1 Backbone of q-z curve approximates Matlock (1970) soft clay relation.",
-              kind: "str",
+              kind: "int",
               name: "soilType",
               required: true
             },
             {
               description: "Ultimate capacity of the q-z material.",
-              kind: "str",
+              kind: "float",
               name: "qult",
               required: true
             },
@@ -18851,16 +18793,14 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
               required: true
             },
             {
-              defaultSource: "doc_text",
-              defaultValue: "0.0",
               description: "The viscous damping term (optional Default = 0.0).",
-              kind: "str",
+              kind: "float",
               name: "c",
               required: false
             },
             {
               description: "The constant ``alpha`` defines the extent of non-linearity in element\u2019s capacity and stiffness with excess pore pressure ratio (:math:`r_u`).",
-              kind: "str",
+              kind: "float",
               name: "alpha",
               required: true
             },
@@ -18895,13 +18835,13 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
             },
             {
               description: "qzType = 1 Backbone of q-z curve approximates Reese and O'Neill's (1987) relation for drilled shafts in clay.",
-              kind: "str",
+              kind: "int",
               name: "qzType",
               required: true
             },
             {
               description: "Ultimate capacity of the q-z material.",
-              kind: "str",
+              kind: "float",
               name: "qult",
               required: true
             },
@@ -18913,17 +18853,17 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
             },
             {
               defaultSource: "signature",
-              defaultValue: "0.0",
+              defaultValue: 0.0,
               description: "Uplift resistance is equal to suction*qult.",
-              kind: "str",
+              kind: "float",
               name: "suction",
               required: true
             },
             {
               defaultSource: "signature",
-              defaultValue: "0.0",
+              defaultValue: 0.0,
               description: "The viscous damping term (dashpot) on the far-field (elastic) component of the displacement rate (velocity).",
-              kind: "str",
+              kind: "float",
               name: "c",
               required: true
             }
@@ -18945,21 +18885,21 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
             },
             {
               defaultSource: "curated",
-              defaultValue: "200000.0",
+              defaultValue: 200000.0,
               description: "initial elastic tangent",
-              kind: "str",
+              kind: "float",
               name: "e0",
               required: true
             },
             {
               description: "\"yield offset\" and the Commonly used value for a is 0.002",
-              kind: "str",
+              kind: "float",
               name: "a",
               required: true
             },
             {
               description: "Parameters to control the transition from elastic to plastic branches.",
-              kind: "str",
+              kind: "float",
               name: "n",
               required: true
             }
@@ -18981,33 +18921,33 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
             },
             {
               description: "Ultimate stress in tension",
-              kind: "str",
+              kind: "float",
               name: "fu",
               required: true
             },
             {
               defaultSource: "curated",
-              defaultValue: "200000.0",
+              defaultValue: 200000.0,
               description: "Initial elastic tangent",
-              kind: "str",
+              kind: "float",
               name: "es",
               required: true
             },
             {
               description: "Tangent at initial strain hardening",
-              kind: "str",
+              kind: "float",
               name: "esh",
               required: true
             },
             {
               description: "Strain corresponding to initial strain hardening",
-              kind: "str",
+              kind: "float",
               name: "epsSh",
               required: true
             },
             {
               description: "Strain at peak stress",
-              kind: "str",
+              kind: "float",
               name: "epsUlt",
               required: true
             },
@@ -19018,25 +18958,25 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
             },
             {
               description: "Slenderness Ratio",
-              kind: "str",
+              kind: "float",
               name: "lsr",
               required: true
             },
             {
               description: "Amplification factor for the buckled stress strain curve.",
-              kind: "str",
+              kind: "float",
               name: "beta",
               required: true
             },
             {
               description: "Buckling reduction factor",
-              kind: "str",
+              kind: "float",
               name: "r",
               required: true
             },
             {
               description: "Buckling constant",
-              kind: "str",
+              kind: "float",
               name: "gamma",
               required: true
             },
@@ -19047,9 +18987,9 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
             },
             {
               defaultSource: "signature",
-              defaultValue: "1.0",
+              defaultValue: 1.0,
               description: "Adjustment Constant usually between 0.75 and 1.0 Default: alpha=1.0, this parameter is optional.",
-              kind: "str",
+              kind: "float",
               name: "alpha",
               required: true
             },
@@ -19060,13 +19000,13 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
             },
             {
               description: "Coffin-Manson constant C",
-              kind: "str",
+              kind: "float",
               name: "cf",
               required: true
             },
             {
               description: "Cyclic strength reduction constant",
-              kind: "str",
+              kind: "float",
               name: "cd",
               required: true
             },
@@ -19077,17 +19017,17 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
             },
             {
               defaultSource: "signature",
-              defaultValue: "4.3",
+              defaultValue: 4.3,
               description: "Hardening constant (default = 4.3)",
-              kind: "str",
+              kind: "float",
               name: "a1",
               required: true
             },
             {
               defaultSource: "signature",
-              defaultValue: "1.0",
+              defaultValue: 1.0,
               description: "Limit for the reduction of the yield plateau.",
-              kind: "str",
+              kind: "float",
               name: "limit",
               required: true
             },
@@ -19098,25 +19038,25 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
             },
             {
               defaultSource: "signature",
-              defaultValue: "0.333",
+              defaultValue: 0.333,
               description: "(default = 0.333)",
-              kind: "str",
+              kind: "float",
               name: "r1",
               required: true
             },
             {
               defaultSource: "signature",
-              defaultValue: "18.0",
+              defaultValue: 18.0,
               description: "(default = 18)",
-              kind: "str",
+              kind: "float",
               name: "r2",
               required: true
             },
             {
               defaultSource: "signature",
-              defaultValue: "4.0",
+              defaultValue: 4.0,
               description: "(default = 4)",
-              kind: "str",
+              kind: "float",
               name: "r3",
               required: true
             }
@@ -19130,61 +19070,61 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
             },
             {
               description: "Intercept strength of the shear wall spring element for the asymtotic line to the envelope curve F0 > FI > 0",
-              kind: "str",
+              kind: "float",
               name: "f0",
               required: true
             },
             {
               description: "Intercept strength of the spring element for the pinching branch of the hysteretic curve.",
-              kind: "str",
+              kind: "float",
               name: "fI",
               required: true
             },
             {
               description: "Spring element displacement at ultimate load.",
-              kind: "str",
+              kind: "float",
               name: "dU",
               required: true
             },
             {
               description: "Initial stiffness of the shear wall spring element (S0 > 0).",
-              kind: "str",
+              kind: "float",
               name: "s0",
               required: true
             },
             {
               description: "Stiffness ratio of the asymptotic line to the spring element envelope curve.",
-              kind: "str",
+              kind: "float",
               name: "r1",
               required: true
             },
             {
               description: "Stiffness ratio of the descending branch of the spring element envelope curve.",
-              kind: "str",
+              kind: "float",
               name: "r2",
               required: true
             },
             {
               description: "Stiffness ratio of the unloading branch off the spring element envelope curve.",
-              kind: "str",
+              kind: "float",
               name: "r3",
               required: true
             },
             {
               description: "Stiffness ratio of the pinching branch for the spring element.",
-              kind: "str",
+              kind: "float",
               name: "r4",
               required: true
             },
             {
               description: "Stiffness degradation parameter for the shear wall spring element.",
-              kind: "str",
+              kind: "float",
               name: "alpha",
               required: true
             },
             {
               description: "Stiffness degradation parameter for the spring element.",
-              kind: "str",
+              kind: "float",
               name: "beta",
               required: true
             }
@@ -19198,49 +19138,47 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
             },
             {
               description: "Initial Stiffness",
-              kind: "str",
+              kind: "float",
               name: "k1",
               required: true
             },
             {
               description: "Post-Activation Stiffness (0< ``k2``< ``k1``)",
-              kind: "str",
+              kind: "float",
               name: "k2",
               required: true
             },
             {
               description: "Forward Activation Stress/Force",
-              kind: "str",
+              kind: "float",
               name: "sigAct",
               required: true
             },
             {
               description: "Ratio of Forward to Reverse Activation Stress/Force",
-              kind: "str",
+              kind: "float",
               name: "beta",
               required: true
             },
             {
               defaultSource: "signature",
-              defaultValue: "0",
+              defaultValue: 0.0,
               description: "slip Strain/Deformation (if ``epsSlip`` = 0, there will be no slippage)",
-              kind: "str",
+              kind: "float",
               name: "epsSlip",
               required: true
             },
             {
               defaultSource: "signature",
-              defaultValue: "0",
+              defaultValue: 0.0,
               description: "Bearing Strain/Deformation (if ``epsBear`` = 0, there will be no bearing)",
-              kind: "str",
+              kind: "float",
               name: "epsBear",
               required: true
             },
             {
-              defaultSource: "signature",
-              defaultValue: "k1",
               description: "Ratio of Bearing Stiffness to Initial Stiffness ``k1``",
-              kind: "str",
+              kind: "float",
               name: "rBear",
               required: true
             }
@@ -19277,49 +19215,43 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
             },
             {
               defaultSource: "curated",
-              defaultValue: "200000.0",
+              defaultValue: 200000.0,
               description: "initial elastic tangent",
-              kind: "str",
+              kind: "float",
               name: "e0",
               required: true
             },
             {
               defaultSource: "curated",
-              defaultValue: "0.01",
+              defaultValue: 0.01,
               description: "strain-hardening ratio (ratio between post-yield tangent and initial elastic tangent)",
-              kind: "str",
+              kind: "float",
               name: "b",
               required: true
             },
             {
               defaultSource: "curated",
-              defaultValue: "0.0",
+              defaultValue: 0.0,
               description: "isotropic hardening parameter, increase of compression yield envelope as proportion of yield strength after a plastic strain of",
-              kind: "str",
+              kind: "float",
               name: "a1",
               required: true
             },
             {
-              defaultSource: "curated",
-              defaultValue: "1.0",
               description: "isotropic hardening parameter (see explanation under ``a1``).",
-              kind: "str",
+              kind: "float",
               name: "a2",
               required: false
             },
             {
-              defaultSource: "curated",
-              defaultValue: "0.0",
               description: "isotropic hardening parameter, increase of tension yield envelope as proportion of yield strength after a plastic strain of :math:`a_4*(F_y/E_0)`.",
-              kind: "str",
+              kind: "float",
               name: "a3",
               required: false
             },
             {
-              defaultSource: "curated",
-              defaultValue: "1.0",
               description: "isotropic hardening parameter (see explanation under ``a3``).",
-              kind: "str",
+              kind: "float",
               name: "a4",
               required: false
             }
@@ -19341,49 +19273,43 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
             },
             {
               defaultSource: "curated",
-              defaultValue: "200000.0",
+              defaultValue: 200000.0,
               description: "initial elastic tangent",
-              kind: "str",
+              kind: "float",
               name: "e0",
               required: true
             },
             {
               defaultSource: "curated",
-              defaultValue: "0.01",
+              defaultValue: 0.01,
               description: "strain-hardening ratio (ratio between post-yield tangent and initial elastic tangent)",
-              kind: "str",
+              kind: "float",
               name: "b",
               required: true
             },
             {
               defaultSource: "curated",
-              defaultValue: "0.0",
+              defaultValue: 0.0,
               description: "isotropic hardening parameter, increase of compression yield envelope as proportion of yield strength after a plastic strain of",
-              kind: "str",
+              kind: "float",
               name: "a1",
               required: true
             },
             {
-              defaultSource: "curated",
-              defaultValue: "1.0",
               description: "isotropic hardening parameter (see explanation under ``a1``).",
-              kind: "str",
+              kind: "float",
               name: "a2",
               required: false
             },
             {
-              defaultSource: "curated",
-              defaultValue: "0.0",
               description: "isotropic hardening parameter, increase of tension yield envelope as proportion of yield strength after a plastic strain of :math:`a_4*(F_y/E_0)`.",
-              kind: "str",
+              kind: "float",
               name: "a3",
               required: false
             },
             {
-              defaultSource: "curated",
-              defaultValue: "1.0",
               description: "isotropic hardening parameter (see explanation under ``a3``).",
-              kind: "str",
+              kind: "float",
               name: "a4",
               required: false
             }
@@ -19405,17 +19331,17 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
             },
             {
               defaultSource: "curated",
-              defaultValue: "200000.0",
+              defaultValue: 200000.0,
               description: "initial elastic tangent",
-              kind: "str",
+              kind: "float",
               name: "e0",
               required: true
             },
             {
               defaultSource: "curated",
-              defaultValue: "0.01",
+              defaultValue: 0.01,
               description: "strain-hardening ratio (ratio between post-yield tangent and initial elastic tangent)",
-              kind: "str",
+              kind: "float",
               name: "b",
               required: true
             },
@@ -19427,42 +19353,32 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
               required: true
             },
             {
-              defaultSource: "signature",
-              defaultValue: "a2*Fy/E0",
               description: "isotropic hardening parameter, increase of compression yield envelope as proportion of yield strength after a plastic strain of",
-              kind: "str",
+              kind: "float",
               name: "a1",
               required: true
             },
             {
-              defaultSource: "signature",
-              defaultValue: "1.0",
               description: "isotropic hardening parameter (see explanation under ``a1``).",
-              kind: "str",
+              kind: "float",
               name: "a2",
               required: false
             },
             {
-              defaultSource: "signature",
-              defaultValue: "a4*Fy/E0",
               description: "isotropic hardening parameter, increase of tension yield envelope as proportion of yield strength after a plastic strain of :math:`a_4*(F_y/E_0)`.",
-              kind: "str",
+              kind: "float",
               name: "a3",
               required: false
             },
             {
-              defaultSource: "signature",
-              defaultValue: "1.0",
               description: "isotropic hardening parameter (see explanation under ``a3``).",
-              kind: "str",
+              kind: "float",
               name: "a4",
               required: false
             },
             {
-              defaultSource: "signature",
-              defaultValue: "0.0",
               description: "Initial Stress Value (optional, default: 0.0) the strain is calculated from ``epsP=sigInit/E``",
-              kind: "str",
+              kind: "float",
               name: "sigInit",
               required: false
             }
@@ -19484,9 +19400,9 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
             },
             {
               defaultSource: "curated",
-              defaultValue: "200000.0",
+              defaultValue: 200000.0,
               description: "initial elastic tangent",
-              kind: "str",
+              kind: "float",
               name: "e0",
               required: true
             },
@@ -19502,7 +19418,7 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
             },
             {
               description: "hardening ratio (E_k/E_0)",
-              kind: "str",
+              kind: "float",
               name: "bK",
               required: true
             },
@@ -19540,25 +19456,25 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
             },
             {
               description: "initial hardening ratio (E_i/E_0)",
-              kind: "str",
+              kind: "float",
               name: "bI",
               required: true
             },
             {
               description: "specifies the position of the intersection point between initial and saturated hardening asymptotes",
-              kind: "str",
+              kind: "float",
               name: "rhoI",
               required: true
             },
             {
               description: "saturated hardening ratio (E_is/E_0)",
-              kind: "str",
+              kind: "float",
               name: "bL",
               required: true
             },
             {
               description: "control the exponential transition from initial to saturated asymptote",
-              kind: "str",
+              kind: "float",
               name: "rI",
               required: true
             },
@@ -19595,13 +19511,13 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
             },
             {
               description: "ultimate strength",
-              kind: "str",
+              kind: "float",
               name: "fU",
               required: true
             },
             {
               description: "control the exponential transition from kinematic hardening to perfectly plastic asymptote",
-              kind: "str",
+              kind: "float",
               name: "rU",
               required: true
             },
@@ -19622,7 +19538,7 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
             },
             {
               description: "initial stress value",
-              kind: "str",
+              kind: "float",
               name: "sigInit",
               required: true
             },
@@ -19633,7 +19549,7 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
             },
             {
               description: "expected number of half-cycles during the loading process Efficiency of the material can be slightly increased by correctly setting this value.",
-              kind: "int",
+              kind: "float",
               name: "cycNum",
               required: true
             }
@@ -19663,21 +19579,21 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
             },
             {
               defaultSource: "curated",
-              defaultValue: "200000.0",
+              defaultValue: 200000.0,
               description: "Initial tangent modulus",
-              kind: "str",
+              kind: "float",
               name: "e0",
               required: true
             },
             {
               description: "Strain hardening ratio in tension (positive loading direction)",
-              kind: "str",
+              kind: "float",
               name: "bp",
               required: true
             },
             {
               description: "Strain hardening ratio in compression (negative loading direction)",
-              kind: "str",
+              kind: "float",
               name: "bn",
               required: true
             },
@@ -19689,34 +19605,26 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
               required: true
             },
             {
-              defaultSource: "signature",
-              defaultValue: "0.0",
               description: "Isotropic hardening in compression parameter (optional, default = 0.0).",
-              kind: "str",
+              kind: "float",
               name: "a1",
               required: false
             },
             {
-              defaultSource: "signature",
-              defaultValue: "1.0",
               description: "Isotropic hardening in compression parameter (optional, default = 1.0).",
-              kind: "str",
+              kind: "float",
               name: "a2",
               required: false
             },
             {
-              defaultSource: "signature",
-              defaultValue: "0.0",
               description: "Isotropic hardening in tension parameter (optional, default = 0.0).",
-              kind: "str",
+              kind: "float",
               name: "a3",
               required: false
             },
             {
-              defaultSource: "signature",
-              defaultValue: "1.0",
               description: "Isotropic hardening in tension parameter (optional, default = 1.0).",
-              kind: "str",
+              kind: "float",
               name: "a4",
               required: false
             }
@@ -19730,77 +19638,77 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
             },
             {
               defaultSource: "curated",
-              defaultValue: "-30.0",
+              defaultValue: -30.0,
               description: "concrete compressive strength (compression is negative)",
-              kind: "str",
+              kind: "float",
               name: "fc",
               required: true
             },
             {
               description: "concrete tensile strength (tension is positive)",
-              kind: "str",
+              kind: "float",
               name: "fct",
               required: true
             },
             {
               defaultSource: "curated",
-              defaultValue: "30000.0",
+              defaultValue: 30000.0,
               description: "concrete modulus of elasticity",
-              kind: "str",
+              kind: "float",
               name: "ec",
               required: true
             },
             {
               description: "tension softening parameter (tension softening exponent)",
-              kind: "str",
+              kind: "float",
               name: "beta",
               required: true
             },
             {
               description: "analysis time at initiation of drying (in days)",
-              kind: "str",
+              kind: "float",
               name: "tD",
               required: true
             },
             {
               description: "ultimate shrinkage strain as per ACI 209R-92 (shrinkage is negative)",
-              kind: "str",
+              kind: "float",
               name: "epsshu",
               required: true
             },
             {
               description: "fitting parameter of the shrinkage time evolution function as per ACI 209R-92",
-              kind: "str",
+              kind: "float",
               name: "psish",
               required: true
             },
             {
               description: "creep model age (in days)",
-              kind: "str",
+              kind: "float",
               name: "tcr",
               required: true
             },
             {
               description: "ultimate creep coefficient as per ACI 209R-92",
-              kind: "str",
+              kind: "float",
               name: "phiu",
               required: true
             },
             {
               description: "fitting parameter of the creep time evolution function as per ACI 209R-92",
-              kind: "str",
+              kind: "float",
               name: "psicr1",
               required: true
             },
             {
               description: "fitting parameter of the creep time evolution function as per ACI 209R-92",
-              kind: "str",
+              kind: "float",
               name: "psicr2",
               required: true
             },
             {
               description: "analysis time corresponding to concrete casting (in days; minimum value 2.0)",
-              kind: "str",
+              kind: "float",
               name: "tcast",
               required: true
             }
@@ -19814,83 +19722,83 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
             },
             {
               defaultSource: "curated",
-              defaultValue: "-30.0",
+              defaultValue: -30.0,
               description: "concrete compressive strength (compression is negative)",
-              kind: "str",
+              kind: "float",
               name: "fc",
               required: true
             },
             {
               description: "concrete tensile strength (tension is positive)",
-              kind: "str",
+              kind: "float",
               name: "fct",
               required: true
             },
             {
               defaultSource: "curated",
-              defaultValue: "30000.0",
+              defaultValue: 30000.0,
               description: "concrete modulus of elasticity",
-              kind: "str",
+              kind: "float",
               name: "ec",
               required: true
             },
             {
               description: "tension softening parameter (tension softening exponent)",
-              kind: "str",
+              kind: "float",
               name: "beta",
               required: true
             },
             {
               description: "analysis time at initiation of drying (in days)",
-              kind: "str",
+              kind: "float",
               name: "tD",
               required: true
             },
             {
               description: "ultimate shrinkage strain as per ACI 209R-92 (shrinkage is negative)",
-              kind: "str",
+              kind: "float",
               name: "epsshu",
               required: true
             },
             {
               description: "fitting parameter of the shrinkage time evolution function as per ACI 209R-92",
-              kind: "str",
+              kind: "float",
               name: "psish",
               required: true
             },
             {
               description: "creep model age (in days)",
-              kind: "str",
+              kind: "float",
               name: "tcr",
               required: true
             },
             {
               description: "ultimate creep strain (e.g., taken from experimental measurements)",
-              kind: "str",
+              kind: "float",
               name: "epscru",
               required: true
             },
             {
               description: "concrete compressive stress (input as negative) associated with $epscru (e.g., experimentally applied)",
-              kind: "str",
+              kind: "float",
               name: "sigCr",
               required: true
             },
             {
               description: "fitting parameter of the creep time evolution function as per ACI 209R-92",
-              kind: "str",
+              kind: "float",
               name: "psicr1",
               required: true
             },
             {
               description: "fitting parameter of the creep time evolution function as per ACI 209R-92",
-              kind: "str",
+              kind: "float",
               name: "psicr2",
               required: true
             },
             {
               description: "analysis time corresponding to concrete casting (in days; minimum value 2.0)",
-              kind: "str",
+              kind: "float",
               name: "tcast",
               required: true
             }
@@ -19904,101 +19812,101 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
             },
             {
               defaultSource: "curated",
-              defaultValue: "-30.0",
+              defaultValue: -30.0,
               description: "concrete compressive strength (compression is negative)",
-              kind: "str",
+              kind: "float",
               name: "fc",
               required: true
             },
             {
               description: "concrete tensile strength (tension is positive)",
-              kind: "str",
+              kind: "float",
               name: "fct",
               required: true
             },
             {
               defaultSource: "curated",
-              defaultValue: "30000.0",
+              defaultValue: 30000.0,
               description: "concrete modulus of elasticity at loading age",
-              kind: "str",
+              kind: "float",
               name: "ec",
               required: true
             },
             {
               description: "concrete modulus of elasticity at 28 days",
-              kind: "str",
+              kind: "float",
               name: "ecm",
               required: true
             },
             {
               description: "tension softening parameter (tension softening exponent)",
-              kind: "str",
+              kind: "float",
               name: "beta",
               required: true
             },
             {
               description: "analysis time at initiation of drying (in days)",
-              kind: "str",
+              kind: "float",
               name: "tD",
               required: true
             },
             {
               description: "ultimate basic shrinkage strain (input as negative) as per fib Model Code 2010",
-              kind: "str",
+              kind: "float",
               name: "epsba",
               required: true
             },
             {
               description: "fitting parameter of the basic shrinkage time evolution function as per fib Model Code 2010",
-              kind: "str",
+              kind: "float",
               name: "epsbb",
               required: true
             },
             {
               description: "product of ultimate drying shrinkage strain and relative humidity function as per fib Model Code 2010",
-              kind: "str",
+              kind: "float",
               name: "epsda",
               required: true
             },
             {
               description: "fitting parameter of the basic shrinkage time evolution function as per fib Model Code 2010",
-              kind: "str",
+              kind: "float",
               name: "epsdb",
               required: true
             },
             {
               description: "parameter for the effect of compressive strength on basic creep as per fib Model Code 2010",
-              kind: "str",
+              kind: "float",
               name: "phiba",
               required: true
             },
             {
               description: "fitting parameter of the basic creep time evolution function as per fib Model Code 2010",
-              kind: "str",
+              kind: "float",
               name: "phibb",
               required: true
             },
             {
               description: "product of the effect of compressive strength and relative humidity on drying creep as per fib Model Code 2010",
-              kind: "int",
+              kind: "float",
               name: "phida",
               required: true
             },
             {
               description: "fitting parameter of the drying creep time evolution function as per fib Model Code 2010",
-              kind: "int",
+              kind: "float",
               name: "phidb",
               required: true
             },
             {
               description: "analysis time corresponding to concrete casting (in days; minimum value 2.0)",
-              kind: "str",
+              kind: "float",
               name: "tcast",
               required: true
             },
             {
               description: "coefficient dependent on the type of cement as per fib Model Code 2010",
-              kind: "str",
+              kind: "float",
               name: "cem",
               required: true
             }
@@ -20012,113 +19920,113 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
             },
             {
               defaultSource: "curated",
-              defaultValue: "-30.0",
+              defaultValue: -30.0,
               description: "concrete compressive strength (compression is negative)",
-              kind: "str",
+              kind: "float",
               name: "fc",
               required: true
             },
             {
               description: "concrete crushing strength (compression is negative)",
-              kind: "str",
+              kind: "float",
               name: "fcu",
               required: true
             },
             {
               description: "concrete strain at crushing strength (input as negative)",
-              kind: "str",
+              kind: "float",
               name: "epscu",
               required: true
             },
             {
               description: "concrete tensile strength (tension is positive)",
-              kind: "str",
+              kind: "float",
               name: "fct",
               required: true
             },
             {
               defaultSource: "curated",
-              defaultValue: "30000.0",
+              defaultValue: 30000.0,
               description: "concrete modulus of elasticity at loading age",
-              kind: "str",
+              kind: "float",
               name: "ec",
               required: true
             },
             {
               description: "concrete modulus of elasticity at 28 days",
-              kind: "str",
+              kind: "float",
               name: "ecm",
               required: true
             },
             {
               description: "tension softening parameter (tension softening exponent)",
-              kind: "str",
+              kind: "float",
               name: "beta",
               required: true
             },
             {
               description: "analysis time at initiation of drying (in days)",
-              kind: "str",
+              kind: "float",
               name: "tD",
               required: true
             },
             {
               description: "ultimate basic shrinkage strain (input as negative) as per fib Model Code 2010",
-              kind: "str",
+              kind: "float",
               name: "epsba",
               required: true
             },
             {
               description: "fitting parameter of the basic shrinkage time evolution function as per fib Model Code 2010",
-              kind: "str",
+              kind: "float",
               name: "epsbb",
               required: true
             },
             {
               description: "product of ultimate drying shrinkage strain and relative humidity function as per fib Model Code 2010",
-              kind: "str",
+              kind: "float",
               name: "epsda",
               required: true
             },
             {
               description: "fitting parameter of the basic shrinkage time evolution function as per fib Model Code 2010",
-              kind: "str",
+              kind: "float",
               name: "epsdb",
               required: true
             },
             {
               description: "parameter for the effect of compressive strength on basic creep as per fib Model Code 2010",
-              kind: "str",
+              kind: "float",
               name: "phiba",
               required: true
             },
             {
               description: "fitting parameter of the basic creep time evolution function as per fib Model Code 2010",
-              kind: "str",
+              kind: "float",
               name: "phibb",
               required: true
             },
             {
               description: "product of the effect of compressive strength and relative humidity on drying creep as per fib Model Code 2010",
-              kind: "int",
+              kind: "float",
               name: "phida",
               required: true
             },
             {
               description: "fitting parameter of the drying creep time evolution function as per fib Model Code 2010",
-              kind: "int",
+              kind: "float",
               name: "phidb",
               required: true
             },
             {
               description: "analysis time corresponding to concrete casting (in days; minimum value 2.0)",
-              kind: "str",
+              kind: "float",
               name: "tcast",
               required: true
             },
             {
               description: "coefficient dependent on the type of cement as per fib Model Code 2010",
-              kind: "str",
+              kind: "float",
               name: "cem",
               required: true
             }
@@ -20132,13 +20040,13 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
             },
             {
               description: "tzType = 1 Backbone of t-z curve approximates Reese and O'Neill (1987).",
-              kind: "str",
+              kind: "int",
               name: "tzType",
               required: true
             },
             {
               description: "Ultimate capacity of the t-z material.",
-              kind: "str",
+              kind: "float",
               name: "tult",
               required: true
             },
@@ -20150,7 +20058,7 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
             },
             {
               description: "The viscous damping term (dashpot) on the far-field (elastic) component of the displacement rate (velocity).",
-              kind: "str",
+              kind: "float",
               name: "c",
               required: true
             },
@@ -20185,13 +20093,13 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
             },
             {
               description: "soilType = 1 Backbone of t-z curve approximates Reese and O'Neill (1987).",
-              kind: "str",
+              kind: "int",
               name: "soilType",
               required: true
             },
             {
               description: "Ultimate capacity of the t-z material.",
-              kind: "str",
+              kind: "float",
               name: "tult",
               required: true
             },
@@ -20202,10 +20110,8 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
               required: true
             },
             {
-              defaultSource: "signature",
-              defaultValue: "0.0",
               description: "The viscous damping term (dashpot) on the far-field (elastic) component of the displacement rate (velocity).",
-              kind: "str",
+              kind: "float",
               name: "c",
               required: false
             }
@@ -20219,13 +20125,13 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
             },
             {
               description: "damping coeficient",
-              kind: "str",
+              kind: "float",
               name: "c",
               required: true
             },
             {
               description: "power factor (=1 means linear damping)",
-              kind: "str",
+              kind: "float",
               name: "alpha",
               required: true
             }
@@ -20239,59 +20145,59 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
             },
             {
               description: "Elastic stiffness of linear spring to model the axial flexibility of a viscous damper (e.g.",
-              kind: "str",
+              kind: "float",
               name: "kEl",
               required: true
             },
             {
               description: "Damping coefficient",
-              kind: "str",
+              kind: "float",
               name: "cd",
               required: true
             },
             {
               description: "Velocity exponent",
-              kind: "str",
+              kind: "float",
               name: "alpha",
               required: true
             },
             {
               defaultSource: "signature",
-              defaultValue: "0.0",
+              defaultValue: 0.0,
               description: "Gap length to simulate the gap length due to the pin tolerance",
-              kind: "str",
+              kind: "float",
               name: "lGap",
               required: true
             },
             {
               defaultSource: "signature",
-              defaultValue: "1",
+              defaultValue: 1,
               description: "Employed adaptive numerical algorithm (default value NM = 1; * ``1`` = Dormand-Prince54, * ``2`` = 6th order Adams-Bashforth-Moulton, * ``3`` = modified Rosenbrock Triple)",
-              kind: "str",
+              kind: "int",
               name: "nM",
               required: true
             },
             {
               defaultSource: "signature",
-              defaultValue: "1e-06",
+              defaultValue: 1e-06,
               description: "Tolerance for absolute relative error control of the adaptive iterative algorithm (default value 10^-6)",
-              kind: "str",
+              kind: "float",
               name: "relTol",
               required: true
             },
             {
               defaultSource: "signature",
-              defaultValue: "1e-10",
+              defaultValue: 1e-10,
               description: "Tolerance for absolute error control of adaptive iterative algorithm (default value 10^-10)",
-              kind: "str",
+              kind: "float",
               name: "absTol",
               required: true
             },
             {
               defaultSource: "signature",
-              defaultValue: 15.0,
+              defaultValue: 15,
               description: "Maximum number of sub-step iterations within an integration step (default value 15)",
-              kind: "float",
+              kind: "int",
               name: "maxHalf",
               required: true
             }
