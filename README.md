@@ -1,5 +1,7 @@
 # PySees
 
+> **⚠️ Under active development.** PySees is incomplete and evolving rapidly. Features, APIs, and file formats are subject to change without notice, and things may break. Not yet recommended for production or critical work.
+
 ## Project Description
 
 PySees is a web-based GUI preprocessor/postprocessor for OpenSeesPy structural models.  
@@ -52,9 +54,9 @@ It does not run OpenSees in the browser. Instead, users build parametric models 
 
 Schema-related scripts:
 - Extract schema candidates:
-  `npm run schema:extract -- --docs-root /tmp/OpenSeesPyDoc --output src/generated/opensees-schema-candidates.json`
+  `npm run schema:extract -- --docs-root /tmp/OpenSeesPyDoc --output src/app/generated/opensees-schema-candidates.json`
 - Build runtime schemas:
-  `npm run schema:build -- --input src/generated/opensees-schema-candidates.json --output src/generated/commandSchemas.generated.ts --uniaxial-defaults scripts/uniaxial-material-defaults.json`
+  `npm run schema:build -- --input src/app/generated/opensees-schema-candidates.json --output src/app/generated/commandSchemas.generated.ts --uniaxial-defaults scripts/uniaxial-material-defaults.json`
 
 ### OpenSeesPy schema extraction
 
@@ -63,7 +65,7 @@ Use the reusable generator to parse OpenSeesPyDoc RST files and emit command sch
 1. Clone docs locally:
    `git clone https://github.com/zhuminjie/OpenSeesPyDoc /tmp/OpenSeesPyDoc`
 2. Run extraction:
-   `npm run schema:extract -- --docs-root /tmp/OpenSeesPyDoc --output src/generated/opensees-schema-candidates.json`
+   `npm run schema:extract -- --docs-root /tmp/OpenSeesPyDoc --output src/app/generated/opensees-schema-candidates.json`
 3. Optional manual corrections:
    `scripts/opensees-schema-overrides.example.json` -> local overrides file, then re-run with `--overrides /path/to/overrides.json`.
 
@@ -80,7 +82,7 @@ Notes:
 
 Build normalized runtime schemas from extracted candidates:
 
-`npm run schema:build -- --input src/generated/opensees-schema-candidates.json --output src/generated/commandSchemas.generated.ts --uniaxial-defaults scripts/uniaxial-material-defaults.json`
+`npm run schema:build -- --input src/app/generated/opensees-schema-candidates.json --output src/app/generated/commandSchemas.generated.ts --uniaxial-defaults scripts/uniaxial-material-defaults.json`
 
 This pass:
 - normalizes argument names and kinds
@@ -90,8 +92,8 @@ This pass:
 - emits deterministic TypeScript for direct app import
 
 Recommended regeneration sequence after doc updates:
-1. `npm run schema:extract -- --docs-root /path/to/OpenSeesPyDoc --output src/generated/opensees-schema-candidates.json`
-2. `npm run schema:build -- --input src/generated/opensees-schema-candidates.json --output src/generated/commandSchemas.generated.ts --uniaxial-defaults scripts/uniaxial-material-defaults.json`
+1. `npm run schema:extract -- --docs-root /path/to/OpenSeesPyDoc --output src/app/generated/opensees-schema-candidates.json`
+2. `npm run schema:build -- --input src/app/generated/opensees-schema-candidates.json --output src/app/generated/commandSchemas.generated.ts --uniaxial-defaults scripts/uniaxial-material-defaults.json`
 
 ## Local Agent (material preview MVP)
 
@@ -121,3 +123,7 @@ Current contract:
 - `GET /health`
 - `POST /v1/session`
 - `GET /v1/ws?token=...`
+
+## License
+
+PySees is licensed under the [PolyForm Noncommercial License 1.0.0](LICENSE.md). Personal, educational, and research use is free. Commercial use — including running or hosting a public instance of the app for others — is not permitted without a separate commercial license.

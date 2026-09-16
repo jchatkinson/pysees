@@ -5,7 +5,7 @@ Generate command schema candidates from OpenSeesPyDoc RST sources.
 Usage:
   uv run python scripts/generate_opensees_schemas.py \
     --docs-root /path/to/OpenSeesPyDoc \
-    --output src/generated/opensees-schema-candidates.json \
+    --output src/app/generated/opensees-schema-candidates.json \
     --overrides scripts/opensees-schema-overrides.json
 """
 
@@ -401,7 +401,7 @@ def apply_overrides(data: dict[str, Any], override_path: Path | None) -> dict[st
 def main() -> None:
   parser = argparse.ArgumentParser(description="Generate OpenSeesPy command schema candidates from RST docs.")
   parser.add_argument("--docs-root", type=Path, required=True, help="Path to local clone of OpenSeesPyDoc.")
-  parser.add_argument("--output", type=Path, default=Path("src/generated/opensees-schema-candidates.json"))
+  parser.add_argument("--output", type=Path, default=Path("src/app/generated/opensees-schema-candidates.json"))
   parser.add_argument("--overrides", type=Path, default=None, help="Optional JSON overrides file.")
   parser.add_argument("--include-code-calls", action="store_true", help="Also parse function-like calls inside code blocks (off by default).")
   parser.add_argument("--include-inline-calls", action="store_true", help="Also parse function-like calls in prose lines (off by default).")

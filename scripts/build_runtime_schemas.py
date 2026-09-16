@@ -4,8 +4,8 @@ Build runtime command schema definitions from extracted OpenSeesPy candidates.
 
 Usage:
   uv run python scripts/build_runtime_schemas.py \
-    --input src/generated/opensees-schema-candidates.json \
-    --output src/generated/commandSchemas.generated.ts
+    --input src/app/generated/opensees-schema-candidates.json \
+    --output src/app/generated/commandSchemas.generated.ts
 """
 
 from __future__ import annotations
@@ -281,8 +281,8 @@ def to_ts_literal(obj: Any, indent: int = 0) -> str:
 
 def main() -> None:
   parser = argparse.ArgumentParser(description="Build runtime schemas from extracted OpenSees candidates.")
-  parser.add_argument("--input", type=Path, default=Path("src/generated/opensees-schema-candidates.json"))
-  parser.add_argument("--output", type=Path, default=Path("src/generated/commandSchemas.generated.ts"))
+  parser.add_argument("--input", type=Path, default=Path("src/app/generated/opensees-schema-candidates.json"))
+  parser.add_argument("--output", type=Path, default=Path("src/app/generated/commandSchemas.generated.ts"))
   parser.add_argument("--uniaxial-defaults", type=Path, default=Path("scripts/uniaxial-material-defaults.json"))
   args = parser.parse_args()
 

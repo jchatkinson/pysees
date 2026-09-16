@@ -2,6 +2,7 @@
   "name": "pysees",
   "private": true,
   "version": "0.3.0",
+  "license": "SEE LICENSE IN LICENSE.md",
   "type": "module",
   "scripts": {
     "dev": "vite",
