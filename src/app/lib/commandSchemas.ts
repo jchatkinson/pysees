@@ -9,6 +9,8 @@ export interface CommandSchema {
   fn: string
   label: string
   category: 'model' | 'recorder'
+  /** Very short, one-line description shown next to the command in search results. */
+  description?: string
   ndmFilter?: number[]
   args: ArgDef[]
   optional: ArgDef[]
@@ -34,6 +36,35 @@ function titleCase(s: string) {
 
 function vec(name: string, label: string, length: number | 'ndm' | 'ndf', defaultValue: number[]): ArgDef {
   return { kind: 'vec', name, label, length, defaultValue }
+}
+
+function genericArgToken(arg: ArgDef): string {
+  if (arg.kind === 'flag') return `[${arg.flag}]`
+  return arg.name
+}
+
+/**
+ * A schema-shape signature like `beamIntegration(type, *args)` rather than one
+ * concrete overload's literal args — used as the search-result subtitle since a
+ * single overload (e.g. the 'CompositeSimpson' args) would be misleading for a
+ * command whose args vary by the chosen type/`choice` arg.
+ */
+function genericSignature(fn: string, args: ArgDef[], optional: ArgDef[]): string {
+  const parts: string[] = []
+  let branched = false
+  for (const arg of args) {
+    parts.push(genericArgToken(arg))
+    if (arg.kind === 'choice' && Object.values(arg.yields).some((sub) => sub.length > 0)) {
+      branched = true
+      break
+    }
+  }
+  if (branched) {
+    parts.push('*args')
+  } else {
+    for (const arg of optional) parts.push(`[${genericArgToken(arg)}]`)
+  }
+  return `${fn}(${parts.join(', ')})`
 }
 
 function generatedFn(fn: string) {
@@ -72,6 +103,7 @@ const V1_COMMAND_SCHEMAS: CommandSchema[] = [
     fn: 'node',
     label: 'Node',
     category: 'model',
+    description: 'Add a node at given coordinates',
     args: nodeArgsFromGenerated(),
     optional: [],
     create: (values, model, base) => ({
@@ -85,6 +117,7 @@ const V1_COMMAND_SCHEMAS: CommandSchema[] = [
     fn: 'fix',
     label: 'Fix Node',
     category: 'model',
+    description: "Restrain a node's degrees of freedom",
     args: fixArgsFromGenerated(),
     optional: [],
     create: (values) => {
@@ -98,6 +131,7 @@ const V1_COMMAND_SCHEMAS: CommandSchema[] = [
     fn: 'load',
     label: 'Nodal Load',
     category: 'model',
+    description: 'Apply a load to a node',
     args: loadArgsFromGenerated(),
     optional: [],
     create: (values) => ({ type: 'ADD_LOAD', nodeId: Math.trunc(num(values.nodeId, 1)), values: nums(values.values) }),
@@ -107,6 +141,7 @@ const V1_COMMAND_SCHEMAS: CommandSchema[] = [
     fn: 'element',
     label: 'Element',
     category: 'model',
+    description: 'Add an element connecting nodes',
     args: elementArgsFromGenerated(),
     optional: [],
     create: (values, model, base) => ({
@@ -139,32 +174,37 @@ function mapGeneratedArg(arg: GeneratedArgDef): ArgDef {
 
 const GENERATED_NON_V1_SCHEMAS: CommandSchema[] = GENERATED_COMMAND_SCHEMAS
   .filter((schema) => !RESERVED_FNS.has(schema.fn))
-  .map((schema) => ({
-    cmd: `OPS:${schema.fn}`,
-    fn: schema.fn,
-    label: titleCase(schema.label || schema.fn),
-    category: schema.category,
-    args: schema.args.map(mapGeneratedArg),
-    optional: schema.optional.map(mapGeneratedArg),
-    create: (values, model, base) => {
-      if (schema.fn !== 'uniaxialMaterial') {
+  .map((schema) => {
+    const args = schema.args.map(mapGeneratedArg)
+    const optional = schema.optional.map(mapGeneratedArg)
+    return {
+      cmd: `OPS:${schema.fn}`,
+      fn: schema.fn,
+      label: titleCase(schema.label || schema.fn),
+      category: schema.category,
+      description: genericSignature(schema.fn, args, optional),
+      args,
+      optional,
+      create: (values, model, base) => {
+        if (schema.fn !== 'uniaxialMaterial') {
+          return {
+            type: 'ADD_OPS',
+            fn: base?.type === 'ADD_OPS' ? base.fn : schema.fn,
+            category: schema.category,
+            values,
+          }
+        }
+        const rawTag = Number(values.matTag)
+        const matTag = Number.isFinite(rawTag) && rawTag > 0 ? Math.trunc(rawTag) : model.nextMatId
         return {
           type: 'ADD_OPS',
           fn: base?.type === 'ADD_OPS' ? base.fn : schema.fn,
           category: schema.category,
-          values,
+          values: { ...values, matTag },
         }
-      }
-      const rawTag = Number(values.matTag)
-      const matTag = Number.isFinite(rawTag) && rawTag > 0 ? Math.trunc(rawTag) : model.nextMatId
-      return {
-        type: 'ADD_OPS',
-        fn: base?.type === 'ADD_OPS' ? base.fn : schema.fn,
-        category: schema.category,
-        values: { ...values, matTag },
-      }
-    },
-  }))
+      },
+    }
+  })
 
 export function getAvailableSchemas(ndm: number) {
   return [...V1_COMMAND_SCHEMAS, ...GENERATED_NON_V1_SCHEMAS].filter((schema) => !schema.ndmFilter || schema.ndmFilter.includes(ndm))
@@ -430,7 +470,26 @@ function flattenArgValues(arg: ArgDef, values: Record<string, unknown>, ctx: Sch
     const selected = String(values[arg.name] ?? arg.defaultValue ?? arg.options[0] ?? '')
     return [selected, ...(arg.yields[selected] ?? []).flatMap((child) => flattenArgValues(child, values, ctx, fallbackMatTag))]
   }
+  if (arg.kind === 'idlist') {
+    // idlist fields insert one command per id (see CommandForm's submitValues); the
+    // preview can only show a single call, so it previews the first id.
+    const ids = Array.isArray(values[arg.name]) ? (values[arg.name] as unknown[]) : []
+    return ids.length ? [Math.trunc(num(ids[0]))] : []
+  }
   return []
+}
+
+function formatPyLiteral(v: string | number | boolean | null): string {
+  if (typeof v === 'string') return `'${v}'`
+  if (typeof v === 'boolean') return v ? 'True' : 'False'
+  if (v === null) return 'None'
+  return String(v)
+}
+
+/** Live python-call preview for a schema using the form's current (or default) values. */
+export function commandPreviewLine(schema: CommandSchema, values: Record<string, unknown>, ctx: SchemaContext, fallbackMatTag = 1): string {
+  const args = [...schema.args, ...schema.optional].flatMap((arg) => flattenArgValues(arg, values, ctx, fallbackMatTag))
+  return `${schema.fn}(${args.map(formatPyLiteral).join(', ')})`
 }
 
 export function buildUniaxialMaterialCallArgs(values: Record<string, unknown>, ctx: SchemaContext, fallbackMatTag: number) {

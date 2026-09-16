@@ -1,24 +1,23 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Button } from '@/app/components/ui/button'
 import { ScrollArea } from '@/app/components/ui/scroll-area'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/app/components/ui/select'
-import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '@/app/components/ui/input-group'
+import { Combobox, ComboboxContent, ComboboxEmpty, ComboboxInput, ComboboxItem, ComboboxList } from '@/app/components/ui/combobox'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/app/components/ui/alert-dialog'
 import { useAppStore, useModelState } from '@/app/store/useAppStore'
-import { commandToValues, getAvailableSchemas, getCommandDocUrl, getSchemaForCommand, initialValues, validateCommand } from '@/app/lib/commandSchemas'
+import { commandPreviewLine, commandToValues, getAvailableSchemas, getCommandDocUrl, getSchemaForCommand, initialValues, validateCommand } from '@/app/lib/commandSchemas'
 import type { CommandSchema } from '@/app/lib/commandSchemas'
 import type { SchemaContext } from '@/app/types/schema'
 import { SchemaFormField } from '@/app/components/SchemaFormField'
 import { replay } from '@/app/lib/replay'
 import type { Command } from '@/app/types/commands'
 import { useHotkeyRegistry } from '@/app/lib/hotkeys'
-import { CircleHelp, X } from 'lucide-react'
+import { CircleHelp } from 'lucide-react'
 
 function keyOf(schema: CommandSchema) {
   return schema.cmd
 }
 
-type CommandGroup = 'model' | 'analysis' | 'output' | 'misc'
+type CommandGroup = 'all' | 'model' | 'analysis' | 'output' | 'misc'
 
 function schemaGroup(schema: CommandSchema): CommandGroup {
   if (schema.category === 'recorder' || schema.fn.toLowerCase().includes('recorder')) return 'output'
@@ -172,20 +171,26 @@ export function CommandForm() {
 
   const schemas = useMemo(() => getAvailableSchemas(ctx.ndm), [ctx.ndm])
   const [selectedCmd, setSelectedCmd] = useState<string>('')
-  const [selectedGroup, setSelectedGroup] = useState<CommandGroup>('model')
+  const [selectedGroup, setSelectedGroup] = useState<CommandGroup>('all')
   const [query, setQuery] = useState('')
-  const [debouncedQuery, setDebouncedQuery] = useState('')
   const [activeFormValues, setActiveFormValues] = useState<Record<string, unknown>>({})
   const [pendingDeleteIndex, setPendingDeleteIndex] = useState<number | null>(null)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const filteredSchemas = useMemo(() => {
-    const searching = debouncedQuery.trim().length > 0
+    const searching = query.trim().length > 0
     return schemas.filter((schema) => {
-      if (!matchesSchema(schema, debouncedQuery)) return false
-      return searching ? true : schemaGroup(schema) === selectedGroup
+      if (!matchesSchema(schema, query)) return false
+      return searching || selectedGroup === 'all' ? true : schemaGroup(schema) === selectedGroup
     })
-  }, [schemas, debouncedQuery, selectedGroup])
-  const selectedSchema = filteredSchemas.find((s) => s.cmd === selectedCmd) ?? filteredSchemas[0] ?? null
+  }, [schemas, query, selectedGroup])
+  // No implicit fallback to the first match: switching groups or searching should
+  // never silently swap the active command out from under the user.
+  const selectedSchema = filteredSchemas.find((s) => s.cmd === selectedCmd) ?? null
+  const selectGroup = (group: CommandGroup) => {
+    setSelectedGroup(group)
+    setSelectedCmd('')
+    setQuery('')
+  }
   const activeSchema = isEditing ? editSchema : selectedSchema
   const fallbackDocValues = useMemo(() => {
     if (Object.keys(activeFormValues).length > 0) return activeFormValues
@@ -194,6 +199,7 @@ export function CommandForm() {
     return {}
   }, [activeFormValues, ctx, isEditing, model, selectedCommand, selectedSchema])
   const activeDocsUrl = activeSchema ? getCommandDocUrl(activeSchema.fn, fallbackDocValues) : null
+  const previewLine = activeSchema ? commandPreviewLine(activeSchema, fallbackDocValues, ctx, model.nextMatId) : null
   const locked = mode === 'results'
   const pendingDeleteIndices = pendingDeleteIndex === null ? [] : previewDeleteCascade(pendingDeleteIndex)
   const isUniaxial = (cmd: Command) => cmd.type === 'ADD_OPS' && cmd.fn === 'uniaxialMaterial'
@@ -209,15 +215,6 @@ export function CommandForm() {
     setPrevSelectionKey(currentSelectionKey)
     setActiveFormValues({})
   }
-
-  if (selectedSchema && selectedSchema.cmd !== selectedCmd) {
-    setSelectedCmd(selectedSchema.cmd)
-  }
-
-  useEffect(() => {
-    const id = window.setTimeout(() => setDebouncedQuery(query), 300)
-    return () => window.clearTimeout(id)
-  }, [query])
 
   useEffect(() => {
     if (isEditing && editSchema && selectedCommand) return
@@ -270,104 +267,108 @@ export function CommandForm() {
     )
   }
 
-  return (
-    <div className="flex flex-col h-full min-h-0 overflow-hidden">
-      <div className="px-3 py-2 text-xs font-medium text-muted-foreground border-b shrink-0 flex items-center gap-2">
-        <span>{hasSelection ? `Edit Command #${selectedHistoryIndex! + 1}` : 'Command'}</span>
+  const commandPreviewBlock = activeSchema && (
+    <div className="border-b px-3 py-2 shrink-0">
+      <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+        <span>{hasSelection ? `Edit Command #${selectedHistoryIndex! + 1}: ${activeSchema.label}` : activeSchema.label}</span>
         {activeDocsUrl && (
           <a
             href={activeDocsUrl}
             target="_blank"
             rel="noreferrer"
             className="ml-auto inline-flex items-center rounded p-0.5 text-muted-foreground hover:bg-accent hover:text-foreground"
-            title={`Open ${activeSchema?.fn} docs`}
-            aria-label={`Open ${activeSchema?.fn} docs`}
+            title={`Open ${activeSchema.fn} docs`}
+            aria-label={`Open ${activeSchema.fn} docs`}
           >
             <CircleHelp className="size-3.5" />
           </a>
         )}
       </div>
+      {previewLine && (
+        <code className="mt-1.5 block overflow-x-auto whitespace-nowrap rounded bg-muted px-2 py-1 text-[11px] font-mono text-foreground/80">
+          {previewLine}
+        </code>
+      )}
+    </div>
+  )
+
+  return (
+    <div className="flex flex-col h-full min-h-0 overflow-hidden">
       {isEditing && editSchema && selectedCommand ? (
-        <CommandFormBody
-          key={`edit-${selectedHistoryIndex}-${editSchema.cmd}-${ctx.ndm}-${ctx.ndf}`}
-          schema={editSchema}
-          ctx={ctx}
-          locked={locked}
-          actionLabel="Save"
-          initial={commandToValues(selectedCommand, ctx)}
-          submitValues={(values) => {
-            const cmd = editSchema.create(values, editModel, selectedCommand)
-            const validation = validateCommand(cmd, editModel)
-            if (validation) return validation
-            updateCommandAt(selectedHistoryIndex!, cmd)
-            setSelectedHistoryIndex(null)
-            return null
-          }}
-          onCancel={() => setSelectedHistoryIndex(null)}
-          onDelete={() => requestDelete(selectedHistoryIndex!)}
-          onValuesChange={(values) => {
-            setActiveFormValues(values)
-            const cmd = editSchema.create(values, editModel, selectedCommand)
-            setMaterialPreviewInputCommand(isUniaxial(cmd) ? cmd : null)
-          }}
-          previewAction={isUniaxial(selectedCommand) ? { onClick: () => setMaterialPreviewPanelOpen(true) } : undefined}
-        />
+        <>
+          {commandPreviewBlock}
+          <CommandFormBody
+            key={`edit-${selectedHistoryIndex}-${editSchema.cmd}-${ctx.ndm}-${ctx.ndf}`}
+            schema={editSchema}
+            ctx={ctx}
+            locked={locked}
+            actionLabel="Save"
+            initial={commandToValues(selectedCommand, ctx)}
+            submitValues={(values) => {
+              const cmd = editSchema.create(values, editModel, selectedCommand)
+              const validation = validateCommand(cmd, editModel)
+              if (validation) return validation
+              updateCommandAt(selectedHistoryIndex!, cmd)
+              setSelectedHistoryIndex(null)
+              return null
+            }}
+            onCancel={() => setSelectedHistoryIndex(null)}
+            onDelete={() => requestDelete(selectedHistoryIndex!)}
+            onValuesChange={(values) => {
+              setActiveFormValues(values)
+              const cmd = editSchema.create(values, editModel, selectedCommand)
+              setMaterialPreviewInputCommand(isUniaxial(cmd) ? cmd : null)
+            }}
+            previewAction={isUniaxial(selectedCommand) ? { onClick: () => setMaterialPreviewPanelOpen(true) } : undefined}
+          />
+        </>
       ) : (
         <>
           <div className="border-b p-3 grid gap-2">
-            <InputGroup className="h-8">
-              <InputGroupInput
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="Search commands (e.g. uni)"
-                disabled={locked}
-                className="text-xs"
-              />
-              {query.trim().length > 0 && (
-                <InputGroupAddon align="inline-end">
-                  <InputGroupButton
-                    size="icon-xs"
-                    variant="ghost"
-                    aria-label="Clear search"
-                    onClick={() => {
-                      setQuery('')
-                      setDebouncedQuery('')
-                    }}
-                    disabled={locked}
-                  >
-                    <X />
-                  </InputGroupButton>
-                </InputGroupAddon>
-              )}
-            </InputGroup>
+            <Combobox
+              items={filteredSchemas}
+              filter={null}
+              inputValue={query}
+              onInputValueChange={setQuery}
+              itemToStringLabel={(schema: CommandSchema) => schema.label}
+              isItemEqualToValue={(a: CommandSchema, b: CommandSchema) => a.cmd === b.cmd}
+              value={selectedSchema}
+              onValueChange={(schema) => {
+                if (schema) setSelectedCmd(schema.cmd)
+              }}
+              disabled={locked}
+            >
+              <ComboboxInput placeholder="Search commands (e.g. uni)" className="h-8 text-xs" showClear />
+              <ComboboxContent>
+                <ComboboxEmpty>No matching commands.</ComboboxEmpty>
+                <ComboboxList>
+                  {(schema: CommandSchema) => (
+                    <ComboboxItem key={keyOf(schema)} value={schema} className="items-start py-1.5">
+                      <div className="flex min-w-0 flex-col gap-0.5">
+                        <span className="truncate">{schema.label}</span>
+                        {schema.description && (
+                          <span className="truncate text-[10px] text-muted-foreground">{schema.description}</span>
+                        )}
+                      </div>
+                    </ComboboxItem>
+                  )}
+                </ComboboxList>
+              </ComboboxContent>
+            </Combobox>
             <div className="flex gap-1">
-              {(['model', 'analysis', 'output', 'misc'] as CommandGroup[]).map((group) => (
-                <Button key={group} variant={selectedGroup === group ? 'default' : 'outline'} size="sm" className="h-7 px-2 text-[11px] capitalize" onClick={() => setSelectedGroup(group)} disabled={locked}>
+              {(['all', 'model', 'analysis', 'output', 'misc'] as CommandGroup[]).map((group) => (
+                <Button key={group} variant={selectedGroup === group ? 'default' : 'outline'} size="sm" className="h-7 px-2 text-[11px] capitalize" onClick={() => selectGroup(group)} disabled={locked}>
                   {group}
                 </Button>
               ))}
             </div>
             <div className="text-[11px] text-muted-foreground">
-              {debouncedQuery.trim() ? `Showing ${filteredSchemas.length} search result${filteredSchemas.length === 1 ? '' : 's'} across all groups` : 'Command Type'}
+              {query.trim()
+                ? `${filteredSchemas.length} result${filteredSchemas.length === 1 ? '' : 's'} for "${query.trim()}"`
+                : `${filteredSchemas.length} ${selectedGroup === 'all' ? '' : `${selectedGroup} `}command${filteredSchemas.length === 1 ? '' : 's'}`}
             </div>
-            <Select
-              value={selectedSchema?.cmd ?? ''}
-              onValueChange={(cmd) => {
-                const schema = filteredSchemas.find((s) => s.cmd === cmd)
-                if (!schema) return
-                setSelectedCmd(schema.cmd)
-              }}
-              disabled={locked || !selectedSchema}
-            >
-              <SelectTrigger className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {filteredSchemas.length === 0 && <div className="px-2 py-1 text-xs text-muted-foreground">No matching commands.</div>}
-                {filteredSchemas.map((schema) => <SelectItem key={keyOf(schema)} value={schema.cmd}>{schema.label}</SelectItem>)}
-              </SelectContent>
-            </Select>
           </div>
+          {commandPreviewBlock}
           {selectedSchema ? (
             <CommandFormBody
               key={`add-${selectedSchema.cmd}-${ctx.ndm}-${ctx.ndf}`}
@@ -406,7 +407,11 @@ export function CommandForm() {
               }}
             />
           ) : (
-            <div className="p-3 text-xs text-muted-foreground">No commands match the current search.</div>
+            <div className="flex-1 flex items-center justify-center p-6">
+              <p className="text-xs text-muted-foreground text-center">
+                {filteredSchemas.length === 0 ? 'No commands match your search.' : 'Search or pick a command above to add it.'}
+              </p>
+            </div>
           )}
         </>
       )}
