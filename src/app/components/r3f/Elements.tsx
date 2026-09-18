@@ -1,5 +1,5 @@
 import { Html, Line } from '@react-three/drei'
-import type { ElementState, NodeState } from '@/app/types/model'
+import type { ElementEntity, NodeEntity } from '@/app/types/model'
 import { toVec3 } from './utils'
 
 const LABEL_STYLE: React.CSSProperties = {
@@ -29,14 +29,14 @@ function Element({
   showLine,
   showId,
 }: {
-  element: ElementState
-  nodeMap: Map<number, NodeState>
+  element: ElementEntity
+  nodeMap: Map<number, NodeEntity>
   showLine: boolean
   showId: boolean
 }) {
   const points = element.nodes
     .map((id) => nodeMap.get(id))
-    .filter((n): n is NodeState => Boolean(n))
+    .filter((n): n is NodeEntity => Boolean(n))
     .map((n) => toVec3(n.coords))
 
   if (points.length < 2) return null
@@ -60,8 +60,8 @@ export function ElementsLayer({
   showElements,
   showElementIds,
 }: {
-  elements: ElementState[]
-  nodeMap: Map<number, NodeState>
+  elements: ElementEntity[]
+  nodeMap: Map<number, NodeEntity>
   showElements: boolean
   showElementIds: boolean
 }) {

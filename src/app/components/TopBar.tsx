@@ -5,14 +5,21 @@ import { Undo2, Redo2 } from 'lucide-react'
 import { useAppStore } from '@/app/store/useAppStore'
 import { PiscesLogo } from '@/app/components/icons/PiscesLogo'
 import { UserButton } from '@clerk/clerk-react'
+import { downloadScript } from '@/app/lib/exportScript'
 
 export function TopBar() {
   const {
     mode,
     setMode,
-    undo,
-    redo,
-    history,
+    activePanel,
+    model,
+    modelPast,
+    modelFuture,
+    modelUndo,
+    modelRedo,
+    analysisHistory,
+    analysisUndo,
+    analysisRedo,
     viewSettings,
     setViewSetting,
     requestViewportAction,
@@ -20,8 +27,10 @@ export function TopBar() {
     connectLocalAgent,
     disconnectLocalAgent,
   } = useAppStore()
-  const canUndo = history.cursor > 0
-  const canRedo = history.cursor < history.commands.length - 1
+  const undo = activePanel === 'model' ? modelUndo : analysisUndo
+  const redo = activePanel === 'model' ? modelRedo : analysisRedo
+  const canUndo = activePanel === 'model' ? modelPast.length > 0 : analysisHistory.cursor > -1
+  const canRedo = activePanel === 'model' ? modelFuture.length > 0 : analysisHistory.cursor < analysisHistory.commands.length - 1
   const checked = (v: boolean | 'indeterminate') => v === true
 
   return (
@@ -37,7 +46,7 @@ export function TopBar() {
         </DropdownMenuTrigger>
         <DropdownMenuContent>
           <DropdownMenuItem disabled>New Model</DropdownMenuItem>
-          <DropdownMenuItem disabled>Export .py</DropdownMenuItem>
+          <DropdownMenuItem disabled={!model.config} onSelect={() => downloadScript(model, analysisHistory)}>Export .py</DropdownMenuItem>
           <DropdownMenuSeparator />
           {localAgent.status === 'connected' ? (
             <DropdownMenuItem onSelect={disconnectLocalAgent}>

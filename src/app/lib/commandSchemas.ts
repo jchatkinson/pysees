@@ -1,20 +1,27 @@
-import type { Command } from '@/app/types/commands'
-import type { ModelState } from '@/app/types/model'
+import type { AnalysisCommand } from '@/app/types/analysisCommands'
+import type { Model, ModelEntityKind } from '@/app/types/model'
 import type { ArgDef, ArgLen, SchemaContext } from '@/app/types/schema'
 import { GENERATED_COMMAND_SCHEMAS } from '@/app/generated/commandSchemas.generated'
 import type { GeneratedArgDef } from '@/app/generated/commandSchemas.generated'
+import { domainForFn, PATTERN_CHILD_FNS, SECTION_CHILD_FNS, type CommandDomain } from '@/app/lib/commandDomain'
+import type { ModelWrite } from '@/app/lib/modelWrite'
+
+export type SchemaResult =
+  | { target: 'model'; write: ModelWrite }
+  | { target: 'analysis'; command: AnalysisCommand }
 
 export interface CommandSchema {
   cmd: string
   fn: string
   label: string
-  category: 'model' | 'recorder'
-  /** Very short, one-line description shown next to the command in search results. */
+  domain: CommandDomain
   description?: string
   ndmFilter?: number[]
   args: ArgDef[]
   optional: ArgDef[]
-  create: (values: Record<string, unknown>, model: ModelState, base?: Command) => Command
+  /** Only ever insertable as a child of a Fiber Section ('section') or a Pattern ('pattern'); hidden from the main add-command list. */
+  childOnly?: 'section' | 'pattern'
+  create: (values: Record<string, unknown>, model: Model, existingId?: number) => SchemaResult
 }
 
 function num(v: unknown, fallback = 0) {
@@ -67,14 +74,9 @@ function genericSignature(fn: string, args: ArgDef[], optional: ArgDef[]): strin
   return `${fn}(${parts.join(', ')})`
 }
 
-function generatedFn(fn: string) {
-  return GENERATED_COMMAND_SCHEMAS.find((s) => s.fn === fn)
-}
+// ─── V1 (hand-curated) model schemas: node / fix / mass / element ────────────
 
 function nodeArgsFromGenerated(): ArgDef[] {
-  const generated = generatedFn('node')
-  const hasCoordVec = generated?.args.some((a) => a.kind === 'vec' && (a.name.toLowerCase().includes('crd') || a.name.toLowerCase().includes('coord')))
-  if (!hasCoordVec) return [vec('coords', 'Coordinates', 'ndm', [0, 0, 0])]
   return [vec('coords', 'Coordinates', 'ndm', [0, 0, 0])]
 }
 
@@ -82,78 +84,255 @@ function fixArgsFromGenerated(): ArgDef[] {
   return [{ kind: 'idlist', name: 'nodeId', label: 'Node ID(s)' }, vec('dofs', 'DOF Fix Flags (0/1)', 'ndf', [1, 1, 1, 0, 0, 0])]
 }
 
-function loadArgsFromGenerated(): ArgDef[] {
-  return [{ kind: 'idlist', name: 'nodeId', label: 'Node ID(s)' }, vec('values', 'Load Values', 'ndf', [0, 0, 0, 0, 0, 0])]
+function massArgs(): ArgDef[] {
+  return [{ kind: 'idlist', name: 'nodeId', label: 'Node ID(s)' }, vec('values', 'Mass Values', 'ndf', [0, 0, 0, 0, 0, 0])]
 }
 
 function elementArgsFromGenerated(): ArgDef[] {
-  const generated = generatedFn('element')
-  const choice = generated?.args.find((a) => a.kind === 'choice')
-  const optionsRaw = choice?.kind === 'choice' ? choice.options : []
-  const options = ['Truss', 'ElasticBeamColumn'].filter((opt) => optionsRaw.includes(opt) || optionsRaw.includes('elasticBeamColumn'))
   return [
-    { kind: 'choice', name: 'eleType', label: 'Element Type', options: options.length ? options : ['Truss', 'ElasticBeamColumn'], yields: {}, defaultValue: 'Truss' },
-    { kind: 'vec', name: 'nodes', label: 'Node IDs', length: 2, defaultValue: [1, 2], nodeSync: true },
+    { kind: 'choice', name: 'eleType', label: 'Element Type', options: ['Truss', 'ElasticBeamColumn'], defaultValue: 'Truss', yields: {
+      Truss: [
+        { kind: 'vec', name: 'nodes', label: 'Node IDs', length: 2, defaultValue: [1, 2], nodeSync: true },
+        { kind: 'int', name: 'matTag', label: 'Material Tag', required: true },
+      ],
+      ElasticBeamColumn: [
+        { kind: 'vec', name: 'nodes', label: 'Node IDs', length: 2, defaultValue: [1, 2], nodeSync: true },
+        { kind: 'float', name: 'A', label: 'Area (A)', defaultValue: 1, required: true },
+        { kind: 'float', name: 'E', label: "Young's Modulus (E)", defaultValue: 1, required: true },
+        { kind: 'float', name: 'Iz', label: 'Moment of Inertia (Iz)', defaultValue: 1, required: true },
+        { kind: 'int', name: 'transfTag', label: 'Transformation Tag', required: true },
+      ],
+    } },
   ]
 }
 
-const V1_COMMAND_SCHEMAS: CommandSchema[] = [
+const V1_MODEL_SCHEMAS: CommandSchema[] = [
   {
     cmd: 'ADD_NODE',
     fn: 'node',
     label: 'Node',
-    category: 'model',
+    domain: 'model',
     description: 'Add a node at given coordinates',
     args: nodeArgsFromGenerated(),
     optional: [],
-    create: (values, model, base) => ({
-      type: 'ADD_NODE',
-      id: base?.type === 'ADD_NODE' ? base.id : model.nextNodeId,
-      coords: nums(values.coords),
+    create: (values, model, existingId) => ({
+      target: 'model',
+      write: { kind: 'node', entity: { id: existingId ?? model.nextIds.node, coords: nums(values.coords) } },
     }),
   },
   {
     cmd: 'FIX',
     fn: 'fix',
     label: 'Fix Node',
-    category: 'model',
+    domain: 'model',
     description: "Restrain a node's degrees of freedom",
     args: fixArgsFromGenerated(),
     optional: [],
     create: (values) => {
       const flags = ints(values.dofs)
       const dofs = flags.map((flag, idx) => (flag ? idx + 1 : 0)).filter(Boolean)
-      return { type: 'FIX', nodeId: Math.trunc(num(values.nodeId, 1)), dofs }
+      return { target: 'model', write: { kind: 'fix', entity: { nodeId: Math.trunc(num(values.nodeId, 1)), dofs } } }
     },
   },
   {
-    cmd: 'ADD_LOAD',
-    fn: 'load',
-    label: 'Nodal Load',
-    category: 'model',
-    description: 'Apply a load to a node',
-    args: loadArgsFromGenerated(),
+    cmd: 'MASS',
+    fn: 'mass',
+    label: 'Nodal Mass',
+    domain: 'model',
+    description: 'Assign mass to a node',
+    args: massArgs(),
     optional: [],
-    create: (values) => ({ type: 'ADD_LOAD', nodeId: Math.trunc(num(values.nodeId, 1)), values: nums(values.values) }),
+    create: (values) => ({
+      target: 'model',
+      write: { kind: 'mass', entity: { nodeId: Math.trunc(num(values.nodeId, 1)), values: nums(values.values) } },
+    }),
   },
   {
     cmd: 'ADD_ELEMENT',
     fn: 'element',
     label: 'Element',
-    category: 'model',
+    domain: 'model',
     description: 'Add an element connecting nodes',
     args: elementArgsFromGenerated(),
     optional: [],
-    create: (values, model, base) => ({
-      type: 'ADD_ELEMENT',
-      id: base?.type === 'ADD_ELEMENT' ? base.id : model.nextEleId,
-      eleType: String(values.eleType ?? 'Truss'),
-      nodes: ints(values.nodes),
+    create: (values, model, existingId) => {
+      const eleType = String(values.eleType ?? 'Truss')
+      const args = eleType === 'Truss'
+        ? { matTag: Math.trunc(num(values.matTag)) }
+        : { A: num(values.A), E: num(values.E), Iz: num(values.Iz), transfTag: Math.trunc(num(values.transfTag)) }
+      return {
+        target: 'model',
+        write: { kind: 'element', entity: { id: existingId ?? model.nextIds.element, eleType, nodes: ints(values.nodes), args } },
+      }
+    },
+  },
+]
+
+// ─── Pattern children: load / eleLoad / sp ───────────────────────────────────
+
+const PATTERN_CHILD_SCHEMAS: CommandSchema[] = [
+  {
+    cmd: 'PATTERN_CHILD:load',
+    fn: 'load',
+    label: 'Nodal Load',
+    domain: 'model',
+    childOnly: 'pattern',
+    description: 'Apply a load to a node under this pattern',
+    args: [{ kind: 'idlist', name: 'nodeId', label: 'Node ID(s)' }, vec('values', 'Load Values', 'ndf', [0, 0, 0, 0, 0, 0])],
+    optional: [],
+    create: (values) => ({
+      target: 'model',
+      write: {
+        kind: 'patternChild',
+        patternId: Math.trunc(num(values.patternId)),
+        child: { kind: 'load', args: { nodeTag: Math.trunc(num(values.nodeId, 1)), values: nums(values.values) } },
+        childIndex: typeof values.childIndex === 'number' ? values.childIndex : undefined,
+      },
+    }),
+  },
+  {
+    cmd: 'PATTERN_CHILD:sp',
+    fn: 'sp',
+    label: 'Imposed Motion (sp)',
+    domain: 'model',
+    childOnly: 'pattern',
+    description: 'Prescribe a displacement at a node DOF under this pattern',
+    args: [
+      { kind: 'int', name: 'nodeTag', label: 'Node Tag', required: true },
+      { kind: 'int', name: 'dof', label: 'DOF', required: true },
+      { kind: 'float', name: 'value', label: 'Value', required: true },
+    ],
+    optional: [],
+    create: (values) => ({
+      target: 'model',
+      write: {
+        kind: 'patternChild',
+        patternId: Math.trunc(num(values.patternId)),
+        child: { kind: 'sp', args: { nodeTag: Math.trunc(num(values.nodeTag)), dof: Math.trunc(num(values.dof)), value: num(values.value) } },
+        childIndex: typeof values.childIndex === 'number' ? values.childIndex : undefined,
+      },
+    }),
+  },
+  {
+    cmd: 'PATTERN_CHILD:eleLoad',
+    fn: 'eleLoad',
+    label: 'Element Load (uniform)',
+    domain: 'model',
+    childOnly: 'pattern',
+    description: 'Apply a uniform transverse/axial load to elements under this pattern',
+    args: [
+      { kind: 'idlist', name: 'eleTags', label: 'Element Tag(s)' },
+      { kind: 'float', name: 'wy', label: 'wy', defaultValue: 0 },
+      { kind: 'float', name: 'wz', label: 'wz', defaultValue: 0 },
+    ],
+    optional: [],
+    create: (values) => ({
+      target: 'model',
+      write: {
+        kind: 'patternChild',
+        patternId: Math.trunc(num(values.patternId)),
+        child: { kind: 'eleLoad', args: { eleTags: ints(values.eleTags), wy: num(values.wy), wz: num(values.wz) } },
+        childIndex: typeof values.childIndex === 'number' ? values.childIndex : undefined,
+      },
     }),
   },
 ]
 
-const RESERVED_FNS = new Set<string>(['node', 'fix', 'load', 'element'])
+// ─── Section children: fiber / patch(rect) / layer(straight) ────────────────
+
+const SECTION_CHILD_SCHEMAS: CommandSchema[] = [
+  {
+    cmd: 'SECTION_CHILD:fiber',
+    fn: 'fiber',
+    label: 'Fiber',
+    domain: 'model',
+    childOnly: 'section',
+    description: 'A single fiber at (yloc, zloc) with area A',
+    args: [
+      { kind: 'float', name: 'yloc', label: 'y', required: true },
+      { kind: 'float', name: 'zloc', label: 'z', required: true },
+      { kind: 'float', name: 'A', label: 'Area', required: true },
+      { kind: 'int', name: 'matTag', label: 'Material Tag', required: true },
+    ],
+    optional: [],
+    create: (values) => ({
+      target: 'model',
+      write: {
+        kind: 'sectionChild',
+        sectionId: Math.trunc(num(values.sectionId)),
+        child: { kind: 'fiber', subType: 'fiber', args: { yloc: num(values.yloc), zloc: num(values.zloc), A: num(values.A), matTag: Math.trunc(num(values.matTag)) } },
+        childIndex: typeof values.childIndex === 'number' ? values.childIndex : undefined,
+      },
+    }),
+  },
+  {
+    cmd: 'SECTION_CHILD:patch-rect',
+    fn: 'patch',
+    label: 'Patch (rect)',
+    domain: 'model',
+    childOnly: 'section',
+    description: 'A rectangular patch of fibers',
+    args: [
+      { kind: 'int', name: 'matTag', label: 'Material Tag', required: true },
+      { kind: 'int', name: 'nFibZ', label: 'Fibers (z)', defaultValue: 4, required: true },
+      { kind: 'int', name: 'nFibY', label: 'Fibers (y)', defaultValue: 4, required: true },
+      { kind: 'float', name: 'y1', label: 'y1', required: true },
+      { kind: 'float', name: 'z1', label: 'z1', required: true },
+      { kind: 'float', name: 'y2', label: 'y2', required: true },
+      { kind: 'float', name: 'z2', label: 'z2', required: true },
+    ],
+    optional: [],
+    create: (values) => ({
+      target: 'model',
+      write: {
+        kind: 'sectionChild',
+        sectionId: Math.trunc(num(values.sectionId)),
+        child: {
+          kind: 'patch', subType: 'rect', args: {
+            matTag: Math.trunc(num(values.matTag)), nFibZ: Math.trunc(num(values.nFibZ)), nFibY: Math.trunc(num(values.nFibY)),
+            y1: num(values.y1), z1: num(values.z1), y2: num(values.y2), z2: num(values.z2),
+          },
+        },
+        childIndex: typeof values.childIndex === 'number' ? values.childIndex : undefined,
+      },
+    }),
+  },
+  {
+    cmd: 'SECTION_CHILD:layer-straight',
+    fn: 'layer',
+    label: 'Layer (straight)',
+    domain: 'model',
+    childOnly: 'section',
+    description: 'A straight line of evenly spaced fibers (e.g. rebar layer)',
+    args: [
+      { kind: 'int', name: 'matTag', label: 'Material Tag', required: true },
+      { kind: 'int', name: 'numFiber', label: 'Num Fibers', defaultValue: 2, required: true },
+      { kind: 'float', name: 'areaFiber', label: 'Area per Fiber', required: true },
+      { kind: 'float', name: 'yi', label: 'yi', required: true },
+      { kind: 'float', name: 'zi', label: 'zi', required: true },
+      { kind: 'float', name: 'yj', label: 'yj', required: true },
+      { kind: 'float', name: 'zj', label: 'zj', required: true },
+    ],
+    optional: [],
+    create: (values) => ({
+      target: 'model',
+      write: {
+        kind: 'sectionChild',
+        sectionId: Math.trunc(num(values.sectionId)),
+        child: {
+          kind: 'layer', subType: 'straight', args: {
+            matTag: Math.trunc(num(values.matTag)), numFiber: Math.trunc(num(values.numFiber)), areaFiber: num(values.areaFiber),
+            yi: num(values.yi), zi: num(values.zi), yj: num(values.yj), zj: num(values.zj),
+          },
+        },
+        childIndex: typeof values.childIndex === 'number' ? values.childIndex : undefined,
+      },
+    }),
+  },
+]
+
+const V1_FNS = new Set<string>(['node', 'fix', 'mass', 'element'])
+const CHILD_FNS = new Set<string>([...PATTERN_CHILD_FNS, ...SECTION_CHILD_FNS])
 
 function mapGeneratedArg(arg: GeneratedArgDef): ArgDef {
   if (arg.kind === 'choice') {
@@ -172,42 +351,119 @@ function mapGeneratedArg(arg: GeneratedArgDef): ArgDef {
   return { kind: arg.kind, name: arg.name, label: titleCase(arg.name), defaultValue: typeof arg.defaultValue === 'number' ? arg.defaultValue : undefined, description: arg.description, required: arg.required, defaultSource: arg.defaultSource }
 }
 
-const GENERATED_NON_V1_SCHEMAS: CommandSchema[] = GENERATED_COMMAND_SCHEMAS
-  .filter((schema) => !RESERVED_FNS.has(schema.fn))
+/** Generic entity-kind for model-domain fns that get a dedicated Model map; everything else lands in `misc`. */
+const MODEL_ENTITY_KIND_BY_FN: Partial<Record<string, ModelWrite['kind']>> = {
+  uniaxialMaterial: 'material',
+  nDMaterial: 'material',
+  section: 'section',
+  geomTransf: 'geomTransf',
+  beamIntegration: 'beamIntegration',
+  equalDOF: 'mpConstraint',
+  equalDOF_Mixed: 'mpConstraint',
+  rigidDiaphragm: 'mpConstraint',
+  rigidLink: 'mpConstraint',
+  region: 'region',
+  timeSeries: 'timeSeries',
+  pattern: 'pattern',
+}
+
+function idKindForModelWriteKind(kind: ModelWrite['kind']): ModelEntityKind {
+  switch (kind) {
+    case 'material': return 'material'
+    case 'section': return 'section'
+    case 'geomTransf': return 'geomTransf'
+    case 'beamIntegration': return 'beamIntegration'
+    case 'mpConstraint': return 'mpConstraint'
+    case 'region': return 'region'
+    case 'timeSeries': return 'timeSeries'
+    case 'pattern': return 'pattern'
+    default: return 'misc'
+  }
+}
+
+/** Walks the (possibly choice-nested) arg tree using the current values bag to find the entity's own tag field, if any. */
+function resolveTagArgName(args: ArgDef[], values: Record<string, unknown>): string | null {
+  for (const arg of args) {
+    if (arg.kind === 'int') {
+      const lower = arg.name.toLowerCase()
+      if (lower.endsWith('tag') && !lower.includes('node') && !lower.includes('ele')) return arg.name
+    }
+    if (arg.kind === 'flag' && values[arg.flag]) {
+      const nested = resolveTagArgName(arg.args, values)
+      if (nested) return nested
+    }
+    if (arg.kind === 'choice') {
+      const selected = String(values[arg.name] ?? arg.defaultValue ?? arg.options[0] ?? '')
+      const nested = resolveTagArgName(arg.yields[selected] ?? [], values)
+      if (nested) return nested
+    }
+  }
+  return null
+}
+
+/** Reads the top-level choice's currently-selected option (the "type" string: matType/secType/transfType/...), if any. */
+function resolveTypeValue(fn: string, args: ArgDef[], values: Record<string, unknown>): string {
+  const choice = args.find((a): a is Extract<ArgDef, { kind: 'choice' }> => a.kind === 'choice')
+  if (!choice) return fn
+  return String(values[choice.name] ?? choice.defaultValue ?? choice.options[0] ?? fn)
+}
+
+const GENERATED_SCHEMAS: CommandSchema[] = GENERATED_COMMAND_SCHEMAS
+  .filter((schema) => !V1_FNS.has(schema.fn) && !CHILD_FNS.has(schema.fn))
   .map((schema) => {
     const args = schema.args.map(mapGeneratedArg)
     const optional = schema.optional.map(mapGeneratedArg)
+    const domain = domainForFn(schema.fn)
     return {
       cmd: `OPS:${schema.fn}`,
       fn: schema.fn,
       label: titleCase(schema.label || schema.fn),
-      category: schema.category,
+      domain,
       description: genericSignature(schema.fn, args, optional),
       args,
       optional,
-      create: (values, model, base) => {
-        if (schema.fn !== 'uniaxialMaterial') {
-          return {
-            type: 'ADD_OPS',
-            fn: base?.type === 'ADD_OPS' ? base.fn : schema.fn,
-            category: schema.category,
-            values,
-          }
+      create: (values, model, existingId): SchemaResult => {
+        if (domain !== 'model') {
+          return { target: 'analysis', command: { type: 'ANALYSIS_OPS', fn: schema.fn, values } }
         }
-        const rawTag = Number(values.matTag)
-        const matTag = Number.isFinite(rawTag) && rawTag > 0 ? Math.trunc(rawTag) : model.nextMatId
-        return {
-          type: 'ADD_OPS',
-          fn: base?.type === 'ADD_OPS' ? base.fn : schema.fn,
-          category: schema.category,
-          values: { ...values, matTag },
+        const kind = MODEL_ENTITY_KIND_BY_FN[schema.fn] ?? 'misc'
+        const idKind = idKindForModelWriteKind(kind)
+        const tagArgName = resolveTagArgName([...args, ...optional], values)
+        let id: number
+        if (existingId !== undefined) {
+          id = existingId
+        } else if (tagArgName) {
+          const raw = Number(values[tagArgName])
+          id = Number.isFinite(raw) && raw > 0 ? Math.trunc(raw) : model.nextIds[idKind]
+        } else {
+          id = model.nextIds[idKind]
         }
+        if (tagArgName) values = { ...values, [tagArgName]: id }
+        const typeValue = resolveTypeValue(schema.fn, args, values)
+
+        if (kind === 'material') return { target: 'model', write: { kind: 'material', entity: { id, kind: schema.fn === 'nDMaterial' ? 'nD' : 'uniaxial', matType: typeValue, args: values } } }
+        if (kind === 'section') return { target: 'model', write: { kind: 'section', entity: { id, secType: typeValue, args: values, children: [] } } }
+        if (kind === 'geomTransf') return { target: 'model', write: { kind: 'geomTransf', entity: { id, transfType: typeValue, args: values } } }
+        if (kind === 'beamIntegration') return { target: 'model', write: { kind: 'beamIntegration', entity: { id, intType: typeValue, args: values } } }
+        if (kind === 'mpConstraint') return { target: 'model', write: { kind: 'mpConstraint', entity: { id, kind: schema.fn as 'equalDOF' | 'equalDOF_Mixed' | 'rigidDiaphragm' | 'rigidLink', args: values } } }
+        if (kind === 'region') return { target: 'model', write: { kind: 'region', entity: { id, args: values } } }
+        if (kind === 'timeSeries') return { target: 'model', write: { kind: 'timeSeries', entity: { id, tsType: typeValue, args: values } } }
+        if (kind === 'pattern') return { target: 'model', write: { kind: 'pattern', entity: { id, patternType: typeValue, args: values, children: [] } } }
+        return { target: 'model', write: { kind: 'misc', entity: { id, fn: schema.fn, args: values } } }
       },
     }
   })
 
 export function getAvailableSchemas(ndm: number) {
-  return [...V1_COMMAND_SCHEMAS, ...GENERATED_NON_V1_SCHEMAS].filter((schema) => !schema.ndmFilter || schema.ndmFilter.includes(ndm))
+  return [...V1_MODEL_SCHEMAS, ...GENERATED_SCHEMAS].filter((schema) => !schema.ndmFilter || schema.ndmFilter.includes(ndm))
+}
+
+export function getPatternChildSchemas() {
+  return PATTERN_CHILD_SCHEMAS
+}
+
+export function getSectionChildSchemas() {
+  return SECTION_CHILD_SCHEMAS
 }
 
 function docsUrlFromRstPath(path: string) {
@@ -300,11 +556,11 @@ function defaultsForArg(arg: ArgDef, ctx: SchemaContext, out: Record<string, unk
   }
 }
 
-export function initialValues(schema: CommandSchema, ctx: SchemaContext, model?: ModelState) {
+export function initialValues(schema: CommandSchema, ctx: SchemaContext, model?: Model) {
   const out: Record<string, unknown> = {}
   for (const arg of schema.args) defaultsForArg(arg, ctx, out)
   for (const arg of schema.optional) defaultsForArg(arg, ctx, out)
-  if (schema.fn === 'uniaxialMaterial' && (!Number.isFinite(Number(out.matTag)) || Number(out.matTag) <= 0)) out.matTag = model?.nextMatId ?? 1
+  if (schema.fn === 'uniaxialMaterial' && (!Number.isFinite(Number(out.matTag)) || Number(out.matTag) <= 0)) out.matTag = model?.nextIds.material ?? 1
   return out
 }
 
@@ -372,53 +628,71 @@ export function validateUniaxialMaterialValues(values: Record<string, unknown>, 
   return validateRequiredArgs(yielded, values, ctx)
 }
 
-export function validateCommand(cmd: Command, model: ModelState) {
-  if (cmd.type === 'ADD_OPS' && cmd.fn === 'uniaxialMaterial') {
-    const ctx: SchemaContext = { ndm: model.config?.ndm ?? 3, ndf: model.config?.ndf ?? 6 }
-    const error = validateUniaxialMaterialValues(cmd.values, ctx)
+/** Validates a SchemaResult before it's written to the model/analysis history. */
+export function validateSchemaResult(result: SchemaResult, model: Model, ctx: SchemaContext): string | null {
+  if (result.target === 'analysis') {
+    if (result.command.type === 'ANALYSIS_OPS' && result.command.fn === 'recorder') return null
+    return null
+  }
+  const write = result.write
+  if (write.kind === 'material' && write.entity.kind === 'uniaxial') {
+    const error = validateUniaxialMaterialValues(write.entity.args, ctx)
     if (error) return error
   }
-  if (cmd.type === 'FIX' || cmd.type === 'ADD_LOAD') {
-    if (!model.nodes.has(cmd.nodeId)) return `Node ${cmd.nodeId} does not exist.`
+  if (write.kind === 'fix' && !model.nodes.has(write.entity.nodeId)) return `Node ${write.entity.nodeId} does not exist.`
+  if (write.kind === 'mass' && !model.nodes.has(write.entity.nodeId)) return `Node ${write.entity.nodeId} does not exist.`
+  if (write.kind === 'element') {
+    if (write.entity.nodes.length < 2) return 'Element requires at least 2 node IDs.'
+    if (write.entity.nodes.some((id) => !model.nodes.has(id))) return 'Element references one or more missing nodes.'
   }
-  if (cmd.type === 'ADD_ELEMENT') {
-    if (cmd.nodes.length < 2) return 'Element requires at least 2 node IDs.'
-    if (cmd.nodes.some((id) => !model.nodes.has(id))) return 'Element references one or more missing nodes.'
-  }
-  if (cmd.type === 'FIX' && cmd.dofs.length === 0) return 'Select at least one constrained DOF.'
+  if (write.kind === 'fix' && write.entity.dofs.length === 0) return 'Select at least one constrained DOF.'
+  if (write.kind === 'patternChild' && !model.patterns.has(write.patternId)) return `Pattern ${write.patternId} does not exist.`
+  if (write.kind === 'sectionChild' && !model.sections.has(write.sectionId)) return `Section ${write.sectionId} does not exist.`
   return null
 }
 
-export function getSchemaForCommand(cmd: Command, ndm: number) {
-  const schemas = getAvailableSchemas(ndm)
-  if (cmd.type === 'ADD_OPS') return schemas.find((schema) => schema.cmd === `OPS:${cmd.fn}`) ?? null
-  if (cmd.type !== 'ADD_NODE' && cmd.type !== 'FIX' && cmd.type !== 'ADD_LOAD' && cmd.type !== 'ADD_ELEMENT') return null
-  return schemas.find((schema) => schema.cmd === cmd.type) ?? null
+/** The underlying OpenSeesPy function name for a stored model entity (used to look up its schema for editing). */
+export function fnForModelEntity(kind: ModelWrite['kind'], entity: unknown): string {
+  switch (kind) {
+    case 'node': return 'node'
+    case 'fix': return 'fix'
+    case 'mass': return 'mass'
+    case 'element': return 'element'
+    case 'material': return (entity as { kind: 'uniaxial' | 'nD' }).kind === 'nD' ? 'nDMaterial' : 'uniaxialMaterial'
+    case 'section': return 'section'
+    case 'geomTransf': return 'geomTransf'
+    case 'beamIntegration': return 'beamIntegration'
+    case 'mpConstraint': return (entity as { kind: string }).kind
+    case 'region': return 'region'
+    case 'timeSeries': return 'timeSeries'
+    case 'pattern': return 'pattern'
+    case 'misc': return (entity as { fn: string }).fn
+    default: return kind
+  }
 }
 
-export function commandToValues(cmd: Command, ctx: SchemaContext) {
-  if (cmd.type === 'ADD_OPS') return { ...cmd.values }
-  const base = {
-    ADD_NODE: { coords: Array.from({ length: ctx.ndm }, (_, i) => cmd.type === 'ADD_NODE' ? (cmd.coords[i] ?? 0) : 0) },
-    FIX: {
-      // idlist field expects number[] — wrap single nodeId in array for edit initialisation
-      nodeId: cmd.type === 'FIX' ? [cmd.nodeId] : [1],
-      dofs: Array.from({ length: ctx.ndf }, (_, i) => cmd.type === 'FIX' ? (cmd.dofs.includes(i + 1) ? 1 : 0) : 0),
-    },
-    ADD_LOAD: {
-      nodeId: cmd.type === 'ADD_LOAD' ? [cmd.nodeId] : [1],
-      values: Array.from({ length: ctx.ndf }, (_, i) => cmd.type === 'ADD_LOAD' ? (cmd.values[i] ?? 0) : 0),
-    },
-    ADD_ELEMENT: {
-      eleType: cmd.type === 'ADD_ELEMENT' ? cmd.eleType : 'Truss',
-      nodes: cmd.type === 'ADD_ELEMENT' ? [...cmd.nodes] : [1, 2],
-    },
+/** Seeds a CommandFormBody's `initial` values from a stored model entity, for editing. */
+export function modelEntityToValues(kind: ModelWrite['kind'], entity: unknown, ctx: SchemaContext): Record<string, unknown> {
+  if (kind === 'node') return { coords: [...(entity as { coords: number[] }).coords] }
+  if (kind === 'fix') {
+    const e = entity as { nodeId: number; dofs: number[] }
+    return { nodeId: [e.nodeId], dofs: Array.from({ length: ctx.ndf }, (_, i) => (e.dofs.includes(i + 1) ? 1 : 0)) }
   }
-  if (cmd.type === 'ADD_NODE') return base.ADD_NODE
-  if (cmd.type === 'FIX') return base.FIX
-  if (cmd.type === 'ADD_LOAD') return base.ADD_LOAD
-  if (cmd.type === 'ADD_ELEMENT') return base.ADD_ELEMENT
-  return {}
+  if (kind === 'mass') {
+    const e = entity as { nodeId: number; values: number[] }
+    return { nodeId: [e.nodeId], values: Array.from({ length: ctx.ndf }, (_, i) => e.values[i] ?? 0) }
+  }
+  if (kind === 'element') {
+    const e = entity as { eleType: string; nodes: number[]; args: Record<string, unknown> }
+    return { eleType: e.eleType, nodes: [...e.nodes], ...e.args }
+  }
+  const e = entity as { args: Record<string, unknown> }
+  return { ...e.args }
+}
+
+export function getSchemaForFn(fn: string, ndm: number) {
+  const schemas = getAvailableSchemas(ndm)
+  return schemas.find((schema) => schema.fn === fn) ?? null
 }
 
 function flattenArgValues(arg: ArgDef, values: Record<string, unknown>, ctx: SchemaContext, fallbackMatTag: number): (string | number | boolean | null)[] {
@@ -471,8 +745,6 @@ function flattenArgValues(arg: ArgDef, values: Record<string, unknown>, ctx: Sch
     return [selected, ...(arg.yields[selected] ?? []).flatMap((child) => flattenArgValues(child, values, ctx, fallbackMatTag))]
   }
   if (arg.kind === 'idlist') {
-    // idlist fields insert one command per id (see CommandForm's submitValues); the
-    // preview can only show a single call, so it previews the first id.
     const ids = Array.isArray(values[arg.name]) ? (values[arg.name] as unknown[]) : []
     return ids.length ? [Math.trunc(num(ids[0]))] : []
   }
@@ -502,4 +774,16 @@ export function buildUniaxialMaterialCallArgs(values: Record<string, unknown>, c
   const yielded = choice.yields[matType] ?? []
   const rest = yielded.flatMap((arg) => flattenArgValues(arg, values, ctx, fallbackMatTag))
   return [matType, ...rest]
+}
+
+/** Turns a schema-shaped fn + values bag into a rendered `ops.fn(...)` call — used by the script exporter and analysis blocks.
+ * `values.__args`, when present (set by analysis blocks), is an exact positional arg list and bypasses schema lookup entirely. */
+export function renderOpsCall(fn: string, values: Record<string, unknown>, ctx: SchemaContext, schemaOverride?: CommandSchema): string {
+  if (Array.isArray(values.__args)) {
+    const args = values.__args as (string | number | boolean | null)[]
+    return `${fn}(${args.map(formatPyLiteral).join(', ')})`
+  }
+  const schema = schemaOverride ?? getSchemaForFn(fn, ctx.ndm)
+  if (!schema) return `${fn}(${Object.values(values).map((v) => formatPyLiteral(v as string | number | boolean | null)).join(', ')})`
+  return commandPreviewLine(schema, values, ctx, Number(values.matTag) || 1)
 }

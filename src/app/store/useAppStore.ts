@@ -1,68 +1,23 @@
 import { create } from 'zustand'
-import type { Command, CommandHistory } from '@/app/types/commands'
-import type { AppMode, ModelConfig, ResultsState } from '@/app/types/model'
-import { replay } from '@/app/lib/replay'
+import type { AnalysisCommand, AnalysisHistory } from '@/app/types/analysisCommands'
+import { emptyAnalysisHistory } from '@/app/types/analysisCommands'
+import type { AppMode, Model, ResultsState } from '@/app/types/model'
+import { emptyModel } from '@/app/types/model'
 import { LocalAgentClient, type AgentConnectionState } from '@/app/lib/localAgent'
-import { buildUniaxialMaterialCallArgs, validateCommand } from '@/app/lib/commandSchemas'
+import { buildUniaxialMaterialCallArgs, validateUniaxialMaterialValues } from '@/app/lib/commandSchemas'
+import { applyModelWrite, deleteEntity, previewDeleteEntity, removeModelChild, type ModelDeletableKind, type ModelWrite } from '@/app/lib/modelWrite'
 
 const DEFAULT_STRAIN_PROTOCOL = [0, 0.001, -0.001, 0.002, -0.002, 0.003, -0.003, 0]
 const agentClient = new LocalAgentClient()
 const POINT_FLUSH_MS = 100
-
-function producedNodeIds(cmd: Command): Set<number> {
-  if (cmd.type === 'ADD_NODE') return new Set([cmd.id])
-  if (cmd.type === 'SCRIPT_GROUP') {
-    const ids = new Set<number>()
-    for (const child of cmd.commands) for (const id of producedNodeIds(child)) ids.add(id)
-    return ids
-  }
-  return new Set()
-}
-
-function dependsOnNodes(cmd: Command, nodeIds: Set<number>): boolean {
-  if (nodeIds.size === 0) return false
-  if ((cmd.type === 'FIX' || cmd.type === 'ADD_LOAD') && nodeIds.has(cmd.nodeId)) return true
-  if (cmd.type === 'ADD_ELEMENT' && cmd.nodes.some((id) => nodeIds.has(id))) return true
-  if (cmd.type === 'SCRIPT_GROUP') return cmd.commands.some((child) => dependsOnNodes(child, nodeIds))
-  return false
-}
-
-function computeCascadeDeleteIndices(history: CommandHistory, index: number) {
-  if (index < 0 || index >= history.commands.length) return []
-  const activeEnd = history.cursor
-  const remove = new Set<number>([index])
-  const removedNodes = producedNodeIds(history.commands[index])
-
-  for (let i = index + 1; i <= activeEnd; i += 1) {
-    if (remove.has(i)) continue
-    const cmd = history.commands[i]
-    if (!cmd) continue
-    if (!dependsOnNodes(cmd, removedNodes)) continue
-    remove.add(i)
-    for (const id of producedNodeIds(cmd)) removedNodes.add(id)
-  }
-  return [...remove].sort((a, b) => a - b)
-}
-
-function findAffectedIndices(commands: Command[], cursor: number, editedIndex: number, editedCommand: Command) {
-  const affected: number[] = []
-  if (editedIndex >= cursor) return affected
-  if (editedCommand.type === 'ADD_NODE') {
-    const nodeId = editedCommand.id
-    for (let i = editedIndex + 1; i <= cursor; i += 1) {
-      const cmd = commands[i]
-      if (!cmd) continue
-      if ((cmd.type === 'FIX' || cmd.type === 'ADD_LOAD') && cmd.nodeId === nodeId) affected.push(i)
-      if (cmd.type === 'ADD_ELEMENT' && cmd.nodes.includes(nodeId)) affected.push(i)
-    }
-  }
-  return affected
-}
+const MODEL_UNDO_DEPTH = 100
 
 interface AppStore {
-  history: CommandHistory
+  model: Model
+  modelPast: Model[]
+  modelFuture: Model[]
+  analysisHistory: AnalysisHistory
   mode: AppMode
-  config: ModelConfig | null
   results: ResultsState | null
   localAgent: {
     status: AgentConnectionState
@@ -77,12 +32,21 @@ interface AppStore {
     logs: { stream: 'stdout' | 'stderr'; line: string }[]
     panelOpen: boolean
     protocol: number[]
-    inputCommand: Command | null
+    inputMaterial: { matType: string; values: Record<string, unknown> } | null
   }
-  selectedHistoryIndex: number | null
-  insertionIndex: number | null
-  lastEditedHistoryIndex: number | null
-  affectedHistoryIndices: number[]
+  activePanel: 'model' | 'analysis'
+  setActivePanel: (panel: 'model' | 'analysis') => void
+
+  // Model panel selection/editing
+  selectedModelEntity: { kind: ModelDeletableKind; id: number } | null
+  setSelectedModelEntity: (sel: { kind: ModelDeletableKind; id: number } | null) => void
+
+  // Analysis panel selection/editing
+  selectedAnalysisIndex: number | null
+  analysisInsertionIndex: number | null
+  setSelectedAnalysisIndex: (index: number | null) => void
+  setAnalysisInsertionIndex: (index: number | null) => void
+
   // viewport node selection
   selectedNodeIds: number[]
   setSelectedNodeIds: (ids: number[]) => void
@@ -102,17 +66,25 @@ interface AppStore {
     showGrid: boolean
   }
   viewportAction: { kind: 'zoomIn' | 'zoomOut' | 'fit'; token: number } | null
-  initModel: (ndm: 2 | 3, ndf: number, extraCommands?: Command[]) => void
-  pushCommand: (cmd: Command) => void
-  insertCommandAt: (cmd: Command, index: number | null) => void
-  updateCommandAt: (index: number, cmd: Command) => void
-  moveCommand: (fromIndex: number, toIndex: number) => void
-  previewDeleteCascade: (index: number) => number[]
-  deleteCommandCascade: (index: number) => void
-  setSelectedHistoryIndex: (index: number | null) => void
-  setInsertionIndex: (index: number | null) => void
-  undo: () => void
-  redo: () => void
+
+  // Model actions
+  initModel: (ndm: 2 | 3, ndf: number, extra?: { writes?: ModelWrite[]; analysisCommands?: AnalysisCommand[] }) => void
+  writeModelEntity: (write: ModelWrite) => void
+  previewDeleteModelEntity: (kind: ModelDeletableKind, id: number) => string[]
+  deleteModelEntity: (kind: ModelDeletableKind, id: number) => void
+  removeModelEntityChild: (parent: 'section' | 'pattern', parentId: number, childIndex: number) => void
+  modelUndo: () => void
+  modelRedo: () => void
+
+  // Analysis actions
+  pushAnalysisCommand: (cmd: AnalysisCommand) => void
+  insertAnalysisCommandAt: (cmd: AnalysisCommand, index: number | null) => void
+  updateAnalysisCommandAt: (index: number, cmd: AnalysisCommand) => void
+  moveAnalysisCommand: (fromIndex: number, toIndex: number) => void
+  deleteAnalysisCommandAt: (index: number) => void
+  analysisUndo: () => void
+  analysisRedo: () => void
+
   setViewSetting: (key: keyof AppStore['viewSettings'], value: boolean) => void
   requestViewportAction: (kind: 'zoomIn' | 'zoomOut' | 'fit') => void
   setMode: (mode: AppMode) => void
@@ -123,9 +95,14 @@ interface AppStore {
   cancelMaterialPreview: () => void
   setMaterialPreviewPanelOpen: (open: boolean) => void
   setMaterialPreviewProtocol: (points: number[]) => void
-  setMaterialPreviewInputCommand: (cmd: Command | null) => void
+  setMaterialPreviewInputMaterial: (input: { matType: string; values: Record<string, unknown> } | null) => void
   clearMaterialPreviewResult: () => void
   clearMaterialPreviewLogs: () => void
+}
+
+function pushModelPast(past: Model[], model: Model): Model[] {
+  const next = [...past, model]
+  return next.length > MODEL_UNDO_DEPTH ? next.slice(next.length - MODEL_UNDO_DEPTH) : next
 }
 
 export const useAppStore = create<AppStore>((set, get) => {
@@ -171,16 +148,25 @@ export const useAppStore = create<AppStore>((set, get) => {
   }
 
   return ({
-  history: { commands: [], cursor: -1 },
+  model: emptyModel(),
+  modelPast: [],
+  modelFuture: [],
+  analysisHistory: emptyAnalysisHistory(),
   mode: 'model',
-  config: null,
   results: null,
   localAgent: { status: 'disconnected', port: null, error: null },
-  materialPreview: { running: false, jobId: null, points: [], error: null, logs: [], panelOpen: false, protocol: [...DEFAULT_STRAIN_PROTOCOL], inputCommand: null },
-  selectedHistoryIndex: null,
-  insertionIndex: null,
-  lastEditedHistoryIndex: null,
-  affectedHistoryIndices: [],
+  materialPreview: { running: false, jobId: null, points: [], error: null, logs: [], panelOpen: false, protocol: [...DEFAULT_STRAIN_PROTOCOL], inputMaterial: null },
+  activePanel: 'model',
+  setActivePanel: (panel) => set({ activePanel: panel }),
+
+  selectedModelEntity: null,
+  setSelectedModelEntity: (sel) => set({ selectedModelEntity: sel }),
+
+  selectedAnalysisIndex: null,
+  analysisInsertionIndex: null,
+  setSelectedAnalysisIndex: (index) => set({ selectedAnalysisIndex: index }),
+  setAnalysisInsertionIndex: (index) => set({ analysisInsertionIndex: index }),
+
   selectedNodeIds: [],
   setSelectedNodeIds: (ids) => set({ selectedNodeIds: ids }),
   toggleNodeInSelection: (id, additive) => set((s) => {
@@ -204,52 +190,102 @@ export const useAppStore = create<AppStore>((set, get) => {
   },
   viewportAction: null,
 
-  initModel: (ndm, ndf, extraCommands) => set(() => {
-    const initCmd: Command = { type: 'MODEL_INIT', ndm, ndf }
-    const commands = [initCmd, ...(extraCommands ?? [])]
-    return { config: { ndm, ndf }, history: { commands, cursor: commands.length - 1 }, selectedHistoryIndex: null, insertionIndex: null, lastEditedHistoryIndex: null, affectedHistoryIndices: [] }
-  }),
-
-  pushCommand: (cmd) => set((s) => {
-    const trimmed = s.history.commands.slice(0, s.history.cursor + 1)
-    trimmed.push(cmd)
-    return { history: { commands: trimmed, cursor: trimmed.length - 1 }, selectedHistoryIndex: null, insertionIndex: null, lastEditedHistoryIndex: null, affectedHistoryIndices: [] }
-  }),
-
-  insertCommandAt: (cmd, index) => set((s) => {
-    const active = s.history.commands.slice(0, s.history.cursor + 1)
-    const at = Math.max(0, Math.min(active.length, index ?? active.length))
-    const commands = [...active.slice(0, at), cmd, ...active.slice(at)]
+  initModel: (ndm, ndf, extra) => set(() => {
+    let model = emptyModel()
+    model = { ...model, config: { ndm, ndf } }
+    for (const write of extra?.writes ?? []) model = applyModelWrite(model, write)
+    const analysisCommands = extra?.analysisCommands ?? []
     return {
-      history: { commands, cursor: s.history.cursor + 1 },
-      selectedHistoryIndex: null,
-      insertionIndex: at + 1,
-      lastEditedHistoryIndex: null,
-      affectedHistoryIndices: [],
+      model,
+      modelPast: [],
+      modelFuture: [],
+      analysisHistory: { commands: analysisCommands, cursor: analysisCommands.length - 1 },
+      selectedModelEntity: null,
+      selectedAnalysisIndex: null,
+      analysisInsertionIndex: null,
     }
   }),
 
-  updateCommandAt: (index, cmd) => set((s) => {
-    if (index < 0 || index >= s.history.commands.length) return s
-    const commands = [...s.history.commands]
-    commands[index] = cmd
-    const affectedHistoryIndices = findAffectedIndices(commands, s.history.cursor, index, cmd)
-    return { history: { ...s.history, commands }, lastEditedHistoryIndex: index, affectedHistoryIndices }
+  writeModelEntity: (write) => set((s) => ({
+    model: applyModelWrite(s.model, write),
+    modelPast: pushModelPast(s.modelPast, s.model),
+    modelFuture: [],
+  })),
+
+  previewDeleteModelEntity: (kind, id) => previewDeleteEntity(get().model, kind, id),
+
+  deleteModelEntity: (kind, id) => set((s) => ({
+    model: deleteEntity(s.model, kind, id),
+    modelPast: pushModelPast(s.modelPast, s.model),
+    modelFuture: [],
+    selectedModelEntity: s.selectedModelEntity?.kind === kind && s.selectedModelEntity.id === id ? null : s.selectedModelEntity,
+  })),
+
+  removeModelEntityChild: (parent, parentId, childIndex) => set((s) => ({
+    model: removeModelChild(s.model, parent, parentId, childIndex),
+    modelPast: pushModelPast(s.modelPast, s.model),
+    modelFuture: [],
+  })),
+
+  modelUndo: () => set((s) => {
+    if (s.modelPast.length === 0) return s
+    const previous = s.modelPast[s.modelPast.length - 1]
+    return {
+      model: previous,
+      modelPast: s.modelPast.slice(0, -1),
+      modelFuture: [s.model, ...s.modelFuture],
+    }
   }),
 
-  moveCommand: (fromIndex, toIndex) => set((s) => {
-    if (fromIndex === toIndex) return s
-    if (fromIndex <= 0) return s // keep MODEL_INIT pinned
-    const maxTo = s.history.commands.length
-    if (fromIndex < 0 || fromIndex >= s.history.commands.length) return s
-    const to = Math.max(1, Math.min(maxTo, toIndex))
-    const commands = [...s.history.commands]
-    const [item] = commands.splice(fromIndex, 1)
-    const insertAt = to > fromIndex ? to - 1 : to
-    commands.splice(insertAt, 0, item)
+  modelRedo: () => set((s) => {
+    if (s.modelFuture.length === 0) return s
+    const [next, ...rest] = s.modelFuture
+    return {
+      model: next,
+      modelPast: pushModelPast(s.modelPast, s.model),
+      modelFuture: rest,
+    }
+  }),
 
-    // Remap an element's position after the move (used for selectedHistoryIndex)
-    const remapElementIndex = (idx: number | null) => {
+  pushAnalysisCommand: (cmd) => set((s) => {
+    const trimmed = s.analysisHistory.commands.slice(0, s.analysisHistory.cursor + 1)
+    trimmed.push(cmd)
+    return { analysisHistory: { commands: trimmed, cursor: trimmed.length - 1 }, selectedAnalysisIndex: null, analysisInsertionIndex: null }
+  }),
+
+  insertAnalysisCommandAt: (cmd, index) => set((s) => {
+    const active = s.analysisHistory.commands.slice(0, s.analysisHistory.cursor + 1)
+    const at = Math.max(0, Math.min(active.length, index ?? active.length))
+    const commands = [...active.slice(0, at), cmd, ...active.slice(at)]
+    return {
+      analysisHistory: { commands, cursor: s.analysisHistory.cursor + 1 },
+      selectedAnalysisIndex: null,
+      analysisInsertionIndex: at + 1,
+    }
+  }),
+
+  updateAnalysisCommandAt: (index, cmd) => set((s) => {
+    if (index < 0 || index >= s.analysisHistory.commands.length) return s
+    const commands = [...s.analysisHistory.commands]
+    commands[index] = cmd
+    return { analysisHistory: { ...s.analysisHistory, commands } }
+  }),
+
+  moveAnalysisCommand: (fromIndex, toIndex) => set((s) => {
+    if (fromIndex === toIndex) return s
+    const { commands } = s.analysisHistory
+    if (fromIndex < 0 || fromIndex >= commands.length) return s
+    const to = Math.max(0, Math.min(commands.length, toIndex))
+    const next = [...commands]
+    const [item] = next.splice(fromIndex, 1)
+    const insertAt = to > fromIndex ? to - 1 : to
+    next.splice(insertAt, 0, item)
+
+    let cursor = s.analysisHistory.cursor
+    if (fromIndex <= cursor && insertAt > cursor) cursor -= 1
+    else if (fromIndex > cursor && insertAt <= cursor) cursor += 1
+
+    const remapIndex = (idx: number | null) => {
       if (idx === null) return null
       if (idx === fromIndex) return insertAt
       if (fromIndex < idx && idx < to) return idx - 1
@@ -257,49 +293,27 @@ export const useAppStore = create<AppStore>((set, get) => {
       return idx
     }
 
-    // Cursor tracks the active/inactive boundary (count-based), not an element position.
-    // Moving a command within the active range doesn't change the active count.
-    let cursor = s.history.cursor
-    if (fromIndex <= cursor && insertAt > cursor) cursor -= 1
-    else if (fromIndex > cursor && insertAt <= cursor) cursor += 1
-
     return {
-      history: { ...s.history, commands, cursor },
-      selectedHistoryIndex: remapElementIndex(s.selectedHistoryIndex),
-      insertionIndex: to,
-      lastEditedHistoryIndex: null,
-      affectedHistoryIndices: [],
+      analysisHistory: { commands: next, cursor },
+      selectedAnalysisIndex: remapIndex(s.selectedAnalysisIndex),
+      analysisInsertionIndex: to,
     }
   }),
 
-  previewDeleteCascade: (index) => computeCascadeDeleteIndices(get().history, index),
-
-  deleteCommandCascade: (index) => set((s) => {
-    const toDelete = computeCascadeDeleteIndices(s.history, index)
-    if (toDelete.length === 0) return s
-    const remove = new Set<number>(toDelete)
-    const commands = s.history.commands.filter((_, i) => !remove.has(i))
-    const removedBeforeCursor = [...remove].filter((i) => i <= s.history.cursor).length
-    const cursor = Math.max(-1, Math.min(commands.length - 1, s.history.cursor - removedBeforeCursor))
+  deleteAnalysisCommandAt: (index) => set((s) => {
+    const { commands, cursor } = s.analysisHistory
+    if (index < 0 || index >= commands.length) return s
+    const next = commands.filter((_, i) => i !== index)
+    const nextCursor = index <= cursor ? Math.max(-1, cursor - 1) : cursor
     return {
-      history: { commands, cursor },
-      selectedHistoryIndex: null,
-      insertionIndex: null,
-      lastEditedHistoryIndex: null,
-      affectedHistoryIndices: [],
+      analysisHistory: { commands: next, cursor: Math.min(nextCursor, next.length - 1) },
+      selectedAnalysisIndex: null,
+      analysisInsertionIndex: null,
     }
   }),
 
-  setSelectedHistoryIndex: (index) => set({ selectedHistoryIndex: index }),
-  setInsertionIndex: (index) => set({ insertionIndex: index }),
-
-  undo: () => set((s) => ({
-    history: { ...s.history, cursor: Math.max(0, s.history.cursor - 1) },
-  })),
-
-  redo: () => set((s) => ({
-    history: { ...s.history, cursor: Math.min(s.history.commands.length - 1, s.history.cursor + 1) },
-  })),
+  analysisUndo: () => set((s) => ({ analysisHistory: { ...s.analysisHistory, cursor: Math.max(-1, s.analysisHistory.cursor - 1) } })),
+  analysisRedo: () => set((s) => ({ analysisHistory: { ...s.analysisHistory, cursor: Math.min(s.analysisHistory.commands.length - 1, s.analysisHistory.cursor + 1) } })),
 
   setViewSetting: (key, value) => set((s) => ({ viewSettings: { ...s.viewSettings, [key]: value } })),
 
@@ -368,10 +382,9 @@ export const useAppStore = create<AppStore>((set, get) => {
 
   runMaterialPreview: (protocolOverride) => {
     const s = get()
-    const currentModel = replay(s.history)
-    const cmd = s.materialPreview.inputCommand
-    if (!s.config) return
-    if (!cmd) {
+    const input = s.materialPreview.inputMaterial
+    if (!s.model.config) return
+    if (!input) {
       set((prev) => ({ materialPreview: { ...prev.materialPreview, error: 'Select or edit a uniaxialMaterial command first.' } }))
       return
     }
@@ -379,16 +392,13 @@ export const useAppStore = create<AppStore>((set, get) => {
       set((prev) => ({ materialPreview: { ...prev.materialPreview, error: 'Connect to local agent first.' } }))
       return
     }
-    if (cmd.type !== 'ADD_OPS' || cmd.fn !== 'uniaxialMaterial') {
-      set((prev) => ({ materialPreview: { ...prev.materialPreview, error: 'Preview only supports uniaxialMaterial commands.' } }))
-      return
-    }
-    const validation = validateCommand(cmd, currentModel)
+    const ctx = { ndm: s.model.config.ndm, ndf: s.model.config.ndf }
+    const validation = validateUniaxialMaterialValues(input.values, ctx)
     if (validation) {
       set((prev) => ({ materialPreview: { ...prev.materialPreview, error: validation } }))
       return
     }
-    const args = buildUniaxialMaterialCallArgs(cmd.values, { ndm: s.config.ndm, ndf: s.config.ndf }, currentModel.nextMatId)
+    const args = buildUniaxialMaterialCallArgs(input.values, ctx, s.model.nextIds.material)
     if (!args || args.length < 2) {
       set((prev) => ({ materialPreview: { ...prev.materialPreview, error: 'Material arguments are incomplete.' } }))
       return
@@ -402,8 +412,8 @@ export const useAppStore = create<AppStore>((set, get) => {
         jobId,
         materialCall: { fn: 'uniaxialMaterial', args },
         protocol: { strain: protocol },
-        ndm: s.config.ndm,
-        ndf: s.config.ndf,
+        ndm: ctx.ndm,
+        ndf: ctx.ndf,
       })
     } catch (error) {
       set((prev) => ({ materialPreview: { ...prev.materialPreview, running: false, error: String(error) } }))
@@ -428,15 +438,15 @@ export const useAppStore = create<AppStore>((set, get) => {
 
   setMaterialPreviewPanelOpen: (open) => set((s) => ({ materialPreview: { ...s.materialPreview, panelOpen: open } })),
   setMaterialPreviewProtocol: (points) => set((s) => ({ materialPreview: { ...s.materialPreview, protocol: points } })),
-  setMaterialPreviewInputCommand: (cmd) => {
-    const prevSig = JSON.stringify(get().materialPreview.inputCommand)
-    const nextSig = JSON.stringify(cmd)
+  setMaterialPreviewInputMaterial: (input) => {
+    const prevSig = JSON.stringify(get().materialPreview.inputMaterial)
+    const nextSig = JSON.stringify(input)
     const changed = prevSig !== nextSig
     if (changed) resetBufferedPoints()
     set((s) => ({
       materialPreview: {
         ...s.materialPreview,
-        inputCommand: cmd,
+        inputMaterial: input,
         ...(changed ? { running: false, jobId: null, points: [], error: null } : {}),
       },
     }))
@@ -444,6 +454,3 @@ export const useAppStore = create<AppStore>((set, get) => {
   clearMaterialPreviewLogs: () => set((s) => ({ materialPreview: { ...s.materialPreview, logs: [] } })),
   })
 })
-
-/** Derived model state — re-computes on every history change */
-export const useModelState = () => replay(useAppStore((s) => s.history))

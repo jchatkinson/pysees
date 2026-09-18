@@ -3,7 +3,7 @@ import { useThree } from '@react-three/fiber'
 import { OrbitControls } from '@react-three/drei'
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib'
 import { Box3, MOUSE, PerspectiveCamera, Vector3 } from 'three'
-import { useAppStore, useModelState } from '@/app/store/useAppStore'
+import { useAppStore } from '@/app/store/useAppStore'
 import { toVec3 } from './utils'
 import { SceneHelpers } from './SceneHelpers'
 import { NodesLayer } from './Nodes'
@@ -26,9 +26,8 @@ export type ViewportSceneRef = {
   hitTestNode: (x: number, y: number) => number | null
 }
 
-export const ViewportScene = forwardRef<ViewportSceneRef, { shiftRotateEnabled?: boolean }>(function ViewportScene(props, ref) {
-  const { shiftRotateEnabled = false } = props
-  const model = useModelState()
+export const ViewportScene = forwardRef<ViewportSceneRef, object>(function ViewportScene(_props, ref) {
+  const model = useAppStore((s) => s.model)
   const viewportAction = useAppStore((s) => s.viewportAction)
   const viewSettings = useAppStore((s) => s.viewSettings)
   const nodePickMode = useAppStore((s) => s.nodePickMode)
@@ -128,15 +127,15 @@ export const ViewportScene = forwardRef<ViewportSceneRef, { shiftRotateEnabled?:
         <SupportsLayer fixes={fixes} nodeMap={model.nodes} />
       )}
       {viewSettings.showNodalLoads && (
-        <LoadsLayer loads={model.loads} nodeMap={model.nodes} />
+        <LoadsLayer patterns={[...model.patterns.values()]} nodeMap={model.nodes} />
       )}
       <OrbitControls
         ref={controlsRef}
         makeDefault
-        enableRotate={shiftRotateEnabled}
-        enablePan={shiftRotateEnabled}
+        enableRotate
+        enablePan
         enableZoom
-        mouseButtons={{ LEFT: MOUSE.PAN, MIDDLE: MOUSE.DOLLY, RIGHT: MOUSE.ROTATE }}
+        mouseButtons={{ LEFT: undefined, MIDDLE: MOUSE.ROTATE, RIGHT: MOUSE.PAN }}
         screenSpacePanning
         target={[0, 0, 0]}
         minDistance={0.5}

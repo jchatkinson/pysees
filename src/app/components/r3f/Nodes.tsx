@@ -1,5 +1,5 @@
 import { Html } from '@react-three/drei'
-import type { NodeState } from '@/app/types/model'
+import type { NodeEntity } from '@/app/types/model'
 import { useAppStore } from '@/app/store/useAppStore'
 import { toVec3 } from './utils'
 
@@ -25,7 +25,7 @@ function Node({
   showId,
   onToggle,
 }: {
-  node: NodeState
+  node: NodeEntity
   selected: boolean
   showId: boolean
   onToggle: (id: number, additive: boolean) => void
@@ -56,7 +56,7 @@ export function NodesLayer({
   showNodes,
   showNodeIds,
 }: {
-  nodes: NodeState[]
+  nodes: NodeEntity[]
   showNodes: boolean
   showNodeIds: boolean
 }) {

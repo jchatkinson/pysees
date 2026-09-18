@@ -1,5 +1,5 @@
 import { Line } from '@react-three/drei'
-import type { FixState, NodeState } from '@/app/types/model'
+import type { FixEntity, NodeEntity } from '@/app/types/model'
 import { toVec3 } from './utils'
 
 const FIX_GLYPH_SIZE = 0.4
@@ -20,8 +20,8 @@ export function SupportsLayer({
   fixes,
   nodeMap,
 }: {
-  fixes: FixState[]
-  nodeMap: Map<number, NodeState>
+  fixes: FixEntity[]
+  nodeMap: Map<number, NodeEntity>
 }) {
   return (
     <>

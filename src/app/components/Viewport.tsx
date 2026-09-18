@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useRef, useState } from 'react'
 import { Canvas } from '@react-three/fiber'
 import { useAppStore } from '@/app/store/useAppStore'
 import { ViewportScene, type ViewportSceneRef } from './r3f/ViewportScene'
@@ -8,7 +8,7 @@ type MarqueeRect = { x1: number; y1: number; x2: number; y2: number }
 
 export function Viewport() {
   const mode = useAppStore((s) => s.mode)
-  const hasConfig = useAppStore((s) => Boolean(s.config))
+  const hasConfig = useAppStore((s) => Boolean(s.model.config))
   const hasResults = useAppStore((s) => Boolean(s.results))
 
   const sceneRef = useRef<ViewportSceneRef>(null)
@@ -16,22 +16,7 @@ export function Viewport() {
   const marqueeActive = useRef(false)
   const dragStart = useRef<{ x: number; y: number } | null>(null)
   const suppressNextClick = useRef(false)
-  const [shiftDown, setShiftDown] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    const onKeyDown = (e: KeyboardEvent) => { if (e.key === 'Shift') setShiftDown(true) }
-    const onKeyUp = (e: KeyboardEvent) => { if (e.key === 'Shift') setShiftDown(false) }
-    const onBlur = () => setShiftDown(false)
-    window.addEventListener('keydown', onKeyDown)
-    window.addEventListener('keyup', onKeyUp)
-    window.addEventListener('blur', onBlur)
-    return () => {
-      window.removeEventListener('keydown', onKeyDown)
-      window.removeEventListener('keyup', onKeyUp)
-      window.removeEventListener('blur', onBlur)
-    }
-  }, [])
 
   return (
     <div className="relative w-full h-full bg-muted/10">
@@ -39,7 +24,7 @@ export function Viewport() {
         ref={containerRef}
         className="absolute inset-0"
         onPointerDownCapture={(e) => {
-          if (e.button !== 0 || e.shiftKey || !containerRef.current) return
+          if (e.button !== 0 || !containerRef.current) return
           const bounds = containerRef.current.getBoundingClientRect()
           dragStart.current = { x: e.clientX - bounds.left, y: e.clientY - bounds.top }
         }}
@@ -82,7 +67,7 @@ export function Viewport() {
           camera={{ position: [8, 8, 10], fov: 45, near: 0.1, far: 2000 }}
           gl={{ antialias: true }}
         >
-          <ViewportScene ref={sceneRef} shiftRotateEnabled={shiftDown} />
+          <ViewportScene ref={sceneRef} />
         </Canvas>
       </div>
 

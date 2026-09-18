@@ -40,7 +40,7 @@ function Card({ title, description, onClick, disabled }: CardProps) {
 }
 
 export function InitModal() {
-  const config = useAppStore((s) => s.config)
+  const config = useAppStore((s) => s.model.config)
   const initModel = useAppStore((s) => s.initModel)
 
   const [step, setStep] = useState<1 | 2>(1)
@@ -75,13 +75,13 @@ export function InitModal() {
       initModel(ndm, ndf)
     } else if (choice === 'momentCurvature') {
       const t = momentCurvatureTemplate()
-      initModel(t.ndm, t.ndf, t.commands)
+      initModel(t.ndm, t.ndf, { writes: t.writes, analysisCommands: t.analysisCommands })
     } else if (choice === 'cantilever') {
       const t = cantileverTemplate({ n: cantN, h: cantH, eleType: cantEle })
-      initModel(t.ndm, t.ndf, t.commands)
+      initModel(t.ndm, t.ndf, { writes: t.writes, analysisCommands: t.analysisCommands })
     } else if (choice === 'frame') {
       const t = frameTemplate({ stories, storyH, bays, bayW, eleType: frameEle, base: frameBase })
-      initModel(t.ndm, t.ndf, t.commands)
+      initModel(t.ndm, t.ndf, { writes: t.writes, analysisCommands: t.analysisCommands })
     }
   }
 
@@ -198,7 +198,6 @@ export function InitModal() {
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="elasticBeamColumn">elasticBeamColumn</SelectItem>
-                      <SelectItem value="dispBeamColumn">dispBeamColumn</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -232,7 +231,6 @@ export function InitModal() {
                       <SelectTrigger><SelectValue /></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="elasticBeamColumn">elasticBeamColumn</SelectItem>
-                        <SelectItem value="dispBeamColumn">dispBeamColumn</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>

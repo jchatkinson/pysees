@@ -120,7 +120,7 @@ export function MaterialPreviewOverlay() {
   const previewError = useAppStore((s) => s.materialPreview.error)
   const previewLogs = useAppStore((s) => s.materialPreview.logs)
   const previewRunning = useAppStore((s) => s.materialPreview.running)
-  const previewInputCommand = useAppStore((s) => s.materialPreview.inputCommand)
+  const previewInputMaterial = useAppStore((s) => s.materialPreview.inputMaterial)
   const previewPointCount = useAppStore((s) => s.materialPreview.points.length)
   const runMaterialPreview = useAppStore((s) => s.runMaterialPreview)
   const cancelMaterialPreview = useAppStore((s) => s.cancelMaterialPreview)
@@ -158,7 +158,7 @@ export function MaterialPreviewOverlay() {
     clearMaterialPreviewResult()
     // eslint-disable-next-line react-hooks/set-state-in-effect -- resets scrub position alongside the store's stale-result clear
     setScrubCount(null)
-  }, [clearMaterialPreviewResult, previewInputCommand, protocolType, maxStrain, numCycles, strainIncrement, approxSteps, protocolText])
+  }, [clearMaterialPreviewResult, previewInputMaterial, protocolType, maxStrain, numCycles, strainIncrement, approxSteps, protocolText])
 
   if (!panelOpen) return null
 
@@ -277,7 +277,7 @@ export function MaterialPreviewOverlay() {
               onClick={() => {
                 runMaterialPreview(generatedProtocol)
               }}
-              disabled={localAgentStatus !== 'connected' || !previewInputCommand || previewRunning}
+              disabled={localAgentStatus !== 'connected' || !previewInputMaterial || previewRunning}
             >
               <Play className="mr-1 size-3.5" />Run
             </Button>

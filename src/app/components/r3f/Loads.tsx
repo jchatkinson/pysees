@@ -1,6 +1,6 @@
 import { Line } from '@react-three/drei'
 import { Vector3 } from 'three'
-import type { LoadState, NodeState } from '@/app/types/model'
+import type { NodeEntity, PatternEntity } from '@/app/types/model'
 import { toVec3 } from './utils'
 
 function NodalLoadGlyph({ coords, values }: { coords: number[]; values: number[] }) {
@@ -32,19 +32,22 @@ function NodalLoadGlyph({ coords, values }: { coords: number[]; values: number[]
   )
 }
 
+/** Renders nodal `load` assignments from every currently-defined pattern (Model entities, not a command history position). */
 export function LoadsLayer({
-  loads,
+  patterns,
   nodeMap,
 }: {
-  loads: LoadState[]
-  nodeMap: Map<number, NodeState>
+  patterns: PatternEntity[]
+  nodeMap: Map<number, NodeEntity>
 }) {
+  const loads = patterns.flatMap((p) => p.children.filter((c) => c.kind === 'load'))
   return (
     <>
       {loads.map((load, idx) => {
-        const node = nodeMap.get(load.nodeId)
+        const args = load.args as { nodeTag: number; values: number[] }
+        const node = nodeMap.get(args.nodeTag)
         if (!node) return null
-        return <NodalLoadGlyph key={`load-${idx}`} coords={node.coords} values={load.values} />
+        return <NodalLoadGlyph key={`load-${idx}`} coords={node.coords} values={args.values} />
       })}
     </>
   )
