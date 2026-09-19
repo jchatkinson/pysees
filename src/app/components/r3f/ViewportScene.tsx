@@ -11,6 +11,8 @@ import { ElementsLayer } from './Elements'
 import { SupportsLayer } from './Supports'
 import { LoadsLayer } from './Loads'
 import { GridlinesLayer } from './Gridlines'
+import { LevelsLayer } from './Levels'
+import { levelElevations } from '@/app/lib/levels'
 
 const NODE_HIT_RADIUS_PX = 12
 
@@ -30,6 +32,7 @@ export type ViewportSceneRef = {
 export const ViewportScene = forwardRef<ViewportSceneRef, object>(function ViewportScene(_props, ref) {
   const model = useAppStore((s) => s.model)
   const gridlines = useAppStore((s) => s.gridlines)
+  const levels = useAppStore((s) => s.levels)
   const viewportAction = useAppStore((s) => s.viewportAction)
   const viewSettings = useAppStore((s) => s.viewSettings)
   const nodePickMode = useAppStore((s) => s.nodePickMode)
@@ -114,7 +117,18 @@ export const ViewportScene = forwardRef<ViewportSceneRef, object>(function Viewp
   return (
     <>
       <SceneHelpers showGrid={viewSettings.showGrid} />
-      <GridlinesLayer gridlines={gridlines} showGridlines={viewSettings.showGridlines} />
+      <GridlinesLayer
+        gridlines={gridlines}
+        showGridlines={viewSettings.showGridlines}
+        ndm={model.config?.ndm ?? 3}
+        levelElevations={levelElevations(levels)}
+      />
+      <LevelsLayer
+        levels={levels}
+        gridlines={gridlines}
+        ndm={model.config?.ndm ?? 3}
+        showLevels={viewSettings.showLevels}
+      />
       <ElementsLayer
         elements={elements}
         nodeMap={model.nodes}

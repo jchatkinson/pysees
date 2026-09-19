@@ -26,7 +26,8 @@ function renderModel(model: Model): string[] {
   for (const sec of [...model.sections.values()].sort((a, b) => a.id - b.id)) {
     lines.push(`ops.${renderOpsCall('section', sec.args, ctx)}`)
     for (const child of sec.children) {
-      lines.push(`ops.${child.kind}(${Object.values(child.args).map((v) => v).join(', ')})`)
+      const childArgs = child.kind === 'fiber' ? Object.values(child.args) : [child.subType, ...Object.values(child.args)]
+      lines.push(`ops.${renderOpsCall(child.kind, { __args: childArgs }, ctx)}`)
     }
   }
   for (const gt of [...model.geomTransfs.values()].sort((a, b) => a.id - b.id)) {
@@ -40,6 +41,8 @@ function renderModel(model: Model): string[] {
       lines.push(`ops.element('Truss', ${ele.id}, ${ele.nodes.join(', ')}, ${ele.args.matTag})`)
     } else if (ele.eleType === 'ElasticBeamColumn') {
       lines.push(`ops.element('ElasticBeamColumn', ${ele.id}, ${ele.nodes.join(', ')}, ${ele.args.A}, ${ele.args.E}, ${ele.args.Iz}, ${ele.args.transfTag})`)
+    } else if (ele.eleType === 'zeroLengthSection') {
+      lines.push(`ops.element('zeroLengthSection', ${ele.id}, ${ele.nodes.join(', ')}, ${ele.args.secTag})`)
     } else {
       lines.push(`ops.element('${ele.eleType}', ${ele.id}, ${ele.nodes.join(', ')})`)
     }

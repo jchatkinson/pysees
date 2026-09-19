@@ -7,7 +7,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { useAppStore } from '@/app/store/useAppStore'
 import {
   commandPreviewLine, fnForModelEntity, getAvailableSchemas, getCommandDocUrl, getPatternChildSchemas,
-  getSchemaForFn, getSectionChildSchemas, initialValues, modelEntityToValues, validateSchemaResult,
+  getSchemaForFn, initialValues, modelEntityToValues, validateSchemaResult,
 } from '@/app/lib/commandSchemas'
 import type { CommandSchema, SchemaResult } from '@/app/lib/commandSchemas'
 import type { SchemaContext } from '@/app/types/schema'
@@ -43,7 +43,7 @@ function matchesSchema(schema: CommandSchema, query: string) {
   return `${schema.label} ${schema.fn} ${schema.cmd}`.toLowerCase().includes(q)
 }
 
-function CommandFormBody({
+export function CommandFormBody({
   schema,
   ctx,
   locked,
@@ -141,7 +141,7 @@ function CommandFormBody({
   )
 }
 
-/** Small nested-children editor shared by Fiber Sections and Load Patterns. */
+/** Small nested-children editor for Load Patterns (Fiber Sections have their own dedicated Section Editor). */
 function ChildrenEditor({
   ctx,
   locked,
@@ -236,6 +236,7 @@ export function CommandForm() {
   const deleteAnalysisCommandAt = useAppStore((s) => s.deleteAnalysisCommandAt)
   const setMaterialPreviewInputMaterial = useAppStore((s) => s.setMaterialPreviewInputMaterial)
   const setMaterialPreviewPanelOpen = useAppStore((s) => s.setMaterialPreviewPanelOpen)
+  const openSectionDialog = useAppStore((s) => s.openSectionDialog)
 
   const ctx = useMemo<SchemaContext>(() => ({ ndm: model.config?.ndm ?? 3, ndf: model.config?.ndf ?? 6 }), [model.config?.ndm, model.config?.ndf])
   const locked = mode === 'results'
@@ -305,6 +306,30 @@ export function CommandForm() {
     const isPattern = selectedModelEntity.kind === 'pattern'
     const previewLine = commandPreviewLine(schema, initial, ctx, model.nextIds.material)
 
+    if (isFiberSection) {
+      const sec = entity as { id: number; children: unknown[] }
+      return (
+        <div className="flex flex-col h-full min-h-0">
+          <div className="border-b px-3 py-2 shrink-0">
+            <span className="text-xs font-medium text-muted-foreground">Fiber Section #{sec.id}</span>
+          </div>
+          <div className="p-3 grid gap-2">
+            <p className="text-[11px] text-muted-foreground">{sec.children.length} fiber/patch item{sec.children.length === 1 ? '' : 's'}.</p>
+            <Button size="sm" onClick={() => openSectionDialog(sec.id)} disabled={locked}>Open Section Editor…</Button>
+            <Button variant="destructive" size="sm" onClick={() => { setPendingModelDelete(selectedModelEntity); setDeleteDialogOpen(true) }} disabled={locked}>Delete</Button>
+          </div>
+          <DeleteDialogs
+            deleteDialogOpen={deleteDialogOpen} setDeleteDialogOpen={setDeleteDialogOpen}
+            pendingModelDelete={pendingModelDelete} setPendingModelDelete={setPendingModelDelete}
+            pendingAnalysisDeleteIndex={pendingAnalysisDeleteIndex} setPendingAnalysisDeleteIndex={setPendingAnalysisDeleteIndex}
+            previewDeleteModelEntity={previewDeleteModelEntity} deleteModelEntity={deleteModelEntity}
+            deleteAnalysisCommandAt={deleteAnalysisCommandAt}
+            onModelDeleted={() => setSelectedModelEntity(null)} onAnalysisDeleted={() => setSelectedAnalysisIndex(null)}
+          />
+        </div>
+      )
+    }
+
     return (
       <div className="flex flex-col h-full min-h-0 overflow-hidden">
         <div className="border-b px-3 py-2 shrink-0">
@@ -339,22 +364,6 @@ export function CommandForm() {
             return null
           }}
         />
-        {isFiberSection && (
-          <ChildrenEditor
-            ctx={ctx}
-            locked={locked}
-            childSchemas={getSectionChildSchemas()}
-            childLabel="Fibers"
-            children={(entity as { children: { kind: string; args: Record<string, unknown> }[] }).children.map((c) => ({ summary: `${c.kind}  ${JSON.stringify(c.args)}` }))}
-            onAdd={(childSchema, values) => {
-              const result = childSchema.create({ ...values, sectionId: selectedModelEntity.id }, model)
-              if (result.target !== 'model') return 'Internal error.'
-              writeModelEntity(result.write)
-              return null
-            }}
-            onRemove={(index) => removeModelEntityChild('section', selectedModelEntity.id, index)}
-          />
-        )}
         {isPattern && (
           <ChildrenEditor
             ctx={ctx}
@@ -496,6 +505,12 @@ export function CommandForm() {
         <div className="border-b px-3 py-2 shrink-0">
           <span className="text-xs font-medium text-muted-foreground">{selectedAddSchema.label}</span>
           {previewLine && <code className="mt-1.5 block overflow-x-auto whitespace-nowrap rounded bg-muted px-2 py-1 text-[11px] font-mono text-foreground/80">{previewLine}</code>}
+        </div>
+      )}
+      {isModelPanel && selectedAddSchema?.fn === 'section' && (
+        <div className="border-b p-3 grid gap-2">
+          <p className="text-[11px] text-muted-foreground">For a Fiber/NDFiber section, use the dedicated editor instead — it handles patches, layers, and rebar with a live preview.</p>
+          <Button size="sm" onClick={() => openSectionDialog(null)} disabled={locked}>Open Section Editor…</Button>
         </div>
       )}
       {selectedAddSchema ? (

@@ -1,7 +1,12 @@
 import type { GridlineEntity } from '@/app/types/gridlines'
 
 export interface EvenlySpacedGridParams {
-  /** coordinate index that steps between lines (0=x, 1=y, 2=z) */
+  /**
+   * Plan-axis index that steps between lines. Grids only carry plan (ground-plane)
+   * coordinates — index 0 is the first plan axis (X), index 1 is the second plan
+   * axis (Z, 3D models only). The vertical axis (Y) is never part of a grid; it's
+   * owned by Levels.
+   */
   axis: number
   /** value along `axis` for the first line */
   offset: number

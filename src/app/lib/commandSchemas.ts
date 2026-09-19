@@ -90,7 +90,7 @@ function massArgs(): ArgDef[] {
 
 function elementArgsFromGenerated(): ArgDef[] {
   return [
-    { kind: 'choice', name: 'eleType', label: 'Element Type', options: ['Truss', 'ElasticBeamColumn'], defaultValue: 'Truss', yields: {
+    { kind: 'choice', name: 'eleType', label: 'Element Type', options: ['Truss', 'ElasticBeamColumn', 'zeroLengthSection'], defaultValue: 'Truss', yields: {
       Truss: [
         { kind: 'vec', name: 'nodes', label: 'Node IDs', length: 2, defaultValue: [1, 2], nodeSync: true },
         { kind: 'int', name: 'matTag', label: 'Material Tag', required: true },
@@ -101,6 +101,10 @@ function elementArgsFromGenerated(): ArgDef[] {
         { kind: 'float', name: 'E', label: "Young's Modulus (E)", defaultValue: 1, required: true },
         { kind: 'float', name: 'Iz', label: 'Moment of Inertia (Iz)', defaultValue: 1, required: true },
         { kind: 'int', name: 'transfTag', label: 'Transformation Tag', required: true },
+      ],
+      zeroLengthSection: [
+        { kind: 'vec', name: 'nodes', label: 'Node IDs', length: 2, defaultValue: [1, 2], nodeSync: true },
+        { kind: 'int', name: 'secTag', label: 'Section Tag', required: true },
       ],
     } },
   ]
@@ -159,7 +163,9 @@ const V1_MODEL_SCHEMAS: CommandSchema[] = [
       const eleType = String(values.eleType ?? 'Truss')
       const args = eleType === 'Truss'
         ? { matTag: Math.trunc(num(values.matTag)) }
-        : { A: num(values.A), E: num(values.E), Iz: num(values.Iz), transfTag: Math.trunc(num(values.transfTag)) }
+        : eleType === 'ElasticBeamColumn'
+        ? { A: num(values.A), E: num(values.E), Iz: num(values.Iz), transfTag: Math.trunc(num(values.transfTag)) }
+        : { secTag: Math.trunc(num(values.secTag)) }
       return {
         target: 'model',
         write: { kind: 'element', entity: { id: existingId ?? model.nextIds.element, eleType, nodes: ints(values.nodes), args } },
@@ -238,98 +244,6 @@ const PATTERN_CHILD_SCHEMAS: CommandSchema[] = [
   },
 ]
 
-// ─── Section children: fiber / patch(rect) / layer(straight) ────────────────
-
-const SECTION_CHILD_SCHEMAS: CommandSchema[] = [
-  {
-    cmd: 'SECTION_CHILD:fiber',
-    fn: 'fiber',
-    label: 'Fiber',
-    domain: 'model',
-    childOnly: 'section',
-    description: 'A single fiber at (yloc, zloc) with area A',
-    args: [
-      { kind: 'float', name: 'yloc', label: 'y', required: true },
-      { kind: 'float', name: 'zloc', label: 'z', required: true },
-      { kind: 'float', name: 'A', label: 'Area', required: true },
-      { kind: 'int', name: 'matTag', label: 'Material Tag', required: true },
-    ],
-    optional: [],
-    create: (values) => ({
-      target: 'model',
-      write: {
-        kind: 'sectionChild',
-        sectionId: Math.trunc(num(values.sectionId)),
-        child: { kind: 'fiber', subType: 'fiber', args: { yloc: num(values.yloc), zloc: num(values.zloc), A: num(values.A), matTag: Math.trunc(num(values.matTag)) } },
-        childIndex: typeof values.childIndex === 'number' ? values.childIndex : undefined,
-      },
-    }),
-  },
-  {
-    cmd: 'SECTION_CHILD:patch-rect',
-    fn: 'patch',
-    label: 'Patch (rect)',
-    domain: 'model',
-    childOnly: 'section',
-    description: 'A rectangular patch of fibers',
-    args: [
-      { kind: 'int', name: 'matTag', label: 'Material Tag', required: true },
-      { kind: 'int', name: 'nFibZ', label: 'Fibers (z)', defaultValue: 4, required: true },
-      { kind: 'int', name: 'nFibY', label: 'Fibers (y)', defaultValue: 4, required: true },
-      { kind: 'float', name: 'y1', label: 'y1', required: true },
-      { kind: 'float', name: 'z1', label: 'z1', required: true },
-      { kind: 'float', name: 'y2', label: 'y2', required: true },
-      { kind: 'float', name: 'z2', label: 'z2', required: true },
-    ],
-    optional: [],
-    create: (values) => ({
-      target: 'model',
-      write: {
-        kind: 'sectionChild',
-        sectionId: Math.trunc(num(values.sectionId)),
-        child: {
-          kind: 'patch', subType: 'rect', args: {
-            matTag: Math.trunc(num(values.matTag)), nFibZ: Math.trunc(num(values.nFibZ)), nFibY: Math.trunc(num(values.nFibY)),
-            y1: num(values.y1), z1: num(values.z1), y2: num(values.y2), z2: num(values.z2),
-          },
-        },
-        childIndex: typeof values.childIndex === 'number' ? values.childIndex : undefined,
-      },
-    }),
-  },
-  {
-    cmd: 'SECTION_CHILD:layer-straight',
-    fn: 'layer',
-    label: 'Layer (straight)',
-    domain: 'model',
-    childOnly: 'section',
-    description: 'A straight line of evenly spaced fibers (e.g. rebar layer)',
-    args: [
-      { kind: 'int', name: 'matTag', label: 'Material Tag', required: true },
-      { kind: 'int', name: 'numFiber', label: 'Num Fibers', defaultValue: 2, required: true },
-      { kind: 'float', name: 'areaFiber', label: 'Area per Fiber', required: true },
-      { kind: 'float', name: 'yi', label: 'yi', required: true },
-      { kind: 'float', name: 'zi', label: 'zi', required: true },
-      { kind: 'float', name: 'yj', label: 'yj', required: true },
-      { kind: 'float', name: 'zj', label: 'zj', required: true },
-    ],
-    optional: [],
-    create: (values) => ({
-      target: 'model',
-      write: {
-        kind: 'sectionChild',
-        sectionId: Math.trunc(num(values.sectionId)),
-        child: {
-          kind: 'layer', subType: 'straight', args: {
-            matTag: Math.trunc(num(values.matTag)), numFiber: Math.trunc(num(values.numFiber)), areaFiber: num(values.areaFiber),
-            yi: num(values.yi), zi: num(values.zi), yj: num(values.yj), zj: num(values.zj),
-          },
-        },
-        childIndex: typeof values.childIndex === 'number' ? values.childIndex : undefined,
-      },
-    }),
-  },
-]
 
 const V1_FNS = new Set<string>(['node', 'fix', 'mass', 'element'])
 const CHILD_FNS = new Set<string>([...PATTERN_CHILD_FNS, ...SECTION_CHILD_FNS])
@@ -460,10 +374,6 @@ export function getAvailableSchemas(ndm: number) {
 
 export function getPatternChildSchemas() {
   return PATTERN_CHILD_SCHEMAS
-}
-
-export function getSectionChildSchemas() {
-  return SECTION_CHILD_SCHEMAS
 }
 
 function docsUrlFromRstPath(path: string) {
@@ -644,6 +554,7 @@ export function validateSchemaResult(result: SchemaResult, model: Model, ctx: Sc
   if (write.kind === 'element') {
     if (write.entity.nodes.length < 2) return 'Element requires at least 2 node IDs.'
     if (write.entity.nodes.some((id) => !model.nodes.has(id))) return 'Element references one or more missing nodes.'
+    if (write.entity.eleType === 'zeroLengthSection' && !model.sections.has(Number(write.entity.args.secTag))) return 'Section does not exist.'
   }
   if (write.kind === 'fix' && write.entity.dofs.length === 0) return 'Select at least one constrained DOF.'
   if (write.kind === 'patternChild' && !model.patterns.has(write.patternId)) return `Pattern ${write.patternId} does not exist.`

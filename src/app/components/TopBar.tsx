@@ -1,7 +1,9 @@
+import { useState } from 'react'
 import { Button } from '@/app/components/ui/button'
 import { Separator } from '@/app/components/ui/separator'
 import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/app/components/ui/dropdown-menu'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/app/components/ui/tooltip'
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/app/components/ui/alert-dialog'
 import { Undo2, Redo2 } from 'lucide-react'
 import { useAppStore } from '@/app/store/useAppStore'
 import { PiscesLogo } from '@/app/components/icons/PiscesLogo'
@@ -28,7 +30,9 @@ export function TopBar() {
     localAgent,
     connectLocalAgent,
     disconnectLocalAgent,
+    newModel,
   } = useAppStore()
+  const [newModelConfirmOpen, setNewModelConfirmOpen] = useState(false)
   const undo = activePanel === 'model' ? modelUndo : analysisUndo
   const redo = activePanel === 'model' ? modelRedo : analysisRedo
   const canUndo = activePanel === 'model' ? modelPast.length > 0 : analysisHistory.cursor > -1
@@ -45,7 +49,7 @@ export function TopBar() {
       <DropdownMenu>
         <DropdownMenuTrigger render={<Button variant="ghost" size="sm" className="h-8 px-2 text-xs">File</Button>} />
         <DropdownMenuContent>
-          <DropdownMenuItem disabled>New Model</DropdownMenuItem>
+          <DropdownMenuItem onClick={() => (model.config ? setNewModelConfirmOpen(true) : newModel())}>New Model</DropdownMenuItem>
           <DropdownMenuItem disabled={!model.config} onClick={() => downloadScript(model, analysisHistory)}>Export .py</DropdownMenuItem>
           <DropdownMenuSeparator />
           {localAgent.status === 'connected' ? (
@@ -70,6 +74,8 @@ export function TopBar() {
             Redo
             <Redo2 className="ml-auto size-3.5" />
           </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem onClick={() => setGridlinesDialogOpen(true)}>Grids & Levels…</DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
       <DropdownMenu>
@@ -84,8 +90,8 @@ export function TopBar() {
           <DropdownMenuCheckboxItem checked={viewSettings.showNodalLoads} onCheckedChange={(v) => setViewSetting('showNodalLoads', checked(v))}>Nodal Loads</DropdownMenuCheckboxItem>
           <DropdownMenuCheckboxItem checked={viewSettings.showElementLoads} onCheckedChange={(v) => setViewSetting('showElementLoads', checked(v))}>Element Loads</DropdownMenuCheckboxItem>
           <DropdownMenuCheckboxItem checked={viewSettings.showGrid} onCheckedChange={(v) => setViewSetting('showGrid', checked(v))}>Grid</DropdownMenuCheckboxItem>
-          <DropdownMenuCheckboxItem checked={viewSettings.showGridlines} onCheckedChange={(v) => setViewSetting('showGridlines', checked(v))}>Gridlines</DropdownMenuCheckboxItem>
-          <DropdownMenuItem onClick={() => setGridlinesDialogOpen(true)}>Gridlines…</DropdownMenuItem>
+          <DropdownMenuCheckboxItem checked={viewSettings.showGridlines} onCheckedChange={(v) => setViewSetting('showGridlines', checked(v))}>Grids</DropdownMenuCheckboxItem>
+          <DropdownMenuCheckboxItem checked={viewSettings.showLevels} onCheckedChange={(v) => setViewSetting('showLevels', checked(v))}>Levels</DropdownMenuCheckboxItem>
           <DropdownMenuSeparator />
           <DropdownMenuCheckboxItem checked={mode === 'results'} onCheckedChange={(v) => setMode(checked(v) ? 'results' : 'model')}>Results Mode</DropdownMenuCheckboxItem>
           <DropdownMenuSeparator />
@@ -119,6 +125,18 @@ export function TopBar() {
       </div>
       <span className="ml-auto text-xs text-muted-foreground">{mode === 'model' ? 'Model' : 'Results'}</span>
       <UserButton afterSignOutUrl="/" appearance={{ elements: { avatarBox: 'h-7 w-7' } }} />
+      <AlertDialog open={newModelConfirmOpen} onOpenChange={setNewModelConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Start a new model?</AlertDialogTitle>
+            <AlertDialogDescription>This clears the current model, history, and results. This cannot be undone.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction variant="destructive" onClick={() => { newModel(); setNewModelConfirmOpen(false) }}>New Model</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </header>
   )
 }

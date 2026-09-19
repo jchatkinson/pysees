@@ -4,6 +4,7 @@ import { emptyAnalysisHistory } from '@/app/types/analysisCommands'
 import type { AppMode, Model, ResultsState } from '@/app/types/model'
 import { emptyModel } from '@/app/types/model'
 import type { GridlineEntity } from '@/app/types/gridlines'
+import type { LevelEntity } from '@/app/types/levels'
 import { LocalAgentClient, type AgentConnectionState } from '@/app/lib/localAgent'
 import { buildUniaxialMaterialCallArgs, validateUniaxialMaterialValues } from '@/app/lib/commandSchemas'
 import { applyModelWrite, deleteEntity, previewDeleteEntity, removeModelChild, type ModelDeletableKind, type ModelWrite } from '@/app/lib/modelWrite'
@@ -20,12 +21,24 @@ interface AppStore {
   analysisHistory: AnalysisHistory
   gridlines: GridlineEntity[]
   nextGridlineId: number
+  levels: LevelEntity[]
+  nextLevelId: number
   gridlinesDialogOpen: boolean
   setGridlinesDialogOpen: (open: boolean) => void
+  materialDialogOpen: boolean
+  setMaterialDialogOpen: (open: boolean) => void
+  sectionDialog: { open: boolean; editingId: number | null }
+  openSectionDialog: (editingId: number | null) => void
+  closeSectionDialog: () => void
   setGridlines: (gridlines: GridlineEntity[]) => void
   addGridline: (entity: Omit<GridlineEntity, 'id'>) => void
   updateGridline: (id: number, patch: Partial<Omit<GridlineEntity, 'id'>>) => void
   removeGridline: (id: number) => void
+  setLevels: (levels: LevelEntity[]) => void
+  addLevel: (entity: Omit<LevelEntity, 'id'>) => void
+  updateLevel: (id: number, patch: Partial<Omit<LevelEntity, 'id'>>) => void
+  removeLevel: (id: number) => void
+  moveLevel: (id: number, direction: 'up' | 'down') => void
   mode: AppMode
   results: ResultsState | null
   localAgent: {
@@ -74,11 +87,13 @@ interface AppStore {
     showElementLoads: boolean
     showGrid: boolean
     showGridlines: boolean
+    showLevels: boolean
   }
   viewportAction: { kind: 'zoomIn' | 'zoomOut' | 'fit'; token: number } | null
 
   // Model actions
-  initModel: (ndm: 2 | 3, ndf: number, extra?: { writes?: ModelWrite[]; analysisCommands?: AnalysisCommand[]; gridlines?: GridlineEntity[] }) => void
+  initModel: (ndm: 2 | 3, ndf: number, extra?: { writes?: ModelWrite[]; analysisCommands?: AnalysisCommand[]; gridlines?: GridlineEntity[]; levels?: LevelEntity[] }) => void
+  newModel: () => void
   writeModelEntity: (write: ModelWrite) => void
   previewDeleteModelEntity: (kind: ModelDeletableKind, id: number) => string[]
   deleteModelEntity: (kind: ModelDeletableKind, id: number) => void
@@ -166,6 +181,11 @@ export const useAppStore = create<AppStore>((set, get) => {
   nextGridlineId: 1,
   gridlinesDialogOpen: false,
   setGridlinesDialogOpen: (open) => set({ gridlinesDialogOpen: open }),
+  materialDialogOpen: false,
+  setMaterialDialogOpen: (open) => set({ materialDialogOpen: open }),
+  sectionDialog: { open: false, editingId: null },
+  openSectionDialog: (editingId) => set({ sectionDialog: { open: true, editingId } }),
+  closeSectionDialog: () => set({ sectionDialog: { open: false, editingId: null } }),
   setGridlines: (gridlines) => set({
     gridlines,
     nextGridlineId: gridlines.reduce((max, g) => Math.max(max, g.id + 1), 1),
@@ -180,6 +200,31 @@ export const useAppStore = create<AppStore>((set, get) => {
   removeGridline: (id) => set((s) => ({
     gridlines: s.gridlines.filter((g) => g.id !== id),
   })),
+  levels: [],
+  nextLevelId: 1,
+  setLevels: (levels) => set({
+    levels,
+    nextLevelId: levels.reduce((max, l) => Math.max(max, l.id + 1), 1),
+  }),
+  addLevel: (entity) => set((s) => ({
+    levels: [...s.levels, { ...entity, id: s.nextLevelId }],
+    nextLevelId: s.nextLevelId + 1,
+  })),
+  updateLevel: (id, patch) => set((s) => ({
+    levels: s.levels.map((l) => (l.id === id ? { ...l, ...patch } : l)),
+  })),
+  removeLevel: (id) => set((s) => ({
+    levels: s.levels.filter((l) => l.id !== id),
+  })),
+  moveLevel: (id, direction) => set((s) => {
+    const index = s.levels.findIndex((l) => l.id === id)
+    if (index === -1) return s
+    const target = direction === 'up' ? index + 1 : index - 1
+    if (target < 0 || target >= s.levels.length) return s
+    const next = [...s.levels]
+    ;[next[index], next[target]] = [next[target], next[index]]
+    return { levels: next }
+  }),
   mode: 'model',
   results: null,
   localAgent: { status: 'disconnected', port: null, error: null },
@@ -216,6 +261,7 @@ export const useAppStore = create<AppStore>((set, get) => {
     showElementLoads: true,
     showGrid: true,
     showGridlines: true,
+    showLevels: true,
   },
   viewportAction: null,
 
@@ -225,6 +271,7 @@ export const useAppStore = create<AppStore>((set, get) => {
     for (const write of extra?.writes ?? []) model = applyModelWrite(model, write)
     const analysisCommands = extra?.analysisCommands ?? []
     const gridlines = extra?.gridlines ?? []
+    const levels = extra?.levels ?? []
     return {
       model,
       modelPast: [],
@@ -232,10 +279,31 @@ export const useAppStore = create<AppStore>((set, get) => {
       analysisHistory: { commands: analysisCommands, cursor: analysisCommands.length - 1 },
       gridlines,
       nextGridlineId: gridlines.reduce((max, g) => Math.max(max, g.id + 1), 1),
+      levels,
+      nextLevelId: levels.reduce((max, l) => Math.max(max, l.id + 1), 1),
       selectedModelEntity: null,
       selectedAnalysisIndex: null,
       analysisInsertionIndex: null,
     }
+  }),
+
+  newModel: () => set({
+    model: emptyModel(),
+    modelPast: [],
+    modelFuture: [],
+    analysisHistory: emptyAnalysisHistory(),
+    gridlines: [],
+    nextGridlineId: 1,
+    levels: [],
+    nextLevelId: 1,
+    selectedModelEntity: null,
+    selectedAnalysisIndex: null,
+    analysisInsertionIndex: null,
+    selectedNodeIds: [],
+    nodePickMode: 'none',
+    pendingNodePick: null,
+    mode: 'model',
+    results: null,
   }),
 
   writeModelEntity: (write) => set((s) => ({

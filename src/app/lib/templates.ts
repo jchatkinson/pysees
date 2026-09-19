@@ -1,15 +1,18 @@
 import type { AnalysisCommand } from '@/app/types/analysisCommands'
 import type { ModelWrite } from '@/app/lib/modelWrite'
 import type { GridlineEntity } from '@/app/types/gridlines'
-import { evenlySpacedGridlines } from '@/app/lib/gridlines'
+import type { LevelEntity } from '@/app/types/levels'
+import { alphaLabel, evenlySpacedGridlines } from '@/app/lib/gridlines'
 
 export interface TemplateResult {
   ndm: 2 | 3
   ndf: number
   writes: ModelWrite[]
   analysisCommands: AnalysisCommand[]
-  /** Optional UI-only reference gridlines the template suggests (no OpenSeesPy equivalent). */
+  /** Optional UI-only reference grids the template suggests (no OpenSeesPy equivalent). */
   gridlines?: GridlineEntity[]
+  /** Optional UI-only story levels the template suggests (no OpenSeesPy equivalent). */
+  levels?: LevelEntity[]
 }
 
 // ---------------------------------------------------------------------------
@@ -26,7 +29,7 @@ export function momentCurvatureTemplate(): TemplateResult {
     { kind: 'material', entity: { id: 1, kind: 'uniaxial', matType: 'Steel01', args: { matTag: 1, matType: 'Steel01', Fy: 400e6, E0: 200e9, b: 0.01 } } },
     { kind: 'material', entity: { id: 2, kind: 'uniaxial', matType: 'Concrete01', args: { matTag: 2, matType: 'Concrete01', fpc: -30e6, epsc0: -0.002, fpcu: -6e6, epsU: -0.006 } } },
     { kind: 'section', entity: { id: 1, secType: 'Fiber', args: { secTag: 1, type: 'Fiber' }, children: [
-      { kind: 'patch', subType: 'rect', args: { matTag: 2, nFibZ: 8, nFibY: 8, y1: -0.25, z1: -0.15, y2: 0.25, z2: 0.15 } },
+      { kind: 'patch', subType: 'rect', args: { matTag: 2, numSubdivY: 8, numSubdivZ: 8, y1: -0.25, z1: -0.15, y2: 0.25, z2: 0.15 } },
       { kind: 'fiber', subType: 'fiber', args: { yloc: -0.21, zloc: -0.11, A: BAR_AREA, matTag: 1 } },
       { kind: 'fiber', subType: 'fiber', args: { yloc: -0.21, zloc: 0.11, A: BAR_AREA, matTag: 1 } },
       { kind: 'fiber', subType: 'fiber', args: { yloc: 0.21, zloc: -0.11, A: BAR_AREA, matTag: 1 } },
@@ -113,30 +116,26 @@ export function frameTemplate({ stories, storyH, bays, bayW, base }: FrameParams
     }
   }
 
-  // Reference gridlines: numbered vertical lines through each bay, lettered horizontal lines through each story.
-  const bayLines = evenlySpacedGridlines({
+  // Reference grids: one numbered column line per bay (plan position only — a 2D
+  // model has no depth, so a grid is just an X value; its vertical extent is
+  // derived from the levels below, not stored on the grid itself).
+  const gridlines = evenlySpacedGridlines({
     axis: 0,
     offset: 0,
     spacing: bayW,
     count: bays + 1,
-    spanStart: [0, 0],
-    spanEnd: [0, stories * storyH],
+    spanStart: [0],
+    spanEnd: [0],
     labelStyle: 'numeric',
     labelPrefix: '',
     startIndex: 1,
   }, 1)
-  const storyLines = evenlySpacedGridlines({
-    axis: 1,
-    offset: 0,
-    spacing: storyH,
-    count: stories + 1,
-    spanStart: [0, 0],
-    spanEnd: [bays * bayW, 0],
-    labelStyle: 'alpha',
-    labelPrefix: '',
-    startIndex: 0,
-  }, bayLines.length + 1)
-  const gridlines = [...bayLines, ...storyLines]
 
-  return { ndm: 2, ndf: 3, writes, analysisCommands: [], gridlines }
+  // Reference levels: ground (height 0) plus one lettered level per story.
+  const levels: LevelEntity[] = [{ id: 1, label: 'A', height: 0 }]
+  for (let j = 1; j <= stories; j++) {
+    levels.push({ id: j + 1, label: alphaLabel(j), height: storyH })
+  }
+
+  return { ndm: 2, ndf: 3, writes, analysisCommands: [], gridlines, levels }
 }
