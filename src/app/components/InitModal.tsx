@@ -81,7 +81,7 @@ export function InitModal() {
       initModel(t.ndm, t.ndf, { writes: t.writes, analysisCommands: t.analysisCommands })
     } else if (choice === 'frame') {
       const t = frameTemplate({ stories, storyH, bays, bayW, eleType: frameEle, base: frameBase })
-      initModel(t.ndm, t.ndf, { writes: t.writes, analysisCommands: t.analysisCommands })
+      initModel(t.ndm, t.ndf, { writes: t.writes, analysisCommands: t.analysisCommands, gridlines: t.gridlines })
     }
   }
 

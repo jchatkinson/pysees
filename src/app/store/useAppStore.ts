@@ -3,6 +3,7 @@ import type { AnalysisCommand, AnalysisHistory } from '@/app/types/analysisComma
 import { emptyAnalysisHistory } from '@/app/types/analysisCommands'
 import type { AppMode, Model, ResultsState } from '@/app/types/model'
 import { emptyModel } from '@/app/types/model'
+import type { GridlineEntity } from '@/app/types/gridlines'
 import { LocalAgentClient, type AgentConnectionState } from '@/app/lib/localAgent'
 import { buildUniaxialMaterialCallArgs, validateUniaxialMaterialValues } from '@/app/lib/commandSchemas'
 import { applyModelWrite, deleteEntity, previewDeleteEntity, removeModelChild, type ModelDeletableKind, type ModelWrite } from '@/app/lib/modelWrite'
@@ -17,6 +18,14 @@ interface AppStore {
   modelPast: Model[]
   modelFuture: Model[]
   analysisHistory: AnalysisHistory
+  gridlines: GridlineEntity[]
+  nextGridlineId: number
+  gridlinesDialogOpen: boolean
+  setGridlinesDialogOpen: (open: boolean) => void
+  setGridlines: (gridlines: GridlineEntity[]) => void
+  addGridline: (entity: Omit<GridlineEntity, 'id'>) => void
+  updateGridline: (id: number, patch: Partial<Omit<GridlineEntity, 'id'>>) => void
+  removeGridline: (id: number) => void
   mode: AppMode
   results: ResultsState | null
   localAgent: {
@@ -64,11 +73,12 @@ interface AppStore {
     showNodalLoads: boolean
     showElementLoads: boolean
     showGrid: boolean
+    showGridlines: boolean
   }
   viewportAction: { kind: 'zoomIn' | 'zoomOut' | 'fit'; token: number } | null
 
   // Model actions
-  initModel: (ndm: 2 | 3, ndf: number, extra?: { writes?: ModelWrite[]; analysisCommands?: AnalysisCommand[] }) => void
+  initModel: (ndm: 2 | 3, ndf: number, extra?: { writes?: ModelWrite[]; analysisCommands?: AnalysisCommand[]; gridlines?: GridlineEntity[] }) => void
   writeModelEntity: (write: ModelWrite) => void
   previewDeleteModelEntity: (kind: ModelDeletableKind, id: number) => string[]
   deleteModelEntity: (kind: ModelDeletableKind, id: number) => void
@@ -152,6 +162,24 @@ export const useAppStore = create<AppStore>((set, get) => {
   modelPast: [],
   modelFuture: [],
   analysisHistory: emptyAnalysisHistory(),
+  gridlines: [],
+  nextGridlineId: 1,
+  gridlinesDialogOpen: false,
+  setGridlinesDialogOpen: (open) => set({ gridlinesDialogOpen: open }),
+  setGridlines: (gridlines) => set({
+    gridlines,
+    nextGridlineId: gridlines.reduce((max, g) => Math.max(max, g.id + 1), 1),
+  }),
+  addGridline: (entity) => set((s) => ({
+    gridlines: [...s.gridlines, { ...entity, id: s.nextGridlineId }],
+    nextGridlineId: s.nextGridlineId + 1,
+  })),
+  updateGridline: (id, patch) => set((s) => ({
+    gridlines: s.gridlines.map((g) => (g.id === id ? { ...g, ...patch } : g)),
+  })),
+  removeGridline: (id) => set((s) => ({
+    gridlines: s.gridlines.filter((g) => g.id !== id),
+  })),
   mode: 'model',
   results: null,
   localAgent: { status: 'disconnected', port: null, error: null },
@@ -187,6 +215,7 @@ export const useAppStore = create<AppStore>((set, get) => {
     showNodalLoads: true,
     showElementLoads: true,
     showGrid: true,
+    showGridlines: true,
   },
   viewportAction: null,
 
@@ -195,11 +224,14 @@ export const useAppStore = create<AppStore>((set, get) => {
     model = { ...model, config: { ndm, ndf } }
     for (const write of extra?.writes ?? []) model = applyModelWrite(model, write)
     const analysisCommands = extra?.analysisCommands ?? []
+    const gridlines = extra?.gridlines ?? []
     return {
       model,
       modelPast: [],
       modelFuture: [],
       analysisHistory: { commands: analysisCommands, cursor: analysisCommands.length - 1 },
+      gridlines,
+      nextGridlineId: gridlines.reduce((max, g) => Math.max(max, g.id + 1), 1),
       selectedModelEntity: null,
       selectedAnalysisIndex: null,
       analysisInsertionIndex: null,

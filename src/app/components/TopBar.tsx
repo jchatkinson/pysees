@@ -23,6 +23,7 @@ export function TopBar() {
     viewSettings,
     setViewSetting,
     requestViewportAction,
+    setGridlinesDialogOpen,
     localAgent,
     connectLocalAgent,
     disconnectLocalAgent,
@@ -88,6 +89,8 @@ export function TopBar() {
           <DropdownMenuCheckboxItem checked={viewSettings.showNodalLoads} onCheckedChange={(v) => setViewSetting('showNodalLoads', checked(v))}>Nodal Loads</DropdownMenuCheckboxItem>
           <DropdownMenuCheckboxItem checked={viewSettings.showElementLoads} onCheckedChange={(v) => setViewSetting('showElementLoads', checked(v))}>Element Loads</DropdownMenuCheckboxItem>
           <DropdownMenuCheckboxItem checked={viewSettings.showGrid} onCheckedChange={(v) => setViewSetting('showGrid', checked(v))}>Grid</DropdownMenuCheckboxItem>
+          <DropdownMenuCheckboxItem checked={viewSettings.showGridlines} onCheckedChange={(v) => setViewSetting('showGridlines', checked(v))}>Gridlines</DropdownMenuCheckboxItem>
+          <DropdownMenuItem onSelect={() => setGridlinesDialogOpen(true)}>Gridlines…</DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuCheckboxItem checked={mode === 'results'} onCheckedChange={(v) => setMode(checked(v) ? 'results' : 'model')}>Results Mode</DropdownMenuCheckboxItem>
           <DropdownMenuSeparator />

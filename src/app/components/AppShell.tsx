@@ -6,6 +6,7 @@ import { AnalysisPanel } from '@/app/components/AnalysisPanel'
 import { CommandForm } from '@/app/components/CommandForm'
 import { Viewport } from '@/app/components/Viewport'
 import { InitModal } from '@/app/components/InitModal'
+import { GridlinesDialog } from '@/app/components/GridlinesDialog'
 import { Button } from '@/app/components/ui/button'
 import { useAppStore } from '@/app/store/useAppStore'
 
@@ -41,6 +42,7 @@ export function AppShell() {
   return (
     <div className="flex flex-col h-screen overflow-hidden">
       <InitModal />
+      <GridlinesDialog />
       <TopBar />
       <div className="flex-1 min-h-0 overflow-hidden">
         <ResizablePanelGroup orientation="horizontal">

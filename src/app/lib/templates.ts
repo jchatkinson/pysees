@@ -1,11 +1,15 @@
 import type { AnalysisCommand } from '@/app/types/analysisCommands'
 import type { ModelWrite } from '@/app/lib/modelWrite'
+import type { GridlineEntity } from '@/app/types/gridlines'
+import { evenlySpacedGridlines } from '@/app/lib/gridlines'
 
 export interface TemplateResult {
   ndm: 2 | 3
   ndf: number
   writes: ModelWrite[]
   analysisCommands: AnalysisCommand[]
+  /** Optional UI-only reference gridlines the template suggests (no OpenSeesPy equivalent). */
+  gridlines?: GridlineEntity[]
 }
 
 // ---------------------------------------------------------------------------
@@ -109,5 +113,30 @@ export function frameTemplate({ stories, storyH, bays, bayW, base }: FrameParams
     }
   }
 
-  return { ndm: 2, ndf: 3, writes, analysisCommands: [] }
+  // Reference gridlines: numbered vertical lines through each bay, lettered horizontal lines through each story.
+  const bayLines = evenlySpacedGridlines({
+    axis: 0,
+    offset: 0,
+    spacing: bayW,
+    count: bays + 1,
+    spanStart: [0, 0],
+    spanEnd: [0, stories * storyH],
+    labelStyle: 'numeric',
+    labelPrefix: '',
+    startIndex: 1,
+  }, 1)
+  const storyLines = evenlySpacedGridlines({
+    axis: 1,
+    offset: 0,
+    spacing: storyH,
+    count: stories + 1,
+    spanStart: [0, 0],
+    spanEnd: [bays * bayW, 0],
+    labelStyle: 'alpha',
+    labelPrefix: '',
+    startIndex: 0,
+  }, bayLines.length + 1)
+  const gridlines = [...bayLines, ...storyLines]
+
+  return { ndm: 2, ndf: 3, writes, analysisCommands: [], gridlines }
 }
