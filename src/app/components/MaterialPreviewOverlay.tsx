@@ -10,6 +10,7 @@ import { Label } from '@/app/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/app/components/ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/app/components/ui/tabs'
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/app/components/ui/chart'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/app/components/ui/tooltip'
 import { useAppStore } from '@/app/store/useAppStore'
 import type { CyclicStrainIncrement, ProtocolType } from '@/app/lib/materialPreviewProtocol'
 import { generateLoadingProtocol } from '@/app/lib/materialPreviewProtocol'
@@ -171,9 +172,16 @@ export function MaterialPreviewOverlay() {
             <span className="ml-auto text-[10px] text-muted-foreground">
               {localAgentStatus === 'connected' ? `Connected :${localAgentPort}` : localAgentStatus}
             </span>
-            <Button size="icon" variant="ghost" className="size-6" onClick={() => setPanelOpen(false)}>
-              <X className="size-3.5" />
-            </Button>
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <Button size="icon" variant="ghost" className="size-6" aria-label="Close material preview" onClick={() => setPanelOpen(false)}>
+                    <X className="size-3.5" />
+                  </Button>
+                }
+              />
+              <TooltipContent>Close</TooltipContent>
+            </Tooltip>
           </div>
         </CardHeader>
         <CardContent className="grid gap-2">
@@ -303,7 +311,7 @@ export function MaterialPreviewOverlay() {
                 max={Math.max(1, previewPointCount)}
                 step={1}
                 className="w-full"
-                onValueChange={(value) => setScrubCount(value[0] ?? 0)}
+                onValueChange={(value) => setScrubCount((Array.isArray(value) ? value[0] : value) ?? 0)}
                 disabled={previewPointCount === 0}
               />
             </div>

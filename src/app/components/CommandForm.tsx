@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Button } from '@/app/components/ui/button'
 import { ScrollArea } from '@/app/components/ui/scroll-area'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/app/components/ui/tooltip'
 import { Combobox, ComboboxContent, ComboboxEmpty, ComboboxInput, ComboboxItem, ComboboxList } from '@/app/components/ui/combobox'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/app/components/ui/alert-dialog'
 import { useAppStore } from '@/app/store/useAppStore'
@@ -175,7 +176,14 @@ function ChildrenEditor({
       {children.map((c, i) => (
         <div key={i} className="flex items-center justify-between gap-2 rounded border px-2 py-1 text-[10px] font-mono">
           <span className="truncate">{c.summary}</span>
-          <button className="text-destructive shrink-0" onClick={() => onRemove(i)} disabled={locked}>×</button>
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <button className="text-destructive shrink-0" onClick={() => onRemove(i)} disabled={locked} aria-label="Remove">×</button>
+              }
+            />
+            <TooltipContent>Remove</TooltipContent>
+          </Tooltip>
         </div>
       ))}
       {adding && schema && (
@@ -302,7 +310,7 @@ export function CommandForm() {
         <div className="border-b px-3 py-2 shrink-0">
           <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
             <span>Edit {schema.label} #{selectedModelEntity.id}</span>
-            <a href={getCommandDocUrl(schema.fn, initial)} target="_blank" rel="noreferrer" className="ml-auto inline-flex items-center rounded p-0.5 text-muted-foreground hover:bg-accent hover:text-foreground">
+            <a href={getCommandDocUrl(schema.fn, initial)} target="_blank" rel="noreferrer" className="ml-auto inline-flex items-center rounded p-0.5 text-muted-foreground hover:bg-accent hover:text-accent-foreground">
               <CircleHelp className="size-3.5" />
             </a>
           </div>

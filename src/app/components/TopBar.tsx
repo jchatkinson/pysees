@@ -1,6 +1,7 @@
 import { Button } from '@/app/components/ui/button'
 import { Separator } from '@/app/components/ui/separator'
 import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/app/components/ui/dropdown-menu'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/app/components/ui/tooltip'
 import { Undo2, Redo2 } from 'lucide-react'
 import { useAppStore } from '@/app/store/useAppStore'
 import { PiscesLogo } from '@/app/components/icons/PiscesLogo'
@@ -42,43 +43,37 @@ export function TopBar() {
       </div>
       <Separator orientation="vertical" className="self-stretch" />
       <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button variant="ghost" size="sm" className="h-8 px-2 text-xs">File</Button>
-        </DropdownMenuTrigger>
+        <DropdownMenuTrigger render={<Button variant="ghost" size="sm" className="h-8 px-2 text-xs">File</Button>} />
         <DropdownMenuContent>
           <DropdownMenuItem disabled>New Model</DropdownMenuItem>
-          <DropdownMenuItem disabled={!model.config} onSelect={() => downloadScript(model, analysisHistory)}>Export .py</DropdownMenuItem>
+          <DropdownMenuItem disabled={!model.config} onClick={() => downloadScript(model, analysisHistory)}>Export .py</DropdownMenuItem>
           <DropdownMenuSeparator />
           {localAgent.status === 'connected' ? (
-            <DropdownMenuItem onSelect={disconnectLocalAgent}>
+            <DropdownMenuItem onClick={disconnectLocalAgent}>
               Disconnect (:{localAgent.port})
             </DropdownMenuItem>
           ) : (
-            <DropdownMenuItem onSelect={() => { void connectLocalAgent() }} disabled={localAgent.status === 'connecting'}>
+            <DropdownMenuItem onClick={() => { void connectLocalAgent() }} disabled={localAgent.status === 'connecting'}>
               {localAgent.status === 'connecting' ? 'Connecting to local...' : 'Connect to local'}
             </DropdownMenuItem>
           )}
         </DropdownMenuContent>
       </DropdownMenu>
       <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button variant="ghost" size="sm" className="h-8 px-2 text-xs">Edit</Button>
-        </DropdownMenuTrigger>
+        <DropdownMenuTrigger render={<Button variant="ghost" size="sm" className="h-8 px-2 text-xs">Edit</Button>} />
         <DropdownMenuContent>
-          <DropdownMenuItem onSelect={undo} disabled={!canUndo}>
+          <DropdownMenuItem onClick={undo} disabled={!canUndo}>
             Undo
             <Undo2 className="ml-auto size-3.5" />
           </DropdownMenuItem>
-          <DropdownMenuItem onSelect={redo} disabled={!canRedo}>
+          <DropdownMenuItem onClick={redo} disabled={!canRedo}>
             Redo
             <Redo2 className="ml-auto size-3.5" />
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
       <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button variant="ghost" size="sm" className="h-8 px-2 text-xs">View</Button>
-        </DropdownMenuTrigger>
+        <DropdownMenuTrigger render={<Button variant="ghost" size="sm" className="h-8 px-2 text-xs">View</Button>} />
         <DropdownMenuContent>
           <DropdownMenuCheckboxItem checked={viewSettings.showNodeIds} onCheckedChange={(v) => setViewSetting('showNodeIds', checked(v))}>Node IDs</DropdownMenuCheckboxItem>
           <DropdownMenuCheckboxItem checked={viewSettings.showElementIds} onCheckedChange={(v) => setViewSetting('showElementIds', checked(v))}>Element IDs</DropdownMenuCheckboxItem>
@@ -90,23 +85,37 @@ export function TopBar() {
           <DropdownMenuCheckboxItem checked={viewSettings.showElementLoads} onCheckedChange={(v) => setViewSetting('showElementLoads', checked(v))}>Element Loads</DropdownMenuCheckboxItem>
           <DropdownMenuCheckboxItem checked={viewSettings.showGrid} onCheckedChange={(v) => setViewSetting('showGrid', checked(v))}>Grid</DropdownMenuCheckboxItem>
           <DropdownMenuCheckboxItem checked={viewSettings.showGridlines} onCheckedChange={(v) => setViewSetting('showGridlines', checked(v))}>Gridlines</DropdownMenuCheckboxItem>
-          <DropdownMenuItem onSelect={() => setGridlinesDialogOpen(true)}>Gridlines…</DropdownMenuItem>
+          <DropdownMenuItem onClick={() => setGridlinesDialogOpen(true)}>Gridlines…</DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuCheckboxItem checked={mode === 'results'} onCheckedChange={(v) => setMode(checked(v) ? 'results' : 'model')}>Results Mode</DropdownMenuCheckboxItem>
           <DropdownMenuSeparator />
-          <DropdownMenuItem onSelect={() => requestViewportAction('zoomIn')}>Zoom In</DropdownMenuItem>
-          <DropdownMenuItem onSelect={() => requestViewportAction('zoomOut')}>Zoom Out</DropdownMenuItem>
-          <DropdownMenuItem onSelect={() => requestViewportAction('fit')}>Zoom To Fit</DropdownMenuItem>
+          <DropdownMenuItem onClick={() => requestViewportAction('zoomIn')}>Zoom In</DropdownMenuItem>
+          <DropdownMenuItem onClick={() => requestViewportAction('zoomOut')}>Zoom Out</DropdownMenuItem>
+          <DropdownMenuItem onClick={() => requestViewportAction('fit')}>Zoom To Fit</DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
       <Separator orientation="vertical" className="self-stretch" />
       <div className="flex items-center gap-1">
-        <Button variant="ghost" size="icon" className="size-8" onClick={undo} disabled={!canUndo}>
-          <Undo2 className="size-4" />
-        </Button>
-        <Button variant="ghost" size="icon" className="size-8" onClick={redo} disabled={!canRedo}>
-          <Redo2 className="size-4" />
-        </Button>
+        <Tooltip>
+          <TooltipTrigger
+            render={
+              <Button variant="ghost" size="icon" className="size-8" aria-label="Undo" onClick={undo} disabled={!canUndo}>
+                <Undo2 className="size-4" />
+              </Button>
+            }
+          />
+          <TooltipContent>Undo</TooltipContent>
+        </Tooltip>
+        <Tooltip>
+          <TooltipTrigger
+            render={
+              <Button variant="ghost" size="icon" className="size-8" aria-label="Redo" onClick={redo} disabled={!canRedo}>
+                <Redo2 className="size-4" />
+              </Button>
+            }
+          />
+          <TooltipContent>Redo</TooltipContent>
+        </Tooltip>
       </div>
       <span className="ml-auto text-xs text-muted-foreground">{mode === 'model' ? 'Model' : 'Results'}</span>
       <UserButton afterSignOutUrl="/" appearance={{ elements: { avatarBox: 'h-7 w-7' } }} />

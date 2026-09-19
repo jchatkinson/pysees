@@ -52,9 +52,7 @@ function NotFound() {
       <section className="rounded-xl border bg-white p-8 text-center shadow-sm">
         <p className="text-sm text-slate-500">Page not found</p>
         <h1 className="mt-1 text-lg font-semibold">Use the PySees studio route</h1>
-        <Button className="mt-4" asChild>
-          <Link to="/studio">Go to Studio</Link>
-        </Button>
+        <Button className="mt-4" render={<Link to="/studio">Go to Studio</Link>} />
       </section>
     </main>
   )

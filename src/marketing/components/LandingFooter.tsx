@@ -40,17 +40,11 @@ export function LandingFooter() {
           <p className="mt-4 text-sm text-slate-600">Create an account to save models and stay updated as features ship.</p>
           <div className="mt-5 flex flex-wrap gap-2">
             <SignedOut>
-              <Button asChild size="lg">
-                <Link to="/signup">Sign up</Link>
-              </Button>
-              <Button asChild size="lg" variant="secondary">
-                <Link to="/login">Log in</Link>
-              </Button>
+              <Button size="lg" render={<Link to="/signup">Sign up</Link>} />
+              <Button size="lg" variant="secondary" render={<Link to="/login">Log in</Link>} />
             </SignedOut>
             <SignedIn>
-              <Button asChild size="lg" variant="outline">
-                <Link to="/studio">Open Studio</Link>
-              </Button>
+              <Button size="lg" variant="outline" render={<Link to="/studio">Open Studio</Link>} />
             </SignedIn>
           </div>
         </div>

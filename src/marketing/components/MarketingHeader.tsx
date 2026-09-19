@@ -39,9 +39,7 @@ export function MarketingHeader({ currentPath }: MarketingHeaderProps) {
               <Button size="sm">Sign up</Button>
             </SignUpButton>
           </SignedOut>
-          <Button asChild size="sm">
-            <Link to="/studio">Open Studio</Link>
-          </Button>
+          <Button size="sm" render={<Link to="/studio">Open Studio</Link>} />
           <SignedIn>
             <UserButton afterSignOutUrl="/" appearance={{ elements: { avatarBox: 'h-8 w-8' } }} />
           </SignedIn>

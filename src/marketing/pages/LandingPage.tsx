@@ -30,16 +30,10 @@ export function LandingPage() {
           <p className="mt-4 max-w-xl text-base text-slate-600">Build geometry, constraints, loads, and recorders in a history-driven GUI. Export valid Python and import recorder output for results view.</p>
           <div className="mt-7 flex flex-wrap gap-3">
             <SignedOut>
-              <Button asChild size="lg">
-                <Link to="/signup">Sign up</Link>
-              </Button>
-              <Button asChild size="lg" variant="secondary">
-                <Link to="/login">Log in</Link>
-              </Button>
+              <Button size="lg" render={<Link to="/signup">Sign up</Link>} />
+              <Button size="lg" variant="secondary" render={<Link to="/login">Log in</Link>} />
             </SignedOut>
-            <Button asChild size="lg" variant="outline">
-              <Link to="/studio">Open Studio</Link>
-            </Button>
+            <Button size="lg" variant="outline" render={<Link to="/studio">Open Studio</Link>} />
           </div>
           <div className="mt-8 flex flex-wrap gap-3">
             {heroShots.map((shot, idx) => (

@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { ChevronRight } from 'lucide-react'
 import { ScrollArea } from '@/app/components/ui/scroll-area'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/app/components/ui/tooltip'
 import { useAppStore } from '@/app/store/useAppStore'
 import type { AnalysisCommand } from '@/app/types/analysisCommands'
 import { domainForFn } from '@/app/lib/commandDomain'
@@ -104,21 +105,28 @@ export function AnalysisPanel() {
     const isSelected = selectedAnalysisIndex === i
     return (
       <div className="flex items-center gap-0.5 group/row">
-        <button
-          className={[
-            'shrink-0 opacity-0 group-hover/row:opacity-100 transition-opacity',
-            'text-muted-foreground/40 hover:text-muted-foreground/80',
-            'cursor-grab active:cursor-grabbing px-0.5 text-[9px] leading-none',
-          ].join(' ')}
-          draggable
-          onDragStart={() => { setDragIndex(i); setDragTarget(null) }}
-          onDragEnd={() => { setDragIndex(null); setDragTarget(null) }}
-          title="Drag to reorder"
-        >⠿</button>
+        <Tooltip>
+          <TooltipTrigger
+            render={
+              <button
+                className={[
+                  'shrink-0 opacity-0 group-hover/row:opacity-100 transition-opacity',
+                  'text-muted-foreground/40 hover:text-muted-foreground/80',
+                  'cursor-grab active:cursor-grabbing px-0.5 text-[9px] leading-none',
+                ].join(' ')}
+                draggable
+                onDragStart={() => { setDragIndex(i); setDragTarget(null) }}
+                onDragEnd={() => { setDragIndex(null); setDragTarget(null) }}
+                aria-label="Drag to reorder"
+              >⠿</button>
+            }
+          />
+          <TooltipContent>Drag to reorder</TooltipContent>
+        </Tooltip>
         <button
           className={[
             'flex-1 text-left px-1.5 py-px rounded text-[10px] font-mono relative truncate',
-            'transition-colors hover:bg-accent',
+            'transition-colors hover:bg-accent hover:text-accent-foreground',
             indented ? 'pl-3' : '',
             isSelected ? 'bg-primary/10 ring-1 ring-inset ring-primary/40' : '',
             isFuture ? 'opacity-30' : '',
@@ -153,7 +161,7 @@ export function AnalysisPanel() {
                   {gi > 0 && renderInsertZone(group.startIndex)}
                   {showHeader && (
                     <button
-                      className="w-full flex items-center gap-1 px-1.5 py-px text-[9px] font-medium uppercase tracking-wider text-muted-foreground hover:text-foreground hover:bg-accent/60 rounded transition-colors"
+                      className="w-full flex items-center gap-1 px-1.5 py-px text-[9px] font-medium uppercase tracking-wider text-muted-foreground hover:text-accent-foreground hover:bg-accent/60 rounded transition-colors"
                       onClick={() => toggleGroup(group)}
                     >
                       <ChevronRight className={`w-2.5 h-2.5 shrink-0 transition-transform ${!collapsed ? 'rotate-90' : ''}`} />

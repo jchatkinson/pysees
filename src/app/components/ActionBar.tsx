@@ -13,35 +13,43 @@ export function ActionBar() {
       <Separator orientation="vertical" className="self-stretch" />
       <div className="flex items-center gap-0.5">
         <Tooltip>
-          <TooltipTrigger asChild>
-            <Button variant="ghost" size="icon" className="size-7" onClick={() => requestViewportAction('zoomIn')}>
-              <ZoomIn className="size-3.5" />
-            </Button>
-          </TooltipTrigger>
+          <TooltipTrigger
+            render={
+              <Button variant="ghost" size="icon" className="size-7" aria-label="Zoom in" onClick={() => requestViewportAction('zoomIn')}>
+                <ZoomIn className="size-3.5" />
+              </Button>
+            }
+          />
           <TooltipContent>Zoom in</TooltipContent>
         </Tooltip>
         <Tooltip>
-          <TooltipTrigger asChild>
-            <Button variant="ghost" size="icon" className="size-7" onClick={() => requestViewportAction('zoomOut')}>
-              <ZoomOut className="size-3.5" />
-            </Button>
-          </TooltipTrigger>
+          <TooltipTrigger
+            render={
+              <Button variant="ghost" size="icon" className="size-7" aria-label="Zoom out" onClick={() => requestViewportAction('zoomOut')}>
+                <ZoomOut className="size-3.5" />
+              </Button>
+            }
+          />
           <TooltipContent>Zoom out</TooltipContent>
         </Tooltip>
         <Tooltip>
-          <TooltipTrigger asChild>
-            <Button variant="ghost" size="icon" className="size-7" onClick={() => requestViewportAction('fit')}>
-              <Maximize2 className="size-3.5" />
-            </Button>
-          </TooltipTrigger>
+          <TooltipTrigger
+            render={
+              <Button variant="ghost" size="icon" className="size-7" aria-label="Fit to view" onClick={() => requestViewportAction('fit')}>
+                <Maximize2 className="size-3.5" />
+              </Button>
+            }
+          />
           <TooltipContent>Fit to view</TooltipContent>
         </Tooltip>
         <Tooltip>
-          <TooltipTrigger asChild>
-            <Button variant="ghost" size="icon" className="size-7">
-              <Box className="size-3.5" />
-            </Button>
-          </TooltipTrigger>
+          <TooltipTrigger
+            render={
+              <Button variant="ghost" size="icon" className="size-7" aria-label="Toggle perspective / orthographic">
+                <Box className="size-3.5" />
+              </Button>
+            }
+          />
           <TooltipContent>Toggle perspective / orthographic</TooltipContent>
         </Tooltip>
       </div>

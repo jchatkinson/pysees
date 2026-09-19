@@ -145,11 +145,13 @@ function FieldLabel({ text, description }: { text: string; description?: string 
       <span>{text}</span>
       {description && (
         <Tooltip>
-          <TooltipTrigger asChild>
-            <button type="button" className="text-muted-foreground hover:text-foreground" tabIndex={-1} aria-label={`${text} info`}>
-              <CircleHelp className="size-3" />
-            </button>
-          </TooltipTrigger>
+          <TooltipTrigger
+            render={
+              <button type="button" className="text-muted-foreground hover:text-foreground" tabIndex={-1} aria-label={`${text} info`}>
+                <CircleHelp className="size-3" />
+              </button>
+            }
+          />
           <TooltipContent side="top">{description}</TooltipContent>
         </Tooltip>
       )}
@@ -371,11 +373,13 @@ export function SchemaFormField({ arg, values, setValue, ctx, disabled }: Schema
           <span>{arg.label ?? arg.flag}</span>
           {arg.description && (
             <Tooltip>
-              <TooltipTrigger asChild>
-                <button type="button" className="text-muted-foreground hover:text-foreground" tabIndex={-1} aria-label={`${arg.label ?? arg.flag} info`}>
-                  <CircleHelp className="size-3" />
-                </button>
-              </TooltipTrigger>
+              <TooltipTrigger
+                render={
+                  <button type="button" className="text-muted-foreground hover:text-foreground" tabIndex={-1} aria-label={`${arg.label ?? arg.flag} info`}>
+                    <CircleHelp className="size-3" />
+                  </button>
+                }
+              />
               <TooltipContent side="top">{arg.description}</TooltipContent>
             </Tooltip>
           )}
@@ -394,7 +398,7 @@ export function SchemaFormField({ arg, values, setValue, ctx, disabled }: Schema
         <FieldLabel text={arg.label ?? arg.name} description={arg.description} />
         <Select value={selected} onValueChange={(value) => {
           setValue(key, value)
-          for (const child of arg.yields[value] ?? []) seedDefaults(child, values, setValue, ctx)
+          for (const child of arg.yields[value ?? ''] ?? []) seedDefaults(child, values, setValue, ctx)
         }} disabled={disabled}>
           <SelectTrigger className="w-full">
             <SelectValue />

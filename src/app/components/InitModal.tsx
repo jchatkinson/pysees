@@ -4,6 +4,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Input } from '@/app/components/ui/input'
 import { Label } from '@/app/components/ui/label'
 import { Button } from '@/app/components/ui/button'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/app/components/ui/tooltip'
+import { ArrowLeft } from 'lucide-react'
 import { useAppStore } from '@/app/store/useAppStore'
 import {
   momentCurvatureTemplate,
@@ -26,15 +28,15 @@ function Card({ title, description, onClick, disabled }: CardProps) {
   return (
     <button
       className={[
-        'border rounded-sm p-2 text-left w-full transition-colors',
-        disabled ? 'opacity-50 cursor-not-allowed' : 'hover:bg-accent cursor-pointer',
+        'group border rounded-sm p-2 text-left w-full transition-colors',
+        disabled ? 'opacity-50 cursor-not-allowed' : 'hover:bg-accent hover:text-accent-foreground cursor-pointer',
       ].join(' ')}
       onClick={disabled ? undefined : onClick}
       disabled={disabled}
     >
       <div className="bg-muted rounded-sm aspect-video w-full mb-2" />
       <p className="text-sm font-medium">{title}</p>
-      <p className="text-xs text-muted-foreground leading-snug">{description}</p>
+      <p className="text-xs text-muted-foreground leading-snug group-hover:text-accent-foreground">{description}</p>
     </button>
   )
 }
@@ -93,8 +95,13 @@ export function InitModal() {
   }
 
   return (
-    <Dialog open>
-      <DialogContent className="sm:max-w-lg" onInteractOutside={(e) => e.preventDefault()}>
+    <Dialog
+      open
+      onOpenChange={(_open, eventDetails) => {
+        if (eventDetails.reason === 'outside-press' || eventDetails.reason === 'focus-out') eventDetails.cancel()
+      }}
+    >
+      <DialogContent className="sm:max-w-lg">
         {step === 1 && (
           <>
             <DialogHeader>
@@ -129,12 +136,16 @@ export function InitModal() {
           <>
             <DialogHeader>
               <div className="flex items-center gap-2">
-                <button
-                  className="text-muted-foreground hover:text-foreground transition-colors text-sm"
-                  onClick={() => setStep(1)}
-                >
-                  ← Back
-                </button>
+                <Tooltip>
+                  <TooltipTrigger
+                    render={
+                      <Button variant="ghost" size="icon-sm" aria-label="Back" onClick={() => setStep(1)}>
+                        <ArrowLeft />
+                      </Button>
+                    }
+                  />
+                  <TooltipContent>Back</TooltipContent>
+                </Tooltip>
                 <DialogTitle>{step2Title[choice]}</DialogTitle>
               </div>
             </DialogHeader>

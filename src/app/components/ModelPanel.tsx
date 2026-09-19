@@ -101,7 +101,7 @@ export function ModelPanel() {
               return (
                 <div key={group.label}>
                   <button
-                    className="w-full flex items-center gap-1 px-1.5 py-px text-[9px] font-medium uppercase tracking-wider text-muted-foreground hover:text-foreground hover:bg-accent/60 rounded transition-colors"
+                    className="w-full flex items-center gap-1 px-1.5 py-px text-[9px] font-medium uppercase tracking-wider text-muted-foreground hover:text-accent-foreground hover:bg-accent/60 rounded transition-colors"
                     onClick={() => toggle(group.label)}
                   >
                     <ChevronRight className={`w-2.5 h-2.5 shrink-0 transition-transform ${!isCollapsed ? 'rotate-90' : ''}`} />
@@ -114,7 +114,7 @@ export function ModelPanel() {
                       <button
                         key={`${row.kind}-${row.id}`}
                         className={[
-                          'w-full text-left px-1.5 py-px pl-3 rounded text-[10px] font-mono truncate transition-colors hover:bg-accent',
+                          'w-full text-left px-1.5 py-px pl-3 rounded text-[10px] font-mono truncate transition-colors hover:bg-accent hover:text-accent-foreground',
                           isSelected ? 'bg-primary/10 ring-1 ring-inset ring-primary/40' : '',
                         ].join(' ')}
                         onClick={() => setSelectedModelEntity({ kind: row.kind, id: row.id })}

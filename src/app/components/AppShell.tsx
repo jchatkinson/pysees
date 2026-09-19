@@ -18,14 +18,14 @@ function LeftPanel() {
       <div className="flex border-b shrink-0">
         <Button
           variant="ghost"
-          className={`flex-1 h-7 rounded-none text-[11px] ${activePanel === 'model' ? 'bg-accent' : ''}`}
+          className={`flex-1 h-7 rounded-none text-[11px] ${activePanel === 'model' ? 'bg-accent text-accent-foreground' : ''}`}
           onClick={() => setActivePanel('model')}
         >
           Model
         </Button>
         <Button
           variant="ghost"
-          className={`flex-1 h-7 rounded-none text-[11px] ${activePanel === 'analysis' ? 'bg-accent' : ''}`}
+          className={`flex-1 h-7 rounded-none text-[11px] ${activePanel === 'analysis' ? 'bg-accent text-accent-foreground' : ''}`}
           onClick={() => setActivePanel('analysis')}
         >
           Analysis
