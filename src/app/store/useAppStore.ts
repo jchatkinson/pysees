@@ -8,6 +8,18 @@ import type { LevelEntity } from '@/app/types/levels'
 import { LocalAgentClient, type AgentConnectionState } from '@/app/lib/localAgent'
 import { buildUniaxialMaterialCallArgs, validateUniaxialMaterialValues } from '@/app/lib/commandSchemas'
 import { applyModelWrite, deleteEntity, previewDeleteEntity, removeModelChild, type ModelDeletableKind, type ModelWrite } from '@/app/lib/modelWrite'
+import { compileInputV1 } from '@/app/lib/carapace/compileInputV1'
+import { runCarapace as runCarapaceWasm, type CarapaceRunResult } from '@/app/lib/carapace/runCarapace'
+import type { CompileDiagnostic } from '@/app/lib/compileAnalysisSequence'
+
+export interface CarapaceRunState {
+  status: 'idle' | 'compiling' | 'running' | 'done' | 'error'
+  diagnostics: CompileDiagnostic[]
+  result: CarapaceRunResult | null
+  error: string | null
+}
+
+const IDLE_CARAPACE_RUN: CarapaceRunState = { status: 'idle', diagnostics: [], result: null, error: null }
 
 const DEFAULT_STRAIN_PROTOCOL = [0, 0.001, -0.001, 0.002, -0.002, 0.003, -0.003, 0]
 const agentClient = new LocalAgentClient()
@@ -58,6 +70,11 @@ interface AppStore {
   }
   activePanel: 'model' | 'analysis'
   setActivePanel: (panel: 'model' | 'analysis') => void
+
+  // Carapace run
+  carapaceRun: CarapaceRunState
+  runCarapace: () => Promise<void>
+  clearCarapaceRun: () => void
 
   // Model panel selection/editing
   selectedModelEntity: { kind: ModelDeletableKind; id: number } | null
@@ -231,6 +248,25 @@ export const useAppStore = create<AppStore>((set, get) => {
   materialPreview: { running: false, jobId: null, points: [], error: null, logs: [], panelOpen: false, protocol: [...DEFAULT_STRAIN_PROTOCOL], inputMaterial: null },
   activePanel: 'model',
   setActivePanel: (panel) => set({ activePanel: panel }),
+
+  carapaceRun: IDLE_CARAPACE_RUN,
+  clearCarapaceRun: () => set({ carapaceRun: IDLE_CARAPACE_RUN }),
+  runCarapace: async () => {
+    const { model, analysisHistory } = get()
+    set({ carapaceRun: { status: 'compiling', diagnostics: [], result: null, error: null } })
+    const { input, diagnostics } = compileInputV1(model, analysisHistory)
+    if (!input) {
+      set({ carapaceRun: { status: 'error', diagnostics, result: null, error: 'Compile failed — see diagnostics.' } })
+      return
+    }
+    set({ carapaceRun: { status: 'running', diagnostics, result: null, error: null } })
+    try {
+      const result = await runCarapaceWasm(input)
+      set({ carapaceRun: { status: result.error ? 'error' : 'done', diagnostics, result, error: result.error ? JSON.stringify(result.error) : null } })
+    } catch (error) {
+      set({ carapaceRun: { status: 'error', diagnostics, result: null, error: String(error) } })
+    }
+  },
 
   selectedModelEntity: null,
   setSelectedModelEntity: (sel) => set({ selectedModelEntity: sel }),

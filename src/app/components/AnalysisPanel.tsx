@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
-import { ChevronRight } from 'lucide-react'
+import { ChevronRight, Play, Loader2, CheckCircle2, XCircle } from 'lucide-react'
 import { ScrollArea } from '@/app/components/ui/scroll-area'
+import { Button } from '@/app/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/app/components/ui/tooltip'
 import { useAppStore } from '@/app/store/useAppStore'
 import type { AnalysisCommand } from '@/app/types/analysisCommands'
@@ -58,6 +59,8 @@ export function AnalysisPanel() {
     analysisInsertionIndex,
     setAnalysisInsertionIndex,
     moveAnalysisCommand,
+    carapaceRun,
+    runCarapace,
   } = useAppStore()
 
   const { commands, cursor } = analysisHistory
@@ -66,6 +69,8 @@ export function AnalysisPanel() {
   const [overrides, setOverrides] = useState<Set<number>>(new Set())
   const [dragIndex, setDragIndex] = useState<number | null>(null)
   const [dragTarget, setDragTarget] = useState<number | null>(null)
+  const [diagnosticsOpen, setDiagnosticsOpen] = useState(false)
+  const busy = carapaceRun.status === 'compiling' || carapaceRun.status === 'running'
 
   const isGroupCollapsed = (g: DisplayGroup) => {
     if (g.count <= 1) return false
@@ -143,8 +148,23 @@ export function AnalysisPanel() {
 
   return (
     <div className="flex flex-col h-full">
-      <div className="px-2 py-1 text-[10px] font-medium uppercase tracking-widest text-muted-foreground border-b shrink-0">
-        Analysis
+      <div className="px-2 py-1 flex items-center gap-2 border-b shrink-0">
+        <span className="text-[10px] font-medium uppercase tracking-widest text-muted-foreground">Analysis</span>
+        <Tooltip>
+          <TooltipTrigger
+            render={
+              <Button
+                variant="ghost" size="icon" className="size-6 ml-auto"
+                disabled={commands.length === 0 || busy}
+                onClick={() => { setDiagnosticsOpen(true); void runCarapace() }}
+                aria-label="Run in Carapace"
+              >
+                {busy ? <Loader2 className="size-3.5 animate-spin" /> : <Play className="size-3.5" />}
+              </Button>
+            }
+          />
+          <TooltipContent>Run in Carapace</TooltipContent>
+        </Tooltip>
       </div>
       <div className="flex-1 min-h-0 overflow-hidden">
         <ScrollArea className="h-full">
@@ -182,6 +202,36 @@ export function AnalysisPanel() {
           </div>
         </ScrollArea>
       </div>
+      {carapaceRun.status !== 'idle' && (
+        <div className="border-t shrink-0 text-[10px]">
+          <button
+            className="w-full flex items-center gap-1.5 px-2 py-1 hover:bg-accent/60 transition-colors"
+            onClick={() => setDiagnosticsOpen((v) => !v)}
+          >
+            {carapaceRun.status === 'compiling' && <><Loader2 className="size-3 animate-spin shrink-0" /><span>Compiling…</span></>}
+            {carapaceRun.status === 'running' && <><Loader2 className="size-3 animate-spin shrink-0" /><span>Running{carapaceRun.result ? '' : ` — ${carapaceRun.diagnostics.length} diagnostic(s)`}…</span></>}
+            {carapaceRun.status === 'done' && <><CheckCircle2 className="size-3 shrink-0 text-emerald-600" /><span>Run complete — {carapaceRun.result?.stagesRun.length ?? 0} stage(s), {carapaceRun.result?.recorderSamples.length ?? 0} recorder(s)</span></>}
+            {carapaceRun.status === 'error' && <><XCircle className="size-3 shrink-0 text-destructive" /><span className="truncate">{carapaceRun.error ?? 'Run failed'}</span></>}
+            {carapaceRun.diagnostics.length > 0 && <span className="ml-auto text-muted-foreground/70">{carapaceRun.diagnostics.length} diagnostic(s)</span>}
+            <ChevronRight className={`size-3 shrink-0 transition-transform ${diagnosticsOpen ? 'rotate-90' : ''}`} />
+          </button>
+          {diagnosticsOpen && (
+            <div className="max-h-32 overflow-auto px-2 pb-1.5 space-y-0.5">
+              {carapaceRun.diagnostics.length === 0 && <p className="text-muted-foreground/60 py-1">No diagnostics.</p>}
+              {carapaceRun.diagnostics.map((d, i) => (
+                <p key={i} className={d.severity === 'error' ? 'text-destructive' : 'text-amber-600'}>
+                  [{d.severity}] {d.message}
+                </p>
+              ))}
+              {carapaceRun.result && carapaceRun.result.recorderSamples.map((samples, i) => (
+                <p key={`r${i}`} className="text-muted-foreground font-mono">
+                  recorder[{i}]: {samples.length} sample(s){samples.length ? ` — last: t=${samples[samples.length - 1][0]}, v=${samples[samples.length - 1][1]}` : ''}
+                </p>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
       <div className="border-t px-2 py-0.5 shrink-0 flex items-center justify-between text-[10px] text-muted-foreground">
         <span>Insert: {analysisInsertionIndex === null ? 'end' : `#${analysisInsertionIndex + 1}`}</span>
         {analysisInsertionIndex !== null && (
