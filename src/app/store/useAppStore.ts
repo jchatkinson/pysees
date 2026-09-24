@@ -9,17 +9,21 @@ import { LocalAgentClient, type AgentConnectionState } from '@/app/lib/localAgen
 import { buildUniaxialMaterialCallArgs, validateUniaxialMaterialValues } from '@/app/lib/commandSchemas'
 import { applyModelWrite, deleteEntity, previewDeleteEntity, removeModelChild, type ModelDeletableKind, type ModelWrite } from '@/app/lib/modelWrite'
 import { compileInputV1 } from '@/app/lib/carapace/compileInputV1'
-import { runCarapace as runCarapaceWasm, type CarapaceRunResult } from '@/app/lib/carapace/runCarapace'
+import { runCarapaceOnWorker, nextCarapaceRunId } from '@/app/lib/carapace/carapaceWorkerClient'
+import type { CarapaceRunProgress, CarapaceRunResult } from '@/app/types/carapaceRun'
 import type { CompileDiagnostic } from '@/app/lib/compileAnalysisSequence'
 
 export interface CarapaceRunState {
-  status: 'idle' | 'compiling' | 'running' | 'done' | 'error'
+  status: 'idle' | 'compiling' | 'running' | 'done' | 'error' | 'cancelled'
   diagnostics: CompileDiagnostic[]
   result: CarapaceRunResult | null
   error: string | null
+  progress: CarapaceRunProgress | null
+  runId: string | null
 }
 
-const IDLE_CARAPACE_RUN: CarapaceRunState = { status: 'idle', diagnostics: [], result: null, error: null }
+const IDLE_CARAPACE_RUN: CarapaceRunState = { status: 'idle', diagnostics: [], result: null, error: null, progress: null, runId: null }
+let activeCarapaceCancel: (() => void) | null = null
 
 const DEFAULT_STRAIN_PROTOCOL = [0, 0.001, -0.001, 0.002, -0.002, 0.003, -0.003, 0]
 const agentClient = new LocalAgentClient()
@@ -74,6 +78,7 @@ interface AppStore {
   // Carapace run
   carapaceRun: CarapaceRunState
   runCarapace: () => Promise<void>
+  cancelCarapaceRun: () => void
   clearCarapaceRun: () => void
 
   // Model panel selection/editing
@@ -251,20 +256,29 @@ export const useAppStore = create<AppStore>((set, get) => {
 
   carapaceRun: IDLE_CARAPACE_RUN,
   clearCarapaceRun: () => set({ carapaceRun: IDLE_CARAPACE_RUN }),
+  cancelCarapaceRun: () => activeCarapaceCancel?.(),
   runCarapace: async () => {
     const { model, analysisHistory } = get()
-    set({ carapaceRun: { status: 'compiling', diagnostics: [], result: null, error: null } })
+    set({ carapaceRun: { status: 'compiling', diagnostics: [], result: null, error: null, progress: null, runId: null } })
     const { input, diagnostics } = compileInputV1(model, analysisHistory)
     if (!input) {
-      set({ carapaceRun: { status: 'error', diagnostics, result: null, error: 'Compile failed — see diagnostics.' } })
+      set({ carapaceRun: { status: 'error', diagnostics, result: null, error: 'Compile failed — see diagnostics.', progress: null, runId: null } })
       return
     }
-    set({ carapaceRun: { status: 'running', diagnostics, result: null, error: null } })
+    const runId = nextCarapaceRunId()
+    set({ carapaceRun: { status: 'running', diagnostics, result: null, error: null, progress: null, runId } })
+    const { promise, cancel } = runCarapaceOnWorker(runId, input, {
+      onProgress: (progress) => set((s) => (s.carapaceRun.runId === runId ? { carapaceRun: { ...s.carapaceRun, progress } } : {})),
+    })
+    activeCarapaceCancel = cancel
     try {
-      const result = await runCarapaceWasm(input)
-      set({ carapaceRun: { status: result.error ? 'error' : 'done', diagnostics, result, error: result.error ? JSON.stringify(result.error) : null } })
+      const result = await promise
+      set({ carapaceRun: { status: result.error ? 'error' : 'done', diagnostics, result, error: result.error ? JSON.stringify(result.error) : null, progress: null, runId } })
     } catch (error) {
-      set({ carapaceRun: { status: 'error', diagnostics, result: null, error: String(error) } })
+      const cancelled = error instanceof Error && error.message === 'cancelled'
+      set({ carapaceRun: { status: cancelled ? 'cancelled' : 'error', diagnostics, result: null, error: cancelled ? null : String(error), progress: null, runId } })
+    } finally {
+      activeCarapaceCancel = null
     }
   },
 

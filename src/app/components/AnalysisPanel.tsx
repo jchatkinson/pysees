@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { ChevronRight, Play, Loader2, CheckCircle2, XCircle } from 'lucide-react'
+import { ChevronRight, Play, Loader2, CheckCircle2, XCircle, Square } from 'lucide-react'
 import { ScrollArea } from '@/app/components/ui/scroll-area'
 import { Button } from '@/app/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/app/components/ui/tooltip'
@@ -61,6 +61,7 @@ export function AnalysisPanel() {
     moveAnalysisCommand,
     carapaceRun,
     runCarapace,
+    cancelCarapaceRun,
   } = useAppStore()
 
   const { commands, cursor } = analysisHistory
@@ -155,15 +156,15 @@ export function AnalysisPanel() {
             render={
               <Button
                 variant="ghost" size="icon" className="size-6 ml-auto"
-                disabled={commands.length === 0 || busy}
-                onClick={() => { setDiagnosticsOpen(true); void runCarapace() }}
-                aria-label="Run in Carapace"
+                disabled={commands.length === 0 && !busy}
+                onClick={() => { if (busy) { cancelCarapaceRun() } else { setDiagnosticsOpen(true); void runCarapace() } }}
+                aria-label={busy ? 'Cancel Carapace run' : 'Run in Carapace'}
               >
-                {busy ? <Loader2 className="size-3.5 animate-spin" /> : <Play className="size-3.5" />}
+                {busy ? <Square className="size-3 fill-current" /> : <Play className="size-3.5" />}
               </Button>
             }
           />
-          <TooltipContent>Run in Carapace</TooltipContent>
+          <TooltipContent>{busy ? 'Cancel run' : 'Run in Carapace'}</TooltipContent>
         </Tooltip>
       </div>
       <div className="flex-1 min-h-0 overflow-hidden">
@@ -209,8 +210,12 @@ export function AnalysisPanel() {
             onClick={() => setDiagnosticsOpen((v) => !v)}
           >
             {carapaceRun.status === 'compiling' && <><Loader2 className="size-3 animate-spin shrink-0" /><span>Compiling…</span></>}
-            {carapaceRun.status === 'running' && <><Loader2 className="size-3 animate-spin shrink-0" /><span>Running{carapaceRun.result ? '' : ` — ${carapaceRun.diagnostics.length} diagnostic(s)`}…</span></>}
+            {carapaceRun.status === 'running' && (
+              <><Loader2 className="size-3 animate-spin shrink-0" />
+              <span>{carapaceRun.progress ? `Running — ${carapaceRun.progress.currentStageId ?? 'stage'}, ${carapaceRun.progress.stepsTaken} step(s)…` : 'Running…'}</span></>
+            )}
             {carapaceRun.status === 'done' && <><CheckCircle2 className="size-3 shrink-0 text-emerald-600" /><span>Run complete — {carapaceRun.result?.stagesRun.length ?? 0} stage(s), {carapaceRun.result?.recorderSamples.length ?? 0} recorder(s)</span></>}
+            {carapaceRun.status === 'cancelled' && <><XCircle className="size-3 shrink-0 text-muted-foreground" /><span>Run cancelled</span></>}
             {carapaceRun.status === 'error' && <><XCircle className="size-3 shrink-0 text-destructive" /><span className="truncate">{carapaceRun.error ?? 'Run failed'}</span></>}
             {carapaceRun.diagnostics.length > 0 && <span className="ml-auto text-muted-foreground/70">{carapaceRun.diagnostics.length} diagnostic(s)</span>}
             <ChevronRight className={`size-3 shrink-0 transition-transform ${diagnosticsOpen ? 'rotate-90' : ''}`} />

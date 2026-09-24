@@ -15,6 +15,29 @@ export interface TemplateResult {
   levels?: LevelEntity[]
 }
 
+/** A one-pattern Plain/Linear static load, registered before a "Whole Model Recorder" +
+ * "Run Gravity Analysis" block pair — the minimum a template needs to be immediately
+ * runnable (script export or Carapace) with recorded output, not just a bare geometry. */
+function staticLoadAnalysis(
+  loadNode: number,
+  loadValues: number[],
+  steps = 10,
+): { writes: ModelWrite[]; analysisCommands: AnalysisCommand[] } {
+  const patternId = 1
+  const tsId = 1
+  return {
+    writes: [
+      { kind: 'timeSeries', entity: { id: tsId, tsType: 'Linear', args: { tag: tsId, factor: 1 } } },
+      { kind: 'pattern', entity: { id: patternId, patternType: 'Plain', args: { patternTag: patternId, tsTag: tsId, fact: 1 }, children: [] } },
+      { kind: 'patternChild', patternId, child: { kind: 'load', args: { nodeTag: loadNode, values: loadValues } } },
+    ],
+    analysisCommands: [
+      { type: 'ANALYSIS_BLOCK', blockId: 'whole-model-recorder', params: { directory: 'out' } },
+      { type: 'ANALYSIS_BLOCK', blockId: 'run-gravity-analysis', params: { steps } },
+    ],
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Moment-Curvature
 // 2D zerolength element with a fiber section:
@@ -22,10 +45,12 @@ export interface TemplateResult {
 // ---------------------------------------------------------------------------
 export function momentCurvatureTemplate(): TemplateResult {
   const BAR_AREA = Math.PI * 0.01 * 0.01 // Ø20mm → 3.14e-4 m²
+  const AXIAL_LOAD = -800e3 // N, compression — ~18% of gross axial capacity for this section
   const writes: ModelWrite[] = [
     { kind: 'node', entity: { id: 1, coords: [0, 0] } },
     { kind: 'node', entity: { id: 2, coords: [0, 0] } },
     { kind: 'fix', entity: { nodeId: 1, dofs: [1, 2, 3] } },
+    { kind: 'fix', entity: { nodeId: 2, dofs: [2] } }, // restrain shear DOF — the section has no shear stiffness
     { kind: 'material', entity: { id: 1, kind: 'uniaxial', matType: 'Steel01', args: { matTag: 1, matType: 'Steel01', Fy: 400e6, E0: 200e9, b: 0.01 } } },
     { kind: 'material', entity: { id: 2, kind: 'uniaxial', matType: 'Concrete01', args: { matTag: 2, matType: 'Concrete01', fpc: -30e6, epsc0: -0.002, fpcu: -6e6, epsU: -0.006 } } },
     { kind: 'section', entity: { id: 1, secType: 'Fiber', args: { secTag: 1, type: 'Fiber' }, children: [
@@ -37,7 +62,22 @@ export function momentCurvatureTemplate(): TemplateResult {
     ] } },
     { kind: 'element', entity: { id: 1, eleType: 'zeroLengthSection', nodes: [1, 2], args: { secTag: 1 } } },
   ]
-  return { ndm: 2, ndf: 3, writes, analysisCommands: [] }
+
+  writes.push(
+    { kind: 'timeSeries', entity: { id: 1, tsType: 'Linear', args: { tag: 1, factor: 1 } } },
+    { kind: 'pattern', entity: { id: 1, patternType: 'Plain', args: { patternTag: 1, tsTag: 1, fact: 1 }, children: [] } },
+    { kind: 'patternChild', patternId: 1, child: { kind: 'load', args: { nodeTag: 2, values: [AXIAL_LOAD, 0, 0] } } },
+  )
+
+  // Standard two-stage moment-curvature protocol: hold axial load constant, then sweep
+  // curvature via rotation (DOF 3) displacement control at the free node.
+  const analysisCommands: AnalysisCommand[] = [
+    { type: 'ANALYSIS_BLOCK', blockId: 'whole-model-recorder', params: { directory: 'out' } },
+    { type: 'ANALYSIS_BLOCK', blockId: 'run-gravity-analysis', params: { steps: 10 } },
+    { type: 'ANALYSIS_BLOCK', blockId: 'run-pushover-analysis', params: { nodeTag: 2, dof: 3, increment: 1e-4, steps: 200 } },
+  ]
+
+  return { ndm: 2, ndf: 3, writes, analysisCommands }
 }
 
 // ---------------------------------------------------------------------------
@@ -68,7 +108,11 @@ export function cantileverTemplate({ n, h }: CantileverParams): TemplateResult {
     })
   }
 
-  return { ndm: 2, ndf: 3, writes, analysisCommands: [] }
+  // Lateral point load at the tip.
+  const tipNode = n + 1
+  const analysis = staticLoadAnalysis(tipNode, [10e3, 0, 0])
+
+  return { ndm: 2, ndf: 3, writes: [...writes, ...analysis.writes], analysisCommands: analysis.analysisCommands }
 }
 
 // ---------------------------------------------------------------------------
@@ -137,5 +181,9 @@ export function frameTemplate({ stories, storyH, bays, bayW, base }: FrameParams
     levels.push({ id: j + 1, label: alphaLabel(j), height: storyH })
   }
 
-  return { ndm: 2, ndf: 3, writes, analysisCommands: [], gridlines, levels }
+  // Lateral point load at the roof, leeward corner.
+  const roofNode = nodeId(bays, stories)
+  const analysis = staticLoadAnalysis(roofNode, [10e3 * stories, 0, 0])
+
+  return { ndm: 2, ndf: 3, writes: [...writes, ...analysis.writes], analysisCommands: analysis.analysisCommands, gridlines, levels }
 }
