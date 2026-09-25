@@ -260,14 +260,14 @@ export const useAppStore = create<AppStore>((set, get) => {
   runCarapace: async () => {
     const { model, analysisHistory } = get()
     set({ carapaceRun: { status: 'compiling', diagnostics: [], result: null, error: null, progress: null, runId: null } })
-    const { input, diagnostics } = compileInputV1(model, analysisHistory)
+    const { input, diagnostics, recordedNodeTags, dofsPerNode } = compileInputV1(model, analysisHistory)
     if (!input) {
       set({ carapaceRun: { status: 'error', diagnostics, result: null, error: 'Compile failed — see diagnostics.', progress: null, runId: null } })
       return
     }
     const runId = nextCarapaceRunId()
     set({ carapaceRun: { status: 'running', diagnostics, result: null, error: null, progress: null, runId } })
-    const { promise, cancel } = runCarapaceOnWorker(runId, input, {
+    const { promise, cancel } = runCarapaceOnWorker(runId, input, recordedNodeTags, dofsPerNode, {
       onProgress: (progress) => set((s) => (s.carapaceRun.runId === runId ? { carapaceRun: { ...s.carapaceRun, progress } } : {})),
     })
     activeCarapaceCancel = cancel

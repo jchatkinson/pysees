@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { ChevronRight, Play, Loader2, CheckCircle2, XCircle, Square } from 'lucide-react'
 import { ScrollArea } from '@/app/components/ui/scroll-area'
 import { Button } from '@/app/components/ui/button'
@@ -7,6 +7,7 @@ import { useAppStore } from '@/app/store/useAppStore'
 import type { AnalysisCommand } from '@/app/types/analysisCommands'
 import { domainForFn } from '@/app/lib/commandDomain'
 import { getAnalysisBlock } from '@/app/lib/analysisBlocks'
+import { queryResults } from '@/app/lib/resultsStorage/resultsStorageClient'
 
 function cmdCategory(cmd: AnalysisCommand): string {
   if (cmd.type === 'ANALYSIS_BLOCK') return 'blocks'
@@ -72,6 +73,32 @@ export function AnalysisPanel() {
   const [dragTarget, setDragTarget] = useState<number | null>(null)
   const [diagnosticsOpen, setDiagnosticsOpen] = useState(false)
   const busy = carapaceRun.status === 'compiling' || carapaceRun.status === 'running'
+
+  // Last-sample preview, fetched on demand from the results-storage worker instead of kept in
+  // memory for the whole run (carapace/docs/results-storage-indexeddb.md's Stage 5) — only
+  // queried once the diagnostics list is actually opened, and only the one sample each node
+  // needs to show here. Every recorded node now carries its full displacement vector (no
+  // per-recorder DOF selection), so this is one vector per node, not one scalar per DOF.
+  const [lastSamples, setLastSamples] = useState<Record<number, number[] | undefined>>({})
+  useEffect(() => {
+    if (!diagnosticsOpen || !carapaceRun.result || !carapaceRun.runId) return
+    const runId = carapaceRun.runId
+    const { sampleCount, recordedNodeTags } = carapaceRun.result
+    let cancelled = false
+    void (async () => {
+      if (sampleCount === 0) { if (!cancelled) setLastSamples({}); return }
+      const next: Record<number, number[] | undefined> = {}
+      await Promise.all(recordedNodeTags.map(async (nodeTag) => {
+        try {
+          const reply = await queryResults(runId, String(nodeTag), sampleCount - 1, 1)
+          const sample = reply.samples[0]
+          if (sample) next[nodeTag] = sample.components
+        } catch { /* best-effort preview; the run's own status already reports failures */ }
+      }))
+      if (!cancelled) setLastSamples(next)
+    })()
+    return () => { cancelled = true }
+  }, [diagnosticsOpen, carapaceRun.result, carapaceRun.runId])
 
   const isGroupCollapsed = (g: DisplayGroup) => {
     if (g.count <= 1) return false
@@ -214,7 +241,7 @@ export function AnalysisPanel() {
               <><Loader2 className="size-3 animate-spin shrink-0" />
               <span>{carapaceRun.progress ? `Running — ${carapaceRun.progress.currentStageId ?? 'stage'}, ${carapaceRun.progress.stepsTaken} step(s)…` : 'Running…'}</span></>
             )}
-            {carapaceRun.status === 'done' && <><CheckCircle2 className="size-3 shrink-0 text-emerald-600" /><span>Run complete — {carapaceRun.result?.stagesRun.length ?? 0} stage(s), {carapaceRun.result?.recorderSamples.length ?? 0} recorder(s)</span></>}
+            {carapaceRun.status === 'done' && <><CheckCircle2 className="size-3 shrink-0 text-emerald-600" /><span>Run complete — {carapaceRun.result?.stagesRun.length ?? 0} stage(s), {carapaceRun.result?.recordedNodeTags.length ?? 0} node(s), {carapaceRun.result?.sampleCount ?? 0} sample(s)</span></>}
             {carapaceRun.status === 'cancelled' && <><XCircle className="size-3 shrink-0 text-muted-foreground" /><span>Run cancelled</span></>}
             {carapaceRun.status === 'error' && <><XCircle className="size-3 shrink-0 text-destructive" /><span className="truncate">{carapaceRun.error ?? 'Run failed'}</span></>}
             {carapaceRun.diagnostics.length > 0 && <span className="ml-auto text-muted-foreground/70">{carapaceRun.diagnostics.length} diagnostic(s)</span>}
@@ -228,11 +255,14 @@ export function AnalysisPanel() {
                   [{d.severity}] {d.message}
                 </p>
               ))}
-              {carapaceRun.result && carapaceRun.result.recorderSamples.map((samples, i) => (
-                <p key={`r${i}`} className="text-muted-foreground font-mono">
-                  recorder[{i}]: {samples.length} sample(s){samples.length ? ` — last: t=${samples[samples.length - 1][0]}, v=${samples[samples.length - 1][1]}` : ''}
-                </p>
-              ))}
+              {carapaceRun.result && carapaceRun.result.recordedNodeTags.map((nodeTag) => {
+                const last = lastSamples[nodeTag]
+                return (
+                  <p key={`n${nodeTag}`} className="text-muted-foreground font-mono">
+                    node[{nodeTag}]: {carapaceRun.result!.sampleCount} sample(s){last ? ` — last: [${last.map((v) => v.toPrecision(4)).join(', ')}]` : ''}
+                  </p>
+                )
+              })}
             </div>
           )}
         </div>

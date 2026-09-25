@@ -11,8 +11,12 @@ export class WasmSession {
     free(): void;
     [Symbol.dispose](): void;
     /**
-     * See `input_v1::Session::advance`. Returns a
-     * `{ done, stageComplete, stepsTaken, loadFactor, error }` object.
+     * See `input_v1::Session::advance`. Returns a `{ done, stageComplete, stepsTaken,
+     * loadFactor, error, recorderBatches }` object — `recorderBatches` holds only the samples
+     * this call produced (results-storage-indexeddb.md's `recorderBatch`, one entry per
+     * recorder that recorded this call), not the whole run's history. There is no separate
+     * "samples so far" accessor: a caller that needs the full history accumulates these
+     * batches itself, same as the planned results-storage worker will.
      */
     advance(step_budget: number): any;
     /**
@@ -21,11 +25,6 @@ export class WasmSession {
      * completed.
      */
     currentStageId(): string | undefined;
-    /**
-     * `[pseudoTime, value][]` samples recorded so far for one recorder,
-     * in the order given to `SequenceSpec::recorders`.
-     */
-    recorderSamples(recorder_index: number): any;
 }
 
 export function axial_displacement(load: number, length: number, area: number, modulus: number): number;
@@ -118,7 +117,6 @@ export interface InitOutput {
     readonly simply_supported_beam_end_rotation: (a: number, b: number, c: number, d: number, e: number) => number;
     readonly wasmsession_advance: (a: number, b: number) => [number, number, number];
     readonly wasmsession_currentStageId: (a: number) => [number, number];
-    readonly wasmsession_recorderSamples: (a: number, b: number) => [number, number, number];
     readonly zero_length_ent_displacement: (a: number, b: number) => number;
     readonly __wbindgen_malloc: (a: number, b: number) => number;
     readonly __wbindgen_realloc: (a: number, b: number, c: number, d: number) => number;

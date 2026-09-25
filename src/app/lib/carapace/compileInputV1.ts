@@ -7,6 +7,11 @@ import { compileAnalysisSequence, type CompileDiagnostic } from '@/app/lib/compi
 export interface CompileInputV1Result {
   input: W.CarapaceInputV1 | null
   diagnostics: CompileDiagnostic[]
+  /** Node tags recorded for displacement, in the order they occupy the dense results-storage
+   * layout (carapace/docs/results-storage-indexeddb.md) — `recordedNodeTags[i]` is nodeIndex `i`. */
+  recordedNodeTags: number[]
+  /** The model's ndf — every recorded node's fixed component width in that dense layout. */
+  dofsPerNode: number
 }
 
 const NO_INDEX = -1
@@ -20,7 +25,7 @@ export function compileInputV1(model: Model, analysisHistory: AnalysisHistory): 
   const diagnostics: CompileDiagnostic[] = []
   const fail = (message: string): CompileInputV1Result => {
     diagnostics.push({ severity: 'error', message, commandIndex: -1 })
-    return { input: null, diagnostics }
+    return { input: null, diagnostics, recordedNodeTags: [], dofsPerNode: 0 }
   }
 
   if (!model.config) return fail('Model is not initialized.')
@@ -161,21 +166,32 @@ export function compileInputV1(model: Model, analysisHistory: AnalysisHistory): 
     const wireStage = compileStage(stage, patternIndex, resolveNode, diagnostics)
     if (wireStage) stages.push(wireStage)
   })
-  const recorders: W.RecorderSpecWire[] = []
+  // Every recorded node always captures its full displacement vector — no per-recorder DOF
+  // selection. This keeps the dense [step][node][dof] results-storage layout addressable by pure
+  // arithmetic (carapace/docs/results-storage-indexeddb.md): a node's columns are always exactly
+  // `dofsPerNode` wide, so there's never a per-recorder offset table to maintain. A RecorderSpec's
+  // own `dofs` (a subset) is intentionally ignored here — it still governs what the exported
+  // openseespy script's recorder command actually asks for; this only shapes Carapace's preview.
+  const dofsPerNode = model.config.ndf
+  const recordedNodeTags: number[] = []
+  const seenNodeTags = new Set<number>()
   for (const rec of sequence.recorders) {
     if (rec.targetKind !== 'node' || rec.responseKind !== 'disp') {
       diagnostics.push({ severity: 'warning', message: `Recorder "${rec.id}" (${rec.targetKind}/${rec.responseKind}) is not yet supported by Carapace — only node displacement recorders are — and was skipped`, commandIndex: -1 })
       continue
     }
     for (const tag of rec.targetTags) {
-      for (const dof of rec.dofs ?? []) {
-        if (dof > 2) continue
-        recorders.push({ node: resolveNode(tag, `Recorder "${rec.id}"`), dof })
-      }
+      if (!seenNodeTags.has(tag)) { seenNodeTags.add(tag); recordedNodeTags.push(tag) }
+    }
+  }
+  const recorders: W.RecorderSpecWire[] = []
+  for (const tag of recordedNodeTags) {
+    for (let dof = 0; dof < dofsPerNode; dof++) {
+      recorders.push({ node: resolveNode(tag, `Recorder for node ${tag}`), dof })
     }
   }
 
-  if (diagnostics.some((d) => d.severity === 'error')) return { input: null, diagnostics }
+  if (diagnostics.some((d) => d.severity === 'error')) return { input: null, diagnostics, recordedNodeTags: [], dofsPerNode: 0 }
 
   const input: W.CarapaceInputV1 = {
     header: { schemaVersion: 1, space: 2, engineVersion: 'pysees-dev' },
@@ -192,7 +208,7 @@ export function compileInputV1(model: Model, analysisHistory: AnalysisHistory): 
     elementLoads: { pattern: [], elementKind: [], elementIndex: [], load: [], stage: [] },
     sequence: { stages, recorders },
   }
-  return { input, diagnostics }
+  return { input, diagnostics, recordedNodeTags, dofsPerNode }
 }
 
 function compileMaterial(mat: MaterialEntity, diagnostics: CompileDiagnostic[]): W.MaterialSpec {

@@ -23,8 +23,12 @@ export class WasmSession {
         wasm.__wbg_wasmsession_free(ptr, 0);
     }
     /**
-     * See `input_v1::Session::advance`. Returns a
-     * `{ done, stageComplete, stepsTaken, loadFactor, error }` object.
+     * See `input_v1::Session::advance`. Returns a `{ done, stageComplete, stepsTaken,
+     * loadFactor, error, recorderBatches }` object — `recorderBatches` holds only the samples
+     * this call produced (results-storage-indexeddb.md's `recorderBatch`, one entry per
+     * recorder that recorded this call), not the whole run's history. There is no separate
+     * "samples so far" accessor: a caller that needs the full history accumulates these
+     * batches itself, same as the planned results-storage worker will.
      * @param {number} step_budget
      * @returns {any}
      */
@@ -49,19 +53,6 @@ export class WasmSession {
             wasm.__wbindgen_free(ret[0], ret[1] * 1, 1);
         }
         return v1;
-    }
-    /**
-     * `[pseudoTime, value][]` samples recorded so far for one recorder,
-     * in the order given to `SequenceSpec::recorders`.
-     * @param {number} recorder_index
-     * @returns {any}
-     */
-    recorderSamples(recorder_index) {
-        const ret = wasm.wasmsession_recorderSamples(this.__wbg_ptr, recorder_index);
-        if (ret[2]) {
-            throw takeFromExternrefTable0(ret[1]);
-        }
-        return takeFromExternrefTable0(ret[0]);
     }
 }
 if (Symbol.dispose) WasmSession.prototype[Symbol.dispose] = WasmSession.prototype.free;
