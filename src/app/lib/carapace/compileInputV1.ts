@@ -1,4 +1,4 @@
-import type { Model, MaterialEntity } from '@/app/types/model'
+import type { Model, MaterialEntity, BeamIntegrationEntity } from '@/app/types/model'
 import type { AnalysisHistory } from '@/app/types/analysisCommands'
 import type { AnalysisStage } from '@/app/types/analysisSequence'
 import type * as W from '@/app/types/carapaceInputV1'
@@ -85,9 +85,24 @@ export function compileInputV1(model: Model, analysisHistory: AnalysisHistory): 
     return idx
   }
 
+  // --- fiber sections (zeroLengthSection's own section, or a DispBeamColumn/ForceBeamColumn's
+  // beamIntegration-referenced one) — compiled once per `model.sections` entry, up front, so
+  // both element loops below can resolve a `secTag` to a `fibers`-table offset by simple lookup. ---
+  const { fibers, sectionIndex } = compileFiberSections(model, resolveMaterial, diagnostics)
+
   // --- elements ---
   const trusses: W.TrussTable = { nodeI: [], nodeJ: [], area: [], material: [], density: [] }
   const elasticBeamColumns: W.ElasticBeamColumnTable = { nodeI: [], nodeJ: [], e: [], a: [], iz: [], transform: [], density: [] }
+  const dispBeamColumns: W.FiberBeamColumnTable = { nodeI: [], nodeJ: [], fiberSection: [], integration: [], corotational: [], density: [] }
+  const zeroLengthSections: W.ZeroLengthSectionTable = { nodeI: [], nodeJ: [], fiberSection: [], materials: [] }
+  const resolveSection = (secTag: number, context: string): number => {
+    const idx = sectionIndex.get(secTag)
+    if (idx === undefined) {
+      diagnostics.push({ severity: 'error', message: `${context} references unknown or unsupported section ${secTag}`, commandIndex: -1 })
+      return NO_INDEX
+    }
+    return idx
+  }
   for (const ele of [...model.elements.values()].sort((a, b) => a.id - b.id)) {
     if (ele.eleType === 'Truss') {
       trusses.nodeI.push(resolveNode(ele.nodes[0], `Truss ${ele.id}`))
@@ -105,6 +120,25 @@ export function compileInputV1(model: Model, analysisHistory: AnalysisHistory): 
       elasticBeamColumns.iz.push(Number(ele.args.Iz) || 0)
       elasticBeamColumns.transform.push(compileTransform(transfType, `ElasticBeamColumn ${ele.id}`, diagnostics))
       elasticBeamColumns.density.push(0)
+    } else if (ele.eleType === 'DispBeamColumn') {
+      const integrationTag = Number(ele.args.integrationTag)
+      const integration = model.beamIntegrations.get(integrationTag)
+      if (!integration) {
+        diagnostics.push({ severity: 'error', message: `DispBeamColumn ${ele.id} references unknown beamIntegration ${integrationTag}`, commandIndex: -1 })
+        continue
+      }
+      const secIdx = resolveSection(Number(integration.args.secTag), `DispBeamColumn ${ele.id}`)
+      dispBeamColumns.nodeI.push(resolveNode(ele.nodes[0], `DispBeamColumn ${ele.id}`))
+      dispBeamColumns.nodeJ.push(resolveNode(ele.nodes[1], `DispBeamColumn ${ele.id}`))
+      dispBeamColumns.fiberSection.push(secIdx)
+      dispBeamColumns.integration.push(compileIntegration(integration, `DispBeamColumn ${ele.id}`, diagnostics))
+      dispBeamColumns.corotational.push(false)
+      dispBeamColumns.density.push(0)
+    } else if (ele.eleType === 'zeroLengthSection') {
+      const secIdx = resolveSection(Number(ele.args.secTag), `ZeroLengthSection ${ele.id}`)
+      zeroLengthSections.nodeI.push(resolveNode(ele.nodes[0], `ZeroLengthSection ${ele.id}`))
+      zeroLengthSections.nodeJ.push(resolveNode(ele.nodes[1], `ZeroLengthSection ${ele.id}`))
+      zeroLengthSections.fiberSection.push(secIdx)
     } else {
       diagnostics.push({ severity: 'warning', message: `Element ${ele.id} (${ele.eleType}) is not yet supported by the Carapace compiler and was skipped`, commandIndex: -1 })
     }
@@ -187,7 +221,7 @@ export function compileInputV1(model: Model, analysisHistory: AnalysisHistory): 
   const recorders: W.RecorderSpecWire[] = []
   for (const tag of recordedNodeTags) {
     for (let dof = 0; dof < dofsPerNode; dof++) {
-      recorders.push({ node: resolveNode(tag, `Recorder for node ${tag}`), dof })
+      recorders.push({ response: 'nodeDisp', node: resolveNode(tag, `Recorder for node ${tag}`), dof })
     }
   }
 
@@ -197,18 +231,116 @@ export function compileInputV1(model: Model, analysisHistory: AnalysisHistory): 
     header: { schemaVersion: 1, space: 2, engineVersion: 'pysees-dev' },
     nodes,
     materials,
-    fibers: { sectionOffsets: [], y: [], area: [], material: [] },
+    fibers,
     trusses,
     elasticBeamColumns,
-    dispBeamColumns: { nodeI: [], nodeJ: [], fiberSection: [], integration: [], corotational: [], density: [] },
+    dispBeamColumns,
     forceBeamColumns: { nodeI: [], nodeJ: [], fiberSection: [], integration: [], corotational: [], density: [] },
-    zeroLengths: { nodeI: [], nodeJ: [], materials: [] },
+    zeroLengths: { nodeI: [], nodeJ: [], materials: [], friction: [] },
+    zeroLengthSections,
+    equalDofs: { retained: [], constrained: [], dofs: [] },
+    rigidDiaphragms: { retained: [], constrained: [] },
     loadPatterns,
     nodalLoads,
     elementLoads: { pattern: [], elementKind: [], elementIndex: [], load: [], stage: [] },
     sequence: { stages, recorders },
+
+    // Planar-only compiler — every spatial (`*3`) table is required by `CarapaceInputV1` but
+    // always empty (see carapaceInputV1.ts's own module doc comment).
+    nodes3: { coords: [], fixed: [], massNodeIndex: [], mass: [] },
+    fibers3: { sectionOffsets: [], y: [], z: [], area: [], material: [] },
+    trusses3: { nodeI: [], nodeJ: [], area: [], material: [], density: [] },
+    elasticBeamColumns3: { nodeI: [], nodeJ: [], e: [], g: [], a: [], j: [], iy: [], iz: [], transform: [], density: [] },
+    dispBeamColumns3: { nodeI: [], nodeJ: [], g: [], j: [], vecXz: [], fiberSection: [], integration: [], density: [] },
+    forceBeamColumns3: { nodeI: [], nodeJ: [], g: [], j: [], vecXz: [], fiberSection: [], integration: [], density: [] },
+    zeroLengths3: { nodeI: [], nodeJ: [], materials: [], friction: [] },
+    zeroLengthSections3: { nodeI: [], nodeJ: [], fiberSection: [], materials: [] },
+    equalDofs3: { retained: [], constrained: [], dofs: [] },
+    rigidDiaphragms3: { retained: [], normal: [], constrained: [] },
+    nodalLoads3: { pattern: [], node: [], dof: [], value: [], stage: [] },
+    elementLoads3: { pattern: [], elementKind: [], elementIndex: [], load: [], stage: [] },
+    sequence3: { stages: [], recorders: [] },
   }
   return { input, diagnostics, recordedNodeTags, dofsPerNode }
+}
+
+/** Compiles every `model.sections` entry with `secType === 'Fiber'` into one flat, offset-indexed
+ * `W.FiberTable` (see its own doc comment) — shared by `zeroLengthSection` elements (whose section
+ * carries the element's whole axial/moment response) and `DispBeamColumn`/`ForceBeamColumn`
+ * elements (via their `beamIntegration`'s own `secTag`). Compiles every Fiber section in the
+ * model up front, indexed by its own tag, rather than lazily per referencing element — simpler,
+ * and cheap at template scale. Only `fiber` items and rectangular `patch` items are understood
+ * today (exactly what `templates.ts` produces); anything else is a warning, not silently ignored
+ * geometry. A rectangular patch is reduced to one fiber per `y`-subdivision (lumping every
+ * `z`-subdivision at that `y`-level into one fiber of the full cross-section width) — correct for
+ * a planar (`ndm=2`) model, where only each fiber's `y` and area (not its `z` position) affect the
+ * section's axial/bending response. */
+function compileFiberSections(
+  model: Model,
+  resolveMaterial: (matTag: number | undefined, context: string) => number,
+  diagnostics: CompileDiagnostic[],
+): { fibers: W.FiberTable; sectionIndex: Map<number, number> } {
+  const sectionIndex = new Map<number, number>()
+  const sectionOffsets: number[] = [0]
+  const y: number[] = []
+  const area: number[] = []
+  const material: number[] = []
+  const secTags = [...model.sections.keys()].sort((a, b) => a - b)
+  for (const secTag of secTags) {
+    const section = model.sections.get(secTag)!
+    if (section.secType !== 'Fiber') {
+      diagnostics.push({ severity: 'warning', message: `Section ${secTag} (${section.secType}) is not yet supported by the Carapace compiler and was skipped`, commandIndex: -1 })
+      continue
+    }
+    sectionIndex.set(secTag, sectionIndex.size)
+    for (const child of section.children) {
+      if (child.kind === 'fiber') {
+        const a = child.args as { yloc?: number; A?: number; matTag?: number }
+        y.push(Number(a.yloc) || 0)
+        area.push(Number(a.A) || 0)
+        material.push(resolveMaterial(Number(a.matTag), `Fiber in section ${secTag}`))
+      } else if (child.kind === 'patch' && child.subType === 'rect') {
+        compileRectPatch(child.args, secTag, resolveMaterial, y, area, material)
+      } else {
+        diagnostics.push({ severity: 'warning', message: `Section ${secTag}: fiber item "${child.kind}/${child.subType}" is not yet supported by the Carapace compiler and was skipped`, commandIndex: -1 })
+      }
+    }
+    sectionOffsets.push(y.length)
+  }
+  return { fibers: { sectionOffsets, y, area, material }, sectionIndex }
+}
+
+function compileRectPatch(
+  args: Record<string, unknown>,
+  secTag: number,
+  resolveMaterial: (matTag: number | undefined, context: string) => number,
+  y: number[],
+  area: number[],
+  material: number[],
+): void {
+  const a = args as { matTag?: number; numSubdivY?: number; numSubdivZ?: number; y1?: number; z1?: number; y2?: number; z2?: number }
+  const numSubdivY = Math.max(1, Math.trunc(Number(a.numSubdivY) || 1))
+  const width = Math.abs((Number(a.z2) || 0) - (Number(a.z1) || 0))
+  const y1 = Number(a.y1) || 0
+  const dy = ((Number(a.y2) || 0) - y1) / numSubdivY
+  const matIdx = resolveMaterial(Number(a.matTag), `Patch in section ${secTag}`)
+  for (let i = 0; i < numSubdivY; i++) {
+    y.push(y1 + dy * (i + 0.5))
+    area.push(Math.abs(dy) * width)
+    material.push(matIdx)
+  }
+}
+
+/** Compiles a `beamIntegration` entity into `W.IntegrationSpec` — only `Legendre`/`Lobatto` are
+ * meaningful to `core`'s `DispBeamColumn`/`ForceBeamColumn` (their own `BeamIntegration` enum),
+ * so anything else (e.g. `'UserDefined'`) defaults to `Legendre` with a diagnostic. */
+function compileIntegration(integration: BeamIntegrationEntity, context: string, diagnostics: CompileDiagnostic[]): W.IntegrationSpec {
+  const points = Math.max(1, Math.trunc(Number(integration.args.n) || 4))
+  if (integration.intType === 'Lobatto') return { kind: 'lobatto', points }
+  if (integration.intType !== 'Legendre') {
+    diagnostics.push({ severity: 'warning', message: `${context}: beamIntegration "${integration.intType}" not supported, defaulting to Legendre`, commandIndex: -1 })
+  }
+  return { kind: 'legendre', points }
 }
 
 function compileMaterial(mat: MaterialEntity, diagnostics: CompileDiagnostic[]): W.MaterialSpec {

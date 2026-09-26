@@ -67,17 +67,59 @@ export function momentCurvatureTemplate(): TemplateResult {
     { kind: 'timeSeries', entity: { id: 1, tsType: 'Linear', args: { tag: 1, factor: 1 } } },
     { kind: 'pattern', entity: { id: 1, patternType: 'Plain', args: { patternTag: 1, tsTag: 1, fact: 1 }, children: [] } },
     { kind: 'patternChild', patternId: 1, child: { kind: 'load', args: { nodeTag: 2, values: [AXIAL_LOAD, 0, 0] } } },
+    // A second, deliberately separate pattern carrying a *unit* moment at the same DOF the
+    // pushover stage sweeps: `DisplacementControl` picks each step's load factor from the
+    // tangent's response to this pattern's reference load (core's "unit-load technique"), which
+    // is exactly zero if no pattern applies anything at that DOF — and pattern 1 can't stand in
+    // for it, since gravity's own stage freezes pattern 1 (holds the axial load constant) before
+    // the pushover stage runs, and a frozen pattern stops contributing sensitivity entirely. Its
+    // magnitude is arbitrary (only its *direction* matters to the unit-load technique) — 1 is the
+    // usual OpenSeesPy moment-curvature convention.
+    { kind: 'timeSeries', entity: { id: 2, tsType: 'Linear', args: { tag: 2, factor: 1 } } },
+    { kind: 'pattern', entity: { id: 2, patternType: 'Plain', args: { patternTag: 2, tsTag: 2, fact: 1 }, children: [] } },
+    { kind: 'patternChild', patternId: 2, child: { kind: 'load', args: { nodeTag: 2, values: [0, 0, 1] } } },
   )
 
   // Standard two-stage moment-curvature protocol: hold axial load constant, then sweep
-  // curvature via rotation (DOF 3) displacement control at the free node.
+  // curvature via rotation (DOF 3) displacement control at the free node. `holdPatterns: [1]`
+  // freezes only the axial pattern — the unit-moment pattern (2) must stay live into the
+  // pushover stage (see the comment on it above).
   const analysisCommands: AnalysisCommand[] = [
     { type: 'ANALYSIS_BLOCK', blockId: 'whole-model-recorder', params: { directory: 'out' } },
-    { type: 'ANALYSIS_BLOCK', blockId: 'run-gravity-analysis', params: { steps: 10 } },
+    { type: 'ANALYSIS_BLOCK', blockId: 'run-gravity-analysis', params: { steps: 10, holdPatterns: [1] } },
     { type: 'ANALYSIS_BLOCK', blockId: 'run-pushover-analysis', params: { nodeTag: 2, dof: 3, increment: 1e-4, steps: 200 } },
   ]
 
   return { ndm: 2, ndf: 3, writes, analysisCommands }
+}
+
+/** Cross-section geometry shared by an `eleType`-parameterized template's member: an elastic
+ * `A`/`E`/`Iz` for `elasticBeamColumn`, or (for `dispBeamColumn`) a `Fiber` section carrying one
+ * rectangular patch sized to that exact same `A`/`Iz` (`height` from `Iz/A = height^2/12`,
+ * `width = A/height`) plus a `Legendre` `beamIntegration` referencing it — same member stiffness,
+ * but actually exercised through Carapace's nonlinear fiber element (`carapace/wasm-bridge`'s
+ * `DispBeamColumn`) instead of silently building an elastic one regardless of the caller's
+ * choice. `matTag`/`transfTag`/`sectionId`/`integrationId` are shared across every element the
+ * caller builds from the returned args — one section/integration per template call, not one per
+ * element, since every member here shares the same cross-section. */
+function beamMemberArgs(
+  writes: ModelWrite[],
+  eleType: 'elasticBeamColumn' | 'dispBeamColumn',
+  section: { A: number; E: number; Iz: number },
+  ids: { matTag: number; transfTag: number; sectionId: number; integrationId: number },
+): { eleType: string; args: Record<string, unknown> } {
+  if (eleType === 'elasticBeamColumn') {
+    return { eleType: 'ElasticBeamColumn', args: { A: section.A, E: section.E, Iz: section.Iz, transfTag: ids.transfTag } }
+  }
+  const height = Math.sqrt((12 * section.Iz) / section.A)
+  const width = section.A / height
+  writes.push(
+    { kind: 'section', entity: { id: ids.sectionId, secType: 'Fiber', args: { secTag: ids.sectionId, type: 'Fiber' }, children: [
+      { kind: 'patch', subType: 'rect', args: { matTag: ids.matTag, numSubdivY: 10, numSubdivZ: 1, y1: -height / 2, z1: -width / 2, y2: height / 2, z2: width / 2 } },
+    ] } },
+    { kind: 'beamIntegration', entity: { id: ids.integrationId, intType: 'Legendre', args: { tag: ids.integrationId, secTag: ids.sectionId, n: 4 } } },
+  )
+  return { eleType: 'DispBeamColumn', args: { transfTag: ids.transfTag, integrationTag: ids.integrationId } }
 }
 
 // ---------------------------------------------------------------------------
@@ -90,7 +132,7 @@ export interface CantileverParams {
   eleType: 'elasticBeamColumn' | 'dispBeamColumn'
 }
 
-export function cantileverTemplate({ n, h }: CantileverParams): TemplateResult {
+export function cantileverTemplate({ n, h, eleType }: CantileverParams): TemplateResult {
   const writes: ModelWrite[] = []
   const dy = h / n
 
@@ -101,10 +143,11 @@ export function cantileverTemplate({ n, h }: CantileverParams): TemplateResult {
   writes.push({ kind: 'geomTransf', entity: { id: 1, transfType: 'Linear', args: { type: 'Linear', transfTag: 1 } } })
   writes.push({ kind: 'material', entity: { id: 1, kind: 'uniaxial', matType: 'Elastic', args: { matTag: 1, matType: 'Elastic', E: 200e9 } } })
 
+  const member = beamMemberArgs(writes, eleType, { A: 0.01, E: 200e9, Iz: 1e-4 }, { matTag: 1, transfTag: 1, sectionId: 1, integrationId: 1 })
   for (let i = 0; i < n; i++) {
     writes.push({
       kind: 'element',
-      entity: { id: i + 1, eleType: 'ElasticBeamColumn', nodes: [i + 1, i + 2], args: { A: 0.01, E: 200e9, Iz: 1e-4, transfTag: 1 } },
+      entity: { id: i + 1, eleType: member.eleType, nodes: [i + 1, i + 2], args: member.args },
     })
   }
 
@@ -130,7 +173,7 @@ export interface FrameParams {
   base: 'fixed' | 'pinned'
 }
 
-export function frameTemplate({ stories, storyH, bays, bayW, base }: FrameParams): TemplateResult {
+export function frameTemplate({ stories, storyH, bays, bayW, eleType, base }: FrameParams): TemplateResult {
   const writes: ModelWrite[] = []
   const nodeId = (i: number, j: number) => j * (bays + 1) + i + 1
 
@@ -146,17 +189,18 @@ export function frameTemplate({ stories, storyH, bays, bayW, base }: FrameParams
   }
 
   writes.push({ kind: 'geomTransf', entity: { id: 1, transfType: 'Linear', args: { type: 'Linear', transfTag: 1 } } })
-  const eleArgs = { A: 0.01, E: 200e9, Iz: 1e-4, transfTag: 1 }
+  writes.push({ kind: 'material', entity: { id: 1, kind: 'uniaxial', matType: 'Elastic', args: { matTag: 1, matType: 'Elastic', E: 200e9 } } })
+  const member = beamMemberArgs(writes, eleType, { A: 0.01, E: 200e9, Iz: 1e-4 }, { matTag: 1, transfTag: 1, sectionId: 1, integrationId: 1 })
   let eleId = 1
 
   for (let i = 0; i <= bays; i++) {
     for (let j = 0; j < stories; j++) {
-      writes.push({ kind: 'element', entity: { id: eleId++, eleType: 'ElasticBeamColumn', nodes: [nodeId(i, j), nodeId(i, j + 1)], args: eleArgs } })
+      writes.push({ kind: 'element', entity: { id: eleId++, eleType: member.eleType, nodes: [nodeId(i, j), nodeId(i, j + 1)], args: member.args } })
     }
   }
   for (let j = 1; j <= stories; j++) {
     for (let i = 0; i < bays; i++) {
-      writes.push({ kind: 'element', entity: { id: eleId++, eleType: 'ElasticBeamColumn', nodes: [nodeId(i, j), nodeId(i + 1, j)], args: eleArgs } })
+      writes.push({ kind: 'element', entity: { id: eleId++, eleType: member.eleType, nodes: [nodeId(i, j), nodeId(i + 1, j)], args: member.args } })
     }
   }
 

@@ -43,6 +43,8 @@ function renderModel(model: Model): string[] {
       lines.push(`ops.element('ElasticBeamColumn', ${ele.id}, ${ele.nodes.join(', ')}, ${ele.args.A}, ${ele.args.E}, ${ele.args.Iz}, ${ele.args.transfTag})`)
     } else if (ele.eleType === 'zeroLengthSection') {
       lines.push(`ops.element('zeroLengthSection', ${ele.id}, ${ele.nodes.join(', ')}, ${ele.args.secTag})`)
+    } else if (ele.eleType === 'DispBeamColumn') {
+      lines.push(`ops.element('dispBeamColumn', ${ele.id}, ${ele.nodes.join(', ')}, ${ele.args.transfTag}, ${ele.args.integrationTag})`)
     } else {
       lines.push(`ops.element('${ele.eleType}', ${ele.id}, ${ele.nodes.join(', ')})`)
     }

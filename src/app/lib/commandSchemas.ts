@@ -90,7 +90,7 @@ function massArgs(): ArgDef[] {
 
 function elementArgsFromGenerated(): ArgDef[] {
   return [
-    { kind: 'choice', name: 'eleType', label: 'Element Type', options: ['Truss', 'ElasticBeamColumn', 'zeroLengthSection'], defaultValue: 'Truss', yields: {
+    { kind: 'choice', name: 'eleType', label: 'Element Type', options: ['Truss', 'ElasticBeamColumn', 'DispBeamColumn', 'zeroLengthSection'], defaultValue: 'Truss', yields: {
       Truss: [
         { kind: 'vec', name: 'nodes', label: 'Node IDs', length: 2, defaultValue: [1, 2], nodeSync: true },
         { kind: 'int', name: 'matTag', label: 'Material Tag', required: true },
@@ -101,6 +101,11 @@ function elementArgsFromGenerated(): ArgDef[] {
         { kind: 'float', name: 'E', label: "Young's Modulus (E)", defaultValue: 1, required: true },
         { kind: 'float', name: 'Iz', label: 'Moment of Inertia (Iz)', defaultValue: 1, required: true },
         { kind: 'int', name: 'transfTag', label: 'Transformation Tag', required: true },
+      ],
+      DispBeamColumn: [
+        { kind: 'vec', name: 'nodes', label: 'Node IDs', length: 2, defaultValue: [1, 2], nodeSync: true },
+        { kind: 'int', name: 'transfTag', label: 'Transformation Tag', required: true },
+        { kind: 'int', name: 'integrationTag', label: 'Beam Integration Tag', required: true },
       ],
       zeroLengthSection: [
         { kind: 'vec', name: 'nodes', label: 'Node IDs', length: 2, defaultValue: [1, 2], nodeSync: true },
@@ -555,6 +560,7 @@ export function validateSchemaResult(result: SchemaResult, model: Model, ctx: Sc
     if (write.entity.nodes.length < 2) return 'Element requires at least 2 node IDs.'
     if (write.entity.nodes.some((id) => !model.nodes.has(id))) return 'Element references one or more missing nodes.'
     if (write.entity.eleType === 'zeroLengthSection' && !model.sections.has(Number(write.entity.args.secTag))) return 'Section does not exist.'
+    if (write.entity.eleType === 'DispBeamColumn' && !model.beamIntegrations.has(Number(write.entity.args.integrationTag))) return 'Beam integration does not exist.'
   }
   if (write.kind === 'fix' && write.entity.dofs.length === 0) return 'Select at least one constrained DOF.'
   if (write.kind === 'patternChild' && !model.patterns.has(write.patternId)) return `Pattern ${write.patternId} does not exist.`

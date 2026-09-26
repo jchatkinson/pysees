@@ -119,7 +119,13 @@ const runGravityAnalysis: AnalysisBlockDef = {
     steps: Math.max(1, Math.trunc(Number(params.steps) || 10)),
     integrator: { kind: 'load-control', increment: 1 / Math.max(1, Math.trunc(Number(params.steps) || 10)) },
     ...convergenceStage(params),
-    holdPatternsAfter: [...model.patterns.keys()],
+    // Defaults to freezing every pattern in the model — right whenever gravity is the only stage
+    // that needs one, but wrong the moment a *later* stage (e.g. a moment-curvature sweep's own
+    // unit-moment pattern, driving `DisplacementControl`'s reference-load sensitivity) needs its
+    // own pattern to stay live through that stage. `params.holdPatterns` (an explicit pattern-tag
+    // list, not exposed in `paramsSchema` — only a template that builds this block's params
+    // programmatically needs it) overrides the "freeze everything" default for exactly that case.
+    holdPatternsAfter: Array.isArray(params.holdPatterns) ? (params.holdPatterns as number[]) : [...model.patterns.keys()],
   }),
 }
 
