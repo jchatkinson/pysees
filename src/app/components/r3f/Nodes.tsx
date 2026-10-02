@@ -2,8 +2,10 @@ import { Html } from '@react-three/drei'
 import type { NodeEntity } from '@/app/types/model'
 import { useAppStore } from '@/app/store/useAppStore'
 import { toVec3 } from './utils'
+import { ScreenSize } from './ScreenSize'
 
-const NODE_RADIUS = 0.12
+/** Node marker radius in screen pixels. */
+const NODE_RADIUS = 6
 
 const LABEL_STYLE: React.CSSProperties = {
   fontSize: 9,
@@ -32,7 +34,7 @@ function Node({
 }) {
   const pos = toVec3(node.coords)
   return (
-    <group position={pos}>
+    <ScreenSize position={pos}>
       <mesh
         onClick={(e) => {
           e.stopPropagation()
@@ -47,7 +49,7 @@ function Node({
           N{node.id}
         </Html>
       )}
-    </group>
+    </ScreenSize>
   )
 }
 

@@ -2,17 +2,23 @@ import { Line } from '@react-three/drei'
 import { Vector3 } from 'three'
 import type { NodeEntity, PatternEntity } from '@/app/types/model'
 import { toVec3 } from './utils'
+import { ScreenSize } from './ScreenSize'
+
+// Glyph dimensions in screen pixels.
+const ARROW_LENGTH = 48
+const ARROW_HEAD_LENGTH = 8
+const ARROW_HEAD_WIDTH = 5
 
 function NodalLoadGlyph({ coords, values }: { coords: number[]; values: number[] }) {
-  const origin = new Vector3(...toVec3(coords))
+  const origin = new Vector3()
   const dir = new Vector3(values[0] ?? 0, values[1] ?? 0, values[2] ?? 0)
   if (dir.length() < 1e-9) return null
-  const tip = origin.clone().add(dir.normalize().multiplyScalar(1.2))
-  const side = dir.clone().normalize().multiplyScalar(0.2)
+  const tip = origin.clone().add(dir.normalize().multiplyScalar(ARROW_LENGTH))
+  const side = dir.clone().normalize().multiplyScalar(ARROW_HEAD_LENGTH)
   const up = new Vector3(0, 0, 1)
-  const right = new Vector3().crossVectors(side, up).normalize().multiplyScalar(0.12)
+  const right = new Vector3().crossVectors(side, up).normalize().multiplyScalar(ARROW_HEAD_WIDTH)
   return (
-    <group>
+    <ScreenSize position={toVec3(coords)}>
       <Line
         points={[origin.toArray() as [number, number, number], tip.toArray() as [number, number, number]]}
         color="#2563eb"
@@ -28,7 +34,7 @@ function NodalLoadGlyph({ coords, values }: { coords: number[]; values: number[]
         color="#2563eb"
         lineWidth={2}
       />
-    </group>
+    </ScreenSize>
   )
 }
 
