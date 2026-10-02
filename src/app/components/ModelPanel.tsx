@@ -54,7 +54,7 @@ function rowsFor(model: Model): { label: string; rows: Row[] }[] {
   if (ts.length) groups.push({ label: 'Time Series', rows: ts })
 
   const patterns: Row[] = [...model.patterns.values()].sort((a, b) => a.id - b.id)
-    .map((p) => ({ kind: 'pattern' as const, id: p.id, summary: `${p.patternType}  #${p.id}${p.children.length ? ` (${p.children.length} loads)` : ''}` }))
+    .map((p) => ({ kind: 'pattern' as const, id: p.id, summary: `${p.name ? `${p.name}  ` : ''}${p.patternType}  #${p.id}${p.children.length ? ` (${p.children.length} loads)` : ''}` }))
   if (patterns.length) groups.push({ label: 'Load Patterns', rows: patterns })
 
   const misc: Row[] = [...model.misc.values()].sort((a, b) => a.id - b.id)

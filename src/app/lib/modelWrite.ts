@@ -74,7 +74,13 @@ export function applyModelWrite(model: Model, write: ModelWrite): Model {
   }
   const map = mapFor(model, write.kind)
   const next = new Map(map as Map<number, unknown>)
-  next.set(keyFor(write), write.entity)
+  let entity: unknown = write.entity
+  if (write.kind === 'pattern') {
+    // Re-saving a pattern from its form rebuilds the entity without its loads or alias; carry them over.
+    const prev = model.patterns.get(write.entity.id)
+    if (prev) entity = { ...write.entity, children: write.entity.children.length ? write.entity.children : prev.children }
+  }
+  next.set(keyFor(write), entity)
   const nextIds = { ...model.nextIds }
   const idKind = write.kind as ModelEntityKind
   if (idKind in nextIds) {

@@ -121,6 +121,9 @@ interface AppStore {
     showGridlines: boolean
     showLevels: boolean
   }
+  /** Pattern tags whose loads are hidden in the viewport; a pattern is shown unless listed, so new patterns appear by default. */
+  hiddenLoadPatterns: number[]
+  toggleLoadPatternVisible: (id: number) => void
   viewportAction: { kind: 'zoomIn' | 'zoomOut' | 'fit'; token: number } | null
 
   // results display (Display Results panel + scene)
@@ -341,6 +344,8 @@ export const useAppStore = create<AppStore>((set, get) => {
     showGridlines: true,
     showLevels: true,
   },
+  hiddenLoadPatterns: [],
+  toggleLoadPatternVisible: (id) => set((s) => ({ hiddenLoadPatterns: s.hiddenLoadPatterns.includes(id) ? s.hiddenLoadPatterns.filter((x) => x !== id) : [...s.hiddenLoadPatterns, id] })),
   viewportAction: null,
   resultsView: DEFAULT_RESULTS_VIEW,
   setResultsView: (patch) => set((s) => ({ resultsView: { ...s.resultsView, ...patch } })),

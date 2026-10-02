@@ -603,6 +603,9 @@ export function modelEntityToValues(kind: ModelWrite['kind'], entity: unknown, c
     const e = entity as { eleType: string; nodes: number[]; args: Record<string, unknown> }
     return { eleType: e.eleType, nodes: [...e.nodes], ...e.args }
   }
+  // Older/template-built entities may lack the schema's `type` discriminator in args; restore it so the form doesn't fall back to the schema default.
+  if (kind === 'pattern') { const e = entity as { patternType: string; args: Record<string, unknown> }; return { type: e.patternType, ...e.args } }
+  if (kind === 'timeSeries') { const e = entity as { tsType: string; args: Record<string, unknown> }; return { type: e.tsType, ...e.args } }
   const e = entity as { args: Record<string, unknown> }
   return { ...e.args }
 }

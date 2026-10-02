@@ -15,7 +15,8 @@ export interface MPConstraintEntity { id: number; kind: 'equalDOF' | 'equalDOF_M
 export interface RegionEntity { id: number; args: Record<string, unknown> }
 export interface TimeSeriesEntity { id: number; tsType: string; args: Record<string, unknown> }
 export interface LoadAssignment { kind: 'load' | 'eleLoad' | 'sp'; args: Record<string, unknown> }
-export interface PatternEntity { id: number; patternType: string; args: Record<string, unknown>; children: LoadAssignment[] }
+/** `name` is a UI-only alias for the OpenSees pattern tag (`id`); it never reaches the generated script except as a comment. */
+export interface PatternEntity { id: number; name?: string; patternType: string; args: Record<string, unknown>; children: LoadAssignment[] }
 /** Catch-all for model-domain OpenSeesPy functions without a dedicated typed map (frictionModel, block2D/3D, mesh, groundMotion, ...) */
 export interface MiscEntity { id: number; fn: string; args: Record<string, unknown> }
 

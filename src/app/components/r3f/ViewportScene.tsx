@@ -37,6 +37,7 @@ export const ViewportScene = forwardRef<ViewportSceneRef, object>(function Viewp
   const model = useAppStore((s) => s.model)
   const gridlines = useAppStore((s) => s.gridlines)
   const levels = useAppStore((s) => s.levels)
+  const hiddenLoadPatterns = useAppStore((s) => s.hiddenLoadPatterns)
   const viewportAction = useAppStore((s) => s.viewportAction)
   const viewSettings = useAppStore((s) => s.viewSettings)
   const nodePickMode = useAppStore((s) => s.nodePickMode)
@@ -150,9 +151,15 @@ export const ViewportScene = forwardRef<ViewportSceneRef, object>(function Viewp
       {viewSettings.showSupports && (
         <SupportsLayer fixes={fixes} nodeMap={model.nodes} />
       )}
-      {viewSettings.showNodalLoads && (
-        <LoadsLayer patterns={[...model.patterns.values()]} nodeMap={model.nodes} />
-      )}
+      <LoadsLayer
+        patterns={[...model.patterns.values()]}
+        nodeMap={model.nodes}
+        elementMap={model.elements}
+        ndm={model.config?.ndm ?? 3}
+        hiddenPatterns={hiddenLoadPatterns}
+        showNodal={viewSettings.showNodalLoads}
+        showElement={viewSettings.showElementLoads}
+      />
       <OrbitControls
         ref={controlsRef}
         makeDefault

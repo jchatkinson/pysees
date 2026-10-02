@@ -1,13 +1,14 @@
 import { useState } from 'react'
 import { Button } from '@/app/components/ui/button'
 import { Separator } from '@/app/components/ui/separator'
-import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/app/components/ui/dropdown-menu'
+import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger, DropdownMenuTrigger } from '@/app/components/ui/dropdown-menu'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/app/components/ui/tooltip'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/app/components/ui/alert-dialog'
 import { Undo2, Redo2 } from 'lucide-react'
 import { useAppStore } from '@/app/store/useAppStore'
 import { PiscesLogo } from '@/app/components/icons/PiscesLogo'
 import { UserButton } from '@clerk/clerk-react'
+import { patternColor } from '@/app/components/r3f/utils'
 import { downloadScript } from '@/app/lib/exportScript'
 
 export function TopBar() {
@@ -23,6 +24,8 @@ export function TopBar() {
     analysisRedo,
     viewSettings,
     setViewSetting,
+    hiddenLoadPatterns,
+    toggleLoadPatternVisible,
     requestViewportAction,
     setGridlinesDialogOpen,
     localAgent,
@@ -87,6 +90,19 @@ export function TopBar() {
           <DropdownMenuCheckboxItem checked={viewSettings.showSupports} onCheckedChange={(v) => setViewSetting('showSupports', checked(v))}>Supports</DropdownMenuCheckboxItem>
           <DropdownMenuCheckboxItem checked={viewSettings.showNodalLoads} onCheckedChange={(v) => setViewSetting('showNodalLoads', checked(v))}>Nodal Loads</DropdownMenuCheckboxItem>
           <DropdownMenuCheckboxItem checked={viewSettings.showElementLoads} onCheckedChange={(v) => setViewSetting('showElementLoads', checked(v))}>Element Loads</DropdownMenuCheckboxItem>
+          {model.patterns.size > 0 && (
+            <DropdownMenuSub>
+              <DropdownMenuSubTrigger>Load Patterns</DropdownMenuSubTrigger>
+              <DropdownMenuSubContent>
+                {[...model.patterns.values()].sort((a, b) => a.id - b.id).map((p, _i, all) => (
+                  <DropdownMenuCheckboxItem key={p.id} checked={!hiddenLoadPatterns.includes(p.id)} onCheckedChange={() => toggleLoadPatternVisible(p.id)}>
+                    <span className="inline-block size-2 rounded-full" style={{ background: patternColor(all.map((q) => q.id), p.id) }} />
+                    {p.name ?? `Pattern ${p.id}`}
+                  </DropdownMenuCheckboxItem>
+                ))}
+              </DropdownMenuSubContent>
+            </DropdownMenuSub>
+          )}
           <DropdownMenuCheckboxItem checked={viewSettings.showGrid} onCheckedChange={(v) => setViewSetting('showGrid', checked(v))}>Grid</DropdownMenuCheckboxItem>
           <DropdownMenuCheckboxItem checked={viewSettings.showGridlines} onCheckedChange={(v) => setViewSetting('showGridlines', checked(v))}>Grids</DropdownMenuCheckboxItem>
           <DropdownMenuCheckboxItem checked={viewSettings.showLevels} onCheckedChange={(v) => setViewSetting('showLevels', checked(v))}>Levels</DropdownMenuCheckboxItem>

@@ -67,6 +67,7 @@ function renderModel(model: Model): string[] {
     lines.push(`ops.${renderOpsCall('timeSeries', ts.args, ctx)}`)
   }
   for (const pattern of [...model.patterns.values()].sort((a, b) => a.id - b.id)) {
+    if (pattern.name) lines.push(`# ${pattern.name.replace(/[\r\n]+/g, ' ')}`)
     lines.push(`ops.${renderOpsCall('pattern', pattern.args, ctx)}`)
     for (const child of pattern.children) {
       if (child.kind === 'load') {

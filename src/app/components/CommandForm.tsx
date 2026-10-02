@@ -1,5 +1,8 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { Button } from '@/app/components/ui/button'
+import { LoadsTable } from '@/app/components/LoadsTable'
+import { Input } from '@/app/components/ui/input'
+import { Label } from '@/app/components/ui/label'
 import { ScrollArea } from '@/app/components/ui/scroll-area'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/app/components/ui/tooltip'
 import { Combobox, ComboboxContent, ComboboxEmpty, ComboboxInput, ComboboxItem, ComboboxList } from '@/app/components/ui/combobox'
@@ -12,7 +15,7 @@ import {
 import type { CommandSchema, SchemaResult } from '@/app/lib/commandSchemas'
 import type { SchemaContext } from '@/app/types/schema'
 import { SchemaFormField } from '@/app/components/SchemaFormField'
-import type { Model } from '@/app/types/model'
+import type { LoadAssignment, Model } from '@/app/types/model'
 import type { AnalysisCommand } from '@/app/types/analysisCommands'
 import { ANALYSIS_BLOCKS, blockAsSchema } from '@/app/lib/analysisBlocks'
 import { useHotkeyRegistry } from '@/app/lib/hotkeys'
@@ -43,6 +46,11 @@ function matchesSchema(schema: CommandSchema, query: string) {
   return `${schema.label} ${schema.fn} ${schema.cmd}`.toLowerCase().includes(q)
 }
 
+interface FormApi { values: Record<string, unknown>; setValue: (key: string, value: unknown) => void }
+
+/** Form-only key carrying a pattern's display name; stripped before the schema builds the entity. */
+const NAME_KEY = '__name'
+
 export function CommandFormBody({
   schema,
   ctx,
@@ -53,6 +61,8 @@ export function CommandFormBody({
   onDelete,
   onValuesChange,
   previewAction,
+  lead,
+  extra,
 }: {
   schema: CommandSchema
   ctx: SchemaContext
@@ -63,6 +73,9 @@ export function CommandFormBody({
   onDelete?: () => void
   onValuesChange?: (values: Record<string, unknown>) => void
   previewAction?: { onClick: () => void; disabled?: boolean }
+  /** Rendered at the start / end of the scrolling form, above the action buttons. Receive the live form values. */
+  lead?: (form: FormApi) => ReactNode
+  extra?: (form: FormApi) => ReactNode
 }) {
   const [values, setValues] = useState<Record<string, unknown>>(() => initial)
   const [error, setError] = useState<string | null>(null)
@@ -77,6 +90,7 @@ export function CommandFormBody({
     <>
       <ScrollArea className="flex-1 min-h-0">
         <div className="p-3 grid gap-3">
+          {lead?.({ values, setValue })}
           {schema.args.map((arg, idx) => (
             <SchemaFormField
               key={`arg-${arg.kind === 'flag' ? arg.flag : arg.name}-${idx}`}
@@ -95,6 +109,7 @@ export function CommandFormBody({
               ctx={ctx}
             />
           ))}
+          {extra?.({ values, setValue })}
         </div>
       </ScrollArea>
       <div className="border-t p-3 grid gap-2 shrink-0">
@@ -135,6 +150,11 @@ export function CommandFormBody({
   )
 }
 
+/** Form values for an existing pattern child (inverse of the child schema's `create`). */
+function childToValues(c: { kind: string; args: Record<string, unknown> }): Record<string, unknown> {
+  return c.kind === 'load' ? { nodeId: [c.args.nodeTag], values: c.args.values } : { ...c.args }
+}
+
 /** Small nested-children editor for Load Patterns (Fiber Sections have their own dedicated Section Editor). */
 function ChildrenEditor({
   ctx,
@@ -146,28 +166,47 @@ function ChildrenEditor({
 }: {
   ctx: SchemaContext
   childSchemas: CommandSchema[]
-  children: { summary: string }[]
+  children: { kind: string; args: Record<string, unknown>; summary: string }[]
   childLabel: string
-  onAdd: (schema: CommandSchema, values: Record<string, unknown>) => string | null
+  /** `index` is set when saving an edit to an existing child, undefined when adding. */
+  onAdd: (schema: CommandSchema, values: Record<string, unknown>, index?: number) => string | null
   onRemove: (index: number) => void
 }) {
   const [adding, setAdding] = useState(false)
+  const [editing, setEditing] = useState<number | null>(null)
   const [selectedCmd, setSelectedCmd] = useState<string>(childSchemas[0]?.cmd ?? '')
   const schema = childSchemas.find((s) => s.cmd === selectedCmd) ?? null
+  const shown = children.map((c, index) => ({ c, index })).filter(({ c }) => childSchemas.some((s) => s.fn === c.kind))
 
   return (
-    <div className="border-t p-3 grid gap-2">
+    <div className="border-t pt-3 grid gap-2">
       <div className="flex items-center justify-between">
-        <span className="text-[11px] font-medium text-muted-foreground">{childLabel} ({children.length})</span>
-        {!adding && (
+        <span className="text-[11px] font-medium text-muted-foreground">{childLabel} ({shown.length})</span>
+        {!adding && editing === null && (
           <Button variant="outline" size="sm" className="h-6 px-2 text-[10px]" onClick={() => setAdding(true)}>
             + Add
           </Button>
         )}
       </div>
-      {children.map((c, i) => (
-        <div key={i} className="flex items-center justify-between gap-2 rounded border px-2 py-1 text-[10px] font-mono">
-          <span className="truncate">{c.summary}</span>
+      {shown.map(({ c, index: i }) => editing === i ? (
+        <div key={i} className="rounded border">
+          <div className="px-2 py-1.5 border-b text-[11px] text-muted-foreground">Edit {childSchemas.find((s) => s.fn === c.kind)?.label ?? c.kind}</div>
+          <CommandFormBody
+            schema={childSchemas.find((s) => s.fn === c.kind)!}
+            ctx={ctx}
+            actionLabel="Save"
+            initial={childToValues(c)}
+            onCancel={() => setEditing(null)}
+            submitValues={(values) => {
+              const err = onAdd(childSchemas.find((s) => s.fn === c.kind)!, values, i)
+              if (!err) setEditing(null)
+              return err
+            }}
+          />
+        </div>
+      ) : (
+        <div key={i} className="flex items-center justify-between gap-2 rounded border px-2 py-1 text-[10px] font-mono hover:bg-accent/50">
+          <button className="truncate text-left flex-1 min-w-0" title="Click to edit" disabled={adding} onClick={() => setEditing(i)}>{c.summary}</button>
           <Tooltip>
             <TooltipTrigger
               render={
@@ -322,7 +361,7 @@ export function CommandForm() {
       <div className="flex flex-col h-full min-h-0 overflow-hidden">
         <div className="border-b px-3 py-2 shrink-0">
           <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
-            <span>Edit {schema.label} #{selectedModelEntity.id}</span>
+            <span>Edit {schema.label} #{selectedModelEntity.id}{isPattern && (entity as { name?: string }).name ? ` — ${(entity as { name?: string }).name}` : ''}</span>
             <a href={getCommandDocUrl(schema.fn, initial)} target="_blank" rel="noreferrer" className="ml-auto inline-flex items-center rounded p-0.5 text-muted-foreground hover:bg-accent hover:text-accent-foreground">
               <CircleHelp className="size-3.5" />
             </a>
@@ -334,7 +373,7 @@ export function CommandForm() {
           schema={schema}
           ctx={ctx}
           actionLabel="Save"
-          initial={initial}
+          initial={isPattern ? { ...initial, [NAME_KEY]: (entity as { name?: string }).name ?? '' } : initial}
           onCancel={() => setSelectedModelEntity(null)}
           onDelete={() => { setPendingModelDelete(selectedModelEntity); setDeleteDialogOpen(true) }}
           onValuesChange={(values) => {
@@ -342,30 +381,45 @@ export function CommandForm() {
             if (schema.fn === 'uniaxialMaterial') setMaterialPreviewInputMaterial({ matType: String(values.matType ?? ''), values })
           }}
           previewAction={schema.fn === 'uniaxialMaterial' ? { onClick: () => setMaterialPreviewPanelOpen(true) } : undefined}
+          lead={isPattern ? ({ values, setValue }) => (
+            <div className="grid gap-1.5">
+              <Label className="text-xs">Name</Label>
+              <Input value={String(values[NAME_KEY] ?? '')} placeholder={`Pattern ${selectedModelEntity.id}`} onChange={(e) => setValue(NAME_KEY, e.target.value)} />
+            </div>
+          ) : undefined}
+          extra={isPattern ? () => (
+            <>
+              <LoadsTable patternId={selectedModelEntity.id} ndf={ctx.ndf} children={(entity as { children: LoadAssignment[] }).children} />
+              <ChildrenEditor
+                ctx={ctx}
+                childSchemas={getPatternChildSchemas().filter((s) => s.fn !== 'load')}
+                childLabel="Other Loads (sp / element)"
+                children={(entity as { children: { kind: string; args: Record<string, unknown> }[] }).children.map((c) => ({ ...c, summary: `${c.kind}  ${JSON.stringify(c.args)}` }))}
+                onAdd={(childSchema, values, index) => {
+                  const result = childSchema.create({ ...values, patternId: selectedModelEntity.id, childIndex: index }, model)
+                  if (result.target !== 'model') return 'Internal error.'
+                  writeModelEntity(result.write)
+                  return null
+                }}
+                onRemove={(index) => removeModelEntityChild('pattern', selectedModelEntity.id, index)}
+              />
+            </>
+          ) : undefined}
           submitValues={(values) => {
-            const result: SchemaResult = schema.create(values, model, selectedModelEntity.id)
+            const { [NAME_KEY]: rawName, ...schemaValues } = values
+            const result: SchemaResult = schema.create(schemaValues, model, selectedModelEntity.id)
             if (result.target !== 'model') return 'Internal error: expected a model write.'
+            if (isPattern && result.write.kind === 'pattern') {
+              const name = String(rawName ?? '').trim()
+              if (name && [...model.patterns.values()].some((p) => p.id !== selectedModelEntity.id && p.name?.toLowerCase() === name.toLowerCase())) return `Another pattern is already named "${name}".`
+              result.write.entity.name = name || undefined
+            }
             const err = validateSchemaResult(result, model, ctx)
             if (err) return err
             writeModelEntity(result.write)
             return null
           }}
         />
-        {isPattern && (
-          <ChildrenEditor
-            ctx={ctx}
-              childSchemas={getPatternChildSchemas()}
-            childLabel="Loads"
-            children={(entity as { children: { kind: string; args: Record<string, unknown> }[] }).children.map((c) => ({ summary: `${c.kind}  ${JSON.stringify(c.args)}` }))}
-            onAdd={(childSchema, values) => {
-              const result = childSchema.create({ ...values, patternId: selectedModelEntity.id }, model)
-              if (result.target !== 'model') return 'Internal error.'
-              writeModelEntity(result.write)
-              return null
-            }}
-            onRemove={(index) => removeModelEntityChild('pattern', selectedModelEntity.id, index)}
-          />
-        )}
         <DeleteDialogs
           deleteDialogOpen={deleteDialogOpen}
           setDeleteDialogOpen={setDeleteDialogOpen}

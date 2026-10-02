@@ -41,8 +41,13 @@ function Card({ title, description, onClick, disabled }: CardProps) {
   )
 }
 
+/** Mounted only while there's no model, so every "New Model" starts again at the first step with fresh template fields. */
 export function InitModal() {
-  const config = useAppStore((s) => s.model.config)
+  const hasModel = useAppStore((s) => Boolean(s.model.config))
+  return hasModel ? null : <InitDialog />
+}
+
+function InitDialog() {
   const initModel = useAppStore((s) => s.initModel)
 
   const [step, setStep] = useState<1 | 2>(1)
@@ -64,8 +69,6 @@ export function InitModal() {
   const [bayW, setBayW] = useState(5.0)
   const [frameEle, setFrameEle] = useState<FrameParams['eleType']>('elasticBeamColumn')
   const [frameBase, setFrameBase] = useState<FrameParams['base']>('fixed')
-
-  if (config) return null
 
   function select(c: Choice) {
     setChoice(c)
@@ -209,6 +212,7 @@ export function InitModal() {
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="elasticBeamColumn">elasticBeamColumn</SelectItem>
+                      <SelectItem value="dispBeamColumn">dispBeamColumn (RC fiber)</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -242,6 +246,7 @@ export function InitModal() {
                       <SelectTrigger><SelectValue /></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="elasticBeamColumn">elasticBeamColumn</SelectItem>
+                        <SelectItem value="dispBeamColumn">dispBeamColumn (RC fiber)</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
