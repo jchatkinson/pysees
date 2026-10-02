@@ -1,4 +1,4 @@
-import { getRunLayout, queryBlock, queryRunExtents } from './resultsStorageClient'
+import { getRunLayout, queryBlock, queryColumns, queryRunExtents } from './resultsStorageClient'
 import type { RecorderKind, RecorderMetadata, ResultBlock, RunExtents, RunMetadata } from '@/app/types/resultsStorage'
 
 const MAX_CACHED_BLOCKS = 8
@@ -9,6 +9,12 @@ export interface RunLayout {
   stride: number
   /** `kind` -> target tag (node or element) -> first row index and the recorder's component labels. */
   columns: Record<RecorderKind, Map<number, { offset: number; labels: string[] }>>
+}
+
+/** Pseudo-time and stage index of every step. */
+export interface RunTimeline {
+  pseudoTime: Float64Array
+  stage: Uint16Array
 }
 
 export interface StepFrame {
@@ -39,6 +45,9 @@ export class StepFrameSource {
   private blocks = new Map<number, ResultBlock>() // blockIndex -> block, insertion order = LRU order
   private inflight = new Map<number, Promise<ResultBlock | null>>()
   private extentsPromise: Promise<RunExtents> | null = null
+  private columnCache = new Map<number, Float64Array>()
+  private columnInflight = new Map<number, Promise<void>>()
+  private timelinePromise: Promise<RunTimeline> | null = null
 
   private constructor(runId: string, layout: RunLayout) {
     this.runId = runId
@@ -105,5 +114,28 @@ export class StepFrameSource {
   /** Whole-run max |value| per kind/label, computed once — what autoscale reads. */
   extents(): Promise<RunExtents> {
     return (this.extentsPromise ??= queryRunExtents(this.runId).then((r) => r.extents))
+  }
+
+  /** Pseudo-time and stage index of every step, fetched once. */
+  timeline(): Promise<RunTimeline> {
+    return (this.timelinePromise ??= queryColumns(this.runId, []).then(({ pseudoTime, stage }) => ({ pseudoTime, stage })))
+  }
+
+  /**
+   * Every step's value of each requested row index (the `offset`s in `layout.columns`), cached per
+   * column so repeated or overlapping plots only fetch what they haven't seen. The returned arrays are
+   * shared with the cache — don't write to them.
+   */
+  async columns(rowIndices: number[]): Promise<Float64Array[]> {
+    const need = [...new Set(rowIndices)].filter((c) => !this.columnCache.has(c) && !this.columnInflight.has(c))
+    if (need.length) {
+      const request = queryColumns(this.runId, need).then(({ data, pseudoTime, stage }) => {
+        need.forEach((c, i) => this.columnCache.set(c, data[i]))
+        this.timelinePromise ??= Promise.resolve({ pseudoTime, stage })
+      }).finally(() => need.forEach((c) => this.columnInflight.delete(c)))
+      need.forEach((c) => this.columnInflight.set(c, request))
+    }
+    await Promise.all(rowIndices.map((c) => this.columnInflight.get(c)))
+    return rowIndices.map((c) => this.columnCache.get(c) ?? new Float64Array(this.sampleCount))
   }
 }

@@ -115,6 +115,7 @@ export type StorageRequest =
   | { type: 'getRunLayout'; requestId: string; runId: string }
   | { type: 'queryBlock'; requestId: string; runId: string; sample: number }
   | { type: 'queryRunExtents'; requestId: string; runId: string }
+  | { type: 'queryColumns'; requestId: string; runId: string; columns: number[] }
 
 // Every reply carries the requestId of the StorageRequest it answers. `storageError` can be
 // sent in place of any other reply for the same requestId when the underlying transaction fails.
@@ -131,4 +132,6 @@ export type StorageReply =
   /** The block containing `sample`, or null if none does. `data` is transferred, not cloned. */
   | { type: 'queryBlockResult'; requestId: string; runId: string; block: ResultBlock | null }
   | { type: 'queryRunExtentsResult'; requestId: string; runId: string; extents: RunExtents }
+  /** Every step's value of each requested row index (`columns[i]` -> `data[i]`), plus the pseudo-time and stage index of each step. All buffers are transferred. */
+  | { type: 'queryColumnsResult'; requestId: string; runId: string; sampleCount: number; pseudoTime: Float64Array; stage: Uint16Array; data: Float64Array[] }
   | { type: 'storageError'; requestId: string; runId: string; detail: string }

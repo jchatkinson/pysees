@@ -4,6 +4,7 @@ import { useAppStore } from '@/app/store/useAppStore'
 import { ViewportScene, type ViewportSceneRef } from './r3f/ViewportScene'
 import { MaterialPreviewOverlay } from './MaterialPreviewOverlay'
 import { ResultsDisplayPanel } from './ResultsDisplayPanel'
+import { PlotOverlay } from './plot/PlotOverlay'
 
 type MarqueeRect = { x1: number; y1: number; x2: number; y2: number }
 
@@ -94,6 +95,7 @@ export function Viewport() {
         </div>
       )}
       <ResultsDisplayPanel />
+      <PlotOverlay />
       <MaterialPreviewOverlay />
     </div>
   )

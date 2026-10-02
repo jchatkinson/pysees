@@ -13,6 +13,7 @@ import { runCarapaceOnWorker, nextCarapaceRunId } from '@/app/lib/carapace/carap
 import { clearAllRuns } from '@/app/lib/resultsStorage/resultsStorageClient'
 import type { CarapaceRunProgress, CarapaceRunResult } from '@/app/types/carapaceRun'
 import { DEFAULT_RESULTS_VIEW, type ResultsView } from '@/app/types/resultsView'
+import { DEFAULT_PLOT_VIEW, SERIES_COLORS, type Channel, type PlotView, type SeriesSpec } from '@/app/types/plotView'
 import type { CompileDiagnostic } from '@/app/lib/compileAnalysisSequence'
 
 /** Suits both forces and displacements in most structural problems. */
@@ -125,6 +126,14 @@ interface AppStore {
   // results display (Display Results panel + scene)
   resultsView: ResultsView
   setResultsView: (patch: Partial<ResultsView>) => void
+
+  // results plot overlay
+  plotView: PlotView
+  setPlotView: (patch: Partial<PlotView>) => void
+  /** Append series (or replace them all); ids and colours are assigned here. */
+  addPlotSeries: (specs: { y: Channel; x?: Channel; label?: string }[], replace?: boolean) => void
+  updatePlotSeries: (id: string, patch: Partial<Omit<SeriesSpec, 'id'>>) => void
+  removePlotSeries: (id: string) => void
 
   // Model actions
   initModel: (ndm: 2 | 3, ndf: number, extra?: { writes?: ModelWrite[]; analysisCommands?: AnalysisCommand[]; gridlines?: GridlineEntity[]; levels?: LevelEntity[] }) => void
@@ -336,6 +345,20 @@ export const useAppStore = create<AppStore>((set, get) => {
   resultsView: DEFAULT_RESULTS_VIEW,
   setResultsView: (patch) => set((s) => ({ resultsView: { ...s.resultsView, ...patch } })),
 
+  plotView: DEFAULT_PLOT_VIEW,
+  setPlotView: (patch) => set((s) => ({ plotView: { ...s.plotView, ...patch } })),
+  addPlotSeries: (specs, replace = false) => set((s) => {
+    let next = replace ? 1 : s.plotView.nextSeriesId
+    const base = replace ? [] : s.plotView.series
+    const added: SeriesSpec[] = specs.map((spec, i) => ({
+      id: `s${next++}`, label: spec.label ?? '', color: SERIES_COLORS[(base.length + i) % SERIES_COLORS.length], visible: true,
+      x: spec.x ?? s.plotView.x, y: spec.y,
+    }))
+    return { plotView: { ...s.plotView, series: [...base, ...added], nextSeriesId: next } }
+  }),
+  updatePlotSeries: (id, patch) => set((s) => ({ plotView: { ...s.plotView, series: s.plotView.series.map((x) => (x.id === id ? { ...x, ...patch } : x)) } })),
+  removePlotSeries: (id) => set((s) => ({ plotView: { ...s.plotView, series: s.plotView.series.filter((x) => x.id !== id) } })),
+
   initModel: (ndm, ndf, extra) => set(() => {
     void clearAllRuns()
     let model = emptyModel()
@@ -357,6 +380,7 @@ export const useAppStore = create<AppStore>((set, get) => {
       selectedAnalysisIndex: null,
       analysisInsertionIndex: null,
       resultsView: DEFAULT_RESULTS_VIEW,
+      plotView: DEFAULT_PLOT_VIEW,
     }
   }),
 
@@ -379,6 +403,7 @@ export const useAppStore = create<AppStore>((set, get) => {
       pendingNodePick: null,
       results: null,
       resultsView: DEFAULT_RESULTS_VIEW,
+      plotView: DEFAULT_PLOT_VIEW,
     })
   },
 

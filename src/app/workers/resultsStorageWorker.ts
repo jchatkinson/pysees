@@ -1,5 +1,5 @@
 import type { StorageReply, StorageRequest } from '@/app/types/resultsStorage'
-import { beginRun, clearAllRuns, deleteRun, finishRun, getRunLayout, listRuns, query, queryBlock, queryJointDisplacements, queryRunExtents, writeBlocks } from '@/app/lib/resultsStorage/db'
+import { beginRun, clearAllRuns, deleteRun, finishRun, getRunLayout, listRuns, query, queryBlock, queryColumns, queryJointDisplacements, queryRunExtents, writeBlocks } from '@/app/lib/resultsStorage/db'
 
 /** carapace/docs/results-storage-indexeddb.md's results-storage worker: owns the IndexedDB
  * connection (db.ts), answers write/query/lifecycle requests, and stays reusable across runs in
@@ -60,6 +60,10 @@ async function handleRequest(request: StorageRequest): Promise<StorageReply> {
       const block = await queryBlock(request.runId, request.sample)
       return { type: 'queryBlockResult', requestId: request.requestId, runId: request.runId, block }
     }
+    case 'queryColumns': {
+      const result = await queryColumns(request.runId, request.columns)
+      return { type: 'queryColumnsResult', requestId: request.requestId, runId: request.runId, ...result }
+    }
     case 'queryRunExtents': {
       const extents = await queryRunExtents(request.runId)
       return { type: 'queryRunExtentsResult', requestId: request.requestId, runId: request.runId, extents }
@@ -67,9 +71,15 @@ async function handleRequest(request: StorageRequest): Promise<StorageReply> {
   }
 }
 
+function transferList(reply: StorageReply): Transferable[] {
+  if (reply.type === 'queryBlockResult') return reply.block ? [reply.block.data] : []
+  if (reply.type === 'queryColumnsResult') return [reply.pseudoTime.buffer, reply.stage.buffer, ...reply.data.map((d) => d.buffer)]
+  return []
+}
+
 function serve(request: StorageRequest, post: (reply: StorageReply, transfer?: Transferable[]) => void) {
   handleRequest(request)
-    .then((reply) => post(reply, reply.type === 'queryBlockResult' && reply.block ? [reply.block.data] : []))
+    .then((reply) => post(reply, transferList(reply)))
     .catch((error: unknown) => post({ type: 'storageError', requestId: request.requestId, runId: requestRunId(request), detail: String(error) }))
 }
 

@@ -368,3 +368,41 @@ export async function queryRunExtents(runId: string): Promise<RunExtents> {
   })
   return extents
 }
+
+export interface ColumnsResult {
+  sampleCount: number
+  pseudoTime: Float64Array
+  stage: Uint16Array
+  data: Float64Array[]
+}
+
+/** Time series of selected row indices (0 is pseudoTime; recorder columns start at 1) over every step, in one block scan. */
+export async function queryColumns(runId: string, columns: number[]): Promise<ColumnsResult> {
+  const { run } = await getRunLayout(runId)
+  const sampleCount = run?.sampleCount ?? 0
+  const result: ColumnsResult = { sampleCount, pseudoTime: new Float64Array(sampleCount), stage: new Uint16Array(sampleCount), data: columns.map(() => new Float64Array(sampleCount)) }
+  if (!run || sampleCount === 0) return result
+  const stride = strideOf(run)
+  const db = await getDb()
+  const tx = db.transaction('responseBlocks', 'readonly')
+  const cursorRequest = tx.objectStore('responseBlocks').openCursor(prefixRange(runId))
+  await new Promise<void>((resolve, reject) => {
+    cursorRequest.onerror = () => reject(cursorRequest.error)
+    cursorRequest.onsuccess = () => {
+      const cursor = cursorRequest.result
+      if (!cursor) { resolve(); return }
+      const block = cursor.value as ResultBlock
+      const view = new Float64Array(block.data)
+      for (let i = 0; i < block.sampleCount; i++) {
+        const step = block.firstSample + i
+        if (step >= sampleCount) break
+        const base = i * stride
+        result.pseudoTime[step] = view[base]
+        result.stage[step] = block.stageIndex
+        for (let c = 0; c < columns.length; c++) result.data[c][step] = view[base + columns[c]]
+      }
+      cursor.continue()
+    }
+  })
+  return result
+}

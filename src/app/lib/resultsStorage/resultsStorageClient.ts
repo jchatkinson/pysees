@@ -70,6 +70,10 @@ export function queryBlock(runId: string, sample: number) {
   return send<Extract<StorageReply, { type: 'queryBlockResult' }>>({ type: 'queryBlock', requestId: nextRequestId(), runId, sample })
 }
 
+export function queryColumns(runId: string, columns: number[]) {
+  return send<Extract<StorageReply, { type: 'queryColumnsResult' }>>({ type: 'queryColumns', requestId: nextRequestId(), runId, columns })
+}
+
 export function queryRunExtents(runId: string) {
   return send<Extract<StorageReply, { type: 'queryRunExtentsResult' }>>({ type: 'queryRunExtents', requestId: nextRequestId(), runId })
 }

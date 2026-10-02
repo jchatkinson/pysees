@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { BarChart3, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Pause, Play, X } from 'lucide-react'
+import { BarChart3, ChartLine, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Pause, Play, X } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/app/components/ui/card'
 import { Button } from '@/app/components/ui/button'
 import { Checkbox } from '@/app/components/ui/checkbox'
@@ -68,13 +68,16 @@ export function ResultsDisplayPanel() {
   const auto = scaleKey ? autoScale(scaleKey, runExtents, metrics) : 1
   const manual = scaleKey ? rv.scales[scaleKey] : null
   const scale = manual ?? auto
+  const plotOpen = useAppStore((s) => s.plotView.open)
+  const setPlotView = useAppStore((s) => s.setPlotView)
   const setScale = (value: number | null) => scaleKey && set({ scales: { ...rv.scales, [scaleKey]: value } })
 
   if (!rv.open) {
     return rv.runId ? (
-      <Button size="sm" variant="outline" className="absolute right-3 top-3 z-40 gap-1 bg-background/90" onClick={() => set({ open: true })}>
-        <BarChart3 className="size-3.5" /> Results
-      </Button>
+      <div className="absolute right-3 top-3 z-40 flex gap-1">
+        <Button size="sm" variant="outline" className="gap-1 bg-background/90" onClick={() => set({ open: true })}><BarChart3 className="size-3.5" /> Results</Button>
+        <Button size="sm" variant={plotOpen ? 'secondary' : 'outline'} className="gap-1 bg-background/90" onClick={() => setPlotView({ open: !plotOpen })}><ChartLine className="size-3.5" /> Plot</Button>
+      </div>
     ) : null
   }
 
@@ -88,7 +91,10 @@ export function ResultsDisplayPanel() {
         <CardHeader className="pb-2">
           <div className="flex items-center justify-between">
             <CardTitle className="text-sm">Display Results</CardTitle>
-            <Button size="icon" variant="ghost" className="size-6" onClick={() => set({ open: false, playing: false })}><X className="size-3.5" /></Button>
+            <div className="flex items-center">
+              <Button size="icon" variant={plotOpen ? 'secondary' : 'ghost'} className="size-6" title="Plot results" onClick={() => setPlotView({ open: !plotOpen })}><ChartLine className="size-3.5" /></Button>
+              <Button size="icon" variant="ghost" className="size-6" onClick={() => set({ open: false, playing: false })}><X className="size-3.5" /></Button>
+            </div>
           </div>
         </CardHeader>
         <CardContent className="grid gap-3 text-xs">
