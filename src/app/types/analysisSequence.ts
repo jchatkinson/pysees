@@ -9,11 +9,14 @@ export type IntegratorSpec =
 /** Provisional test-name union — align with carapace-core's actual convergence-test enum once the compiler lands. */
 export interface ConvergenceSpec { testType: 'NormDispIncr' | 'NormUnbalance' | 'EnergyIncr'; tol: number; maxIter: number }
 
+/** OpenSees algorithm names, mapped to carapace's `AlgorithmSpec` by the compiler. */
+export type AlgorithmKind = 'linear' | 'newton-raphson' | 'modified-newton' | 'krylov-newton' | 'newton-line-search'
+
 export interface TransientSpec {
   integrator: { kind: 'newmark'; gamma: number; beta: number }
   dt: number
   nSteps: number
-  algorithm: 'linear' | 'newton-raphson'
+  algorithm: AlgorithmKind
   convergence?: ConvergenceSpec
 }
 
@@ -23,8 +26,13 @@ export type AnalysisStage =
       id: string
       steps: number
       integrator: IntegratorSpec
-      algorithm: 'linear' | 'newton-raphson'
+      algorithm: AlgorithmKind
       convergence?: ConvergenceSpec
+      /** Load patterns (model pattern tags) this stage ramps. Omitted/empty = every pattern no other stage claims. */
+      patterns?: number[]
+      /** Freeze this stage's patterns at their final factor afterward (OpenSees `loadConst`). Defaults to true. */
+      holdLoads?: boolean
+      /** Explicit override of the patterns frozen afterward; normally derived from `patterns`/`holdLoads`. */
       holdPatternsAfter?: number[]
     }
   | { kind: 'modal'; id: string; modes: number }

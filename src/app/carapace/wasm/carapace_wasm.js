@@ -30,7 +30,7 @@ export class WasmSession {
      * "samples so far" accessor: a caller that needs the full history accumulates these
      * batches itself, same as the planned results-storage worker will.
      * @param {number} step_budget
-     * @returns {any}
+     * @returns {StepOutcome}
      */
     advance(step_budget) {
         const ret = wasm.wasmsession_advance(this.__wbg_ptr, step_budget);
@@ -107,7 +107,7 @@ export function damped_sdof_free_vibration_displacement(steps, dt) {
  * with a `{ kind: "...", ... }`-shaped JS error object on any
  * [`input_v1::DecodeError`], the same tagged shape a Rust caller would
  * match on.
- * @param {any} value
+ * @param {CarapaceInputV1} value
  * @returns {WasmSession}
  */
 export function decodeInput(value) {
@@ -153,9 +153,9 @@ export function mass_spring_chain_frequencies() {
 /**
  * M4 wiring check: a `Truss` (elastic) in parallel with a `ZeroLength`+
  * `ElasticPP` (elastic-perfectly-plastic) spring, loaded past the EPP
- * spring's yield point within a single step — needs `Algorithm::
- * NewtonRaphson`'s iteration to resolve correctly (`Algorithm::Linear`'s
- * one-shot solve can't cross a material regime boundary within a step).
+ * spring's yield point within a single step — needs `Algorithm::Newton`'s
+ * iteration to resolve correctly (`Algorithm::Linear`'s one-shot solve
+ * can't cross a material regime boundary within a step).
  * See `core/tests/m4_analysis.rs` for the native equivalent and the
  * closed-form derivation.
  * @param {number} force

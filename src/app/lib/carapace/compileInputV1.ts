@@ -1,6 +1,6 @@
 import type { Model, MaterialEntity, BeamIntegrationEntity } from '@/app/types/model'
 import type { AnalysisHistory } from '@/app/types/analysisCommands'
-import type { AnalysisStage } from '@/app/types/analysisSequence'
+import type { AlgorithmKind, AnalysisStage } from '@/app/types/analysisSequence'
 import type * as W from '@/app/types/carapaceInputV1'
 import { compileAnalysisSequence, type CompileDiagnostic } from '@/app/lib/compileAnalysisSequence'
 
@@ -157,16 +157,23 @@ export function compileInputV1(model: Model, analysisHistory: AnalysisHistory): 
   }
   const loadPatterns: W.LoadPatternTable = { series, scaleFactor }
 
-  // Stage a displacement-control integrator targets is that pattern's natural "introduce me here" signal
-  // (it's the reference-load pattern for that stage); every other pattern defaults to stage 0. There's no
-  // dedicated pattern->stage UI yet, so multi-stage sequences beyond one gravity + one pushover pattern
-  // aren't disambiguated further.
+  // Which wire stage ramps each pattern. Wire stage indices count only static stages (the only kind
+  // compileStage emits). A stage's explicit `patterns` claim wins; a pattern no stage claims falls back
+  // to the stage whose displacement-control node/DOF it loads (its reference-load role), else stage 0.
+  const staticStages = sequence.stages.filter((st): st is Extract<AnalysisStage, { kind: 'static' }> => st.kind === 'static')
+  const claimedStage = new Map<number, number>()
+  staticStages.forEach((stage, stageIdx) => {
+    for (const tag of stage.patterns ?? []) if (!claimedStage.has(tag)) claimedStage.set(tag, stageIdx)
+  })
   const dcStageByNodeDof = new Map<string, number>()
-  sequence.stages.forEach((stage, stageIdx) => {
-    if (stage.kind === 'static' && stage.integrator.kind === 'displacement-control') {
+  staticStages.forEach((stage, stageIdx) => {
+    if (stage.integrator.kind === 'displacement-control') {
       dcStageByNodeDof.set(`${stage.integrator.nodeTag}:${stage.integrator.dof}`, stageIdx)
     }
   })
+  for (const tag of claimedStage.keys()) {
+    if (!model.patterns.has(tag)) diagnostics.push({ severity: 'warning', message: `Analysis stage references load pattern ${tag}, which does not exist in the model`, commandIndex: -1 })
+  }
 
   const nodalLoads: W.NodalLoadTable = { pattern: [], node: [], dof: [], value: [], stage: [] }
   for (const id of patternIds) {
@@ -181,7 +188,7 @@ export function compileInputV1(model: Model, analysisHistory: AnalysisHistory): 
       const nIdx = resolveNode(a.nodeTag, `Load in pattern ${id}`)
       a.values.forEach((v, dof) => {
         if (!v || dof > 2) return
-        const stage = dcStageByNodeDof.get(`${a.nodeTag}:${dof}`) ?? 0
+        const stage = claimedStage.get(id) ?? dcStageByNodeDof.get(`${a.nodeTag}:${dof}`) ?? 0
         nodalLoads.pattern.push(pIdx)
         nodalLoads.node.push(nIdx)
         nodalLoads.dof.push(dof)
@@ -197,7 +204,7 @@ export function compileInputV1(model: Model, analysisHistory: AnalysisHistory): 
   // --- sequence ---
   const stages: W.StageSpec[] = []
   sequence.stages.forEach((stage) => {
-    const wireStage = compileStage(stage, patternIndex, resolveNode, diagnostics)
+    const wireStage = compileStage(stage, stages.length, patternIndex, claimedStage, resolveNode, diagnostics)
     if (wireStage) stages.push(wireStage)
   })
   // Every recorded node always captures its full displacement vector — no per-recorder DOF
@@ -377,9 +384,21 @@ function compileTimeSeries(ts: { tsType: string; args: Record<string, unknown> }
   return { kind: 'constant' }
 }
 
+function compileAlgorithm(kind: AlgorithmKind): W.AlgorithmSpec {
+  switch (kind) {
+    case 'linear': return { kind: 'linear' }
+    case 'modified-newton': return { kind: 'newton', tangent: 'initial' }
+    case 'krylov-newton': return { kind: 'krylovNewton', tangent: 'current', maxDimension: 3 }
+    case 'newton-line-search': return { kind: 'newton', lineSearch: { kind: 'regulaFalsi', tol: 0.8, maxIter: 10, maxEta: 10 } }
+    default: return { kind: 'newton' }
+  }
+}
+
 function compileStage(
   stage: AnalysisStage,
+  stageIdx: number,
   patternIndex: Map<number, number>,
+  claimedStage: Map<number, number>,
   resolveNode: (id: number, context: string) => number,
   diagnostics: CompileDiagnostic[],
 ): W.StageSpec | null {
@@ -390,11 +409,18 @@ function compileStage(
   const integrator: W.IntegratorSpec = stage.integrator.kind === 'load-control'
     ? { kind: 'loadControl', increment: stage.integrator.increment }
     : { kind: 'displacementControl', node: resolveNode(stage.integrator.nodeTag, `Stage "${stage.id}" displacement control`), dof: stage.integrator.dof, increment: stage.integrator.increment }
-  const algorithm: W.AlgorithmSpec = stage.algorithm === 'linear' ? 'linear' : 'newtonRaphson'
-  const convergence: W.ConvergenceSpec | null = stage.convergence
+  const algorithm: W.AlgorithmSpec = compileAlgorithm(stage.algorithm)
+  const convergence: W.ConvergenceSpec | undefined = stage.convergence
     ? { kind: stage.convergence.testType === 'NormDispIncr' ? 'normDispIncr' : stage.convergence.testType === 'EnergyIncr' ? 'energyIncr' : 'normUnbalance', tol: stage.convergence.tol, maxIter: stage.convergence.maxIter }
-    : null
-  const holdPatternsAfter = (stage.holdPatternsAfter ?? [])
+    : undefined
+  // Hold what this stage ramped: its claimed patterns, plus (for the first stage, when it is load-controlled)
+  // any pattern nothing claims, since those ramp there. A displacement-control stage's reference load is
+  // never frozen unless asked, as freezing it would zero the sensitivity the integrator drives against.
+  const unclaimed = stageIdx === 0 && stage.integrator.kind === 'load-control'
+    ? [...patternIndex.keys()].filter((tag) => !claimedStage.has(tag))
+    : []
+  const heldTags = stage.holdLoads === false ? [] : (stage.holdPatternsAfter ?? [...(stage.patterns ?? []), ...unclaimed])
+  const holdPatternsAfter = heldTags
     .map((id) => patternIndex.get(id))
     .filter((idx): idx is number => idx !== undefined)
   return { kind: 'static', id: stage.id, steps: stage.steps, integrator, algorithm, convergence, holdPatternsAfter }

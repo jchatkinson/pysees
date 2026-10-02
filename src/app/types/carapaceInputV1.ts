@@ -51,7 +51,12 @@ export type MaterialSpec =
 export type IntegratorSpec =
   | { kind: 'loadControl'; increment: number }
   | { kind: 'displacementControl'; node: number; dof: number; increment: number }
-export type AlgorithmSpec = 'linear' | 'newtonRaphson'
+export type AlgorithmSpec =
+  | 'linear'
+  | 'newtonRaphson'
+  | { kind: 'linear' }
+  | { kind: 'newton'; tangent?: 'current' | 'reuseAtStepStart' | 'initial'; lineSearch?: { kind: 'bisection' | 'regulaFalsi'; tol: number; maxIter: number; maxEta: number } }
+  | { kind: 'krylovNewton'; tangent: 'current' | 'reuseAtStepStart' | 'initial'; maxDimension: number }
 export type ConvergenceSpec =
   | { kind: 'normUnbalance'; tol: number; maxIter: number }
   | { kind: 'normDispIncr'; tol: number; maxIter: number }
@@ -65,7 +70,7 @@ export type StageSpec = {
   steps: number
   integrator: IntegratorSpec
   algorithm: AlgorithmSpec
-  convergence: ConvergenceSpec | null
+  convergence?: ConvergenceSpec
   holdPatternsAfter: number[]
 }
 /** Only the `nodeDisp` recorder kind is modeled here — `compileInputV1.ts` only ever emits that
@@ -96,7 +101,7 @@ export interface EqualDofTable3 { retained: number[]; constrained: number[]; dof
 export interface RigidDiaphragmTable3 { retained: number[]; normal: Axis3Spec[]; constrained: [number, number][] }
 /** `stages` reuses the planar `StageSpec` (the Rust `SequenceSpec3` does too — stage/integrator
  * compilation never touches element physics). `recorders` is never populated by this compiler. */
-export interface SequenceSpec3 { stages: StageSpec[]; recorders: unknown[] }
+export interface SequenceSpec3 { stages: StageSpec[]; recorders: never[] }
 
 export interface CarapaceInputV1 {
   header: { schemaVersion: number; space: 2; engineVersion: string }

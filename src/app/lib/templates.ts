@@ -33,7 +33,7 @@ function staticLoadAnalysis(
     ],
     analysisCommands: [
       { type: 'ANALYSIS_BLOCK', blockId: 'whole-model-recorder', params: { directory: 'out' } },
-      { type: 'ANALYSIS_BLOCK', blockId: 'run-gravity-analysis', params: { steps } },
+      { type: 'ANALYSIS_BLOCK', blockId: 'run-gravity-analysis', params: { patterns: [patternId], steps } },
     ],
   }
 }
@@ -81,13 +81,13 @@ export function momentCurvatureTemplate(): TemplateResult {
   )
 
   // Standard two-stage moment-curvature protocol: hold axial load constant, then sweep
-  // curvature via rotation (DOF 3) displacement control at the free node. `holdPatterns: [1]`
+  // curvature via rotation (DOF 3) displacement control at the free node. `patterns: [1]`
   // freezes only the axial pattern — the unit-moment pattern (2) must stay live into the
   // pushover stage (see the comment on it above).
   const analysisCommands: AnalysisCommand[] = [
     { type: 'ANALYSIS_BLOCK', blockId: 'whole-model-recorder', params: { directory: 'out' } },
-    { type: 'ANALYSIS_BLOCK', blockId: 'run-gravity-analysis', params: { steps: 10, holdPatterns: [1] } },
-    { type: 'ANALYSIS_BLOCK', blockId: 'run-pushover-analysis', params: { nodeTag: 2, dof: 3, increment: 1e-4, steps: 200 } },
+    { type: 'ANALYSIS_BLOCK', blockId: 'run-gravity-analysis', params: { patterns: [1], steps: 10 } },
+    { type: 'ANALYSIS_BLOCK', blockId: 'run-pushover-analysis', params: { patterns: [2], nodeTag: 2, dof: 3, increment: 1e-4, steps: 200 } },
   ]
 
   return { ndm: 2, ndf: 3, writes, analysisCommands }

@@ -6,7 +6,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/app/components/ui/too
 import { useAppStore } from '@/app/store/useAppStore'
 import type { AnalysisCommand } from '@/app/types/analysisCommands'
 import { domainForFn } from '@/app/lib/commandDomain'
-import { getAnalysisBlock } from '@/app/lib/analysisBlocks'
+import { getAnalysisBlock, resolveAnalysisCommand } from '@/app/lib/analysisBlocks'
 import { queryResults } from '@/app/lib/resultsStorage/resultsStorageClient'
 
 function cmdCategory(cmd: AnalysisCommand): string {
@@ -54,6 +54,7 @@ const AUTO_COLLAPSE_THRESHOLD = 4
 
 export function AnalysisPanel() {
   const {
+    model,
     analysisHistory,
     selectedAnalysisIndex,
     setSelectedAnalysisIndex,
@@ -69,6 +70,12 @@ export function AnalysisPanel() {
   const groups = useMemo(() => computeGroups(commands), [commands])
 
   const [overrides, setOverrides] = useState<Set<number>>(new Set())
+  const [expandedBlocks, setExpandedBlocks] = useState<Set<number>>(new Set())
+  const toggleBlock = (i: number) => setExpandedBlocks((prev) => {
+    const next = new Set(prev)
+    if (next.has(i)) next.delete(i); else next.add(i)
+    return next
+  })
   const [dragIndex, setDragIndex] = useState<number | null>(null)
   const [dragTarget, setDragTarget] = useState<number | null>(null)
   const [diagnosticsOpen, setDiagnosticsOpen] = useState(false)
@@ -136,7 +143,10 @@ export function AnalysisPanel() {
     const isCurrent = i === cursor
     const isFuture = i > cursor
     const isSelected = selectedAnalysisIndex === i
+    const isBlock = cmd.type === 'ANALYSIS_BLOCK'
+    const expanded = isBlock && expandedBlocks.has(i)
     return (
+      <>
       <div className="flex items-center gap-0.5 group/row">
         <Tooltip>
           <TooltipTrigger
@@ -170,7 +180,27 @@ export function AnalysisPanel() {
           {isCurrent && <span className="absolute left-0 top-0.5 bottom-0.5 w-[2px] bg-primary rounded-r" />}
           {summary(cmd)}
         </button>
+        {isBlock && (
+          <button
+            className="shrink-0 px-0.5 text-muted-foreground/60 hover:text-foreground"
+            onClick={() => toggleBlock(i)}
+            aria-label={expanded ? 'Hide OpenSees commands' : 'Show OpenSees commands'}
+            aria-expanded={expanded}
+          >
+            <ChevronRight className={`size-3 transition-transform ${expanded ? 'rotate-90' : ''}`} />
+          </button>
+        )}
       </div>
+      {expanded && (
+        <div className={['ml-4 mb-0.5 border-l pl-1.5 text-[10px] font-mono text-muted-foreground', isFuture ? 'opacity-30' : ''].join(' ')}>
+          {(() => {
+            const lines = resolveAnalysisCommand(cmd, model)
+            if (lines.length === 0) return <p className="py-px italic">No commands.</p>
+            return lines.map((c, k) => <p key={k} className="py-px truncate" title={summary(c)}>ops.{summary(c)}</p>)
+          })()}
+        </div>
+      )}
+      </>
     )
   }
 

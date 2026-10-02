@@ -2,7 +2,7 @@ import type { Model } from '@/app/types/model'
 import type { AnalysisCommand } from '@/app/types/analysisCommands'
 import type { ArgDef } from '@/app/types/schema'
 import type { CommandSchema } from '@/app/lib/commandSchemas'
-import type { AnalysisStage, ConvergenceSpec, RecorderSpec } from '@/app/types/analysisSequence'
+import type { AlgorithmKind, AnalysisStage, ConvergenceSpec, RecorderSpec } from '@/app/types/analysisSequence'
 
 export interface AnalysisBlockDef {
   id: string
@@ -25,9 +25,14 @@ function ops(fn: string, args: PositionalArg[]): AnalysisCommand {
   return { type: 'ANALYSIS_OPS', fn, values: { __args: args } }
 }
 
+const ALGORITHM_OPTIONS = ['Newton', 'ModifiedNewton', 'KrylovNewton', 'NewtonLineSearch', 'Linear']
+const ALGORITHM_KINDS: Record<string, AlgorithmKind> = {
+  Newton: 'newton-raphson', ModifiedNewton: 'modified-newton', KrylovNewton: 'krylov-newton', NewtonLineSearch: 'newton-line-search', Linear: 'linear',
+}
+
 /** Shared "analysis settings" fields (algorithm + convergence test) every solver stage block exposes. */
 const CONVERGENCE_SCHEMA: ArgDef[] = [
-  { kind: 'choice', name: 'algorithm', label: 'Algorithm', options: ['Newton', 'Linear'], yields: { Newton: [], Linear: [] }, defaultValue: 'Newton' },
+  { kind: 'choice', name: 'algorithm', label: 'Algorithm', options: ALGORITHM_OPTIONS, yields: Object.fromEntries(ALGORITHM_OPTIONS.map((o) => [o, []])), defaultValue: 'Newton' },
   { kind: 'choice', name: 'testType', label: 'Convergence Test', options: ['NormDispIncr', 'NormUnbalance', 'EnergyIncr'], yields: { NormDispIncr: [], NormUnbalance: [], EnergyIncr: [] }, defaultValue: 'NormDispIncr' },
   { kind: 'float', name: 'tol', label: 'Tolerance', defaultValue: 1e-6 },
   { kind: 'int', name: 'maxIter', label: 'Max Iterations', defaultValue: 25 },
@@ -41,9 +46,9 @@ function convergenceOps(params: Record<string, unknown>): AnalysisCommand[] {
   return [ops('test', [testType, tol, maxIter]), ops('algorithm', [algorithm])]
 }
 
-function convergenceStage(params: Record<string, unknown>): { algorithm: 'linear' | 'newton-raphson'; convergence: ConvergenceSpec } {
+function convergenceStage(params: Record<string, unknown>): { algorithm: AlgorithmKind; convergence: ConvergenceSpec } {
   return {
-    algorithm: String(params.algorithm ?? 'Newton') === 'Linear' ? 'linear' : 'newton-raphson',
+    algorithm: ALGORITHM_KINDS[String(params.algorithm ?? 'Newton')] ?? 'newton-raphson',
     convergence: {
       testType: String(params.testType ?? 'NormDispIncr') as ConvergenceSpec['testType'],
       tol: Number(params.tol) || 1e-6,
@@ -52,10 +57,21 @@ function convergenceStage(params: Record<string, unknown>): { algorithm: 'linear
   }
 }
 
+const PATTERNS_FIELD: ArgDef = {
+  kind: 'idlist', name: 'patterns', label: 'Load Patterns', defaultValue: [],
+  description: 'Pattern tags this stage ramps. Leave empty to apply every pattern no other analysis stage claims.',
+}
+
+function patternTags(params: Record<string, unknown>): number[] {
+  // `holdPatterns` is the pre-`patterns` spelling, kept so already-saved histories still resolve.
+  const raw = Array.isArray(params.patterns) && params.patterns.length ? params.patterns : params.holdPatterns
+  return Array.isArray(raw) ? raw.map(Number).filter((n) => Number.isFinite(n)) : []
+}
+
 const wholeModelRecorder: AnalysisBlockDef = {
   id: 'whole-model-recorder',
   label: 'Whole Model Recorder',
-  description: 'Node displacement/velocity/acceleration, support reactions, and element forces for every node/element currently in the model.',
+  description: 'Node displacement, support reactions, and element forces for every node/element currently in the model.',
   paramsSchema: [{ kind: 'str', name: 'directory', label: 'Output Directory', defaultValue: 'out' }],
   build: (params, model) => {
     const dir = String(params.directory ?? 'out').replace(/\/$/, '')
@@ -64,8 +80,6 @@ const wholeModelRecorder: AnalysisBlockDef = {
     const commands: AnalysisCommand[] = []
     if (nodeTags.length) {
       commands.push(ops('recorder', ['Node', '-file', `${dir}/disp.out`, '-time', '-node', ...nodeTags, '-dof', 1, 2, 3, 'disp']))
-      commands.push(ops('recorder', ['Node', '-file', `${dir}/vel.out`, '-time', '-node', ...nodeTags, '-dof', 1, 2, 3, 'vel']))
-      commands.push(ops('recorder', ['Node', '-file', `${dir}/accel.out`, '-time', '-node', ...nodeTags, '-dof', 1, 2, 3, 'accel']))
       commands.push(ops('recorder', ['Node', '-file', `${dir}/reaction.out`, '-time', '-node', ...nodeTags, '-dof', 1, 2, 3, 'reaction']))
     }
     if (eleTags.length) {
@@ -81,8 +95,6 @@ const wholeModelRecorder: AnalysisBlockDef = {
     const recorders: RecorderSpec[] = []
     if (nodeTags.length) {
       recorders.push({ id: 'disp', targetKind: 'node', targetTags: nodeTags, responseKind: 'disp', dofs })
-      recorders.push({ id: 'vel', targetKind: 'node', targetTags: nodeTags, responseKind: 'vel', dofs })
-      recorders.push({ id: 'accel', targetKind: 'node', targetTags: nodeTags, responseKind: 'accel', dofs })
       recorders.push({ id: 'reaction', targetKind: 'node', targetTags: nodeTags, responseKind: 'reaction', dofs })
     }
     if (eleTags.length) {
@@ -93,11 +105,14 @@ const wholeModelRecorder: AnalysisBlockDef = {
 }
 
 const runGravityAnalysis: AnalysisBlockDef = {
+  // id kept as 'run-gravity-analysis' so saved histories keep resolving; it is a general static load stage.
   id: 'run-gravity-analysis',
-  label: 'Run Gravity Analysis',
-  description: 'Static analysis applying a chosen load pattern in `steps` load-control increments.',
+  label: 'Run Static Load Analysis',
+  description: 'Static analysis ramping the chosen load patterns in `steps` load-control increments (gravity, or any other load case).',
   paramsSchema: [
+    PATTERNS_FIELD,
     { kind: 'int', name: 'steps', label: 'Steps', defaultValue: 10, required: true },
+    { kind: 'choice', name: 'holdLoads', label: 'Hold Loads Afterward', options: ['Yes', 'No'], yields: { Yes: [], No: [] }, defaultValue: 'Yes', description: 'Freeze these loads at full value for later stages (loadConst).' },
     ...CONVERGENCE_SCHEMA,
   ],
   build: (params) => {
@@ -110,23 +125,21 @@ const runGravityAnalysis: AnalysisBlockDef = {
       ops('integrator', ['LoadControl', 1 / steps]),
       ops('analysis', ['Static']),
       ops('analyze', [steps]),
-      ops('loadConst', ['-time', 0.0]),
+      ...(params.holdLoads === 'No' ? [] : [ops('loadConst', ['-time', 0.0])]),
     ]
   },
-  toStage: (params, model) => ({
-    kind: 'static',
-    id: 'gravity',
-    steps: Math.max(1, Math.trunc(Number(params.steps) || 10)),
-    integrator: { kind: 'load-control', increment: 1 / Math.max(1, Math.trunc(Number(params.steps) || 10)) },
-    ...convergenceStage(params),
-    // Defaults to freezing every pattern in the model — right whenever gravity is the only stage
-    // that needs one, but wrong the moment a *later* stage (e.g. a moment-curvature sweep's own
-    // unit-moment pattern, driving `DisplacementControl`'s reference-load sensitivity) needs its
-    // own pattern to stay live through that stage. `params.holdPatterns` (an explicit pattern-tag
-    // list, not exposed in `paramsSchema` — only a template that builds this block's params
-    // programmatically needs it) overrides the "freeze everything" default for exactly that case.
-    holdPatternsAfter: Array.isArray(params.holdPatterns) ? (params.holdPatterns as number[]) : [...model.patterns.keys()],
-  }),
+  toStage: (params) => {
+    const steps = Math.max(1, Math.trunc(Number(params.steps) || 10))
+    return {
+      kind: 'static',
+      id: 'static-load',
+      steps,
+      integrator: { kind: 'load-control', increment: 1 / steps },
+      ...convergenceStage(params),
+      patterns: patternTags(params),
+      holdLoads: params.holdLoads !== 'No',
+    }
+  },
 }
 
 const runPushoverAnalysis: AnalysisBlockDef = {
@@ -134,6 +147,7 @@ const runPushoverAnalysis: AnalysisBlockDef = {
   label: 'Run Pushover Analysis',
   description: 'Static analysis in `steps` displacement-control increments at a chosen node/DOF.',
   paramsSchema: [
+    { ...PATTERNS_FIELD, label: 'Reference Load Patterns', description: 'Pattern tags whose loads define the load direction displacement control drives against. Leave empty to use every pattern with a load on the control node/DOF.' },
     { kind: 'int', name: 'nodeTag', label: 'Control Node', required: true },
     { kind: 'int', name: 'dof', label: 'DOF (1-based)', defaultValue: 1, required: true },
     { kind: 'float', name: 'increment', label: 'Displacement Increment', defaultValue: 0.01, required: true },
@@ -161,6 +175,7 @@ const runPushoverAnalysis: AnalysisBlockDef = {
       kind: 'static',
       id: 'pushover',
       steps: Math.max(1, Math.trunc(Number(params.steps) || 100)),
+      patterns: patternTags(params),
       integrator: {
         kind: 'displacement-control',
         nodeTag: Math.trunc(Number(params.nodeTag) || 0),
