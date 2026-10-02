@@ -32,8 +32,12 @@ export interface RunMetadata {
   storageFailureDetail?: string
   /** The model's ndf — every recorded node's fixed component width. */
   dofsPerNode: number
-  /** Number of recorded nodes; the dense per-step row is `1 + nodeCount * dofsPerNode` wide. */
+  /** Number of recorded nodes. */
   nodeCount: number
+  /** Scalar data columns per step (displacements, then reactions, then element forces); the dense
+   * per-step row is `1 + columnCount` wide. Absent on runs stored before reactions/forces existed,
+   * where it is `nodeCount * dofsPerNode`. */
+  columnCount?: number
   /** Samples committed so far — shared across every node, since they're recorded on one timeline. */
   sampleCount: number
 }
@@ -54,7 +58,16 @@ export interface RecorderMetadata {
   recorderId: string
   nodeIndex: number
   componentLayout: string[]
+  /** Absent on runs stored before reactions/forces existed (all node displacements). */
+  kind?: RecorderKind
+  /** First data column (after pseudoTime) of this recorder's `componentLayout.length` columns.
+   * Absent on older runs, where it is `nodeIndex * dofsPerNode`. */
+  columnOffset?: number
 }
+
+/** Node displacements are keyed by `String(nodeTag)`; reactions and forces by `reaction:<nodeTag>`
+ * and `force:<elementTag>`. */
+export type RecorderKind = 'disp' | 'reaction' | 'force'
 
 // responseBlocks([runId, blockIndex]) — one row per chunk, covering every recorded node.
 export interface ResultBlock {
@@ -94,7 +107,7 @@ export type StorageRequest =
   | { type: 'deleteRun'; requestId: string; runId: string }
   | { type: 'clearAllRuns'; requestId: string }
   | { type: 'listRuns'; requestId: string }
-  | { type: 'queryJointDisplacements'; requestId: string; runId: string }
+  | { type: 'queryJointDisplacements'; requestId: string; runId: string; kind?: RecorderKind }
 
 // Every reply carries the requestId of the StorageRequest it answers. `storageError` can be
 // sent in place of any other reply for the same requestId when the underlying transaction fails.

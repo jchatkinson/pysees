@@ -1,6 +1,7 @@
 import type { CarapaceInputV1 } from '@/app/types/carapaceInputV1'
 import type { CarapaceRunProgress, CarapaceRunResult } from '@/app/types/carapaceRun'
 import type { RecorderMetadata, RunMetadata, StageMetadata } from '@/app/types/resultsStorage'
+import type { RecorderPlan } from '@/app/lib/carapace/compileInputV1'
 import * as resultsStorage from '@/app/lib/resultsStorage/resultsStorageClient'
 
 let worker: Worker | null = null
@@ -18,7 +19,7 @@ export interface RunCarapaceOnWorkerOptions {
   onProgress?: (progress: CarapaceRunProgress) => void
 }
 
-function runMetadataFor(runId: string, input: CarapaceInputV1, nodeCount: number, dofsPerNode: number): RunMetadata {
+function runMetadataFor(runId: string, input: CarapaceInputV1, nodeCount: number, dofsPerNode: number, columnCount: number): RunMetadata {
   return {
     runId,
     // pysees's compiler doesn't produce model/sequence provenance hashes yet
@@ -32,6 +33,7 @@ function runMetadataFor(runId: string, input: CarapaceInputV1, nodeCount: number
     status: 'running',
     dofsPerNode,
     nodeCount,
+    columnCount,
     sampleCount: 0,
   }
 }
@@ -40,12 +42,14 @@ function stageMetadataFor(runId: string, input: CarapaceInputV1): StageMetadata[
   return input.sequence.stages.map((stage, stageIndex) => ({ runId, stageIndex, stageId: stage.id, kind: stage.kind, status: 'pending' }))
 }
 
-function recorderMetadataFor(runId: string, recordedNodeTags: number[], dofsPerNode: number): RecorderMetadata[] {
-  return recordedNodeTags.map((tag, nodeIndex) => ({
+function recorderMetadataFor(runId: string, recorderPlans: RecorderPlan[]): RecorderMetadata[] {
+  return recorderPlans.map((plan, nodeIndex) => ({
     runId,
-    recorderId: String(tag),
+    recorderId: plan.recorderId,
     nodeIndex,
-    componentLayout: Array.from({ length: dofsPerNode }, (_, dof) => `dof${dof}`),
+    componentLayout: plan.componentLayout,
+    kind: plan.kind,
+    columnOffset: plan.columnOffset,
   }))
 }
 
@@ -55,13 +59,14 @@ function recorderMetadataFor(runId: string, recordedNodeTags: number[], dofsPerN
  * IndexedDB row before the analysis worker starts, hands the analysis worker a direct
  * `MessagePort` to the storage worker for `writeBlocks` traffic, and finalizes the run's stored
  * status once the analysis worker settles. `recordedNodeTags`/`dofsPerNode` come straight from
- * compileInputV1's result — every recorded node always carries its full displacement vector, so
- * these two numbers are all the dense results-storage layout needs. */
+ * compileInputV1's result; `recorderPlans` lays out every stored channel (displacements, then
+ * reactions, then element forces) as consecutive columns of the dense results-storage row. */
 export function runCarapaceOnWorker(
   runId: string,
   input: CarapaceInputV1,
   recordedNodeTags: number[],
   dofsPerNode: number,
+  recorderPlans: RecorderPlan[],
   options: RunCarapaceOnWorkerOptions = {},
 ): { promise: Promise<CarapaceRunResult>; cancel: () => void } {
   const w = getWorker()
@@ -72,9 +77,9 @@ export function runCarapaceOnWorker(
     // model-hash provenance yet to tell an old run apart from the current one).
     await resultsStorage.clearAllRuns()
     await resultsStorage.beginRun(
-      runMetadataFor(runId, input, nodeCount, dofsPerNode),
+      runMetadataFor(runId, input, nodeCount, dofsPerNode, input.sequence.recorders.length),
       stageMetadataFor(runId, input),
-      recorderMetadataFor(runId, recordedNodeTags, dofsPerNode),
+      recorderMetadataFor(runId, recorderPlans),
     )
 
     const channel = new MessageChannel()
@@ -104,7 +109,7 @@ export function runCarapaceOnWorker(
       }
       const cleanup = () => w.removeEventListener('message', onMessage)
       w.addEventListener('message', onMessage)
-      w.postMessage({ type: 'run', runId, input, dofsPerNode, storagePort: channel.port2 }, [channel.port2])
+      w.postMessage({ type: 'run', runId, input, storagePort: channel.port2 }, [channel.port2])
     }).catch(async (error: unknown) => {
       const cancelled = error instanceof Error && error.message === 'cancelled'
       await resultsStorage.finishRun(runId, cancelled ? 'cancelled' : 'failed', cancelled ? undefined : String(error))

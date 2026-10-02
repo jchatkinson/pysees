@@ -2,7 +2,7 @@
 // resultsStorageWorker.ts only — the main thread never opens this database directly. Stage 3 of
 // that doc's delivery plan: exercised here with synthetic blocks, not yet wired to a real
 // analysis worker.
-import type { JointDisplacementRow, RecorderMetadata, ResultBlock, ResultSample, RunMetadata, RunStatus, StageMetadata } from '@/app/types/resultsStorage'
+import type { JointDisplacementRow, RecorderKind, RecorderMetadata, ResultBlock, ResultSample, RunMetadata, RunStatus, StageMetadata } from '@/app/types/resultsStorage'
 
 const DB_NAME = 'pysees-results'
 // v2: responseBlocks dropped recorderId from its key — one dense row per chunk covering every
@@ -115,6 +115,15 @@ export async function writeBlocks(runId: string, blocks: ResultBlock[]): Promise
   return { committedBlockKeys, committedSampleCount: sampleCount }
 }
 
+/** Row width and a recorder's first column, with the pre-reactions/forces fallbacks documented on
+ * `RunMetadata.columnCount` / `RecorderMetadata.columnOffset`. */
+function strideOf(run: RunMetadata): number {
+  return 1 + (run.columnCount ?? run.nodeCount * run.dofsPerNode)
+}
+function columnOffsetOf(recorder: RecorderMetadata, run: RunMetadata): number {
+  return recorder.columnOffset ?? recorder.nodeIndex * run.dofsPerNode
+}
+
 export interface QueryResult {
   samples: ResultSample[]
   nextFirstSample?: number
@@ -123,13 +132,12 @@ export interface QueryResult {
 /** Slices one node's `dofsPerNode` columns out of every sample in a dense run-wide block —
  * `nodeOffset` is `1 + nodeIndex * dofsPerNode` (the `+1` skips the leading `pseudoTime`
  * column). */
-function samplesFromBlock(block: ResultBlock, nodeCount: number, dofsPerNode: number, nodeOffset: number): ResultSample[] {
-  const stride = 1 + nodeCount * dofsPerNode
+function samplesFromBlock(block: ResultBlock, stride: number, nodeOffset: number, width: number): ResultSample[] {
   const view = new Float64Array(block.data)
   const samples: ResultSample[] = []
   for (let i = 0; i < block.sampleCount; i++) {
     const offset = i * stride
-    samples.push({ pseudoTime: view[offset], components: Array.from(view.subarray(offset + nodeOffset, offset + nodeOffset + dofsPerNode)) })
+    samples.push({ pseudoTime: view[offset], components: Array.from(view.subarray(offset + nodeOffset, offset + nodeOffset + width)) })
   }
   return samples
 }
@@ -140,7 +148,8 @@ export async function query(runId: string, recorderId: string, firstSample = 0, 
   const run = await reqDone(tx.objectStore('runs').get(runId)) as RunMetadata | undefined
   const recorder = await reqDone(tx.objectStore('recorders').get([runId, recorderId])) as RecorderMetadata | undefined
   if (!run || !recorder) return { samples: [] }
-  const nodeOffset = 1 + recorder.nodeIndex * run.dofsPerNode
+  const nodeOffset = 1 + columnOffsetOf(recorder, run)
+  const stride = strideOf(run)
 
   const store = tx.objectStore('responseBlocks')
   const range = IDBKeyRange.bound([runId, 0], [runId, Infinity])
@@ -156,7 +165,7 @@ export async function query(runId: string, recorderId: string, firstSample = 0, 
       const block = cursor.value as ResultBlock & { runId: string }
       const blockEnd = block.firstSample + block.sampleCount
       if (blockEnd > firstSample) {
-        const blockSamples = samplesFromBlock(block, run.nodeCount, run.dofsPerNode, nodeOffset)
+        const blockSamples = samplesFromBlock(block, stride, nodeOffset, recorder.componentLayout.length)
         const startIndex = Math.max(0, firstSample - block.firstSample)
         for (let i = startIndex; i < blockSamples.length; i++) {
           if (limit !== undefined && samples.length >= limit) {
@@ -191,14 +200,15 @@ export interface QueryJointDisplacementsResult {
  * results-browser data table pools across runs. Pulls every recorded node for every sample, so
  * it scales with nodeCount * sampleCount; fine for today's model sizes, but if that becomes a
  * problem this is the place to add pagination or a narrower node/step filter. */
-export async function queryJointDisplacements(runId: string): Promise<QueryJointDisplacementsResult> {
+export async function queryJointDisplacements(runId: string, kind: RecorderKind = 'disp'): Promise<QueryJointDisplacementsResult> {
   const db = await getDb()
   const tx = db.transaction(['runs', 'recorders', 'responseBlocks'], 'readonly')
   const run = await reqDone(tx.objectStore('runs').get(runId)) as RunMetadata | undefined
   if (!run) return { recorders: [], rows: [] }
 
   const recorders = (await reqDone(tx.objectStore('recorders').getAll(prefixRange(runId)))) as RecorderMetadata[]
-  recorders.sort((a, b) => a.nodeIndex - b.nodeIndex)
+  recorders.sort((a, b) => columnOffsetOf(a, run) - columnOffsetOf(b, run))
+  const selected = recorders.filter((r) => (r.kind ?? 'disp') === kind)
 
   const rows: JointDisplacementRow[] = []
   const store = tx.objectStore('responseBlocks')
@@ -209,21 +219,21 @@ export async function queryJointDisplacements(runId: string): Promise<QueryJoint
       const cursor = cursorRequest.result
       if (!cursor) { resolve(); return }
       const block = cursor.value as ResultBlock & { runId: string }
-      const stride = 1 + run.nodeCount * run.dofsPerNode
+      const stride = strideOf(run)
       const view = new Float64Array(block.data)
       for (let i = 0; i < block.sampleCount; i++) {
         const offset = i * stride
         const pseudoTime = view[offset]
         const step = block.firstSample + i
-        for (const recorder of recorders) {
-          const nodeOffset = 1 + recorder.nodeIndex * run.dofsPerNode
+        for (const recorder of selected) {
+          const nodeOffset = 1 + columnOffsetOf(recorder, run)
           rows.push({
             runId,
             stageIndex: block.stageIndex,
             step,
             pseudoTime,
-            node: recorder.recorderId,
-            components: Array.from(view.subarray(offset + nodeOffset, offset + nodeOffset + run.dofsPerNode)),
+            node: recorder.recorderId.replace(/^[a-z]+:/, ''),
+            components: Array.from(view.subarray(offset + nodeOffset, offset + nodeOffset + recorder.componentLayout.length)),
           })
         }
       }
@@ -231,7 +241,7 @@ export async function queryJointDisplacements(runId: string): Promise<QueryJoint
     }
   })
   await txDone(tx)
-  return { recorders, rows }
+  return { recorders: selected, rows }
 }
 
 export async function finishRun(runId: string, status: 'complete' | 'failed' | 'cancelled' | 'storage-failed', detail?: string): Promise<RunStatus> {

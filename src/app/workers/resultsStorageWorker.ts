@@ -49,7 +49,7 @@ async function handleRequest(request: StorageRequest): Promise<StorageReply> {
       return { type: 'listRunsResult', requestId: request.requestId, runs }
     }
     case 'queryJointDisplacements': {
-      const result = await queryJointDisplacements(request.runId)
+      const result = await queryJointDisplacements(request.runId, request.kind)
       return { type: 'queryJointDisplacementsResult', requestId: request.requestId, runId: request.runId, recorders: result.recorders, rows: result.rows }
     }
   }

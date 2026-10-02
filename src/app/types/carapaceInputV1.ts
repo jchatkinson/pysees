@@ -73,11 +73,13 @@ export type StageSpec = {
   convergence?: ConvergenceSpec
   holdPatternsAfter: number[]
 }
-/** Only the `nodeDisp` recorder kind is modeled here — `compileInputV1.ts` only ever emits that
- * kind (see its own "only node displacement recorders are supported" diagnostic); the Rust
- * `RecorderSpec` enum (internally tagged on `response`) also has `nodeVel`/`nodeAccel`/
- * `elementForce`/`modeShape`/`reaction`/`fiber` variants this compiler doesn't produce yet. */
-export interface RecorderSpecWire { response: 'nodeDisp'; node: number; dof: number }
+/** The recorder kinds `compileInputV1.ts` emits: `nodeDisp`, `reaction` and `elementForce` (the Rust
+ * `RecorderSpec` enum, internally tagged on `response`, also has `nodeVel`/`nodeAccel`/`modeShape`/
+ * `fiber`, which the compiler doesn't produce yet). */
+export type RecorderSpecWire =
+  | { response: 'nodeDisp'; node: number; dof: number }
+  | { response: 'reaction'; node: number; dof: number }
+  | { response: 'elementForce'; elementKind: ElementKind; elementIndex: number; component: number }
 export interface SequenceSpec { stages: StageSpec[]; recorders: RecorderSpecWire[] }
 
 // --- Spatial ("space: 3") counterparts -------------------------------------------------------

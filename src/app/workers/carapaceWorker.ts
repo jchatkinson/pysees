@@ -7,13 +7,12 @@ import type { ResultBlock, StorageReply, StorageRequest } from '@/app/types/resu
  * is this run's dedicated side of a `MessageChannel` to the results-storage worker (see
  * carapace/docs/results-storage-indexeddb.md's "Use a MessageChannel between the two workers") —
  * the main thread creates the channel, keeps the other port for its own beginRun/finishRun calls,
- * and transfers this one when starting the run. `dofsPerNode` is the model's ndf: every recorded
- * node in `input.sequence.recorders` always carries its full displacement vector (no per-recorder
- * DOF selection), so `input.sequence.recorders.length / dofsPerNode` recorded nodes, in that
- * fixed-width, node-major order, is all this worker needs to build the dense results-storage rows
- * itself — see resultsStorage.ts's header comment. */
+ * and transfers this one when starting the run. Every wire recorder in `input.sequence.recorders`
+ * is one scalar column of the dense results-storage row, in wire order (compileInputV1 lays out
+ * displacements, then reactions, then element forces), so the recorder count is all this worker
+ * needs to build the rows — see resultsStorage.ts's header comment. */
 type InMsg =
-  | { type: 'run'; runId: string; input: CarapaceInputV1; dofsPerNode: number; storagePort?: MessagePort }
+  | { type: 'run'; runId: string; input: CarapaceInputV1; storagePort?: MessagePort }
   | { type: 'cancel'; runId: string }
 
 type OutMsg =
@@ -59,8 +58,8 @@ const cancelledRuns = new Set<string>()
 // serialized camelCase via serde-wasm-bindgen. `advance()` returns `any` at the TS boundary since
 // it crosses as a `JsValue`; this is the shape we know it actually has. `recorderBatches` is
 // ordered by `recorderIndex` ascending and, in steady state, has one entry per wire recorder
-// (every recorder samples every step) — recorderIndex `i` is therefore node `i / dofsPerNode`'s
-// dof `i % dofsPerNode`, exactly the dense layout's node-major, fixed-width ordering.
+// (every recorder samples every step) — recorderIndex `i` is therefore data column `i` of the
+// dense row.
 interface WasmRecorderBatch { recorderIndex: number; stageIndex: number; firstSample: number; samples: [number, number][] }
 interface WasmStepOutcome {
   done: boolean
@@ -92,8 +91,8 @@ class StorageStream {
   private requestCounter = 0
   private failure: string | null = null
 
-  constructor(private port: MessagePort, private runId: string, private nodeCount: number, private dofsPerNode: number) {
-    this.stride = 1 + nodeCount * dofsPerNode
+  constructor(private port: MessagePort, private runId: string, private columnCount: number) {
+    this.stride = 1 + columnCount
     port.onmessage = (e: MessageEvent<StorageReply>) => this.onReply(e.data)
   }
 
@@ -109,13 +108,13 @@ class StorageStream {
   }
 
   /** Appends one `advance()` call's worth of steps. `batches` must be ordered by `recorderIndex`
-   * ascending and cover every wire recorder — `nodeCount * dofsPerNode` of them, one per
-   * (node, dof) scalar — which holds whenever `stepsTaken > 0`, since every recorder samples
+   * ascending and cover every wire recorder — `columnCount` of them, one per scalar
+   * column — which holds whenever `stepsTaken > 0`, since every recorder samples
    * every step. A call with the wrong count is dropped with a warning rather than corrupting the
    * dense row layout. */
   async add(batches: WasmRecorderBatch[], stageIndex: number): Promise<void> {
     if (batches.length === 0) return
-    const expected = this.nodeCount * this.dofsPerNode
+    const expected = this.columnCount
     if (batches.length !== expected) {
       console.warn(`StorageStream: expected ${expected} recorder batches this call, got ${batches.length} — dropping`)
       return
@@ -160,11 +159,10 @@ class StorageStream {
   }
 }
 
-async function runOne(runId: string, input: CarapaceInputV1, dofsPerNode: number, storagePort?: MessagePort) {
+async function runOne(runId: string, input: CarapaceInputV1, storagePort?: MessagePort) {
   const { decodeInput } = await loadWasm()
   const session = decodeInput(input)
-  const nodeCount = dofsPerNode > 0 ? input.sequence.recorders.length / dofsPerNode : 0
-  const storageStream = storagePort ? new StorageStream(storagePort, runId, nodeCount, dofsPerNode) : null
+  const storageStream = storagePort ? new StorageStream(storagePort, runId, input.sequence.recorders.length) : null
 
   const stagesRun: string[] = []
   let error: CarapaceRunResult['error'] = null
@@ -217,7 +215,7 @@ ctx.onmessage = (e) => {
   const msg = e.data
   if (msg.type === 'run') {
     ctx.postMessage({ type: 'accepted', runId: msg.runId })
-    runOne(msg.runId, msg.input, msg.dofsPerNode, msg.storagePort).catch((error) => ctx.postMessage({ type: 'error', runId: msg.runId, error: String(error) }))
+    runOne(msg.runId, msg.input, msg.storagePort).catch((error) => ctx.postMessage({ type: 'error', runId: msg.runId, error: String(error) }))
   } else if (msg.type === 'cancel') {
     cancelledRuns.add(msg.runId)
   }

@@ -12,20 +12,52 @@ export interface CompileInputV1Result {
   recordedNodeTags: number[]
   /** The model's ndf — every recorded node's fixed component width in that dense layout. */
   dofsPerNode: number
+  /** Every stored recorder, in wire-recorder (= results-column) order: node displacements first,
+   * then support reactions, then element forces. Each one owns `componentLayout.length`
+   * consecutive columns starting at `columnOffset` (after the leading pseudo-time column). */
+  recorderPlans: RecorderPlan[]
+}
+
+export type RecorderPlanKind = 'disp' | 'reaction' | 'force'
+export interface RecorderPlan {
+  recorderId: string
+  kind: RecorderPlanKind
+  /** Node tag (disp/reaction) or element tag (force). */
+  targetTag: number
+  columnOffset: number
+  componentLayout: string[]
+}
+
+/** Local nodal force components of a planar element (`ElementOps::local_force`), in order. */
+const ELEMENT_FORCE_LABELS = ['Ni', 'Vi', 'Mi', 'Nj', 'Vj', 'Mj']
+
+/** Names a node's `ndf` DOF components from `[x, y, z, rx, ry, rz]`-ordered labels. Planar (ndm=2)
+ * nodes with a rotation DOF skip the out-of-plane entries (x, y, rz); anything else unrecognised
+ * falls back to `dof<i>`. */
+function dofLabels(ndm: number, ndf: number, names: string[]): string[] {
+  const [x, y, z, rx, ry, rz] = names
+  const layout = ndm === 2
+    ? (ndf === 2 ? [x, y] : ndf === 3 ? [x, y, rz] : [])
+    : (ndf === 3 ? [x, y, z] : ndf === 6 ? [x, y, z, rx, ry, rz] : [])
+  return Array.from({ length: ndf }, (_, i) => layout[i] ?? `dof${i}`)
+}
+
+export function recorderIdFor(kind: RecorderPlanKind, tag: number): string {
+  return kind === 'disp' ? String(tag) : `${kind}:${tag}`
 }
 
 const NO_INDEX = -1
 
 /** Compiles a pysees Model + AnalysisHistory into the CarapaceInputV1 shape decodeInput() expects.
  * Scope (matches carapace-wasm's current decoder): planar (ndm=2/ndf=3) only, Truss/ElasticBeamColumn
- * elements, static stages only, single node/dof displacement recorders. Everything outside that is
+ * elements, static stages only, node displacement/reaction and element force recorders. Everything outside that is
  * reported as a diagnostic and dropped, never guessed at — this is the full validation boundary
  * pysees-handoff.md assigns to the compiler. */
 export function compileInputV1(model: Model, analysisHistory: AnalysisHistory): CompileInputV1Result {
   const diagnostics: CompileDiagnostic[] = []
   const fail = (message: string): CompileInputV1Result => {
     diagnostics.push({ severity: 'error', message, commandIndex: -1 })
-    return { input: null, diagnostics, recordedNodeTags: [], dofsPerNode: 0 }
+    return { input: null, diagnostics, recordedNodeTags: [], dofsPerNode: 0, recorderPlans: [] }
   }
 
   if (!model.config) return fail('Model is not initialized.')
@@ -103,6 +135,7 @@ export function compileInputV1(model: Model, analysisHistory: AnalysisHistory): 
     }
     return idx
   }
+  const elementRefs = new Map<number, { kind: W.ElementKind; index: number }>()
   for (const ele of [...model.elements.values()].sort((a, b) => a.id - b.id)) {
     if (ele.eleType === 'Truss') {
       trusses.nodeI.push(resolveNode(ele.nodes[0], `Truss ${ele.id}`))
@@ -110,6 +143,7 @@ export function compileInputV1(model: Model, analysisHistory: AnalysisHistory): 
       trusses.area.push(Number(ele.args.A) || 0)
       trusses.material.push(resolveMaterial(Number(ele.args.matTag), `Truss ${ele.id}`))
       trusses.density.push(Number(ele.args.rho) || 0)
+      elementRefs.set(ele.id, { kind: 'truss', index: trusses.nodeI.length - 1 })
     } else if (ele.eleType === 'ElasticBeamColumn') {
       const transfTag = Number(ele.args.transfTag)
       const transfType = model.geomTransfs.get(transfTag)?.transfType
@@ -120,6 +154,7 @@ export function compileInputV1(model: Model, analysisHistory: AnalysisHistory): 
       elasticBeamColumns.iz.push(Number(ele.args.Iz) || 0)
       elasticBeamColumns.transform.push(compileTransform(transfType, `ElasticBeamColumn ${ele.id}`, diagnostics))
       elasticBeamColumns.density.push(0)
+      elementRefs.set(ele.id, { kind: 'elasticBeamColumn', index: elasticBeamColumns.nodeI.length - 1 })
     } else if (ele.eleType === 'DispBeamColumn') {
       const integrationTag = Number(ele.args.integrationTag)
       const integration = model.beamIntegrations.get(integrationTag)
@@ -134,11 +169,13 @@ export function compileInputV1(model: Model, analysisHistory: AnalysisHistory): 
       dispBeamColumns.integration.push(compileIntegration(integration, `DispBeamColumn ${ele.id}`, diagnostics))
       dispBeamColumns.corotational.push(false)
       dispBeamColumns.density.push(0)
+      elementRefs.set(ele.id, { kind: 'dispBeamColumn', index: dispBeamColumns.nodeI.length - 1 })
     } else if (ele.eleType === 'zeroLengthSection') {
       const secIdx = resolveSection(Number(ele.args.secTag), `ZeroLengthSection ${ele.id}`)
       zeroLengthSections.nodeI.push(resolveNode(ele.nodes[0], `ZeroLengthSection ${ele.id}`))
       zeroLengthSections.nodeJ.push(resolveNode(ele.nodes[1], `ZeroLengthSection ${ele.id}`))
       zeroLengthSections.fiberSection.push(secIdx)
+      elementRefs.set(ele.id, { kind: 'zeroLengthSection', index: zeroLengthSections.nodeI.length - 1 })
     } else {
       diagnostics.push({ severity: 'warning', message: `Element ${ele.id} (${ele.eleType}) is not yet supported by the Carapace compiler and was skipped`, commandIndex: -1 })
     }
@@ -210,29 +247,57 @@ export function compileInputV1(model: Model, analysisHistory: AnalysisHistory): 
   // Every recorded node always captures its full displacement vector — no per-recorder DOF
   // selection. This keeps the dense [step][node][dof] results-storage layout addressable by pure
   // arithmetic (carapace/docs/results-storage-indexeddb.md): a node's columns are always exactly
-  // `dofsPerNode` wide, so there's never a per-recorder offset table to maintain. A RecorderSpec's
-  // own `dofs` (a subset) is intentionally ignored here — it still governs what the exported
-  // openseespy script's recorder command actually asks for; this only shapes Carapace's preview.
+  // `dofsPerNode` wide. A RecorderSpec's own `dofs` (a subset) is intentionally ignored here — it
+  // still governs what the exported openseespy script's recorder command actually asks for; this
+  // only shapes Carapace's preview. Reactions get the same full-width treatment; element forces
+  // record all six planar local components. Every recorder is one wire scalar per column, so the
+  // plan's `columnOffset`s are just running wire-recorder indices.
   const dofsPerNode = model.config.ndf
+  const dispLabels = dofLabels(model.config.ndm, dofsPerNode, ['dx', 'dy', 'dz', 'rx', 'ry', 'rz'])
+  const reactionLabels = dofLabels(model.config.ndm, dofsPerNode, ['Fx', 'Fy', 'Fz', 'Mx', 'My', 'Mz'])
   const recordedNodeTags: number[] = []
-  const seenNodeTags = new Set<number>()
+  const recordedReactionTags: number[] = []
+  const recordedElementTags: number[] = []
+  const seen = { disp: new Set<number>(), reaction: new Set<number>(), force: new Set<number>() }
   for (const rec of sequence.recorders) {
-    if (rec.targetKind !== 'node' || rec.responseKind !== 'disp') {
-      diagnostics.push({ severity: 'warning', message: `Recorder "${rec.id}" (${rec.targetKind}/${rec.responseKind}) is not yet supported by Carapace — only node displacement recorders are — and was skipped`, commandIndex: -1 })
-      continue
-    }
-    for (const tag of rec.targetTags) {
-      if (!seenNodeTags.has(tag)) { seenNodeTags.add(tag); recordedNodeTags.push(tag) }
+    if (rec.targetKind === 'node' && rec.responseKind === 'disp') {
+      for (const tag of rec.targetTags) if (!seen.disp.has(tag)) { seen.disp.add(tag); recordedNodeTags.push(tag) }
+    } else if (rec.targetKind === 'node' && rec.responseKind === 'reaction') {
+      for (const tag of rec.targetTags) if (!seen.reaction.has(tag)) { seen.reaction.add(tag); recordedReactionTags.push(tag) }
+    } else if (rec.targetKind === 'element' && rec.responseKind === 'force') {
+      for (const tag of rec.targetTags) if (!seen.force.has(tag)) { seen.force.add(tag); recordedElementTags.push(tag) }
+    } else {
+      diagnostics.push({ severity: 'warning', message: `Recorder "${rec.id}" (${rec.targetKind}/${rec.responseKind}) is not yet supported by Carapace — only node displacement/reaction and element force recorders are — and was skipped`, commandIndex: -1 })
     }
   }
   const recorders: W.RecorderSpecWire[] = []
+  const recorderPlans: RecorderPlan[] = []
+  const plan = (kind: RecorderPlanKind, targetTag: number, componentLayout: string[]) => {
+    recorderPlans.push({ recorderId: recorderIdFor(kind, targetTag), kind, targetTag, columnOffset: recorders.length, componentLayout })
+  }
   for (const tag of recordedNodeTags) {
-    for (let dof = 0; dof < dofsPerNode; dof++) {
-      recorders.push({ response: 'nodeDisp', node: resolveNode(tag, `Recorder for node ${tag}`), dof })
+    plan('disp', tag, dispLabels)
+    const node = resolveNode(tag, `Recorder for node ${tag}`)
+    for (let dof = 0; dof < dofsPerNode; dof++) recorders.push({ response: 'nodeDisp', node, dof })
+  }
+  for (const tag of recordedReactionTags) {
+    // Only supported nodes (an sp/fix constraint) carry a reaction; elsewhere it is just a free DOF's residual.
+    if (!model.fixes.get(tag)?.dofs.length) continue
+    plan('reaction', tag, reactionLabels)
+    const node = resolveNode(tag, `Reaction recorder for node ${tag}`)
+    for (let dof = 0; dof < dofsPerNode; dof++) recorders.push({ response: 'reaction', node, dof })
+  }
+  for (const tag of recordedElementTags) {
+    const ref = elementRefs.get(tag)
+    // An element the compiler skipped already produced its own "not yet supported" warning.
+    if (!ref) continue
+    plan('force', tag, ELEMENT_FORCE_LABELS)
+    for (let component = 0; component < ELEMENT_FORCE_LABELS.length; component++) {
+      recorders.push({ response: 'elementForce', elementKind: ref.kind, elementIndex: ref.index, component })
     }
   }
 
-  if (diagnostics.some((d) => d.severity === 'error')) return { input: null, diagnostics, recordedNodeTags: [], dofsPerNode: 0 }
+  if (diagnostics.some((d) => d.severity === 'error')) return { input: null, diagnostics, recordedNodeTags: [], dofsPerNode: 0, recorderPlans: [] }
 
   const input: W.CarapaceInputV1 = {
     header: { schemaVersion: 1, space: 2, engineVersion: 'pysees-dev' },
@@ -268,7 +333,7 @@ export function compileInputV1(model: Model, analysisHistory: AnalysisHistory): 
     elementLoads3: { pattern: [], elementKind: [], elementIndex: [], load: [], stage: [] },
     sequence3: { stages: [], recorders: [] },
   }
-  return { input, diagnostics, recordedNodeTags, dofsPerNode }
+  return { input, diagnostics, recordedNodeTags, dofsPerNode, recorderPlans }
 }
 
 /** Compiles every `model.sections` entry with `secType === 'Fiber'` into one flat, offset-indexed

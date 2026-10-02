@@ -4,9 +4,12 @@ import { RefreshCw, Loader2 } from 'lucide-react'
 import { Button } from '@/app/components/ui/button'
 import { Input } from '@/app/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/app/components/ui/select'
+import { useAppStore } from '@/app/store/useAppStore'
+import { formatResult } from '@/app/lib/formatResult'
 import { DataTable } from '@/app/components/ui/data-table'
+import { columnFilterFn } from '@/app/components/ui/column-filter'
 import { listRuns, queryJointDisplacements } from '@/app/lib/resultsStorage/resultsStorageClient'
-import type { RunMetadata } from '@/app/types/resultsStorage'
+import type { RecorderKind, RunMetadata } from '@/app/types/resultsStorage'
 
 /** ETABS-style pooled results table: every stored run's joint displacements, flattened into one
  * (case, stage, step, node) row shape and sorted/filtered client-side. Other result types
@@ -23,9 +26,16 @@ interface DisplacementRow {
 
 const RESULT_TYPES = [
   { id: 'joint-displacements', label: 'Joint Displacements' },
-  { id: 'element-forces', label: 'Element Forces (soon)' },
-  { id: 'reactions', label: 'Base Reactions (soon)' },
+  { id: 'element-forces', label: 'Element Forces' },
+  { id: 'reactions', label: 'Reactions' },
 ] as const
+
+const KIND_BY_RESULT_TYPE: Record<(typeof RESULT_TYPES)[number]['id'], RecorderKind> = {
+  'joint-displacements': 'disp',
+  'element-forces': 'force',
+  'reactions': 'reaction',
+}
+const TARGET_HEADER: Record<RecorderKind, string> = { disp: 'Node', reaction: 'Node', force: 'Element' }
 
 function shortRunId(runId: string): string {
   return runId.length > 10 ? `${runId.slice(0, 8)}…` : runId
@@ -42,6 +52,10 @@ export function ResultsPanel() {
   const [globalFilter, setGlobalFilter] = useState('')
   const [caseFilter, setCaseFilter] = useState<string>('all')
 
+  const zeroTolerance = useAppStore((s) => s.zeroTolerance)
+  const setZeroTolerance = useAppStore((s) => s.setZeroTolerance)
+  const kind = KIND_BY_RESULT_TYPE[resultType as keyof typeof KIND_BY_RESULT_TYPE] ?? 'disp'
+
   const load = () => {
     setLoading(true)
     setError(null)
@@ -49,7 +63,7 @@ export function ResultsPanel() {
       try {
         const { runs: allRuns } = await listRuns()
         const withData = allRuns.filter((r) => r.sampleCount > 0)
-        const results = await Promise.all(withData.map((run) => queryJointDisplacements(run.runId)))
+        const results = await Promise.all(withData.map((run) => queryJointDisplacements(run.runId, kind)))
         const nextRows: DisplacementRow[] = []
         let labels: string[] = []
         results.forEach((result, i) => {
@@ -72,7 +86,7 @@ export function ResultsPanel() {
     })()
   }
 
-  useEffect(() => { load() }, [])
+  useEffect(() => { load() }, [kind])
 
   const columns = useMemo<ColumnDef<DisplacementRow>[]>(() => {
     const base: ColumnDef<DisplacementRow>[] = [
@@ -80,7 +94,7 @@ export function ResultsPanel() {
       { accessorKey: 'stageIndex', header: 'Stage' },
       { accessorKey: 'step', header: 'Step' },
       { accessorKey: 'pseudoTime', header: 'Time', cell: (c) => c.getValue<number>().toPrecision(5) },
-      { accessorKey: 'node', header: 'Node' },
+      { accessorKey: 'node', header: TARGET_HEADER[kind] },
     ]
     const dofCols: ColumnDef<DisplacementRow>[] = componentLabels.map((label, i) => ({
       id: `dof-${i}`,
@@ -88,17 +102,18 @@ export function ResultsPanel() {
       accessorFn: (row) => row.values[i],
       cell: (c) => {
         const v = c.getValue<number | undefined>()
-        return v === undefined ? '' : v.toExponential(4)
+        return v === undefined ? '' : formatResult(v, zeroTolerance)
       },
     }))
     return [...base, ...dofCols]
-  }, [componentLabels])
+  }, [componentLabels, kind, zeroTolerance])
 
   const filteredRows = useMemo(() => (caseFilter === 'all' ? rows : rows.filter((r) => r.runId === caseFilter)), [rows, caseFilter])
 
   const table = useReactTable({
     data: filteredRows,
     columns,
+    defaultColumn: { filterFn: columnFilterFn },
     state: { sorting, globalFilter },
     onSortingChange: setSorting,
     onGlobalFilterChange: setGlobalFilter,
@@ -117,7 +132,7 @@ export function ResultsPanel() {
             <SelectTrigger className="h-7 flex-1 text-[11px]"><SelectValue /></SelectTrigger>
             <SelectContent>
               {RESULT_TYPES.map((rt) => (
-                <SelectItem key={rt.id} value={rt.id} disabled={rt.id !== 'joint-displacements'}>{rt.label}</SelectItem>
+                <SelectItem key={rt.id} value={rt.id}>{rt.label}</SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -134,6 +149,16 @@ export function ResultsPanel() {
             </SelectContent>
           </Select>
           <Input placeholder="Filter…" value={globalFilter} onChange={(e) => setGlobalFilter(e.target.value)} className="h-7 flex-1 text-[11px]" />
+          <label className="flex shrink-0 items-center gap-1 text-[10px] text-muted-foreground" title="Values smaller than this display as 0">
+            Zero tol
+            <Input
+              key={zeroTolerance}
+              defaultValue={String(zeroTolerance)}
+              onBlur={(e) => { const v = Number(e.target.value); if (Number.isFinite(v) && v >= 0) setZeroTolerance(v); else e.target.value = String(zeroTolerance) }}
+              onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur() }}
+              className="h-7 w-16 text-[11px]"
+            />
+          </label>
         </div>
       </div>
       {error && <p className="shrink-0 px-2 py-1 text-[11px] text-destructive">{error}</p>}

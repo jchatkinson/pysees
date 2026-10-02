@@ -1,4 +1,4 @@
-import type { RecorderMetadata, ResultBlock, RunMetadata, StageMetadata, StorageReply, StorageRequest } from '@/app/types/resultsStorage'
+import type { RecorderKind, RecorderMetadata, ResultBlock, RunMetadata, StageMetadata, StorageReply, StorageRequest } from '@/app/types/resultsStorage'
 
 let worker: Worker | null = null
 function getWorker(): Worker {
@@ -58,8 +58,8 @@ export function listRuns() {
   return send<Extract<StorageReply, { type: 'listRunsResult' }>>({ type: 'listRuns', requestId: nextRequestId() })
 }
 
-export function queryJointDisplacements(runId: string) {
-  return send<Extract<StorageReply, { type: 'queryJointDisplacementsResult' }>>({ type: 'queryJointDisplacements', requestId: nextRequestId(), runId })
+export function queryJointDisplacements(runId: string, kind?: RecorderKind) {
+  return send<Extract<StorageReply, { type: 'queryJointDisplacementsResult' }>>({ type: 'queryJointDisplacements', requestId: nextRequestId(), runId, kind })
 }
 
 /** Hands one side of a `MessageChannel` to the storage worker (see resultsStorageWorker.ts's

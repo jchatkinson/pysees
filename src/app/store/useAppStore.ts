@@ -14,6 +14,9 @@ import { clearAllRuns } from '@/app/lib/resultsStorage/resultsStorageClient'
 import type { CarapaceRunProgress, CarapaceRunResult } from '@/app/types/carapaceRun'
 import type { CompileDiagnostic } from '@/app/lib/compileAnalysisSequence'
 
+/** Suits both forces and displacements in most structural problems. */
+export const DEFAULT_ZERO_TOLERANCE = 1e-6
+
 export interface CarapaceRunState {
   status: 'idle' | 'compiling' | 'running' | 'done' | 'error' | 'cancelled'
   diagnostics: CompileDiagnostic[]
@@ -37,6 +40,9 @@ interface AppStore {
   modelFuture: Model[]
   analysisHistory: AnalysisHistory
   gridlines: GridlineEntity[]
+  /** Results with |value| below this display as a plain 0 instead of scientific notation. */
+  zeroTolerance: number
+  setZeroTolerance: (tol: number) => void
   nextGridlineId: number
   levels: LevelEntity[]
   nextLevelId: number
@@ -201,6 +207,8 @@ export const useAppStore = create<AppStore>((set, get) => {
   modelFuture: [],
   analysisHistory: emptyAnalysisHistory(),
   gridlines: [],
+  zeroTolerance: DEFAULT_ZERO_TOLERANCE,
+  setZeroTolerance: (zeroTolerance) => set({ zeroTolerance }),
   nextGridlineId: 1,
   gridlinesDialogOpen: false,
   setGridlinesDialogOpen: (open) => set({ gridlinesDialogOpen: open }),
@@ -262,14 +270,14 @@ export const useAppStore = create<AppStore>((set, get) => {
   runCarapace: async () => {
     const { model, analysisHistory } = get()
     set({ carapaceRun: { status: 'compiling', diagnostics: [], result: null, error: null, progress: null, runId: null } })
-    const { input, diagnostics, recordedNodeTags, dofsPerNode } = compileInputV1(model, analysisHistory)
+    const { input, diagnostics, recordedNodeTags, dofsPerNode, recorderPlans } = compileInputV1(model, analysisHistory)
     if (!input) {
       set({ carapaceRun: { status: 'error', diagnostics, result: null, error: 'Compile failed — see diagnostics.', progress: null, runId: null } })
       return
     }
     const runId = nextCarapaceRunId()
     set({ carapaceRun: { status: 'running', diagnostics, result: null, error: null, progress: null, runId } })
-    const { promise, cancel } = runCarapaceOnWorker(runId, input, recordedNodeTags, dofsPerNode, {
+    const { promise, cancel } = runCarapaceOnWorker(runId, input, recordedNodeTags, dofsPerNode, recorderPlans, {
       onProgress: (progress) => set((s) => (s.carapaceRun.runId === runId ? { carapaceRun: { ...s.carapaceRun, progress } } : {})),
     })
     activeCarapaceCancel = cancel
