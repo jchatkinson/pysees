@@ -2,12 +2,13 @@
 // resultsStorageWorker.ts only — the main thread never opens this database directly. Stage 3 of
 // that doc's delivery plan: exercised here with synthetic blocks, not yet wired to a real
 // analysis worker.
-import type { JointDisplacementRow, RecorderKind, RecorderMetadata, ResultBlock, ResultSample, RunMetadata, RunStatus, StageMetadata } from '@/app/types/resultsStorage'
+import type { JointDisplacementRow, RecorderKind, RunExtents, RecorderMetadata, ResultBlock, ResultSample, RunMetadata, RunStatus, StageMetadata } from '@/app/types/resultsStorage'
 
 const DB_NAME = 'pysees-results'
 // v2: responseBlocks dropped recorderId from its key — one dense row per chunk covering every
 // recorded node, not one row per node per chunk (see resultsStorage.ts's header comment for why).
-const DB_VERSION = 2
+// v3: responseBlocks gets a [runId, firstSample] index so "the block holding step N" is one lookup.
+const DB_VERSION = 3
 const TERMINAL_STATUSES: ReadonlySet<RunStatus> = new Set(['complete', 'failed', 'cancelled', 'storage-failed', 'interrupted'])
 
 function openDb(): Promise<IDBDatabase> {
@@ -25,6 +26,9 @@ function openDb(): Promise<IDBDatabase> {
         // still pre-release, dev-time data only.
         if (db.objectStoreNames.contains('responseBlocks')) db.deleteObjectStore('responseBlocks')
         db.createObjectStore('responseBlocks', { keyPath: ['runId', 'blockIndex'] })
+      }
+      if (e.oldVersion < 3) {
+        request.transaction!.objectStore('responseBlocks').createIndex('byFirstSample', ['runId', 'firstSample'])
       }
     }
     request.onsuccess = () => resolve(request.result)
@@ -304,4 +308,63 @@ export async function deleteRun(runId: string): Promise<void> {
     deleteByRunId(tx, 'responseBlocks', runId),
   ])
   await txDone(tx)
+}
+
+/** One run's metadata plus its recorders ordered by first column — enough to locate any node's
+ * displacement or element's forces in a dense row. */
+export async function getRunLayout(runId: string): Promise<{ run: RunMetadata | null; recorders: RecorderMetadata[] }> {
+  const db = await getDb()
+  const tx = db.transaction(['runs', 'recorders'], 'readonly')
+  const run = await reqDone(tx.objectStore('runs').get(runId)) as RunMetadata | undefined
+  if (!run) return { run: null, recorders: [] }
+  const recorders = await reqDone(tx.objectStore('recorders').getAll(prefixRange(runId))) as RecorderMetadata[]
+  recorders.sort((a, b) => columnOffsetOf(a, run) - columnOffsetOf(b, run))
+  return { run, recorders }
+}
+
+/** The block whose sample range contains `sample`: the last block starting at or before it. */
+export async function queryBlock(runId: string, sample: number): Promise<ResultBlock | null> {
+  const db = await getDb()
+  const tx = db.transaction('responseBlocks', 'readonly')
+  const cursorRequest = tx.objectStore('responseBlocks').index('byFirstSample').openCursor(IDBKeyRange.bound([runId, 0], [runId, sample]), 'prev')
+  const cursor = await reqDone(cursorRequest)
+  if (!cursor) return null
+  const block = cursor.value as ResultBlock
+  return sample < block.firstSample + block.sampleCount ? block : null
+}
+
+/** Max |value| per recorder kind and component label across every step of a run. */
+export async function queryRunExtents(runId: string): Promise<RunExtents> {
+  const extents: RunExtents = { disp: {}, reaction: {}, force: {} }
+  const { run, recorders } = await getRunLayout(runId)
+  if (!run) return extents
+  const stride = strideOf(run)
+  const maxima = recorders.map((r) => new Float64Array(r.componentLayout.length))
+  const db = await getDb()
+  const tx = db.transaction('responseBlocks', 'readonly')
+  const cursorRequest = tx.objectStore('responseBlocks').openCursor(prefixRange(runId))
+  await new Promise<void>((resolve, reject) => {
+    cursorRequest.onerror = () => reject(cursorRequest.error)
+    cursorRequest.onsuccess = () => {
+      const cursor = cursorRequest.result
+      if (!cursor) { resolve(); return }
+      const block = cursor.value as ResultBlock
+      const view = new Float64Array(block.data)
+      for (let i = 0; i < block.sampleCount; i++) {
+        recorders.forEach((rec, k) => {
+          const base = i * stride + 1 + columnOffsetOf(rec, run)
+          for (let c = 0; c < maxima[k].length; c++) {
+            const v = Math.abs(view[base + c])
+            if (v > maxima[k][c]) maxima[k][c] = v
+          }
+        })
+      }
+      cursor.continue()
+    }
+  })
+  recorders.forEach((rec, k) => {
+    const bucket = extents[rec.kind ?? 'disp']
+    rec.componentLayout.forEach((label, c) => { bucket[label] = Math.max(bucket[label] ?? 0, maxima[k][c]) })
+  })
+  return extents
 }

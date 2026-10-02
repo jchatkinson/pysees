@@ -12,6 +12,7 @@ import { compileInputV1 } from '@/app/lib/carapace/compileInputV1'
 import { runCarapaceOnWorker, nextCarapaceRunId } from '@/app/lib/carapace/carapaceWorkerClient'
 import { clearAllRuns } from '@/app/lib/resultsStorage/resultsStorageClient'
 import type { CarapaceRunProgress, CarapaceRunResult } from '@/app/types/carapaceRun'
+import { DEFAULT_RESULTS_VIEW, type ResultsView } from '@/app/types/resultsView'
 import type { CompileDiagnostic } from '@/app/lib/compileAnalysisSequence'
 
 /** Suits both forces and displacements in most structural problems. */
@@ -120,6 +121,10 @@ interface AppStore {
     showLevels: boolean
   }
   viewportAction: { kind: 'zoomIn' | 'zoomOut' | 'fit'; token: number } | null
+
+  // results display (Display Results panel + scene)
+  resultsView: ResultsView
+  setResultsView: (patch: Partial<ResultsView>) => void
 
   // Model actions
   initModel: (ndm: 2 | 3, ndf: number, extra?: { writes?: ModelWrite[]; analysisCommands?: AnalysisCommand[]; gridlines?: GridlineEntity[]; levels?: LevelEntity[] }) => void
@@ -276,14 +281,18 @@ export const useAppStore = create<AppStore>((set, get) => {
       return
     }
     const runId = nextCarapaceRunId()
-    set({ carapaceRun: { status: 'running', diagnostics, result: null, error: null, progress: null, runId } })
+    set((s) => ({ carapaceRun: { status: 'running', diagnostics, result: null, error: null, progress: null, runId }, resultsView: { ...s.resultsView, runId: null, step: 0, stepFrac: 0, playing: false } }))
     const { promise, cancel } = runCarapaceOnWorker(runId, input, recordedNodeTags, dofsPerNode, recorderPlans, {
       onProgress: (progress) => set((s) => (s.carapaceRun.runId === runId ? { carapaceRun: { ...s.carapaceRun, progress } } : {})),
     })
     activeCarapaceCancel = cancel
     try {
       const result = await promise
-      set({ carapaceRun: { status: result.error ? 'error' : 'done', diagnostics, result, error: result.error ? JSON.stringify(result.error) : null, progress: null, runId } })
+      set((s) => ({
+        carapaceRun: { status: result.error ? 'error' : 'done', diagnostics, result, error: result.error ? JSON.stringify(result.error) : null, progress: null, runId },
+        // Show the finished run at its last step; first successful run also opens the panel on the deformed shape.
+        resultsView: result.sampleCount > 0 ? { ...s.resultsView, runId, step: result.sampleCount - 1, stepFrac: 0, open: true, type: s.resultsView.type === 'none' ? 'deformed' : s.resultsView.type } : s.resultsView,
+      }))
     } catch (error) {
       const cancelled = error instanceof Error && error.message === 'cancelled'
       set({ carapaceRun: { status: cancelled ? 'cancelled' : 'error', diagnostics, result: null, error: cancelled ? null : String(error), progress: null, runId } })
@@ -324,6 +333,8 @@ export const useAppStore = create<AppStore>((set, get) => {
     showLevels: true,
   },
   viewportAction: null,
+  resultsView: DEFAULT_RESULTS_VIEW,
+  setResultsView: (patch) => set((s) => ({ resultsView: { ...s.resultsView, ...patch } })),
 
   initModel: (ndm, ndf, extra) => set(() => {
     void clearAllRuns()
@@ -345,6 +356,7 @@ export const useAppStore = create<AppStore>((set, get) => {
       selectedModelEntity: null,
       selectedAnalysisIndex: null,
       analysisInsertionIndex: null,
+      resultsView: DEFAULT_RESULTS_VIEW,
     }
   }),
 
@@ -366,6 +378,7 @@ export const useAppStore = create<AppStore>((set, get) => {
       nodePickMode: 'none',
       pendingNodePick: null,
       results: null,
+      resultsView: DEFAULT_RESULTS_VIEW,
     })
   },
 
@@ -614,5 +627,19 @@ export const useAppStore = create<AppStore>((set, get) => {
     }))
   },
   clearMaterialPreviewLogs: () => set((s) => ({ materialPreview: { ...s.materialPreview, logs: [] } })),
+  })
+})
+
+// Stored results describe the model and analysis sequence they were run on, and runs aren't hashed
+// (see `runMetadataFor`), so any edit to either makes them stale: drop them rather than show a
+// shape that no longer matches. Display preferences (type, scales, toggles) are kept.
+useAppStore.subscribe((s, prev) => {
+  if (s.model === prev.model && s.analysisHistory === prev.analysisHistory) return
+  if (s.carapaceRun.status === 'running' || s.carapaceRun.status === 'compiling') s.cancelCarapaceRun()
+  if (s.carapaceRun.status === 'idle' && s.resultsView.runId === null) return
+  void clearAllRuns()
+  useAppStore.setState({
+    carapaceRun: s.carapaceRun.status === 'done' ? IDLE_CARAPACE_RUN : s.carapaceRun,
+    resultsView: { ...s.resultsView, runId: null, step: 0, stepFrac: 0, playing: false, open: false },
   })
 })

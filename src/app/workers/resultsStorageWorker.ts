@@ -1,5 +1,5 @@
 import type { StorageReply, StorageRequest } from '@/app/types/resultsStorage'
-import { beginRun, clearAllRuns, deleteRun, finishRun, listRuns, query, queryJointDisplacements, writeBlocks } from '@/app/lib/resultsStorage/db'
+import { beginRun, clearAllRuns, deleteRun, finishRun, getRunLayout, listRuns, query, queryBlock, queryJointDisplacements, queryRunExtents, writeBlocks } from '@/app/lib/resultsStorage/db'
 
 /** carapace/docs/results-storage-indexeddb.md's results-storage worker: owns the IndexedDB
  * connection (db.ts), answers write/query/lifecycle requests, and stays reusable across runs in
@@ -11,7 +11,7 @@ type ControlMsg = { type: 'connect'; port: MessagePort }
 type InMsg = StorageRequest | ControlMsg
 
 const ctx = self as unknown as {
-  postMessage: (msg: StorageReply) => void
+  postMessage: (msg: StorageReply, transfer?: Transferable[]) => void
   onmessage: ((e: MessageEvent<InMsg>) => void) | null
 }
 
@@ -52,19 +52,31 @@ async function handleRequest(request: StorageRequest): Promise<StorageReply> {
       const result = await queryJointDisplacements(request.runId, request.kind)
       return { type: 'queryJointDisplacementsResult', requestId: request.requestId, runId: request.runId, recorders: result.recorders, rows: result.rows }
     }
+    case 'getRunLayout': {
+      const { run, recorders } = await getRunLayout(request.runId)
+      return { type: 'getRunLayoutResult', requestId: request.requestId, runId: request.runId, run, recorders }
+    }
+    case 'queryBlock': {
+      const block = await queryBlock(request.runId, request.sample)
+      return { type: 'queryBlockResult', requestId: request.requestId, runId: request.runId, block }
+    }
+    case 'queryRunExtents': {
+      const extents = await queryRunExtents(request.runId)
+      return { type: 'queryRunExtentsResult', requestId: request.requestId, runId: request.runId, extents }
+    }
   }
 }
 
-function serve(request: StorageRequest, post: (reply: StorageReply) => void) {
+function serve(request: StorageRequest, post: (reply: StorageReply, transfer?: Transferable[]) => void) {
   handleRequest(request)
-    .then(post)
+    .then((reply) => post(reply, reply.type === 'queryBlockResult' && reply.block ? [reply.block.data] : []))
     .catch((error: unknown) => post({ type: 'storageError', requestId: request.requestId, runId: requestRunId(request), detail: String(error) }))
 }
 
 ctx.onmessage = (e) => {
   const msg = e.data
   if (msg.type === 'connect') {
-    msg.port.onmessage = (portEvent: MessageEvent<StorageRequest>) => serve(portEvent.data, (reply) => msg.port.postMessage(reply))
+    msg.port.onmessage = (portEvent: MessageEvent<StorageRequest>) => serve(portEvent.data, (reply, transfer = []) => msg.port.postMessage(reply, transfer))
     return
   }
   serve(msg, (reply) => ctx.postMessage(reply))

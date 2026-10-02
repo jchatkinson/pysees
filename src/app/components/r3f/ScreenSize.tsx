@@ -1,24 +1,13 @@
 import { useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
-import { MathUtils, OrthographicCamera, PerspectiveCamera, Vector3 } from 'three'
-import type { Camera, Group } from 'three'
+import { Vector3 } from 'three'
+import type { Group } from 'three'
+import { worldUnitsPerPixel } from './screenScale'
 import type { ThreeElements } from '@react-three/fiber'
 
 type GroupProps = ThreeElements['group']
 
 const tmp = new Vector3()
-
-/** World units spanned by one screen pixel at `worldPos` for the given camera. */
-export function worldUnitsPerPixel(camera: Camera, worldPos: Vector3, viewportHeightPx: number): number {
-  if (camera instanceof PerspectiveCamera) {
-    const dist = camera.position.distanceTo(worldPos)
-    return (2 * dist * Math.tan(MathUtils.degToRad(camera.fov) / 2)) / viewportHeightPx
-  }
-  if (camera instanceof OrthographicCamera) {
-    return (camera.top - camera.bottom) / camera.zoom / viewportHeightPx
-  }
-  return 1
-}
 
 /**
  * Group whose children are sized in screen pixels: 1 local unit == `px` pixels at any zoom.

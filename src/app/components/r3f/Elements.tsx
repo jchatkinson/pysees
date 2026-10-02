@@ -1,6 +1,17 @@
-import { Html, Line } from '@react-three/drei'
-import type { ElementEntity, NodeEntity } from '@/app/types/model'
-import { toVec3 } from './utils'
+import { useEffect, useMemo } from 'react'
+import { useThree } from '@react-three/fiber'
+import { Html } from '@react-three/drei'
+import { LineMaterial, LineSegments2, LineSegmentsGeometry } from 'three-stdlib'
+import { useAppStore } from '@/app/store/useAppStore'
+import { BufferLines } from './BufferLines'
+import type { DisplayBuffers } from './displayBuffers'
+import { fillSegmentPositions, type SceneIndex } from './sceneIndex'
+
+const ELEMENT_COLOR = 0x4b5563
+const ELEMENT_LINE_WIDTH_PX = 2
+const GHOST_COLOR = 0x9ca3af
+const GHOST_LINE_WIDTH_PX = 1
+const DEFORMED_COLOR = 0x2563eb
 
 const LABEL_STYLE: React.CSSProperties = {
   fontSize: 9,
@@ -15,68 +26,65 @@ const LABEL_STYLE: React.CSSProperties = {
   pointerEvents: 'none',
 }
 
-function midpoint(points: [number, number, number][]): [number, number, number] {
-  const sum = points.reduce(
-    (acc, p) => [acc[0] + p[0], acc[1] + p[1], acc[2] + p[2]] as [number, number, number],
-    [0, 0, 0] as [number, number, number],
-  )
-  return [sum[0] / points.length, sum[1] / points.length, sum[2] / points.length]
+/** Every element as one batched fat-line draw call; `ghost` draws the thin undeformed reference under a displaced shape. */
+function ElementLines({ index, ghost }: { index: SceneIndex; ghost: boolean }) {
+  const size = useThree((s) => s.size)
+
+  const material = useMemo(() => new LineMaterial({ color: ghost ? GHOST_COLOR : ELEMENT_COLOR, linewidth: ghost ? GHOST_LINE_WIDTH_PX : ELEMENT_LINE_WIDTH_PX }), [ghost])
+  const { lines, geometry } = useMemo(() => {
+    const positions = new Float32Array(index.segmentCount * 6)
+    fillSegmentPositions(index, index.nodeCoords, positions)
+    const geometry = new LineSegmentsGeometry()
+    geometry.setPositions(positions)
+    const lines = new LineSegments2(geometry, material)
+    // Positions will be rewritten per step, so the static bounding sphere can't be trusted.
+    lines.frustumCulled = false
+    return { lines, geometry }
+  }, [index, material])
+
+  useEffect(() => { material.resolution.set(size.width, size.height) }, [material, size])
+  useEffect(() => () => geometry.dispose(), [geometry])
+  useEffect(() => () => material.dispose(), [material])
+
+  return <primitive object={lines} />
 }
 
-function Element({
-  element,
-  nodeMap,
-  showLine,
-  showId,
-}: {
-  element: ElementEntity
-  nodeMap: Map<number, NodeEntity>
-  showLine: boolean
-  showId: boolean
-}) {
-  const points = element.nodes
-    .map((id) => nodeMap.get(id))
-    .filter((n): n is NodeEntity => Boolean(n))
-    .map((n) => toVec3(n.coords))
-
-  if (points.length < 2) return null
-  const mid = midpoint(points)
-
+function ElementLabels({ index }: { index: SceneIndex }) {
   return (
     <>
-      {showLine && <Line points={points} color="#4b5563" lineWidth={2} />}
-      {showId && (
-        <Html position={mid} center style={LABEL_STYLE} zIndexRange={[10, 10]}>
-          E{element.id}
-        </Html>
-      )}
+      {index.elementIds.map((id, j) => {
+        const rows = index.elementNodes[j]
+        const mid: [number, number, number] = [0, 0, 0]
+        for (const r of rows) for (let k = 0; k < 3; k++) mid[k] += index.nodeCoords[r * 3 + k] / rows.length
+        return (
+          <Html key={id} position={mid} center style={LABEL_STYLE} zIndexRange={[10, 10]}>
+            E{id}
+          </Html>
+        )
+      })}
     </>
   )
 }
 
 export function ElementsLayer({
-  elements,
-  nodeMap,
+  index,
+  buffers,
   showElements,
   showElementIds,
 }: {
-  elements: ElementEntity[]
-  nodeMap: Map<number, NodeEntity>
+  index: SceneIndex
+  buffers: DisplayBuffers
   showElements: boolean
   showElementIds: boolean
 }) {
-  if (!showElements && !showElementIds) return null
+  const deformedMode = useAppStore((s) => s.resultsView.type === 'deformed' && s.resultsView.runId !== null)
+  const showUndeformed = useAppStore((s) => s.resultsView.showUndeformed)
+  const hasSegments = index.segmentCount > 0
   return (
     <>
-      {elements.map((element) => (
-        <Element
-          key={element.id}
-          element={element}
-          nodeMap={nodeMap}
-          showLine={showElements}
-          showId={showElementIds}
-        />
-      ))}
+      {showElements && hasSegments && (!deformedMode || showUndeformed) && <ElementLines index={index} ghost={deformedMode} />}
+      {deformedMode && hasSegments && <BufferLines positions={buffers.deformedSegments} color={DEFORMED_COLOR} widthPx={ELEMENT_LINE_WIDTH_PX} isActive={() => buffers.active} getVersion={() => buffers.version} />}
+      {showElementIds && <ElementLabels index={index} />}
     </>
   )
 }

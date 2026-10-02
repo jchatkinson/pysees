@@ -99,6 +99,10 @@ export interface JointDisplacementRow {
   components: number[]
 }
 
+/** Max |value| over every step of a run, per recorder kind and component label (e.g. `extents.disp.dx`) —
+ * what autoscaling needs so a fixed scale doesn't pulse while animating. */
+export type RunExtents = Record<RecorderKind, Record<string, number>>
+
 export type StorageRequest =
   | { type: 'beginRun'; requestId: string; run: RunMetadata; stages: StageMetadata[]; recorders: RecorderMetadata[] }
   | { type: 'writeBlocks'; requestId: string; runId: string; batchId: string; blocks: ResultBlock[] }
@@ -108,6 +112,9 @@ export type StorageRequest =
   | { type: 'clearAllRuns'; requestId: string }
   | { type: 'listRuns'; requestId: string }
   | { type: 'queryJointDisplacements'; requestId: string; runId: string; kind?: RecorderKind }
+  | { type: 'getRunLayout'; requestId: string; runId: string }
+  | { type: 'queryBlock'; requestId: string; runId: string; sample: number }
+  | { type: 'queryRunExtents'; requestId: string; runId: string }
 
 // Every reply carries the requestId of the StorageRequest it answers. `storageError` can be
 // sent in place of any other reply for the same requestId when the underlying transaction fails.
@@ -120,4 +127,8 @@ export type StorageReply =
   | { type: 'clearAllRunsAck'; requestId: string }
   | { type: 'listRunsResult'; requestId: string; runs: RunMetadata[] }
   | { type: 'queryJointDisplacementsResult'; requestId: string; runId: string; recorders: RecorderMetadata[]; rows: JointDisplacementRow[] }
+  | { type: 'getRunLayoutResult'; requestId: string; runId: string; run: RunMetadata | null; recorders: RecorderMetadata[] }
+  /** The block containing `sample`, or null if none does. `data` is transferred, not cloned. */
+  | { type: 'queryBlockResult'; requestId: string; runId: string; block: ResultBlock | null }
+  | { type: 'queryRunExtentsResult'; requestId: string; runId: string; extents: RunExtents }
   | { type: 'storageError'; requestId: string; runId: string; detail: string }

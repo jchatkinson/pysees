@@ -13,6 +13,10 @@ import { LoadsLayer } from './Loads'
 import { GridlinesLayer } from './Gridlines'
 import { LevelsLayer } from './Levels'
 import { levelElevations } from '@/app/lib/levels'
+import { buildSceneIndex } from './sceneIndex'
+import { DisplayBuffers } from './displayBuffers'
+import { ResultsDriver } from './ResultsDriver'
+import { DiagramLayer } from './Diagrams'
 
 const NODE_HIT_RADIUS_PX = 12
 
@@ -41,8 +45,8 @@ export const ViewportScene = forwardRef<ViewportSceneRef, object>(function Viewp
   const controlsRef = useRef<OrbitControlsImpl | null>(null)
   const { camera, size } = useThree()
 
-  const nodes = useMemo(() => [...model.nodes.values()].sort((a, b) => a.id - b.id), [model.nodes])
-  const elements = useMemo(() => [...model.elements.values()].sort((a, b) => a.id - b.id), [model.elements])
+  const sceneIndex = useMemo(() => buildSceneIndex(model.nodes, model.elements), [model.nodes, model.elements])
+  const displayBuffers = useMemo(() => new DisplayBuffers(sceneIndex), [sceneIndex])
   const fixes = useMemo(() => [...model.fixes.values()].sort((a, b) => a.nodeId - b.nodeId), [model.fixes])
 
   // Expose selectInRect to the parent (Viewport.tsx) via ref
@@ -56,8 +60,8 @@ export const ViewportScene = forwardRef<ViewportSceneRef, object>(function Viewp
       // Right-to-left drag => inclusive "crossing" select (partial overlap counts).
       const exclusive = x2 >= x1
       const selected: number[] = []
-      for (const node of model.nodes.values()) {
-        const v = new Vector3(...toVec3(node.coords)).project(camera)
+      for (let i = 0; i < sceneIndex.nodeIds.length; i++) {
+        const v = new Vector3().fromArray(displayBuffers.nodePositions, i * 3).project(camera)
         const sx = (v.x + 1) * 0.5 * size.width
         const sy = (-v.y + 1) * 0.5 * size.height
         const hit = exclusive
@@ -65,23 +69,23 @@ export const ViewportScene = forwardRef<ViewportSceneRef, object>(function Viewp
             && sy - NODE_HIT_RADIUS_PX >= minY && sy + NODE_HIT_RADIUS_PX <= maxY
           : sx + NODE_HIT_RADIUS_PX >= minX && sx - NODE_HIT_RADIUS_PX <= maxX
             && sy + NODE_HIT_RADIUS_PX >= minY && sy - NODE_HIT_RADIUS_PX <= maxY
-        if (hit) selected.push(node.id)
+        if (hit) selected.push(sceneIndex.nodeIds[i])
       }
       setSelectedNodeIds(selected)
     },
     hitTestNode(x, y) {
       let closestId: number | null = null
       let minDist = NODE_HIT_RADIUS_PX
-      for (const node of model.nodes.values()) {
-        const v = new Vector3(...toVec3(node.coords)).project(camera)
+      for (let i = 0; i < sceneIndex.nodeIds.length; i++) {
+        const v = new Vector3().fromArray(displayBuffers.nodePositions, i * 3).project(camera)
         const sx = (v.x + 1) * 0.5 * size.width
         const sy = (-v.y + 1) * 0.5 * size.height
         const dist = Math.hypot(sx - x, sy - y)
-        if (dist < minDist) { minDist = dist; closestId = node.id }
+        if (dist < minDist) { minDist = dist; closestId = sceneIndex.nodeIds[i] }
       }
       return closestId
     },
-  }), [camera, size, model.nodes, setSelectedNodeIds])
+  }), [camera, size, sceneIndex, displayBuffers, setSelectedNodeIds])
 
   useEffect(() => {
     if (!viewportAction) return
@@ -129,14 +133,17 @@ export const ViewportScene = forwardRef<ViewportSceneRef, object>(function Viewp
         ndm={model.config?.ndm ?? 3}
         showLevels={viewSettings.showLevels}
       />
+      <ResultsDriver index={sceneIndex} buffers={displayBuffers} />
+      <DiagramLayer buffers={displayBuffers} />
       <ElementsLayer
-        elements={elements}
-        nodeMap={model.nodes}
+        index={sceneIndex}
+        buffers={displayBuffers}
         showElements={viewSettings.showElements}
         showElementIds={viewSettings.showElementIds}
       />
       <NodesLayer
-        nodes={nodes}
+        index={sceneIndex}
+        buffers={displayBuffers}
         showNodes={viewSettings.showNodes}
         showNodeIds={viewSettings.showNodeIds}
       />

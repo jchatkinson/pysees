@@ -3,6 +3,7 @@ import { Canvas } from '@react-three/fiber'
 import { useAppStore } from '@/app/store/useAppStore'
 import { ViewportScene, type ViewportSceneRef } from './r3f/ViewportScene'
 import { MaterialPreviewOverlay } from './MaterialPreviewOverlay'
+import { ResultsDisplayPanel } from './ResultsDisplayPanel'
 
 type MarqueeRect = { x1: number; y1: number; x2: number; y2: number }
 
@@ -92,6 +93,7 @@ export function Viewport() {
           </span>
         </div>
       )}
+      <ResultsDisplayPanel />
       <MaterialPreviewOverlay />
     </div>
   )
