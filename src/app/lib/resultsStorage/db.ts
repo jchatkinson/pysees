@@ -2,7 +2,7 @@
 // resultsStorageWorker.ts only — the main thread never opens this database directly. Stage 3 of
 // that doc's delivery plan: exercised here with synthetic blocks, not yet wired to a real
 // analysis worker.
-import type { RecorderMetadata, ResultBlock, ResultSample, RunMetadata, RunStatus, StageMetadata } from '@/app/types/resultsStorage'
+import type { JointDisplacementRow, RecorderMetadata, ResultBlock, ResultSample, RunMetadata, RunStatus, StageMetadata } from '@/app/types/resultsStorage'
 
 const DB_NAME = 'pysees-results'
 // v2: responseBlocks dropped recorderId from its key — one dense row per chunk covering every
@@ -174,6 +174,66 @@ export async function query(runId: string, recorderId: string, firstSample = 0, 
   return { samples, nextFirstSample }
 }
 
+export async function listRuns(): Promise<RunMetadata[]> {
+  const db = await getDb()
+  const tx = db.transaction('runs', 'readonly')
+  const runs = await reqDone(tx.objectStore('runs').getAll()) as RunMetadata[]
+  await txDone(tx)
+  return runs
+}
+
+export interface QueryJointDisplacementsResult {
+  recorders: RecorderMetadata[]
+  rows: JointDisplacementRow[]
+}
+
+/** Unpivots one run's dense `responseBlocks` into one row per (node, step) — the shape the
+ * results-browser data table pools across runs. Pulls every recorded node for every sample, so
+ * it scales with nodeCount * sampleCount; fine for today's model sizes, but if that becomes a
+ * problem this is the place to add pagination or a narrower node/step filter. */
+export async function queryJointDisplacements(runId: string): Promise<QueryJointDisplacementsResult> {
+  const db = await getDb()
+  const tx = db.transaction(['runs', 'recorders', 'responseBlocks'], 'readonly')
+  const run = await reqDone(tx.objectStore('runs').get(runId)) as RunMetadata | undefined
+  if (!run) return { recorders: [], rows: [] }
+
+  const recorders = (await reqDone(tx.objectStore('recorders').getAll(prefixRange(runId)))) as RecorderMetadata[]
+  recorders.sort((a, b) => a.nodeIndex - b.nodeIndex)
+
+  const rows: JointDisplacementRow[] = []
+  const store = tx.objectStore('responseBlocks')
+  const cursorRequest = store.openCursor(prefixRange(runId))
+  await new Promise<void>((resolve, reject) => {
+    cursorRequest.onerror = () => reject(cursorRequest.error)
+    cursorRequest.onsuccess = () => {
+      const cursor = cursorRequest.result
+      if (!cursor) { resolve(); return }
+      const block = cursor.value as ResultBlock & { runId: string }
+      const stride = 1 + run.nodeCount * run.dofsPerNode
+      const view = new Float64Array(block.data)
+      for (let i = 0; i < block.sampleCount; i++) {
+        const offset = i * stride
+        const pseudoTime = view[offset]
+        const step = block.firstSample + i
+        for (const recorder of recorders) {
+          const nodeOffset = 1 + recorder.nodeIndex * run.dofsPerNode
+          rows.push({
+            runId,
+            stageIndex: block.stageIndex,
+            step,
+            pseudoTime,
+            node: recorder.recorderId,
+            components: Array.from(view.subarray(offset + nodeOffset, offset + nodeOffset + run.dofsPerNode)),
+          })
+        }
+      }
+      cursor.continue()
+    }
+  })
+  await txDone(tx)
+  return { recorders, rows }
+}
+
 export async function finishRun(runId: string, status: 'complete' | 'failed' | 'cancelled' | 'storage-failed', detail?: string): Promise<RunStatus> {
   const db = await getDb()
   const tx = db.transaction('runs', 'readwrite')
@@ -207,6 +267,21 @@ async function deleteByRunId(tx: IDBTransaction, storeName: 'stages' | 'recorder
       cursor.continue()
     }
   })
+}
+
+/** Wipes every stored run. Called when a new analysis run starts or the model is reset, so the
+ * results browser only ever shows the current model's latest results — this app doesn't (yet)
+ * compute real model/sequence provenance hashes (see `runMetadataFor`'s `modelHash: 'unhashed'`
+ * placeholder in carapaceWorkerClient.ts), so there's no way to tell an old run apart from a
+ * current one; clearing on every new run sidesteps needing that hash at all. */
+export async function clearAllRuns(): Promise<void> {
+  const db = await getDb()
+  const tx = db.transaction(['runs', 'stages', 'recorders', 'responseBlocks'], 'readwrite')
+  tx.objectStore('runs').clear()
+  tx.objectStore('stages').clear()
+  tx.objectStore('recorders').clear()
+  tx.objectStore('responseBlocks').clear()
+  await txDone(tx)
 }
 
 export async function deleteRun(runId: string): Promise<void> {

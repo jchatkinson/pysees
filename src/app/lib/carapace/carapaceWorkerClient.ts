@@ -68,6 +68,9 @@ export function runCarapaceOnWorker(
   const nodeCount = recordedNodeTags.length
 
   const promise = (async () => {
+    // Only one run's results are ever kept — see `clearAllRuns`'s doc comment for why (no real
+    // model-hash provenance yet to tell an old run apart from the current one).
+    await resultsStorage.clearAllRuns()
     await resultsStorage.beginRun(
       runMetadataFor(runId, input, nodeCount, dofsPerNode),
       stageMetadataFor(runId, input),

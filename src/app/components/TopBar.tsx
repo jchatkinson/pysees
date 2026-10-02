@@ -12,8 +12,6 @@ import { downloadScript } from '@/app/lib/exportScript'
 
 export function TopBar() {
   const {
-    mode,
-    setMode,
     activePanel,
     model,
     modelPast,
@@ -93,8 +91,6 @@ export function TopBar() {
           <DropdownMenuCheckboxItem checked={viewSettings.showGridlines} onCheckedChange={(v) => setViewSetting('showGridlines', checked(v))}>Grids</DropdownMenuCheckboxItem>
           <DropdownMenuCheckboxItem checked={viewSettings.showLevels} onCheckedChange={(v) => setViewSetting('showLevels', checked(v))}>Levels</DropdownMenuCheckboxItem>
           <DropdownMenuSeparator />
-          <DropdownMenuCheckboxItem checked={mode === 'results'} onCheckedChange={(v) => setMode(checked(v) ? 'results' : 'model')}>Results Mode</DropdownMenuCheckboxItem>
-          <DropdownMenuSeparator />
           <DropdownMenuItem onClick={() => requestViewportAction('zoomIn')}>Zoom In</DropdownMenuItem>
           <DropdownMenuItem onClick={() => requestViewportAction('zoomOut')}>Zoom Out</DropdownMenuItem>
           <DropdownMenuItem onClick={() => requestViewportAction('fit')}>Zoom To Fit</DropdownMenuItem>
@@ -123,8 +119,9 @@ export function TopBar() {
           <TooltipContent>Redo</TooltipContent>
         </Tooltip>
       </div>
-      <span className="ml-auto text-xs text-muted-foreground">{mode === 'model' ? 'Model' : 'Results'}</span>
-      <UserButton afterSignOutUrl="/" appearance={{ elements: { avatarBox: 'h-7 w-7' } }} />
+      <div className="ml-auto">
+        <UserButton afterSignOutUrl="/" appearance={{ elements: { avatarBox: 'h-7 w-7' } }} />
+      </div>
       <AlertDialog open={newModelConfirmOpen} onOpenChange={setNewModelConfirmOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>

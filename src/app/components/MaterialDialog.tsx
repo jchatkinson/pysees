@@ -29,7 +29,6 @@ export function MaterialDialog() {
           key={open ? 'open' : 'closed'}
           schema={schema}
           ctx={ctx}
-          locked={false}
           actionLabel="Create"
           initial={initialValues(schema, ctx, model)}
           onCancel={() => setOpen(false)}

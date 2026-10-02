@@ -67,5 +67,3 @@ export function emptyModel(): Model {
 export interface ResultsState {
   files: { name: string; data: string }[]
 }
-
-export type AppMode = 'model' | 'results'

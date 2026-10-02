@@ -73,12 +73,28 @@ export interface ResultSample {
   components: number[]
 }
 
+/** One (node, step) observation, unpivoted out of a run's dense response blocks — the row shape
+ * the results-browser data table pools across every run. `stageIndex` and `step` (the run-wide
+ * sample index) come straight from the owning `ResultBlock`; `components` line up 1:1 with that
+ * node's `RecorderMetadata.componentLayout`. */
+export interface JointDisplacementRow {
+  runId: string
+  stageIndex: number
+  step: number
+  pseudoTime: number
+  node: string
+  components: number[]
+}
+
 export type StorageRequest =
   | { type: 'beginRun'; requestId: string; run: RunMetadata; stages: StageMetadata[]; recorders: RecorderMetadata[] }
   | { type: 'writeBlocks'; requestId: string; runId: string; batchId: string; blocks: ResultBlock[] }
   | { type: 'query'; requestId: string; runId: string; recorderId: string; firstSample?: number; limit?: number }
   | { type: 'finishRun'; requestId: string; runId: string; status: 'complete' | 'failed' | 'cancelled' | 'storage-failed'; detail?: string }
   | { type: 'deleteRun'; requestId: string; runId: string }
+  | { type: 'clearAllRuns'; requestId: string }
+  | { type: 'listRuns'; requestId: string }
+  | { type: 'queryJointDisplacements'; requestId: string; runId: string }
 
 // Every reply carries the requestId of the StorageRequest it answers. `storageError` can be
 // sent in place of any other reply for the same requestId when the underlying transaction fails.
@@ -88,4 +104,7 @@ export type StorageReply =
   | { type: 'queryResult'; requestId: string; runId: string; recorderId: string; samples: ResultSample[]; nextFirstSample?: number }
   | { type: 'finishRunAck'; requestId: string; runId: string; status: RunStatus }
   | { type: 'deleteRunAck'; requestId: string; runId: string }
+  | { type: 'clearAllRunsAck'; requestId: string }
+  | { type: 'listRunsResult'; requestId: string; runs: RunMetadata[] }
+  | { type: 'queryJointDisplacementsResult'; requestId: string; runId: string; recorders: RecorderMetadata[]; rows: JointDisplacementRow[] }
   | { type: 'storageError'; requestId: string; runId: string; detail: string }

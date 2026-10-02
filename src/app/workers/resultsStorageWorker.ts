@@ -1,5 +1,5 @@
 import type { StorageReply, StorageRequest } from '@/app/types/resultsStorage'
-import { beginRun, deleteRun, finishRun, query, writeBlocks } from '@/app/lib/resultsStorage/db'
+import { beginRun, clearAllRuns, deleteRun, finishRun, listRuns, query, queryJointDisplacements, writeBlocks } from '@/app/lib/resultsStorage/db'
 
 /** carapace/docs/results-storage-indexeddb.md's results-storage worker: owns the IndexedDB
  * connection (db.ts), answers write/query/lifecycle requests, and stays reusable across runs in
@@ -16,7 +16,9 @@ const ctx = self as unknown as {
 }
 
 function requestRunId(request: StorageRequest): string {
-  return request.type === 'beginRun' ? request.run.runId : request.runId
+  if (request.type === 'beginRun') return request.run.runId
+  if (request.type === 'listRuns' || request.type === 'clearAllRuns') return ''
+  return request.runId
 }
 
 async function handleRequest(request: StorageRequest): Promise<StorageReply> {
@@ -39,6 +41,17 @@ async function handleRequest(request: StorageRequest): Promise<StorageReply> {
     case 'deleteRun':
       await deleteRun(request.runId)
       return { type: 'deleteRunAck', requestId: request.requestId, runId: request.runId }
+    case 'clearAllRuns':
+      await clearAllRuns()
+      return { type: 'clearAllRunsAck', requestId: request.requestId }
+    case 'listRuns': {
+      const runs = await listRuns()
+      return { type: 'listRunsResult', requestId: request.requestId, runs }
+    }
+    case 'queryJointDisplacements': {
+      const result = await queryJointDisplacements(request.runId)
+      return { type: 'queryJointDisplacementsResult', requestId: request.requestId, runId: request.runId, recorders: result.recorders, rows: result.rows }
+    }
   }
 }
 

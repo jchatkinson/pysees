@@ -7,9 +7,7 @@ import { MaterialPreviewOverlay } from './MaterialPreviewOverlay'
 type MarqueeRect = { x1: number; y1: number; x2: number; y2: number }
 
 export function Viewport() {
-  const mode = useAppStore((s) => s.mode)
   const hasConfig = useAppStore((s) => Boolean(s.model.config))
-  const hasResults = useAppStore((s) => Boolean(s.results))
 
   const sceneRef = useRef<ViewportSceneRef>(null)
   const [marquee, setMarquee] = useState<MarqueeRect | null>(null)
@@ -92,11 +90,6 @@ export function Viewport() {
           <span className="rounded-sm border bg-background/90 px-2 py-1 text-xs text-muted-foreground">
             Create a model to start
           </span>
-        </div>
-      )}
-      {mode === 'results' && !hasResults && (
-        <div className="absolute top-2 left-2 rounded-sm border bg-background/90 px-2 py-1 text-xs text-muted-foreground pointer-events-none">
-          No results imported yet
         </div>
       )}
       <MaterialPreviewOverlay />

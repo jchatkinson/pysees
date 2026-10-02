@@ -4,6 +4,7 @@ import { ActionBar } from '@/app/components/ActionBar'
 import { ModelPanel } from '@/app/components/ModelPanel'
 import { AnalysisPanel } from '@/app/components/AnalysisPanel'
 import { CommandForm } from '@/app/components/CommandForm'
+import { ResultsPanel } from '@/app/components/ResultsPanel'
 import { Viewport } from '@/app/components/Viewport'
 import { InitModal } from '@/app/components/InitModal'
 import { GridlinesDialog } from '@/app/components/GridlinesDialog'
@@ -40,6 +41,34 @@ function LeftPanel() {
   )
 }
 
+function RightPanel() {
+  const activeRightPanel = useAppStore((s) => s.activeRightPanel)
+  const setActiveRightPanel = useAppStore((s) => s.setActiveRightPanel)
+  return (
+    <div className="flex flex-col h-full">
+      <div className="flex border-b shrink-0">
+        <Button
+          variant="ghost"
+          className={`flex-1 h-7 rounded-none text-[11px] ${activeRightPanel === 'command' ? 'bg-accent text-accent-foreground' : ''}`}
+          onClick={() => setActiveRightPanel('command')}
+        >
+          Command
+        </Button>
+        <Button
+          variant="ghost"
+          className={`flex-1 h-7 rounded-none text-[11px] ${activeRightPanel === 'results' ? 'bg-accent text-accent-foreground' : ''}`}
+          onClick={() => setActiveRightPanel('results')}
+        >
+          Results
+        </Button>
+      </div>
+      <div className="flex-1 min-h-0">
+        {activeRightPanel === 'command' ? <CommandForm /> : <ResultsPanel />}
+      </div>
+    </div>
+  )
+}
+
 export function AppShell() {
   return (
     <div className="flex flex-col h-screen overflow-hidden">
@@ -59,7 +88,7 @@ export function AppShell() {
           </ResizablePanel>
           <ResizableHandle withHandle />
           <ResizablePanel defaultSize="25%">
-            <CommandForm />
+            <RightPanel />
           </ResizablePanel>
         </ResizablePanelGroup>
       </div>

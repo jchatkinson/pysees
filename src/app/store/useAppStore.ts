@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import type { AnalysisCommand, AnalysisHistory } from '@/app/types/analysisCommands'
 import { emptyAnalysisHistory } from '@/app/types/analysisCommands'
-import type { AppMode, Model, ResultsState } from '@/app/types/model'
+import type { Model, ResultsState } from '@/app/types/model'
 import { emptyModel } from '@/app/types/model'
 import type { GridlineEntity } from '@/app/types/gridlines'
 import type { LevelEntity } from '@/app/types/levels'
@@ -10,6 +10,7 @@ import { buildUniaxialMaterialCallArgs, validateUniaxialMaterialValues } from '@
 import { applyModelWrite, deleteEntity, previewDeleteEntity, removeModelChild, type ModelDeletableKind, type ModelWrite } from '@/app/lib/modelWrite'
 import { compileInputV1 } from '@/app/lib/carapace/compileInputV1'
 import { runCarapaceOnWorker, nextCarapaceRunId } from '@/app/lib/carapace/carapaceWorkerClient'
+import { clearAllRuns } from '@/app/lib/resultsStorage/resultsStorageClient'
 import type { CarapaceRunProgress, CarapaceRunResult } from '@/app/types/carapaceRun'
 import type { CompileDiagnostic } from '@/app/lib/compileAnalysisSequence'
 
@@ -55,7 +56,6 @@ interface AppStore {
   updateLevel: (id: number, patch: Partial<Omit<LevelEntity, 'id'>>) => void
   removeLevel: (id: number) => void
   moveLevel: (id: number, direction: 'up' | 'down') => void
-  mode: AppMode
   results: ResultsState | null
   localAgent: {
     status: AgentConnectionState
@@ -74,6 +74,8 @@ interface AppStore {
   }
   activePanel: 'model' | 'analysis'
   setActivePanel: (panel: 'model' | 'analysis') => void
+  activeRightPanel: 'command' | 'results'
+  setActiveRightPanel: (panel: 'command' | 'results') => void
 
   // Carapace run
   carapaceRun: CarapaceRunState
@@ -134,7 +136,6 @@ interface AppStore {
 
   setViewSetting: (key: keyof AppStore['viewSettings'], value: boolean) => void
   requestViewportAction: (kind: 'zoomIn' | 'zoomOut' | 'fit') => void
-  setMode: (mode: AppMode) => void
   importResults: (files: { name: string; data: string }[]) => void
   connectLocalAgent: () => Promise<void>
   disconnectLocalAgent: () => void
@@ -247,12 +248,13 @@ export const useAppStore = create<AppStore>((set, get) => {
     ;[next[index], next[target]] = [next[target], next[index]]
     return { levels: next }
   }),
-  mode: 'model',
   results: null,
   localAgent: { status: 'disconnected', port: null, error: null },
   materialPreview: { running: false, jobId: null, points: [], error: null, logs: [], panelOpen: false, protocol: [...DEFAULT_STRAIN_PROTOCOL], inputMaterial: null },
   activePanel: 'model',
   setActivePanel: (panel) => set({ activePanel: panel }),
+  activeRightPanel: 'command',
+  setActiveRightPanel: (panel) => set({ activeRightPanel: panel }),
 
   carapaceRun: IDLE_CARAPACE_RUN,
   clearCarapaceRun: () => set({ carapaceRun: IDLE_CARAPACE_RUN }),
@@ -316,6 +318,7 @@ export const useAppStore = create<AppStore>((set, get) => {
   viewportAction: null,
 
   initModel: (ndm, ndf, extra) => set(() => {
+    void clearAllRuns()
     let model = emptyModel()
     model = { ...model, config: { ndm, ndf } }
     for (const write of extra?.writes ?? []) model = applyModelWrite(model, write)
@@ -337,24 +340,26 @@ export const useAppStore = create<AppStore>((set, get) => {
     }
   }),
 
-  newModel: () => set({
-    model: emptyModel(),
-    modelPast: [],
-    modelFuture: [],
-    analysisHistory: emptyAnalysisHistory(),
-    gridlines: [],
-    nextGridlineId: 1,
-    levels: [],
-    nextLevelId: 1,
-    selectedModelEntity: null,
-    selectedAnalysisIndex: null,
-    analysisInsertionIndex: null,
-    selectedNodeIds: [],
-    nodePickMode: 'none',
-    pendingNodePick: null,
-    mode: 'model',
-    results: null,
-  }),
+  newModel: () => {
+    void clearAllRuns()
+    set({
+      model: emptyModel(),
+      modelPast: [],
+      modelFuture: [],
+      analysisHistory: emptyAnalysisHistory(),
+      gridlines: [],
+      nextGridlineId: 1,
+      levels: [],
+      nextLevelId: 1,
+      selectedModelEntity: null,
+      selectedAnalysisIndex: null,
+      analysisInsertionIndex: null,
+      selectedNodeIds: [],
+      nodePickMode: 'none',
+      pendingNodePick: null,
+      results: null,
+    })
+  },
 
   writeModelEntity: (write) => set((s) => ({
     model: applyModelWrite(s.model, write),
@@ -469,7 +474,6 @@ export const useAppStore = create<AppStore>((set, get) => {
 
   requestViewportAction: (kind) => set((s) => ({ viewportAction: { kind, token: (s.viewportAction?.token ?? 0) + 1 } })),
 
-  setMode: (mode) => set({ mode }),
   importResults: (files) => set({ results: { files } }),
 
   connectLocalAgent: async () => {

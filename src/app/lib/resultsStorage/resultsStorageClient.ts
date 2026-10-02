@@ -50,6 +50,18 @@ export function deleteRun(runId: string) {
   return send<Extract<StorageReply, { type: 'deleteRunAck' }>>({ type: 'deleteRun', requestId: nextRequestId(), runId })
 }
 
+export function clearAllRuns() {
+  return send<Extract<StorageReply, { type: 'clearAllRunsAck' }>>({ type: 'clearAllRuns', requestId: nextRequestId() })
+}
+
+export function listRuns() {
+  return send<Extract<StorageReply, { type: 'listRunsResult' }>>({ type: 'listRuns', requestId: nextRequestId() })
+}
+
+export function queryJointDisplacements(runId: string) {
+  return send<Extract<StorageReply, { type: 'queryJointDisplacementsResult' }>>({ type: 'queryJointDisplacements', requestId: nextRequestId(), runId })
+}
+
 /** Hands one side of a `MessageChannel` to the storage worker (see resultsStorageWorker.ts's
  * `{ type: 'connect' }` handling) so the analysis worker, given the other side, can send
  * `writeBlocks` directly instead of relaying every batch through the main thread. */

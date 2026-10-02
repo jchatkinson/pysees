@@ -46,7 +46,6 @@ function matchesSchema(schema: CommandSchema, query: string) {
 export function CommandFormBody({
   schema,
   ctx,
-  locked,
   actionLabel,
   initial,
   submitValues,
@@ -57,7 +56,6 @@ export function CommandFormBody({
 }: {
   schema: CommandSchema
   ctx: SchemaContext
-  locked: boolean
   actionLabel: string
   initial: Record<string, unknown>
   submitValues: (values: Record<string, unknown>) => string | null
@@ -86,7 +84,6 @@ export function CommandFormBody({
               values={values}
               setValue={setValue}
               ctx={ctx}
-              disabled={locked}
             />
           ))}
           {schema.optional.map((arg, idx) => (
@@ -96,26 +93,24 @@ export function CommandFormBody({
               values={values}
               setValue={setValue}
               ctx={ctx}
-              disabled={locked}
             />
           ))}
         </div>
       </ScrollArea>
       <div className="border-t p-3 grid gap-2 shrink-0">
         {error && <p className="text-[11px] text-destructive">{error}</p>}
-        {locked && <p className="text-[11px] text-muted-foreground">Model is read-only in Results mode.</p>}
         <div className="flex gap-2">
           {onDelete && (
-            <Button variant="destructive" size="sm" onClick={onDelete} disabled={locked}>
+            <Button variant="destructive" size="sm" onClick={onDelete}>
               Delete
             </Button>
           )}
           {previewAction && (
-            <Button variant="outline" size="sm" className="flex-1" onClick={previewAction.onClick} disabled={locked || previewAction.disabled}>
+            <Button variant="outline" size="sm" className="flex-1" onClick={previewAction.onClick} disabled={previewAction.disabled}>
               Preview
             </Button>
           )}
-          <Button variant="outline" size="sm" className="flex-1" onClick={() => { setValues(initial); setError(null) }} disabled={locked}>
+          <Button variant="outline" size="sm" className="flex-1" onClick={() => { setValues(initial); setError(null) }}>
             Reset
           </Button>
           {onCancel && (
@@ -126,7 +121,6 @@ export function CommandFormBody({
           <Button
             size="sm"
             className={onCancel ? '' : 'flex-1'}
-            disabled={locked}
             onClick={() => {
               const validation = submitValues(values)
               setError(validation)
@@ -144,7 +138,6 @@ export function CommandFormBody({
 /** Small nested-children editor for Load Patterns (Fiber Sections have their own dedicated Section Editor). */
 function ChildrenEditor({
   ctx,
-  locked,
   childSchemas,
   children,
   childLabel,
@@ -152,7 +145,6 @@ function ChildrenEditor({
   onRemove,
 }: {
   ctx: SchemaContext
-  locked: boolean
   childSchemas: CommandSchema[]
   children: { summary: string }[]
   childLabel: string
@@ -168,7 +160,7 @@ function ChildrenEditor({
       <div className="flex items-center justify-between">
         <span className="text-[11px] font-medium text-muted-foreground">{childLabel} ({children.length})</span>
         {!adding && (
-          <Button variant="outline" size="sm" className="h-6 px-2 text-[10px]" onClick={() => setAdding(true)} disabled={locked}>
+          <Button variant="outline" size="sm" className="h-6 px-2 text-[10px]" onClick={() => setAdding(true)}>
             + Add
           </Button>
         )}
@@ -179,7 +171,7 @@ function ChildrenEditor({
           <Tooltip>
             <TooltipTrigger
               render={
-                <button className="text-destructive shrink-0" onClick={() => onRemove(i)} disabled={locked} aria-label="Remove">×</button>
+                <button className="text-destructive shrink-0" onClick={() => onRemove(i)} aria-label="Remove">×</button>
               }
             />
             <TooltipContent>Remove</TooltipContent>
@@ -201,8 +193,7 @@ function ChildrenEditor({
             key={selectedCmd}
             schema={schema}
             ctx={ctx}
-            locked={locked}
-            actionLabel="Add"
+              actionLabel="Add"
             initial={initialValues(schema, ctx)}
             onCancel={() => setAdding(false)}
             submitValues={(values) => {
@@ -218,7 +209,6 @@ function ChildrenEditor({
 }
 
 export function CommandForm() {
-  const mode = useAppStore((s) => s.mode)
   const activePanel = useAppStore((s) => s.activePanel)
   const model = useAppStore((s) => s.model)
   const analysisHistory = useAppStore((s) => s.analysisHistory)
@@ -239,8 +229,6 @@ export function CommandForm() {
   const openSectionDialog = useAppStore((s) => s.openSectionDialog)
 
   const ctx = useMemo<SchemaContext>(() => ({ ndm: model.config?.ndm ?? 3, ndf: model.config?.ndf ?? 6 }), [model.config?.ndm, model.config?.ndf])
-  const locked = mode === 'results'
-
   const [query, setQuery] = useState('')
   const [selectedCmd, setSelectedCmd] = useState<string>('')
   const [activeFormValues, setActiveFormValues] = useState<Record<string, unknown>>({})
@@ -296,7 +284,7 @@ export function CommandForm() {
         <div className="flex flex-col h-full min-h-0">
           <div className="border-t p-3 grid gap-2">
             <p className="text-[11px] text-muted-foreground">This entity type is not editable yet.</p>
-            <Button variant="destructive" size="sm" onClick={() => { setPendingModelDelete(selectedModelEntity); setDeleteDialogOpen(true) }} disabled={locked}>Delete</Button>
+            <Button variant="destructive" size="sm" onClick={() => { setPendingModelDelete(selectedModelEntity); setDeleteDialogOpen(true) }}>Delete</Button>
           </div>
         </div>
       )
@@ -315,8 +303,8 @@ export function CommandForm() {
           </div>
           <div className="p-3 grid gap-2">
             <p className="text-[11px] text-muted-foreground">{sec.children.length} fiber/patch item{sec.children.length === 1 ? '' : 's'}.</p>
-            <Button size="sm" onClick={() => openSectionDialog(sec.id)} disabled={locked}>Open Section Editor…</Button>
-            <Button variant="destructive" size="sm" onClick={() => { setPendingModelDelete(selectedModelEntity); setDeleteDialogOpen(true) }} disabled={locked}>Delete</Button>
+            <Button size="sm" onClick={() => openSectionDialog(sec.id)}>Open Section Editor…</Button>
+            <Button variant="destructive" size="sm" onClick={() => { setPendingModelDelete(selectedModelEntity); setDeleteDialogOpen(true) }}>Delete</Button>
           </div>
           <DeleteDialogs
             deleteDialogOpen={deleteDialogOpen} setDeleteDialogOpen={setDeleteDialogOpen}
@@ -345,7 +333,6 @@ export function CommandForm() {
           key={`model-edit-${selectedModelEntity.kind}-${selectedModelEntity.id}`}
           schema={schema}
           ctx={ctx}
-          locked={locked}
           actionLabel="Save"
           initial={initial}
           onCancel={() => setSelectedModelEntity(null)}
@@ -367,8 +354,7 @@ export function CommandForm() {
         {isPattern && (
           <ChildrenEditor
             ctx={ctx}
-            locked={locked}
-            childSchemas={getPatternChildSchemas()}
+              childSchemas={getPatternChildSchemas()}
             childLabel="Loads"
             children={(entity as { children: { kind: string; args: Record<string, unknown> }[] }).children.map((c) => ({ summary: `${c.kind}  ${JSON.stringify(c.args)}` }))}
             onAdd={(childSchema, values) => {
@@ -404,7 +390,7 @@ export function CommandForm() {
         <div className="flex flex-col h-full min-h-0">
           <div className="border-t p-3 grid gap-2">
             <p className="text-[11px] text-muted-foreground">Script groups are not editable — delete and re-add instead.</p>
-            <Button variant="destructive" size="sm" onClick={() => { setPendingAnalysisDeleteIndex(selectedAnalysisIndex); setDeleteDialogOpen(true) }} disabled={locked}>Delete</Button>
+            <Button variant="destructive" size="sm" onClick={() => { setPendingAnalysisDeleteIndex(selectedAnalysisIndex); setDeleteDialogOpen(true) }}>Delete</Button>
           </div>
           <DeleteDialogs
             deleteDialogOpen={deleteDialogOpen} setDeleteDialogOpen={setDeleteDialogOpen}
@@ -425,7 +411,7 @@ export function CommandForm() {
         <div className="flex flex-col h-full min-h-0">
           <div className="border-t p-3 grid gap-2">
             <p className="text-[11px] text-muted-foreground">This command type is not editable yet.</p>
-            <Button variant="destructive" size="sm" onClick={() => { setPendingAnalysisDeleteIndex(selectedAnalysisIndex); setDeleteDialogOpen(true) }} disabled={locked}>Delete</Button>
+            <Button variant="destructive" size="sm" onClick={() => { setPendingAnalysisDeleteIndex(selectedAnalysisIndex); setDeleteDialogOpen(true) }}>Delete</Button>
           </div>
         </div>
       )
@@ -440,7 +426,6 @@ export function CommandForm() {
           key={`analysis-edit-${selectedAnalysisIndex}-${schema.cmd}`}
           schema={schema}
           ctx={ctx}
-          locked={locked}
           actionLabel="Save"
           initial={initial}
           onCancel={() => setSelectedAnalysisIndex(null)}
@@ -480,7 +465,6 @@ export function CommandForm() {
           isItemEqualToValue={(a: CommandSchema, b: CommandSchema) => a.cmd === b.cmd}
           value={selectedAddSchema}
           onValueChange={(schema) => { if (schema) { setSelectedCmd(schema.cmd); setActiveFormValues({}) } }}
-          disabled={locked}
         >
           <ComboboxInput placeholder={isModelPanel ? 'Search model commands' : 'Search analysis commands / blocks'} className="h-8 text-xs" showClear />
           <ComboboxContent>
@@ -510,7 +494,7 @@ export function CommandForm() {
       {isModelPanel && selectedAddSchema?.fn === 'section' && (
         <div className="border-b p-3 grid gap-2">
           <p className="text-[11px] text-muted-foreground">For a Fiber/NDFiber section, use the dedicated editor instead — it handles patches, layers, and rebar with a live preview.</p>
-          <Button size="sm" onClick={() => openSectionDialog(null)} disabled={locked}>Open Section Editor…</Button>
+          <Button size="sm" onClick={() => openSectionDialog(null)}>Open Section Editor…</Button>
         </div>
       )}
       {selectedAddSchema ? (
@@ -518,7 +502,6 @@ export function CommandForm() {
           key={`add-${selectedAddSchema.cmd}-${ctx.ndm}-${ctx.ndf}`}
           schema={selectedAddSchema}
           ctx={ctx}
-          locked={locked}
           actionLabel="Add Command"
           initial={initialValues(selectedAddSchema, ctx, model)}
           onValuesChange={(values) => {
