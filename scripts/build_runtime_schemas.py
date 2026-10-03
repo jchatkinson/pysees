@@ -159,7 +159,17 @@ def apply_uniaxial_arg_metadata(
     if "required" in arg_meta:
       out["required"] = bool(arg_meta["required"])
   is_required = bool(out.get("required", True))
+  # The docs list some trailing args as positional-required although OpenSees defaults them
+  # (e.g. Steel01's a1). Keep the curated default but let the form leave them blank.
+  if str(arg.get("name", "")).lower() in curated_defaults.get("optionalByMaterial", {}).get(mat_type, []):
+    out["required"] = False
+    is_required = False
+  # Optional args only get a curated default (shown in the form), never a signature/doc one.
   if not is_required:
+    curated = coerce_default(str(out.get("kind", "str")), lookup_curated_default(curated_defaults, mat_type, str(arg.get("name", ""))))
+    if curated is not None:
+      out["defaultValue"] = curated
+      out["defaultSource"] = "curated"
     return out
   kind = str(out.get("kind", "str"))
   default_source = None

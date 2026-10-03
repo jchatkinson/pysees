@@ -4,38 +4,42 @@
 
 ## Project Description
 
-PySees is a web-based GUI preprocessor/postprocessor for OpenSeesPy structural models.  
-It does not run OpenSees in the browser. Instead, users build parametric models from command history, export a Python script, run analysis externally on their local machine, and import recorder results back for visualization. Further integration with opensees may be possible in the future, if licensing requirements are permissive, but that has not yet been investigated. 
+PySees is a web-based GUI for building, running, and postprocessing structural models. Models are built parametrically in the browser and analyzed **in the browser** by [Carapace](../carapace), a Rust finite-element engine compiled to WebAssembly. Results are stored locally (IndexedDB) and visualized in the 3D viewport and plots.
+
+OpenSees is optional. Users who want to run their model in OpenSees can export it as an OpenSeesPy script and run it on their own machine. PySees does not run OpenSees, and has no server-side or local-agent compute.
 
 ## Goals
 
-- Lower the barrier to entry for OpenSees by reducing the amount of programming expertise required to get started.
-- Provide a gentle path into OpenSees by bridging traditional structural analysis workflows with its code-first environment.
-- Expand OpenSees adoption by making modeling and postprocessing more accessible to a broader audience.
+- Lower the barrier to entry for structural analysis (and OpenSees) by reducing the programming expertise required to get started.
+- Provide a gentle path from traditional structural analysis workflows into OpenSees' code-first environment.
+- Make modeling and postprocessing accessible to a broader audience, with nothing to install.
 - Reduce repeated setup effort for students and researchers through a core set of reusable modeling and visualization utilities.
 
 ## Technical Objectives
 
-- Provide a history-based, parametric modeling workflow for OpenSeesPy.
-- Keep scene rendering and script export as pure functions of command history replay.
-- Support script-assisted model generation for repetitive geometry and loading patterns.
-- Enable lightweight postprocessing from imported recorder files.
+- Provide a parametric modeling workflow with schema-driven forms derived from the OpenSeesPy docs.
+- Keep scene rendering, analysis input, and script export as pure functions of the model and analysis sequence.
+- Run analyses in Web Workers on Carapace wasm, streaming results into IndexedDB so large runs stay responsive.
+- Keep exported OpenSeesPy scripts valid and faithful to the model.
 
 ## Features
 
-- Immutable command history with undo/redo and replay-derived model state.
+- Parametric model editing with undo/redo: nodes, materials, fiber sections, geometric transforms, elements, supports, load patterns, gridlines and levels, with starter templates.
 - Schema-driven command forms for OpenSees command entry.
-- 3D viewport with nodes/elements/supports/load glyphs.
-- View controls for IDs and visibility toggles.
-- Python export pipeline target (`openseespy.opensees` script output).
+- Analysis sequence builder (static stages today) compiled to Carapace input.
+- In-browser analysis with progress and cancellation.
+- 3D viewport with nodes, elements, supports, load glyphs, deformed shape and element force diagrams, with step playback.
+- Plot overlay and data tables for recorded channels.
+- Material Preview: chart the response of a uniaxial material under a monotonic, cyclic, or custom strain protocol, computed by Carapace.
+- OpenSeesPy script export (`File > Export .py`).
 
 ## Roadmap
 
-1. Complete V1 model pipeline: model/node/fix/load/timeSeries/pattern/geomTransf/basic elements.
-2. Add scripting workflow (`SCRIPT_GROUP`) for parametric command generation.
-3. Implement robust Python exporter and round-trip validation.
-4. Expand results mode: deformed shape, time history plotting, force/reaction views.
-5. Improve large-recorder import path with chunked parsing and worker-based processing.
+1. Broaden Carapace coverage in the compiler: more materials, modal and transient stages, 3D elements.
+2. Script export polish: dedicated download flow and Tcl output.
+3. Scripting workflow for parametric model generation (see `SCRIPTINGPLAN.md`).
+4. Richer results: more force/stress views, reactions, time-history tools.
+5. Optional import of recorder output from external OpenSees runs.
 
 ## Usage
 
@@ -47,9 +51,11 @@ It does not run OpenSees in the browser. Instead, users build parametric models 
    `npm run dev`
 3. Run lint checks:
    `npm run lint`
-4. Build the app:
+4. Rebuild the bundled Carapace wasm after engine changes (needs the sibling `../carapace` checkout and `wasm-bindgen`):
+   `scripts/build-carapace.sh`
+5. Build the app:
    `npm run build`
-5. Preview the production build:
+6. Preview the production build:
    `npm run preview`
 
 Schema-related scripts:
@@ -94,35 +100,6 @@ This pass:
 Recommended regeneration sequence after doc updates:
 1. `npm run schema:extract -- --docs-root /path/to/OpenSeesPyDoc --output src/app/generated/opensees-schema-candidates.json`
 2. `npm run schema:build -- --input src/app/generated/opensees-schema-candidates.json --output src/app/generated/commandSchemas.generated.ts --uniaxial-defaults scripts/uniaxial-material-defaults.json`
-
-## Local Agent (material preview MVP)
-
-PySees can connect to a local Go agent for live material hysteresis preview without running OpenSees on the server.
-
-### Build agent
-
-```bash
-cd agent
-/usr/local/go/bin/go build ./cmd/pysees-agent
-```
-
-### Run agent
-
-```bash
-cd agent
-./pysees-agent
-```
-
-The agent binds to the first free localhost port in: `8765, 8766, 8767, 8768`.
-
-### Connect from app
-
-In Studio: `File > Connect to local instance`.
-
-Current contract:
-- `GET /health`
-- `POST /v1/session`
-- `GET /v1/ws?token=...`
 
 ## License
 

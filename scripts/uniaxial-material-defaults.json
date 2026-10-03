@@ -18,6 +18,10 @@
     "ets": 200.0,
     "lambda": 0.1
   },
+  "optionalByMaterial": {
+    "Steel01": ["a1"],
+    "Steel01Thermal": ["a1"]
+  },
   "byMaterial": {
     "Elastic": {
       "E": 200000.0,

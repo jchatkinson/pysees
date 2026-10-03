@@ -66,7 +66,7 @@ export function momentCurvatureTemplate(): TemplateResult {
     { kind: 'node', entity: { id: 2, coords: [0, 0] } },
     { kind: 'fix', entity: { nodeId: 1, dofs: [1, 2, 3] } },
     { kind: 'fix', entity: { nodeId: 2, dofs: [2] } }, // restrain shear DOF — the section has no shear stiffness
-    { kind: 'material', entity: { id: 1, kind: 'uniaxial', matType: 'Steel01', args: { matTag: 1, matType: 'Steel01', Fy: 400e6, E0: 200e9, b: 0.01 } } },
+    { kind: 'material', entity: { id: 1, kind: 'uniaxial', matType: 'Steel01', args: { matTag: 1, matType: 'Steel01', fy: 400e6, e0: 200e9, b: 0.01 } } },
     { kind: 'material', entity: { id: 2, kind: 'uniaxial', matType: 'Concrete01', args: { matTag: 2, matType: 'Concrete01', fpc: -30e6, epsc0: -0.002, fpcu: -6e6, epsU: -0.006 } } },
     { kind: 'section', entity: { id: 1, secType: 'Fiber', args: { secTag: 1, type: 'Fiber' }, children: [
       { kind: 'patch', subType: 'rect', args: { matTag: 2, numSubdivY: 8, numSubdivZ: 8, y1: -0.25, z1: -0.15, y2: 0.25, z2: 0.15 } },
@@ -129,7 +129,7 @@ function beamMemberArgs(
   const { b, h, barArea, barOffset } = RC_SECTION
   const bars = [-barOffset, 0, barOffset].flatMap((y) => [-barOffset, 0, barOffset].filter((z) => y !== 0 || z !== 0).map((z) => ({ y, z })))
   writes.push(
-    { kind: 'material', entity: { id: 1, kind: 'uniaxial', matType: 'Steel01', args: { matTag: 1, matType: 'Steel01', Fy: 400e6, E0: 200e9, b: 0.01 } } },
+    { kind: 'material', entity: { id: 1, kind: 'uniaxial', matType: 'Steel01', args: { matTag: 1, matType: 'Steel01', fy: 400e6, e0: 200e9, b: 0.01 } } },
     { kind: 'material', entity: { id: 2, kind: 'uniaxial', matType: 'Concrete01', args: { matTag: 2, matType: 'Concrete01', fpc: -30e6, epsc0: -0.002, fpcu: -6e6, epsU: -0.006 } } },
     { kind: 'section', entity: { id: ids.sectionId, secType: 'Fiber', args: { secTag: ids.sectionId, type: 'Fiber' }, children: [
       { kind: 'patch', subType: 'rect', args: { matTag: 2, numSubdivY: 8, numSubdivZ: 8, y1: -h / 2, z1: -b / 2, y2: h / 2, z2: b / 2 } },
@@ -159,7 +159,7 @@ export function cantileverTemplate({ n, h, eleType }: CantileverParams): Templat
   }
   writes.push({ kind: 'fix', entity: { nodeId: 1, dofs: [1, 2, 3] } })
   writes.push({ kind: 'geomTransf', entity: { id: 1, transfType: 'Linear', args: { type: 'Linear', transfTag: 1 } } })
-  if (eleType === 'elasticBeamColumn') writes.push({ kind: 'material', entity: { id: 1, kind: 'uniaxial', matType: 'Elastic', args: { matTag: 1, matType: 'Elastic', E: 200e9 } } })
+  if (eleType === 'elasticBeamColumn') writes.push({ kind: 'material', entity: { id: 1, kind: 'uniaxial', matType: 'Elastic', args: { matTag: 1, matType: 'Elastic', e: 200e9 } } })
 
   const member = beamMemberArgs(writes, eleType, { A: 0.01, E: 200e9, Iz: 1e-4 }, { transfTag: 1, sectionId: 1, integrationId: 1 })
   for (let i = 0; i < n; i++) {
@@ -208,7 +208,7 @@ export function frameTemplate({ stories, storyH, bays, bayW, eleType, base }: Fr
   }
 
   writes.push({ kind: 'geomTransf', entity: { id: 1, transfType: 'Linear', args: { type: 'Linear', transfTag: 1 } } })
-  if (eleType === 'elasticBeamColumn') writes.push({ kind: 'material', entity: { id: 1, kind: 'uniaxial', matType: 'Elastic', args: { matTag: 1, matType: 'Elastic', E: 200e9 } } })
+  if (eleType === 'elasticBeamColumn') writes.push({ kind: 'material', entity: { id: 1, kind: 'uniaxial', matType: 'Elastic', args: { matTag: 1, matType: 'Elastic', e: 200e9 } } })
   const member = beamMemberArgs(writes, eleType, { A: 0.01, E: 200e9, Iz: 1e-4 }, { transfTag: 1, sectionId: 1, integrationId: 1 })
   let eleId = 1
 

@@ -1,39 +1,68 @@
-import type { CarapaceInputV1, MaterialSpec, StageSpec } from '@/app/types/carapaceInputV1'
+import type { MaterialProbeError, WasmMaterialProbe } from '@/app/carapace/wasm/carapace_wasm.js'
+import type { MaterialEntity } from '@/app/types/model'
+import type { CompileDiagnostic } from '@/app/lib/compileAnalysisSequence'
+import { compileMaterial } from '@/app/lib/carapace/compileInputV1'
 
-/** A unit zero-length spring probe. With a unit reference load, Carapace's load factor is the
- * material force (stress for the unit-area probe) at each imposed displacement/strain target. */
-export function materialPreviewInput(material: MaterialSpec, protocol: number[]): CarapaceInputV1 {
-  let previous = 0
-  const stages: StageSpec[] = protocol.flatMap((target, index) => {
-    const increment = target - previous
-    previous = target
-    // OpenSees prints the initial/repeated target without calling analyze(). A zero-increment
-    // displacement-control step is singular in Carapace, so preserve that behavior here.
-    if (increment === 0) return []
-    return {
-      kind: 'static', id: `material-probe-${index}`, steps: 1,
-      integrator: { kind: 'displacementControl', node: 1, dof: 0, increment },
-      // Keep the Linear unit-load pattern active: Carapace's displacement-control predictor
-      // derives its reference-load sensitivity from non-frozen patterns on every protocol leg.
-      algorithm: 'newtonRaphson', convergence: { kind: 'normUnbalance', tol: 1e-6, maxIter: 25 }, holdPatternsAfter: [],
-    }
+type Wasm = typeof import('@/app/carapace/wasm/carapace_wasm.js')
+
+let wasmModule: Promise<Wasm> | null = null
+function loadWasm(): Promise<Wasm> {
+  wasmModule ??= import('@/app/carapace/wasm/carapace_wasm.js').then(async (mod) => {
+    await mod.default()
+    return mod
   })
-  return {
-    header: { schemaVersion: 1, space: 2, engineVersion: 'pysees-material-preview' },
-    nodes: { coords: [0, 0, 0, 0], fixed: [7, 6], massNodeIndex: [], mass: [] }, materials: [material], fibers: { sectionOffsets: [], y: [], area: [], material: [] },
-    trusses: { nodeI: [], nodeJ: [], area: [], material: [], density: [] }, elasticBeamColumns: { nodeI: [], nodeJ: [], e: [], a: [], iz: [], transform: [], density: [] },
-    dispBeamColumns: { nodeI: [], nodeJ: [], fiberSection: [], integration: [], corotational: [], density: [] }, forceBeamColumns: { nodeI: [], nodeJ: [], fiberSection: [], integration: [], corotational: [], density: [] },
-    zeroLengths: { nodeI: [0], nodeJ: [1], materials: [[0, 0, 0]], friction: [] }, zeroLengthSections: { nodeI: [], nodeJ: [], fiberSection: [], materials: [] },
-    equalDofs: { retained: [], constrained: [], dofs: [] }, rigidDiaphragms: { retained: [], constrained: [] },
-    // Same unit reference load and Linear time series as the original OpenSees probe. The load
-    // remains active between stages, so its multiplier is the zero-length spring force.
-    loadPatterns: { series: [{ kind: 'linear', slope: 1 }], scaleFactor: [1] },
-    nodalLoads: { pattern: [0], node: [1], dof: [0], value: [1], stage: [0] },
-    elementLoads: { pattern: [], elementKind: [], elementIndex: [], load: [], stage: [] }, sequence: { stages, recorders: [{ response: 'nodeDisp', node: 1, dof: 0 }] },
-    nodes3: { coords: [], fixed: [], massNodeIndex: [], mass: [] }, fibers3: { sectionOffsets: [], y: [], z: [], area: [], material: [] }, trusses3: { nodeI: [], nodeJ: [], area: [], material: [], density: [] },
-    elasticBeamColumns3: { nodeI: [], nodeJ: [], e: [], g: [], a: [], j: [], iy: [], iz: [], transform: [], density: [] }, dispBeamColumns3: { nodeI: [], nodeJ: [], g: [], j: [], vecXz: [], fiberSection: [], integration: [], density: [] },
-    forceBeamColumns3: { nodeI: [], nodeJ: [], g: [], j: [], vecXz: [], fiberSection: [], integration: [], density: [] }, zeroLengths3: { nodeI: [], nodeJ: [], materials: [], friction: [] }, zeroLengthSections3: { nodeI: [], nodeJ: [], fiberSection: [], materials: [] },
-    equalDofs3: { retained: [], constrained: [], dofs: [] }, rigidDiaphragms3: { retained: [], normal: [], constrained: [] }, nodalLoads3: { pattern: [], node: [], dof: [], value: [], stage: [] },
-    elementLoads3: { pattern: [], elementKind: [], elementIndex: [], load: [], stage: [] }, sequence3: { stages: [], recorders: [] },
+  return wasmModule
+}
+
+export interface MaterialPreviewPoint { eps: number; sig: number }
+
+export interface RunMaterialPreviewOptions {
+  isCancelled: () => boolean
+}
+
+const BATCH_MS = 50
+
+function describeProbeError(error: unknown): string {
+  const e = error as Partial<MaterialProbeError> | undefined
+  switch (e?.kind) {
+    case 'unsupportedMaterial': return `The ${e.material} material is not supported by the material preview yet.`
+    case 'invalidTarget': return `Strain ${e.target} is not a finite number.`
+    case 'invalidProbe': return `Invalid material: ${e.reason}`
+    case 'solverFailure': return `Solver failed at strain ${e.target}: ${e.detail}`
+    default: return error instanceof Error ? error.message : String(error)
+  }
+}
+
+/** Drives a Carapace uniaxial material probe (a unit zero-length spring under prescribed strain)
+ * through `protocol`, returning every `{ eps, sig }` point at once so the UI renders a single update. Yields to the
+ * event loop periodically so the page stays responsive and cancellation takes effect; a cancelled
+ * run resolves with the points computed so far. Throws an Error with a
+ * user-presentable message. */
+export async function runMaterialPreview(material: MaterialEntity, protocol: number[], { isCancelled }: RunMaterialPreviewOptions): Promise<MaterialPreviewPoint[]> {
+  const diagnostics: CompileDiagnostic[] = []
+  const spec = compileMaterial(material, diagnostics)
+  const failure = diagnostics.find((d) => d.severity === 'error')
+  if (failure) throw new Error(failure.message)
+
+  const wasm = await loadWasm()
+  let probe: WasmMaterialProbe | null = null
+  try {
+    probe = wasm.createMaterialProbe({ material: spec })
+    const points: MaterialPreviewPoint[] = []
+    let sliceStart = performance.now()
+    for (const target of protocol) {
+      if (isCancelled()) break
+      const { strain, stress } = probe.applyStrain(target)
+      points.push({ eps: strain, sig: stress })
+      if (performance.now() - sliceStart >= BATCH_MS) {
+        await new Promise<void>((resolve) => setTimeout(resolve, 0))
+        sliceStart = performance.now()
+      }
+    }
+    return points
+  } catch (error) {
+    throw new Error(describeProbeError(error), { cause: error })
+  } finally {
+    probe?.free()
   }
 }

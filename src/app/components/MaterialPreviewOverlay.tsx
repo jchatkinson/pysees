@@ -1,6 +1,6 @@
 import { memo, useEffect, useMemo, useRef, useState } from 'react'
-import { X, Play, Square, Eraser, ChevronDown, ChevronUp } from 'lucide-react'
-import { CartesianGrid, Line, LineChart, XAxis, YAxis } from 'recharts'
+import { X, Play, Square } from 'lucide-react'
+import { CartesianGrid, Label as ChartLabel, Line, LineChart, XAxis, YAxis } from 'recharts'
 import { Card, CardContent, CardHeader, CardTitle } from '@/app/components/ui/card'
 import { Button } from '@/app/components/ui/button'
 import { Textarea } from '@/app/components/ui/textarea'
@@ -22,12 +22,18 @@ const hysteresisChartConfig = {
 const protocolChartConfig = { eps: { label: 'Strain', color: '#22c55e' } } as const
 const HYSTERESIS_ANIMATION_MS = 3000
 
+/** Compact tick text: plain decimals for moderate magnitudes, short scientific otherwise. */
+function formatTick(value: number): string {
+  if (value === 0) return '0'
+  const abs = Math.abs(value)
+  if (abs >= 1e5 || abs < 1e-3) return value.toExponential(1).replace('e+', 'e')
+  return String(Number(value.toPrecision(3)))
+}
+
 const HysteresisChartPanel = memo(function HysteresisChartPanel({
-  connected,
   animateToken,
   scrubCount,
 }: {
-  connected: boolean
   animateToken: number
   scrubCount: number | null
 }) {
@@ -78,48 +84,45 @@ const HysteresisChartPanel = memo(function HysteresisChartPanel({
         <p className="text-[11px] font-medium">Chart</p>
         <p className="text-[10px] text-muted-foreground">{animatedPoints.length}/{points.length} points</p>
       </div>
-      {connected ? (
-        <ChartContainer config={hysteresisChartConfig} className="h-72 w-full">
-          <LineChart data={animatedPoints} margin={{ left: 2, right: 6, top: 6, bottom: 2 }}>
-            <CartesianGrid />
-            <XAxis
-              type="number"
-              dataKey="eps"
-              domain={['auto', 'auto']}
-              tickLine={false}
-              axisLine={false}
-              minTickGap={20}
-              tick={{ fontSize: 9 }}
-            />
-            <YAxis
-              type="number"
-              domain={['auto', 'auto']}
-              tickLine={false}
-              axisLine={false}
-              width={28}
-              tick={{ fontSize: 9 }}
-            />
-            <ChartTooltip content={<ChartTooltipContent />} />
-            <Line type="linear" dataKey="sig" stroke={hysteresisChartConfig.sig.color} strokeWidth={1.75} dot={false} isAnimationActive={false} connectNulls />
-          </LineChart>
-        </ChartContainer>
-      ) : (
-        <div className="grid h-72 place-items-center rounded border bg-muted/20 p-6 text-center text-xs text-muted-foreground">
-          Not Connected - Setup connection to local opensees instance to enable material previews
-        </div>
-      )}
+      <ChartContainer config={hysteresisChartConfig} className="h-72 w-full">
+        <LineChart data={animatedPoints} margin={{ left: 4, right: 12, top: 6, bottom: 4 }}>
+          <CartesianGrid />
+          <XAxis
+            type="number"
+            dataKey="eps"
+            domain={['auto', 'auto']}
+            tickLine={false}
+            axisLine={false}
+            minTickGap={20}
+            tick={{ fontSize: 9 }}
+            tickFormatter={formatTick}
+            height={36}
+          >
+            <ChartLabel value="Strain" position="insideBottom" offset={0} style={{ fontSize: 10, fill: 'var(--muted-foreground)' }} />
+          </XAxis>
+          <YAxis
+            type="number"
+            domain={['auto', 'auto']}
+            tickLine={false}
+            axisLine={false}
+            width={52}
+            tick={{ fontSize: 9 }}
+            tickFormatter={formatTick}
+          >
+            <ChartLabel value="Stress" angle={-90} position="insideLeft" offset={4} style={{ fontSize: 10, fill: 'var(--muted-foreground)', textAnchor: 'middle' }} />
+          </YAxis>
+          <ChartTooltip content={<ChartTooltipContent />} />
+          <Line type="linear" dataKey="sig" stroke={hysteresisChartConfig.sig.color} strokeWidth={1.75} dot={false} isAnimationActive={false} connectNulls />
+        </LineChart>
+      </ChartContainer>
     </div>
   )
 })
 
 export function MaterialPreviewOverlay() {
-  const localAgentStatus = useAppStore((s) => s.localAgent.status)
-  const localAgentPort = useAppStore((s) => s.localAgent.port)
-  const localAgentError = useAppStore((s) => s.localAgent.error)
   const panelOpen = useAppStore((s) => s.materialPreview.panelOpen)
   const previewProtocol = useAppStore((s) => s.materialPreview.protocol)
   const previewError = useAppStore((s) => s.materialPreview.error)
-  const previewLogs = useAppStore((s) => s.materialPreview.logs)
   const previewRunning = useAppStore((s) => s.materialPreview.running)
   const previewInputMaterial = useAppStore((s) => s.materialPreview.inputMaterial)
   const previewPointCount = useAppStore((s) => s.materialPreview.points.length)
@@ -127,9 +130,7 @@ export function MaterialPreviewOverlay() {
   const cancelMaterialPreview = useAppStore((s) => s.cancelMaterialPreview)
   const setPanelOpen = useAppStore((s) => s.setMaterialPreviewPanelOpen)
   const clearMaterialPreviewResult = useAppStore((s) => s.clearMaterialPreviewResult)
-  const clearLogs = useAppStore((s) => s.clearMaterialPreviewLogs)
 
-  const [showLogs, setShowLogs] = useState(false)
   const [protocolType, setProtocolType] = useState<ProtocolType>('custom')
   const [maxStrain, setMaxStrain] = useState('0.02')
   const [numCycles, setNumCycles] = useState('3')
@@ -169,13 +170,10 @@ export function MaterialPreviewOverlay() {
         <CardHeader className="pb-2">
           <div className="flex items-center gap-2">
             <CardTitle className="text-sm">Material Preview</CardTitle>
-            <span className="ml-auto text-[10px] text-muted-foreground">
-              {localAgentStatus === 'connected' ? `Connected :${localAgentPort}` : localAgentStatus}
-            </span>
             <Tooltip>
               <TooltipTrigger
                 render={
-                  <Button size="icon" variant="ghost" className="size-6" aria-label="Close material preview" onClick={() => setPanelOpen(false)}>
+                  <Button size="icon" variant="ghost" className="ml-auto size-6" aria-label="Close material preview" onClick={() => setPanelOpen(false)}>
                     <X className="size-3.5" />
                   </Button>
                 }
@@ -185,8 +183,8 @@ export function MaterialPreviewOverlay() {
           </div>
         </CardHeader>
         <CardContent className="grid gap-2">
-          {(previewError || localAgentError) && (
-            <p className="text-[11px] text-destructive">{previewError || localAgentError}</p>
+          {previewError && (
+            <p className="text-[11px] text-destructive">{previewError}</p>
           )}
 
           <Tabs defaultValue="protocol">
@@ -275,7 +273,7 @@ export function MaterialPreviewOverlay() {
             </TabsContent>
 
             <TabsContent value="hysteresis" className="mt-2">
-              <HysteresisChartPanel connected={localAgentStatus === 'connected'} animateToken={animateToken} scrubCount={scrubCount} />
+              <HysteresisChartPanel animateToken={animateToken} scrubCount={scrubCount} />
             </TabsContent>
           </Tabs>
 
@@ -285,7 +283,7 @@ export function MaterialPreviewOverlay() {
               onClick={() => {
                 runMaterialPreview(generatedProtocol)
               }}
-              disabled={localAgentStatus !== 'connected' || !previewInputMaterial || previewRunning}
+              disabled={!previewInputMaterial || previewRunning}
             >
               <Play className="mr-1 size-3.5" />Run
             </Button>
@@ -299,7 +297,7 @@ export function MaterialPreviewOverlay() {
                 setScrubCount(null)
                 setAnimateToken((v) => v + 1)
               }}
-              disabled={localAgentStatus !== 'connected' || previewRunning || previewPointCount === 0}
+              disabled={previewRunning || previewPointCount === 0}
             >
               Animate
             </Button>
@@ -315,27 +313,6 @@ export function MaterialPreviewOverlay() {
                 disabled={previewPointCount === 0}
               />
             </div>
-          </div>
-
-          <div className="rounded border p-2">
-            <div className="flex items-center gap-2">
-              <button className="flex flex-1 items-center text-[11px] font-medium" onClick={() => setShowLogs((v) => !v)}>
-                Runtime logs
-                {showLogs ? <ChevronUp className="ml-auto size-3.5" /> : <ChevronDown className="ml-auto size-3.5" />}
-              </button>
-              <Button size="sm" variant="ghost" onClick={clearLogs} disabled={previewLogs.length === 0}>
-                <Eraser className="mr-1 size-3.5" />Clear Logs
-              </Button>
-            </div>
-            {showLogs && (
-              <div className="mt-2 max-h-28 overflow-auto rounded border bg-muted/20 p-2 font-mono text-[10px]">
-                {previewLogs.length === 0 ? (
-                  <p className="text-muted-foreground">No logs.</p>
-                ) : (
-                  previewLogs.map((log, i) => <p key={`${log.stream}-${i}`}>[{log.stream}] {log.line}</p>)
-                )}
-              </div>
-            )}
           </div>
         </CardContent>
       </Card>

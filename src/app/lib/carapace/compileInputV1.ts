@@ -466,14 +466,14 @@ function compileIntegration(integration: BeamIntegrationEntity, context: string,
   return { kind: 'legendre', points }
 }
 
-function compileMaterial(mat: MaterialEntity, diagnostics: CompileDiagnostic[]): W.MaterialSpec {
+export function compileMaterial(mat: MaterialEntity, diagnostics: CompileDiagnostic[]): W.MaterialSpec {
   const a = mat.args
   switch (mat.matType) {
-    case 'Elastic': return { kind: 'elastic', e: Number(a.E) || 0 }
-    case 'ElasticPP': return { kind: 'elasticPp', e: Number(a.E) || 0, eyp: Number(a.epsyP) || 0 }
-    case 'ENT': return { kind: 'ent', e: Number(a.E) || 0 }
-    case 'Steel01': return { kind: 'steel01', fy: Number(a.Fy) || 0, e0: Number(a.E0) || 0, b: Number(a.b) || 0, a1: Number(a.a1) || 0, a2: Number(a.a2) || 1, a3: Number(a.a3) || 0, a4: Number(a.a4) || 1 }
-    case 'Concrete01': return { kind: 'concrete01', fpc: Number(a.fpc) || 0, epsc0: Number(a.epsc0) || 0, fpcu: Number(a.fpcu) || 0, epscu: Number(a.epscu) || 0 }
+    case 'Elastic': return { kind: 'elastic', e: Number(a.e) || 0 }
+    case 'ElasticPP': return { kind: 'elasticPp', e: Number(a.e) || 0, eyp: Number(a.epsyP) || 0 }
+    case 'ENT': return { kind: 'ent', e: Number(a.e) || 0 }
+    case 'Steel01': return { kind: 'steel01', fy: Number(a.fy) || 0, e0: Number(a.e0) || 0, b: Number(a.b) || 0, a1: Number(a.a1) || 0, a2: Number(a.a2) || 1, a3: Number(a.a3) || 0, a4: Number(a.a4) || 1 }
+    case 'Concrete01': return { kind: 'concrete01', fpc: Number(a.fpc) || 0, epsc0: Number(a.epsc0) || 0, fpcu: Number(a.fpcu) || 0, epscu: Number(a.epsU) || 0 }
     default:
       diagnostics.push({ severity: 'error', message: `Material ${mat.id} (${mat.matType}) is not yet supported by the Carapace compiler`, commandIndex: -1 })
       return { kind: 'elastic', e: 0 }

@@ -19235,21 +19235,27 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
               description: "isotropic hardening parameter, increase of compression yield envelope as proportion of yield strength after a plastic strain of",
               kind: "float",
               name: "a1",
-              required: true
+              required: false
             },
             {
+              defaultSource: "curated",
+              defaultValue: 1.0,
               description: "isotropic hardening parameter (see explanation under ``a1``).",
               kind: "float",
               name: "a2",
               required: false
             },
             {
+              defaultSource: "curated",
+              defaultValue: 0.0,
               description: "isotropic hardening parameter, increase of tension yield envelope as proportion of yield strength after a plastic strain of :math:`a_4*(F_y/E_0)`.",
               kind: "float",
               name: "a3",
               required: false
             },
             {
+              defaultSource: "curated",
+              defaultValue: 1.0,
               description: "isotropic hardening parameter (see explanation under ``a3``).",
               kind: "float",
               name: "a4",
@@ -19293,21 +19299,27 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
               description: "isotropic hardening parameter, increase of compression yield envelope as proportion of yield strength after a plastic strain of",
               kind: "float",
               name: "a1",
-              required: true
+              required: false
             },
             {
+              defaultSource: "curated",
+              defaultValue: 1.0,
               description: "isotropic hardening parameter (see explanation under ``a1``).",
               kind: "float",
               name: "a2",
               required: false
             },
             {
+              defaultSource: "curated",
+              defaultValue: 0.0,
               description: "isotropic hardening parameter, increase of tension yield envelope as proportion of yield strength after a plastic strain of :math:`a_4*(F_y/E_0)`.",
               kind: "float",
               name: "a3",
               required: false
             },
             {
+              defaultSource: "curated",
+              defaultValue: 1.0,
               description: "isotropic hardening parameter (see explanation under ``a3``).",
               kind: "float",
               name: "a4",

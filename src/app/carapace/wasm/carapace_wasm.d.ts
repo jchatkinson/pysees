@@ -603,6 +603,16 @@ export interface LoadPatternTable {
     scaleFactor: number[];
 }
 
+export interface MaterialProbeConfig {
+    material: MaterialSpec;
+    initialStrain?: number | undefined;
+}
+
+export interface MaterialProbeResponse {
+    strain: number;
+    stress: number;
+}
+
 export interface NodalLoadTable {
     /**
      * Index into `LoadPatternTable`.
@@ -713,6 +723,8 @@ export type LegacyAlgorithmSpec = "linear" | "newtonRaphson";
 
 export type LineSearchSpec = { kind: "bisection"; tol: number; maxIter: number; maxEta: number } | { kind: "regulaFalsi"; tol: number; maxIter: number; maxEta: number };
 
+export type MaterialProbeError = { kind: "unsupportedMaterial"; material: string } | { kind: "invalidTarget"; target: number } | { kind: "invalidProbe"; reason: string } | { kind: "solverFailure"; target: number; detail: string };
+
 export type RecorderSpec = { response: "nodeDisp"; node: number; dof: number } | { response: "nodeVel"; node: number; dof: number } | { response: "nodeAccel"; node: number; dof: number } | { response: "elementForce"; elementKind: ElementKind; elementIndex: number; component: number } | { response: "elementLoad"; elementKind: ElementKind; elementIndex: number; component: number } | { response: "modeShape"; mode: number; node: number; dof: number } | { response: "reaction"; node: number; dof: number } | { response: "fiber"; elementKind: ElementKind; elementIndex: number; point: number; fiber: number; quantity: FiberResponseKind };
 
 export type StageSpec = { kind: "static"; id: string; steps: number; integrator: IntegratorSpec; algorithm: AlgorithmSpec; convergence?: ConvergenceSpec; holdPatternsAfter: number[] } | { kind: "modal"; id: string; modes: number } | { kind: "transient"; id: string; steps: number; dt: number; damping: DampingSpec; groundMotions: GroundMotionSpec[]; algorithm?: AlgorithmSpec; convergence?: ConvergenceSpec };
@@ -725,6 +737,23 @@ export type TimeSeriesSpec = { kind: "constant" } | { kind: "linear"; slope: num
 
 export type TransformSpec = "linear" | "pDelta" | "corotational";
 
+
+/**
+ * Opaque handle to a persistent uniaxial material probe (`material_probe`).
+ * Material state persists across `applyStrain` calls; cancel between points
+ * by simply not calling it again.
+ */
+export class WasmMaterialProbe {
+    private constructor();
+    free(): void;
+    [Symbol.dispose](): void;
+    /**
+     * Imposes the strain and returns `{ strain, stress }`; rejects with a
+     * `{ kind, ... }` `MaterialProbeError`.
+     */
+    applyStrain(target: number): MaterialProbeResponse;
+    reset(): void;
+}
 
 /**
  * Opaque handle to a decoded, steppable analysis session — the `Session`
@@ -761,6 +790,8 @@ export function axial_displacement(load: number, length: number, area: number, m
  * criteria. Kept alongside the M0 export for wasm/Node verification.
  */
 export function axial_displacement_via_analysis(load: number, length: number, area: number, modulus: number): number;
+
+export function createMaterialProbe(config: MaterialProbeConfig): WasmMaterialProbe;
 
 /**
  * M6 wiring check: Newmark + Rayleigh-damped SDOF free vibration, closed
@@ -831,15 +862,19 @@ export type InitInput = RequestInfo | URL | Response | BufferSource | WebAssembl
 
 export interface InitOutput {
     readonly memory: WebAssembly.Memory;
+    readonly __wbg_wasmmaterialprobe_free: (a: number, b: number) => void;
     readonly __wbg_wasmsession_free: (a: number, b: number) => void;
     readonly axial_displacement: (a: number, b: number, c: number, d: number) => number;
     readonly axial_displacement_via_analysis: (a: number, b: number, c: number, d: number) => number;
+    readonly createMaterialProbe: (a: any) => [number, number, number];
     readonly damped_sdof_free_vibration_displacement: (a: number, b: number) => number;
     readonly decodeInput: (a: any) => [number, number, number];
     readonly disp_beam_column_cantilever_tip_deflection: (a: number, b: number, c: number, d: number, e: number) => number;
     readonly mass_spring_chain_frequencies: () => [number, number];
     readonly newton_raphson_elastic_plastic_displacement: (a: number) => number;
     readonly simply_supported_beam_end_rotation: (a: number, b: number, c: number, d: number, e: number) => number;
+    readonly wasmmaterialprobe_applyStrain: (a: number, b: number) => [number, number, number];
+    readonly wasmmaterialprobe_reset: (a: number) => [number, number];
     readonly wasmsession_advance: (a: number, b: number) => [number, number, number];
     readonly wasmsession_currentStageId: (a: number) => [number, number];
     readonly zero_length_ent_displacement: (a: number, b: number) => number;

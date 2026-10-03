@@ -1,6 +1,50 @@
 /* @ts-self-types="./carapace_wasm.d.ts" */
 
 /**
+ * Opaque handle to a persistent uniaxial material probe (`material_probe`).
+ * Material state persists across `applyStrain` calls; cancel between points
+ * by simply not calling it again.
+ */
+export class WasmMaterialProbe {
+    static __wrap(ptr) {
+        const obj = Object.create(WasmMaterialProbe.prototype);
+        obj.__wbg_ptr = ptr;
+        WasmMaterialProbeFinalization.register(obj, obj.__wbg_ptr, obj);
+        return obj;
+    }
+    __destroy_into_raw() {
+        const ptr = this.__wbg_ptr;
+        this.__wbg_ptr = 0;
+        WasmMaterialProbeFinalization.unregister(this);
+        return ptr;
+    }
+    free() {
+        const ptr = this.__destroy_into_raw();
+        wasm.__wbg_wasmmaterialprobe_free(ptr, 0);
+    }
+    /**
+     * Imposes the strain and returns `{ strain, stress }`; rejects with a
+     * `{ kind, ... }` `MaterialProbeError`.
+     * @param {number} target
+     * @returns {MaterialProbeResponse}
+     */
+    applyStrain(target) {
+        const ret = wasm.wasmmaterialprobe_applyStrain(this.__wbg_ptr, target);
+        if (ret[2]) {
+            throw takeFromExternrefTable0(ret[1]);
+        }
+        return takeFromExternrefTable0(ret[0]);
+    }
+    reset() {
+        const ret = wasm.wasmmaterialprobe_reset(this.__wbg_ptr);
+        if (ret[1]) {
+            throw takeFromExternrefTable0(ret[0]);
+        }
+    }
+}
+if (Symbol.dispose) WasmMaterialProbe.prototype[Symbol.dispose] = WasmMaterialProbe.prototype.free;
+
+/**
  * Opaque handle to a decoded, steppable analysis session — the `Session`
  * enum itself can't cross the boundary directly, since `wasm_bindgen`
  * requires an exported type to be a plain struct.
@@ -83,6 +127,18 @@ export function axial_displacement(load, length, area, modulus) {
 export function axial_displacement_via_analysis(load, length, area, modulus) {
     const ret = wasm.axial_displacement_via_analysis(load, length, area, modulus);
     return ret;
+}
+
+/**
+ * @param {MaterialProbeConfig} config
+ * @returns {WasmMaterialProbe}
+ */
+export function createMaterialProbe(config) {
+    const ret = wasm.createMaterialProbe(config);
+    if (ret[2]) {
+        throw takeFromExternrefTable0(ret[1]);
+    }
+    return WasmMaterialProbe.__wrap(ret[0]);
 }
 
 /**
@@ -431,6 +487,9 @@ function __wbg_get_imports() {
     };
 }
 
+const WasmMaterialProbeFinalization = (typeof FinalizationRegistry === 'undefined')
+    ? { register: () => {}, unregister: () => {} }
+    : new FinalizationRegistry(ptr => wasm.__wbg_wasmmaterialprobe_free(ptr, 1));
 const WasmSessionFinalization = (typeof FinalizationRegistry === 'undefined')
     ? { register: () => {}, unregister: () => {} }
     : new FinalizationRegistry(ptr => wasm.__wbg_wasmsession_free(ptr, 1));

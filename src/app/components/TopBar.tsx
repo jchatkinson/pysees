@@ -28,9 +28,6 @@ export function TopBar() {
     toggleLoadPatternVisible,
     requestViewportAction,
     setGridlinesDialogOpen,
-    localAgent,
-    connectLocalAgent,
-    disconnectLocalAgent,
     newModel,
   } = useAppStore()
   const [newModelConfirmOpen, setNewModelConfirmOpen] = useState(false)
@@ -52,16 +49,6 @@ export function TopBar() {
         <DropdownMenuContent>
           <DropdownMenuItem onClick={() => (model.config ? setNewModelConfirmOpen(true) : newModel())}>New Model</DropdownMenuItem>
           <DropdownMenuItem disabled={!model.config} onClick={() => downloadScript(model, analysisHistory)}>Export .py</DropdownMenuItem>
-          <DropdownMenuSeparator />
-          {localAgent.status === 'connected' ? (
-            <DropdownMenuItem onClick={disconnectLocalAgent}>
-              Disconnect (:{localAgent.port})
-            </DropdownMenuItem>
-          ) : (
-            <DropdownMenuItem onClick={() => { void connectLocalAgent() }} disabled={localAgent.status === 'connecting'}>
-              {localAgent.status === 'connecting' ? 'Connecting to local...' : 'Connect to local'}
-            </DropdownMenuItem>
-          )}
         </DropdownMenuContent>
       </DropdownMenu>
       <DropdownMenu>

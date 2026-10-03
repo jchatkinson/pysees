@@ -110,7 +110,8 @@ function tryParseDynamicFloatList(text: string): number[] | null {
 
 function seedDefaults(arg: ArgDef, values: Record<string, unknown>, setValue: (key: string, value: unknown) => void, ctx: SchemaContext) {
   if (arg.kind === 'int' || arg.kind === 'float') {
-    if (values[arg.name] === undefined) setValue(arg.name, Number(arg.defaultValue ?? 0))
+    // No default means the field starts blank (and, if required, fails validation) rather than a misleading 0.
+    if (values[arg.name] === undefined && arg.defaultValue !== undefined) setValue(arg.name, Number(arg.defaultValue))
     return
   }
   if (arg.kind === 'str') {

@@ -9,9 +9,6 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "agent:run": "cd agent && go run ./cmd/pysees-agent",
-    "agent:venv": "cd agent && go run ./cmd/pysees-agent --python-bin ../.venv/bin/python",
-    "agent:build": "cd agent && go build ./cmd/pysees-agent",
     "schema:extract": "uv run python scripts/generate_opensees_schemas.py",
     "schema:build": "uv run python scripts/build_runtime_schemas.py"
   },

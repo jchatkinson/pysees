@@ -1,310 +1,119 @@
-You are helping plan and build a web-based GUI preprocessor/postprocessor for OpenSeesPy
-structural models. The app generates a Python script as its output — it does not run
-OpenSees itself. Results can be imported back in for postprocessing after the user runs
-the script externally.
+PySees is a web-based GUI for building, running, and postprocessing structural models. Analysis runs
+**in the browser** on Carapace, a Rust finite-element engine compiled to WebAssembly (sibling repo
+`../carapace`, bundled here as `src/app/carapace/wasm`). OpenSees is optional: the user exports the
+model as an OpenSeesPy script (`.py`; `.tcl` planned) and runs it themselves. The app never talks to a
+local OpenSees process or agent.
 
 ---
 
-## Core Concept
+## IMPORTANT NOTES
 
-The app is a parametric model builder. Every user action is a discrete Command object
-pushed onto an immutable history stack. The 3D scene and Python script are both pure
-functions of replaying that stack — similar to history-based parametric CAD (Fusion 360,
-FreeCAD).
-
-CommandHistory[] → replay() → ModelState → Three.js scene
-→ .py script output
+- Do not build or run the dev server unless specifically asked.
+- Use standard shadcn components (Base UI flavor, not Radix) and architecture wherever possible.
+- Keep code compact. Do not newline every property of a JSX element or object literal.
+- When a task has an unclear outcome, ask for more information.
+- 2D/3D, not "planar"/"spatial", in prose and docs.
+- No local-agent / websocket / OpenSees-process connectivity anywhere in the UI. In-browser analysis goes through Carapace.
 
 ---
 
 ## Tech Stack
 
-- Vite
-- React
-- Three.js / @react-three/fiber / @react-three/drei
-- Shadcn
-- TypeScript
+Vite, React, TypeScript, Zustand (`src/app/store/useAppStore.ts`), Three.js via @react-three/fiber +
+drei, shadcn/Base UI + Tailwind v4, recharts (charts), TanStack Table, react-router, Clerk (auth gate on `/studio`).
+Carapace wasm runs in Web Workers; results persist in IndexedDB through a storage worker.
+
+Routes: marketing pages (`src/marketing`) and the app at `/studio` (`AppShell`), behind sign-in.
 
 ---
 
-## UI Layout Aliases
+## Core Concept
 
-| Alias       | Component         | Description                              |
-|-------------|-------------------|------------------------------------------|
-| top menu    | `TopBar`          | Mode toggle, undo/redo, export button    |
-| left menu   | `HistoryPanel`    | Command history list, script button      |
-| right menu  | `CommandForm`     | Command form, script editor, viz controls |
-| bot menu    | `ActionBar`       | Status messages, zoom controls, cursor coords, scrubber |
-| viewport    | `Viewport`        | 3D R3F canvas                            |
+The user builds a parametric model; everything downstream is derived from it.
 
----
-
-## IMPORTANT NOTES: 
-
-- Do not build or run dev server unless specifically asked. 
-- Use standard Shadcn components and architecture wherever possible
-- Keep code compact. For example, do not newline every property of an html element or js object. 
-- When a task has an unclear outcome, ask for more information.
-
----
-
-## Initialization
-
-Before the app loads, a mandatory modal captures:
-```ts
-interface ModelConfig {
-  ndm: 2 | 3
-  ndf: number  // suggested default: ndm=2→3, ndm=3→6, user-overridable
-}
+```
+Model (entity maps)  ─┬─► 3D viewport (r3f)
+AnalysisHistory      ─┼─► compileInputV1 ─► Carapace wasm worker ─► results (IndexedDB) ─► results viewport / plots
+                      └─► exportScript ─► OpenSeesPy .py
 ```
 
-This maps to the first openseespy call and the first entry in the command history:
-```python
-ops.model('basic', '-ndm', ndm, '-ndf', ndf)
-```
-
-ndm and ndf are then static constants for the lifetime of the model. All schema
-vec lengths that reference 'ndm' or 'ndf' resolve to concrete integers at init time.
-
----
-
-## Application Modes
-
-The app has two top-level modes toggled via a toolbar:
-
-- **Model mode** — history panel, command forms, 3D model viewport
-- **Results mode** — results panel, visualization controls, 3D results viewport
-
-Results state is null until the user imports recorder output files. The model is
-read-only in Results mode.
+- **Model** (`types/model.ts`): maps of typed entities (nodes, materials, sections, geomTransfs,
+  beamIntegrations, elements, fixes, mpConstraints, timeSeries, patterns, regions, misc) plus
+  `nextIds`. Edited through `applyModelWrite` / `deleteEntity` (`lib/modelWrite.ts`); undo/redo is a
+  snapshot stack (`modelPast`/`modelFuture`). IDs are app-managed.
+- **AnalysisHistory** (`types/analysisCommands.ts`, `analysisSequence.ts`): authored analysis commands,
+  with cursor undo/redo. `analysisBlocks.ts` defines blocks that lower to stages/recorders;
+  `compileAnalysisSequence.ts` turns them into a sequence of stages (static now; modal/transient not yet
+  compiled).
+- `ndm` (2|3) and `ndf` are fixed at init (`InitModal`); changing them means a new model.
+- Editing the model or analysis history invalidates stored results (store subscription clears them).
 
 ---
 
-## Command System
+## Carapace pipeline
 
-Each user action is a typed Command:
-```ts
-type Command =
-  | { type: 'MODEL_INIT'; ndm: number; ndf: number }
-  | { type: 'ADD_NODE'; id: number; coords: number[] }
-  | { type: 'ADD_MATERIAL'; id: number; matType: string; params: number[] }
-  | { type: 'ADD_ELEMENT'; id: number; eleType: string; nodes: number[]; matId?: number }
-  | { type: 'FIX'; nodeId: number; dofs: number[] }
-  | { type: 'ADD_LOAD'; nodeId: number; values: number[] }
-  | { type: 'ADD_RECORDER'; recorderType: string; params: object }
-  | { type: 'SCRIPT_GROUP'; source: string; commands: Command[] }
-  // extend as needed
-
-interface CommandHistory {
-  commands: Command[]
-  cursor: number  // for undo/redo — replay commands[0..cursor]
-}
-```
-
-ModelState is derived by reducing over commands[0..cursor]:
-```ts
-function replay(history: CommandHistory): ModelState
-```
-
-**Node movement:** There is no openseespy equivalent of moveNode. Moving a node in the
-viewport is a viewport interaction that finds and mutates the original ADD_NODE command
-in the history and replays forward. The generated script always emits the final node
-position — no move command ever appears. Downstream commands (elements, loads) remain
-valid as they reference by ID. Affected downstream commands are highlighted in the
-history panel.
-
-**Parametric editing:** Clicking any command in the history panel opens its form for
-editing. State rebuilds by re-replaying from that point forward.
+- `lib/carapace/compileInputV1.ts` compiles Model + sequence into `CarapaceInputV1`
+  (`types/carapaceInputV1.ts`, mirrors Rust `input_v1` in `../carapace/wasm-bridge`), returning
+  diagnostics for anything unsupported. Material/section arg names are the **schema** names (lowercase,
+  e.g. `fy`, `e0`, `epsU`), not OpenSees doc capitalisation.
+- `workers/carapaceWorker.ts` decodes the input, advances in chunks (cooperative cancel), and streams
+  recorder batches to `workers/resultsStorageWorker.ts` over a `MessageChannel`. Client side:
+  `lib/carapace/carapaceWorkerClient.ts`. Store state: `carapaceRun`.
+- Rebuild the bundled wasm after Carapace changes: `scripts/build-carapace.sh` (needs the `../carapace` checkout,
+  `wasm-bindgen`).
+- Material Preview (`MaterialPreviewOverlay`, `lib/carapace/materialPreview.ts`) drives Carapace's
+  `createMaterialProbe` (unit zero-length spring, prescribed strain) through a load protocol
+  (`lib/materialPreviewProtocol.ts`) and charts strain vs stress. Points are committed in one store update.
+  See `docs/carapace-material-preview-handoff.md`.
 
 ---
 
 ## Schema System
 
-Each openseespy command has a declarative ArgDef schema. Forms and codegen are both
-derived from the same schema — no command-specific UI code.
-```ts
-type ArgDef =
-  | { kind: 'int' | 'float' | 'str'; name: string; label?: string }
-  | { kind: 'vec'; name: string; length: number }  // resolved at init from ndm/ndf
-  | { kind: 'flag'; flag: string; args: ArgDef[] }  // optional keyword group
-  | { kind: 'choice'; name: string; options: string[]; yields: Record<string, ArgDef[]> }
+Forms and OpenSeesPy codegen derive from declarative `ArgDef` schemas (`types/schema.ts`,
+`lib/commandSchemas.ts`); there is no per-command UI code. `SchemaFormField` renders the tree
+(int/float/str, vec, flag, choice, idlist); fields with no schema default start blank.
 
-interface CommandSchema {
-  cmd: string          // internal command type
-  fn: string           // openseespy function name e.g. 'node', 'element', 'fix'
-  label: string        // display name
-  category: 'model' | 'recorder'  // controls where it appears in the UI
-  ndmFilter?: number[] // e.g. [2] means only available in 2D models
-  args: ArgDef[]
-  optional: ArgDef[]
-}
-```
-
-Schema files are static JSON/TS, generated once by LLM batch-processing the OpenSeesPyDoc
-RST source files, then manually reviewed. The RST docs are the source of truth.
+- `src/app/generated/commandSchemas.generated.ts` is generated from the OpenSeesPyDoc RST:
+  `npm run schema:extract` then `npm run schema:build` (see README). Curated uniaxial defaults and
+  optional-arg overrides live in `scripts/uniaxial-material-defaults.json`. Prefer fixing the generator
+  inputs over hand-editing generated output (if you must patch it, mirror the change in the generator).
+- `lib/templates.ts` provides starter models; their material `args` must use schema names.
 
 ---
 
-## Form Renderer
+## UI Layout
 
-A generic recursive component walks the ArgDef tree:
-```ts
-function FormField({ arg, ctx }: { arg: ArgDef; ctx: { ndm: number; ndf: number } })
-```
+| Alias      | Component(s)                                   | Description |
+|------------|------------------------------------------------|-------------|
+| top menu   | `TopBar`                                       | File (new, export .py), edit (undo/redo), view settings |
+| left panel | `ModelPanel` / `AnalysisPanel` (`AppShell`)    | Model entities and analysis blocks; toggled by `activePanel` |
+| right      | `CommandForm`, `MaterialDialog`, `sections/*`  | Schema forms, material picker/preview, fiber section editor |
+| bot menu   | `ActionBar`                                    | Status, zoom, cursor coords |
+| viewport   | `Viewport` + `components/r3f/*`                | 3D model and results scene (nodes, elements, supports, loads, gridlines, levels, deformed shape, force diagrams) |
+| results    | `ResultsPanel`, `ResultsDisplayPanel`, `plot/*` | Run controls, display options, step playback, plot overlay and data tables |
+| overlays   | `MaterialPreviewOverlay`, `PlotOverlay`        | Floating panels over the viewport |
 
-- int/float → number input
-- str → text input
-- vec of length n → n number inputs inline
-- flag → checkbox that reveals its sub-args when checked
-- choice → select that reveals the corresponding sub-arg group
-
----
-
-## Scripting
-
-Users can open a script editor panel and write JS to emit commands programmatically.
-This is useful for parametric geometry — grids of nodes, repeated elements, etc.
-
-Scripts run in a **Web Worker** with no DOM, no fetch, no fs access. The only exposed
-API is a thin command-emitter surface:
-```ts
-// available globals inside the worker sandbox
-const api = {
-  // command emitters
-  node: (coords: number[]) => void,
-  fix: (nodeId: number, dofs: number[]) => void,
-  element: (type: string, nodes: number[], params: object) => void,
-  material: (type: string, params: object) => void,
-  load: (nodeId: number, values: number[]) => void,
-  recorder: (type: string, params: object) => void,
-
-  // readonly model context
-  ndm: number,
-  ndf: number,
-  nodes: ReadonlyMap<number, number[]>,  // id → coords, for referencing existing geometry
-
-  // math helpers
-  range: (n: number) => number[],
-  linspace: (start: number, end: number, n: number) => number[],
-}
-```
-
-Example user script:
-```js
-// 10-node truss chord
-for (let i = 0; i < 10; i++) {
-  node([i * 1.5, 0, 0])
-}
-for (let i = 0; i < 9; i++) {
-  element('Truss', [i+1, i+2], { A: 0.01, E: 200000 })
-}
-fix(1, [1,1,1,1,1,1])
-```
-
-The Worker collects emitted commands and posts them back as a batch. Scripts land in
-the history as a single collapsible **SCRIPT_GROUP** entry containing:
-
-- The script source (re-editable — re-running replaces the group's commands)
-- The flat list of emitted commands (shown when expanded)
-
-Re-editing a script source re-runs the worker and replaces the group in-place, then
-replays forward. Individual commands within a group are not directly editable — edit
-the script instead.
+Results live in IndexedDB (`lib/resultsStorage`), read per step for display (`useResultsSource`,
+`stepFrames`); 2D models render in the XY plane.
 
 ---
 
-## Python Codegen
+## Exporting to OpenSees
 
-Each Command maps to one or more openseespy lines. SCRIPT_GROUP is flattened to its
-child commands for output. Output is a complete runnable .py file:
-```python
-import openseespy.opensees as ops
-
-ops.model('basic', '-ndm', 2, '-ndf', 3)
-ops.node(1, 0.0, 0.0)
-ops.node(2, 5.0, 0.0)
-ops.fix(1, 1, 1, 1)
-ops.recorder('Node', '-file', 'node_disp.out', '-node', 1, 2, '-dof', 1, 2, 'disp')
-# ...
-```
-
----
-
-## 3D Viewport — Model Mode
-
-- Nodes: spheres, clickable/selectable
-- Elements: lines (truss/beam) or meshes (shell/brick) based on type
-- Boundary conditions: visual glyph per fixed DOF
-- Load arrows: nodal loads
-- Element local axes: toggleable
-- 2D models render in the XY plane, camera locked accordingly
-- Selection state feeds into the active command form (e.g. pick node for FIX)
-
----
-
-## 3D Viewport — Results Mode
-
-Activated after recorder output files are imported. Recorder files are plain text/CSV.
-Since the app owns all node/element ID assignment, mapping results back to geometry
-is unambiguous.
-
-Supported visualizations:
-
-- **Deformed shape** — node displacements applied as offsets, scale factor slider
-- **Element force diagram** — color map or diagram lines for axial/shear/moment
-- **Reaction glyphs** — at fixed nodes
-- **Time history plot** — 2D chart (separate panel) for dynamic recorder output,
-  scrubbing the time axis updates the 3D deformed shape
-
-Results state is separate from model state and never enters the command history:
-```ts
-interface AppState {
-  model: ModelState        // derived from history
-  config: ModelConfig      // ndm, ndf — static
-  results: ResultsState | null  // imported externally, null until loaded
-}
-```
-
----
-
-## History Panel
-
-Sidebar list of all commands in order. Each entry shows command type + summary of
-key params. SCRIPT_GROUP entries are collapsible. Recorder commands visually separated
-from model commands (e.g. section divider or distinct color).
-
-- Click entry → open form for parametric editing (except SCRIPT_GROUP → opens script editor)
-- Undo/redo moves cursor
-- Affected downstream commands highlighted after an upstream edit
-- Node move via viewport mutates ADD_NODE in place, highlighted in panel
-
----
-
-## Initial Scope (V1)
-
-Prioritize end-to-end pipeline first, exotic types later.
-
-**Model commands:** model, node, fix, load (nodal), timeSeries, pattern,
-geomTransf, element (Truss, ElasticBeamColumn)
-
-**Recorder commands:** Node recorder (disp, vel, accel, reaction),
-Element recorder (basic forces)
-
-**Results:** deformed shape + scale slider, basic time history plot
-
-**Scripting:** Web Worker sandbox, SCRIPT_GROUP history entry, re-editable source
-
-This covers a complete simple static or dynamic structural model and validates
-the full Command → State → Scene → Script → Import Results pipeline.
+`lib/exportScript.ts` renders the model and analysis history to an OpenSeesPy script
+(`File > Export .py`); renderers go through the same schemas as the forms. Tcl export and a tidier
+download flow are planned. Importing recorder output from an external OpenSees run is a possible
+future path, but the primary results path is Carapace.
 
 ---
 
 ## Key Constraints
 
-- No OpenSees runtime in the browser — pure preprocessor
-- ndm/ndf immutable after init (prompt user to start a new model to change)
-- All IDs (nodeTag, eleTag, matTag) managed by the app — no user-assigned tags
-- Script output must be valid openseespy — testable externally
-- Element palette filtered by ndm at the schema level
-- Scripting sandbox: Web Worker only, no eval on main thread, restricted API surface
-- Results state never enters command history — it is always derived from external files
+- Analysis is in-browser via Carapace; no OpenSees runtime, local agent, or server compute.
+- ndm/ndf immutable after init.
+- App-managed IDs for all entities.
+- Anything the Carapace compiler can't yet express must surface as a compile diagnostic, not silently degrade.
+- Exported scripts must remain valid OpenSeesPy.
+- Results never enter the model or analysis history; they are derived and discarded when either changes.
+- Scripting (`SCRIPTINGPLAN.md`) is deferred.
