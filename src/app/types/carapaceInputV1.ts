@@ -32,7 +32,8 @@ export interface LoadPatternTable { series: TimeSeriesSpec[]; scaleFactor: numbe
 export interface NodalLoadTable { pattern: number[]; node: number[]; dof: number[]; value: number[]; stage: number[] }
 
 export type ElementKind = 'truss' | 'elasticBeamColumn' | 'dispBeamColumn' | 'forceBeamColumn' | 'zeroLength' | 'zeroLengthSection'
-export type ElementLoadSpec = { kind: 'uniformTransverse'; w: number }
+/** Uniform load per length in the element's local axes: `wx` along the member, `wy` transverse. */
+export type ElementLoadSpec = { kind: 'uniform'; wx: number; wy: number }
 export interface ElementLoadTable { pattern: number[]; elementKind: ElementKind[]; elementIndex: number[]; load: ElementLoadSpec[]; stage: number[] }
 
 export type MaterialSpec =
@@ -73,13 +74,15 @@ export type StageSpec = {
   convergence?: ConvergenceSpec
   holdPatternsAfter: number[]
 }
-/** The recorder kinds `compileInputV1.ts` emits: `nodeDisp`, `reaction` and `elementForce` (the Rust
+/** The recorder kinds `compileInputV1.ts` emits: `nodeDisp`, `reaction`, `elementForce` and `elementLoad` (the Rust
  * `RecorderSpec` enum, internally tagged on `response`, also has `nodeVel`/`nodeAccel`/`modeShape`/
  * `fiber`, which the compiler doesn't produce yet). */
 export type RecorderSpecWire =
   | { response: 'nodeDisp'; node: number; dof: number }
   | { response: 'reaction'; node: number; dof: number }
   | { response: 'elementForce'; elementKind: ElementKind; elementIndex: number; component: number }
+  /** The uniform load the element carries at each sample (local axes; component 0 = wx, 1 = wy). */
+  | { response: 'elementLoad'; elementKind: ElementKind; elementIndex: number; component: number }
 export interface SequenceSpec { stages: StageSpec[]; recorders: RecorderSpecWire[] }
 
 // --- Spatial ("space: 3") counterparts -------------------------------------------------------
@@ -96,7 +99,7 @@ export interface ZeroLengthTable3 { nodeI: number[]; nodeJ: number[]; materials:
 export interface ZeroLengthSectionTable3 { nodeI: number[]; nodeJ: number[]; fiberSection: number[]; materials: [number, number, number][] }
 export interface FiberTable3 { sectionOffsets: number[]; y: number[]; z: number[]; area: number[]; material: number[] }
 export type ElementKind3 = 'truss' | 'elasticBeamColumn' | 'dispBeamColumn' | 'forceBeamColumn' | 'zeroLength' | 'zeroLengthSection'
-export type ElementLoadSpec3 = { kind: 'uniformTransverse'; wy: number; wz: number }
+export type ElementLoadSpec3 = { kind: 'uniform'; wx: number; wy: number; wz: number }
 export interface ElementLoadTable3 { pattern: number[]; elementKind: ElementKind3[]; elementIndex: number[]; load: ElementLoadSpec3[]; stage: number[] }
 export type Axis3Spec = 'x' | 'y' | 'z'
 export interface EqualDofTable3 { retained: number[]; constrained: number[]; dofs: [number, number][] }

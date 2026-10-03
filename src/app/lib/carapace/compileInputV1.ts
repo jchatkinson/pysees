@@ -30,6 +30,9 @@ export interface RecorderPlan {
 
 /** Local nodal force components of a planar element (`ElementOps::local_force`), in order. */
 const ELEMENT_FORCE_LABELS = ['Ni', 'Vi', 'Mi', 'Nj', 'Vj', 'Mj']
+/** Appended to a loaded element's force columns: the uniform load it carries at each sample (local axes), so a
+ * consumer can recover internal forces between the ends. Absent for unloaded elements. */
+export const ELEMENT_LOAD_LABELS = ['wx', 'wy']
 
 /** Names a node's `ndf` DOF components from `[x, y, z, rx, ry, rz]`-ordered labels. Planar (ndm=2)
  * nodes with a rotation DOF skip the out-of-plane entries (x, y, rz); anything else unrecognised
@@ -217,10 +220,7 @@ export function compileInputV1(model: Model, analysisHistory: AnalysisHistory): 
     const pattern = model.patterns.get(id)!
     const pIdx = patternIndex.get(id)!
     for (const child of pattern.children) {
-      if (child.kind !== 'load') {
-        if (child.kind === 'eleLoad') diagnostics.push({ severity: 'warning', message: `Element loads (pattern ${id}) are not yet supported by the Carapace compiler and were skipped`, commandIndex: -1 })
-        continue
-      }
+      if (child.kind !== 'load') continue
       const a = child.args as { nodeTag: number; values: number[] }
       const nIdx = resolveNode(a.nodeTag, `Load in pattern ${id}`)
       a.values.forEach((v, dof) => {
@@ -234,8 +234,52 @@ export function compileInputV1(model: Model, analysisHistory: AnalysisHistory): 
       })
     }
   }
-  if (nodalLoads.node.length && sequence.stages.length === 0) {
-    diagnostics.push({ severity: 'error', message: 'Model has nodal loads but the analysis sequence has no stages', commandIndex: -1 })
+
+  // Element loads (`eleLoad`): uniform, local-axis (wx axial, wy/wz transverse) — matches the wire spec. Only
+  // the beam-column kinds take them in Carapace today, so other element kinds are skipped with a warning. An element
+  // load has no node/DOF to infer a stage from, so it registers with its pattern's claiming stage, else the stage its
+  // pattern's nodal loads resolve to, else 0 (everything in one pattern ramps together).
+  const elementLoads: W.ElementLoadTable = { pattern: [], elementKind: [], elementIndex: [], load: [], stage: [] }
+  const loadedElementTags = new Set<number>()
+  for (const id of patternIds) {
+    const pattern = model.patterns.get(id)!
+    const pIdx = patternIndex.get(id)!
+    const nodalStage = pattern.children.flatMap((child) => {
+      if (child.kind !== 'load') return []
+      const a = child.args as { nodeTag: number; values: number[] }
+      return a.values.flatMap((v, dof) => (v && dof <= 2 && dcStageByNodeDof.has(`${a.nodeTag}:${dof}`) ? [dcStageByNodeDof.get(`${a.nodeTag}:${dof}`)!] : []))
+    })[0]
+    const stage = claimedStage.get(id) ?? nodalStage ?? 0
+    for (const child of pattern.children) {
+      if (child.kind !== 'eleLoad') continue
+      const a = child.args as { eleTags?: number[]; wx?: number; wy?: number; wz?: number }
+      const [wx, wy, wz] = [Number(a.wx) || 0, Number(a.wy) || 0, Number(a.wz) || 0]
+      if (wz) diagnostics.push({ severity: 'warning', message: `Element load in pattern ${id} sets wz, which has no meaning in a planar model and was ignored`, commandIndex: -1 })
+      if (!wx && !wy) continue
+      for (const tag of a.eleTags ?? []) {
+        const ref = elementRefs.get(tag)
+        if (!ref) {
+          const ele = model.elements.get(tag)
+          diagnostics.push(ele
+            ? { severity: 'warning', message: `Element loads on ${ele.eleType} ${tag} (pattern ${id}) are not yet supported by the Carapace compiler and were skipped`, commandIndex: -1 }
+            : { severity: 'error', message: `Element load in pattern ${id} references unknown element ${tag}`, commandIndex: -1 })
+          continue
+        }
+        if (ref.kind !== 'elasticBeamColumn' && ref.kind !== 'dispBeamColumn' && ref.kind !== 'forceBeamColumn') {
+          diagnostics.push({ severity: 'warning', message: `Element loads on ${model.elements.get(tag)?.eleType ?? ref.kind} ${tag} (pattern ${id}) are not yet supported by the Carapace compiler and were skipped`, commandIndex: -1 })
+          continue
+        }
+        elementLoads.pattern.push(pIdx)
+        elementLoads.elementKind.push(ref.kind)
+        elementLoads.elementIndex.push(ref.index)
+        elementLoads.load.push({ kind: 'uniform', wx, wy })
+        elementLoads.stage.push(stage)
+        loadedElementTags.add(tag)
+      }
+    }
+  }
+  if ((nodalLoads.node.length || elementLoads.pattern.length) && sequence.stages.length === 0) {
+    diagnostics.push({ severity: 'error', message: 'Model has loads but the analysis sequence has no stages', commandIndex: -1 })
   }
 
   // --- sequence ---
@@ -291,9 +335,16 @@ export function compileInputV1(model: Model, analysisHistory: AnalysisHistory): 
     const ref = elementRefs.get(tag)
     // An element the compiler skipped already produced its own "not yet supported" warning.
     if (!ref) continue
-    plan('force', tag, ELEMENT_FORCE_LABELS)
+    // A loaded element also records the load it carries, in the same column group, right after its end forces.
+    const loaded = loadedElementTags.has(tag)
+    plan('force', tag, loaded ? [...ELEMENT_FORCE_LABELS, ...ELEMENT_LOAD_LABELS] : ELEMENT_FORCE_LABELS)
     for (let component = 0; component < ELEMENT_FORCE_LABELS.length; component++) {
       recorders.push({ response: 'elementForce', elementKind: ref.kind, elementIndex: ref.index, component })
+    }
+    if (loaded) {
+      for (let component = 0; component < ELEMENT_LOAD_LABELS.length; component++) {
+        recorders.push({ response: 'elementLoad', elementKind: ref.kind, elementIndex: ref.index, component })
+      }
     }
   }
 
@@ -314,7 +365,7 @@ export function compileInputV1(model: Model, analysisHistory: AnalysisHistory): 
     rigidDiaphragms: { retained: [], constrained: [] },
     loadPatterns,
     nodalLoads,
-    elementLoads: { pattern: [], elementKind: [], elementIndex: [], load: [], stage: [] },
+    elementLoads,
     sequence: { stages, recorders },
 
     // Planar-only compiler — every spatial (`*3`) table is required by `CarapaceInputV1` but

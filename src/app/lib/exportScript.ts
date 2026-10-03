@@ -2,13 +2,26 @@ import type { Model } from '@/app/types/model'
 import type { AnalysisHistory } from '@/app/types/analysisCommands'
 import type { SchemaContext } from '@/app/types/schema'
 import { fnForModelEntity, renderOpsCall } from '@/app/lib/commandSchemas'
-import { resolveAnalysisCommand } from '@/app/lib/analysisBlocks'
+import { blockPatternTags, resolveAnalysisCommand } from '@/app/lib/analysisBlocks'
+import type { PatternEntity } from '@/app/types/model'
 
 function pyList(nums: number[]): string {
   return `[${nums.join(', ')}]`
 }
 
-function renderModel(model: Model): string[] {
+/** Pattern tag -> index of the first analysis command whose stage claims it (its `patterns` param). A claimed pattern is
+ * declared just before that stage instead of up front, because OpenSees ramps every pattern that exists when a stage
+ * runs: the push pattern must not exist yet while gravity ramps (and `loadConst` must already have frozen gravity). */
+function claimingCommand(analysisHistory: AnalysisHistory): Map<number, number> {
+  const claimed = new Map<number, number>()
+  analysisHistory.commands.forEach((cmd, i) => {
+    if (cmd.type !== 'ANALYSIS_BLOCK') return
+    for (const tag of blockPatternTags(cmd.params)) if (!claimed.has(tag)) claimed.set(tag, i)
+  })
+  return claimed
+}
+
+function renderModel(model: Model, deferredPatterns: ReadonlySet<number>): string[] {
   const lines: string[] = []
   const ctx: SchemaContext = { ndm: model.config?.ndm ?? 3, ndf: model.config?.ndf ?? 6 }
   lines.push(`ops.model('basic', '-ndm', ${ctx.ndm}, '-ndf', ${ctx.ndf})`)
@@ -67,19 +80,28 @@ function renderModel(model: Model): string[] {
     lines.push(`ops.${renderOpsCall('timeSeries', ts.args, ctx)}`)
   }
   for (const pattern of [...model.patterns.values()].sort((a, b) => a.id - b.id)) {
-    if (pattern.name) lines.push(`# ${pattern.name.replace(/[\r\n]+/g, ' ')}`)
-    lines.push(`ops.${renderOpsCall('pattern', pattern.args, ctx)}`)
-    for (const child of pattern.children) {
-      if (child.kind === 'load') {
-        const a = child.args as { nodeTag: number; values: number[] }
-        lines.push(`ops.load(${a.nodeTag}, ${a.values.join(', ')})`)
-      } else if (child.kind === 'sp') {
-        const a = child.args as { nodeTag: number; dof: number; value: number }
-        lines.push(`ops.sp(${a.nodeTag}, ${a.dof}, ${a.value})`)
-      } else if (child.kind === 'eleLoad') {
-        const a = child.args as { eleTags: number[]; wy: number; wz: number }
-        lines.push(`ops.eleLoad('-ele', ${pyList(a.eleTags)}, '-type', '-beamUniform', ${a.wy}, ${a.wz})`)
-      }
+    if (!deferredPatterns.has(pattern.id)) lines.push(...renderPattern(pattern, ctx))
+  }
+  return lines
+}
+
+function renderPattern(pattern: PatternEntity, ctx: SchemaContext): string[] {
+  const lines: string[] = []
+  if (pattern.name) lines.push(`# ${pattern.name.replace(/[\r\n]+/g, ' ')}`)
+  lines.push(`ops.${renderOpsCall('pattern', pattern.args, ctx)}`)
+  for (const child of pattern.children) {
+    if (child.kind === 'load') {
+      const a = child.args as { nodeTag: number; values: number[] }
+      lines.push(`ops.load(${a.nodeTag}, ${a.values.join(', ')})`)
+    } else if (child.kind === 'sp') {
+      const a = child.args as { nodeTag: number; dof: number; value: number }
+      lines.push(`ops.sp(${a.nodeTag}, ${a.dof}, ${a.value})`)
+    } else if (child.kind === 'eleLoad') {
+      const a = child.args as { eleTags: number[]; wx?: number; wy?: number; wz?: number }
+      const [wx, wy, wz] = [a.wx ?? 0, a.wy ?? 0, a.wz ?? 0]
+      // OpenSees `-beamUniform` takes local-axis components positionally: 2D is `Wy Wx`, 3D is `Wy Wz Wx`.
+      const comps = ctx.ndm === 2 ? [wy, wx] : [wy, wz, wx]
+      lines.push(`ops.eleLoad('-ele', ${pyList(a.eleTags)}, '-type', '-beamUniform', ${comps.join(', ')})`)
     }
   }
   return lines
@@ -87,12 +109,18 @@ function renderModel(model: Model): string[] {
 
 function renderAnalysis(analysisHistory: AnalysisHistory, model: Model, ctx: SchemaContext): string[] {
   const lines: string[] = []
-  for (const cmd of analysisHistory.commands) {
+  const claimed = claimingCommand(analysisHistory)
+  analysisHistory.commands.forEach((cmd, i) => {
+    // Declare the patterns this stage claims first, so the stage's own commands (e.g. DisplacementControl) can see them.
+    for (const [tag, at] of claimed) {
+      const pattern = model.patterns.get(tag)
+      if (at === i && pattern) lines.push(...renderPattern(pattern, ctx))
+    }
     for (const resolved of resolveAnalysisCommand(cmd, model)) {
       if (resolved.type !== 'ANALYSIS_OPS') continue
       lines.push(`ops.${renderOpsCall(resolved.fn, resolved.values, ctx)}`)
     }
-  }
+  })
   return lines
 }
 
@@ -103,7 +131,7 @@ export function exportScript(model: Model, analysisHistory: AnalysisHistory): st
     'import openseespy.opensees as ops',
     '',
     'ops.wipe()',
-    ...renderModel(model),
+    ...renderModel(model, new Set(claimingCommand(analysisHistory).keys())),
     '',
     ...renderAnalysis(analysisHistory, model, ctx),
     '',

@@ -90,6 +90,7 @@ export function TopBar() {
           <DropdownMenuCheckboxItem checked={viewSettings.showSupports} onCheckedChange={(v) => setViewSetting('showSupports', checked(v))}>Supports</DropdownMenuCheckboxItem>
           <DropdownMenuCheckboxItem checked={viewSettings.showNodalLoads} onCheckedChange={(v) => setViewSetting('showNodalLoads', checked(v))}>Nodal Loads</DropdownMenuCheckboxItem>
           <DropdownMenuCheckboxItem checked={viewSettings.showElementLoads} onCheckedChange={(v) => setViewSetting('showElementLoads', checked(v))}>Element Loads</DropdownMenuCheckboxItem>
+          <DropdownMenuCheckboxItem checked={viewSettings.showLoadValues} onCheckedChange={(v) => setViewSetting('showLoadValues', checked(v))}>Load Values</DropdownMenuCheckboxItem>
           {model.patterns.size > 0 && (
             <DropdownMenuSub>
               <DropdownMenuSubTrigger>Load Patterns</DropdownMenuSubTrigger>

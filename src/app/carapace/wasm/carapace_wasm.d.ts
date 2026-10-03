@@ -423,7 +423,7 @@ export type TransformSpec3 = { kind: "linear3"; vecXz: [number, number, number] 
  * type that's different per profile, so this stays its own enum rather
  * than a generic parameter.
  */
-export type RecorderSpec3 = { response: "nodeDisp"; node: number; dof: number } | { response: "nodeVel"; node: number; dof: number } | { response: "nodeAccel"; node: number; dof: number } | { response: "elementForce"; elementKind: ElementKind3; elementIndex: number; component: number } | { response: "modeShape"; mode: number; node: number; dof: number } | { response: "reaction"; node: number; dof: number } | { response: "fiber"; elementKind: ElementKind3; elementIndex: number; point: number; fiber: number; quantity: FiberResponseKind };
+export type RecorderSpec3 = { response: "nodeDisp"; node: number; dof: number } | { response: "nodeVel"; node: number; dof: number } | { response: "nodeAccel"; node: number; dof: number } | { response: "elementForce"; elementKind: ElementKind3; elementIndex: number; component: number } | { response: "elementLoad"; elementKind: ElementKind3; elementIndex: number; component: number } | { response: "modeShape"; mode: number; node: number; dof: number } | { response: "reaction"; node: number; dof: number } | { response: "fiber"; elementKind: ElementKind3; elementIndex: number; point: number; fiber: number; quantity: FiberResponseKind };
 
 /**
  * `SequenceSpec`'s spatial counterpart. `stages: Vec<StageSpec>` is reused
@@ -701,9 +701,9 @@ export type ElementKind = "truss" | "elasticBeamColumn" | "dispBeamColumn" | "fo
 
 export type ElementKind3 = "truss" | "elasticBeamColumn" | "dispBeamColumn" | "forceBeamColumn" | "zeroLength" | "zeroLengthSection";
 
-export type ElementLoadSpec = { kind: "uniformTransverse"; w: number };
+export type ElementLoadSpec = { kind: "uniform"; wx: number; wy: number };
 
-export type ElementLoadSpec3 = { kind: "uniformTransverse"; wy: number; wz: number };
+export type ElementLoadSpec3 = { kind: "uniform"; wx: number; wy: number; wz: number };
 
 export type IntegrationSpec = { kind: "legendre"; points: number } | { kind: "lobatto"; points: number };
 
@@ -713,7 +713,7 @@ export type LegacyAlgorithmSpec = "linear" | "newtonRaphson";
 
 export type LineSearchSpec = { kind: "bisection"; tol: number; maxIter: number; maxEta: number } | { kind: "regulaFalsi"; tol: number; maxIter: number; maxEta: number };
 
-export type RecorderSpec = { response: "nodeDisp"; node: number; dof: number } | { response: "nodeVel"; node: number; dof: number } | { response: "nodeAccel"; node: number; dof: number } | { response: "elementForce"; elementKind: ElementKind; elementIndex: number; component: number } | { response: "modeShape"; mode: number; node: number; dof: number } | { response: "reaction"; node: number; dof: number } | { response: "fiber"; elementKind: ElementKind; elementIndex: number; point: number; fiber: number; quantity: FiberResponseKind };
+export type RecorderSpec = { response: "nodeDisp"; node: number; dof: number } | { response: "nodeVel"; node: number; dof: number } | { response: "nodeAccel"; node: number; dof: number } | { response: "elementForce"; elementKind: ElementKind; elementIndex: number; component: number } | { response: "elementLoad"; elementKind: ElementKind; elementIndex: number; component: number } | { response: "modeShape"; mode: number; node: number; dof: number } | { response: "reaction"; node: number; dof: number } | { response: "fiber"; elementKind: ElementKind; elementIndex: number; point: number; fiber: number; quantity: FiberResponseKind };
 
 export type StageSpec = { kind: "static"; id: string; steps: number; integrator: IntegratorSpec; algorithm: AlgorithmSpec; convergence?: ConvergenceSpec; holdPatternsAfter: number[] } | { kind: "modal"; id: string; modes: number } | { kind: "transient"; id: string; steps: number; dt: number; damping: DampingSpec; groundMotions: GroundMotionSpec[]; algorithm?: AlgorithmSpec; convergence?: ConvergenceSpec };
 

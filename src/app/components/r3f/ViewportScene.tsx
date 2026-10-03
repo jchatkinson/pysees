@@ -41,6 +41,8 @@ export const ViewportScene = forwardRef<ViewportSceneRef, object>(function Viewp
   const viewportAction = useAppStore((s) => s.viewportAction)
   const viewSettings = useAppStore((s) => s.viewSettings)
   const nodePickMode = useAppStore((s) => s.nodePickMode)
+  // Results are drawn on the structure, so applied loads would just clutter them (same condition ResultsDriver draws under).
+  const showingResults = useAppStore((s) => s.resultsView.type !== 'none' && s.resultsView.runId !== null)
   const setSelectedNodeIds = useAppStore((s) => s.setSelectedNodeIds)
 
   const controlsRef = useRef<OrbitControlsImpl | null>(null)
@@ -151,7 +153,7 @@ export const ViewportScene = forwardRef<ViewportSceneRef, object>(function Viewp
       {viewSettings.showSupports && (
         <SupportsLayer fixes={fixes} nodeMap={model.nodes} />
       )}
-      <LoadsLayer
+      {!showingResults && <LoadsLayer
         patterns={[...model.patterns.values()]}
         nodeMap={model.nodes}
         elementMap={model.elements}
@@ -159,7 +161,8 @@ export const ViewportScene = forwardRef<ViewportSceneRef, object>(function Viewp
         hiddenPatterns={hiddenLoadPatterns}
         showNodal={viewSettings.showNodalLoads}
         showElement={viewSettings.showElementLoads}
-      />
+        showValues={viewSettings.showLoadValues}
+      />}
       <OrbitControls
         ref={controlsRef}
         makeDefault

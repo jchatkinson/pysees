@@ -230,11 +230,12 @@ const PATTERN_CHILD_SCHEMAS: CommandSchema[] = [
     label: 'Element Load (uniform)',
     domain: 'model',
     childOnly: 'pattern',
-    description: 'Apply a uniform transverse/axial load to elements under this pattern',
+    description: 'Apply a uniform load (force/length, in the element local axes) to elements under this pattern: wx axial, wy/wz transverse',
     args: [
       { kind: 'idlist', name: 'eleTags', label: 'Element Tag(s)' },
-      { kind: 'float', name: 'wy', label: 'wy', defaultValue: 0 },
-      { kind: 'float', name: 'wz', label: 'wz', defaultValue: 0 },
+      { kind: 'float', name: 'wx', label: 'wx (axial)', defaultValue: 0 },
+      { kind: 'float', name: 'wy', label: 'wy (local y)', defaultValue: 0 },
+      { kind: 'float', name: 'wz', label: 'wz (local z, 3D)', defaultValue: 0 },
     ],
     optional: [],
     create: (values) => ({
@@ -242,7 +243,7 @@ const PATTERN_CHILD_SCHEMAS: CommandSchema[] = [
       write: {
         kind: 'patternChild',
         patternId: Math.trunc(num(values.patternId)),
-        child: { kind: 'eleLoad', args: { eleTags: ints(values.eleTags), wy: num(values.wy), wz: num(values.wz) } },
+        child: { kind: 'eleLoad', args: { eleTags: ints(values.eleTags), wx: num(values.wx), wy: num(values.wy), wz: num(values.wz) } },
         childIndex: typeof values.childIndex === 'number' ? values.childIndex : undefined,
       },
     }),

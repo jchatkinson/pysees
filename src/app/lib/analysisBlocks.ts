@@ -62,7 +62,7 @@ const PATTERNS_FIELD: ArgDef = {
   description: 'Pattern tags this stage ramps. Leave empty to apply every pattern no other analysis stage claims.',
 }
 
-function patternTags(params: Record<string, unknown>): number[] {
+export function blockPatternTags(params: Record<string, unknown>): number[] {
   // `holdPatterns` is the pre-`patterns` spelling, kept so already-saved histories still resolve.
   const raw = Array.isArray(params.patterns) && params.patterns.length ? params.patterns : params.holdPatterns
   return Array.isArray(raw) ? raw.map(Number).filter((n) => Number.isFinite(n)) : []
@@ -136,7 +136,7 @@ const runGravityAnalysis: AnalysisBlockDef = {
       steps,
       integrator: { kind: 'load-control', increment: 1 / steps },
       ...convergenceStage(params),
-      patterns: patternTags(params),
+      patterns: blockPatternTags(params),
       holdLoads: params.holdLoads !== 'No',
     }
   },
@@ -175,7 +175,7 @@ const runPushoverAnalysis: AnalysisBlockDef = {
       kind: 'static',
       id: 'pushover',
       steps: Math.max(1, Math.trunc(Number(params.steps) || 100)),
-      patterns: patternTags(params),
+      patterns: blockPatternTags(params),
       integrator: {
         kind: 'displacement-control',
         nodeTag: Math.trunc(Number(params.nodeTag) || 0),

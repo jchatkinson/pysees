@@ -117,6 +117,7 @@ interface AppStore {
     showSupports: boolean
     showNodalLoads: boolean
     showElementLoads: boolean
+    showLoadValues: boolean
     showGrid: boolean
     showGridlines: boolean
     showLevels: boolean
@@ -340,6 +341,7 @@ export const useAppStore = create<AppStore>((set, get) => {
     showSupports: true,
     showNodalLoads: true,
     showElementLoads: true,
+    showLoadValues: false,
     showGrid: true,
     showGridlines: true,
     showLevels: true,

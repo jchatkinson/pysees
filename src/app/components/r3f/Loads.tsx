@@ -1,9 +1,10 @@
 import { useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
-import { Line } from '@react-three/drei'
+import { Billboard, Line, Text } from '@react-three/drei'
+import type { Group } from 'three'
 import { Vector3 } from 'three'
 import type { ElementEntity, NodeEntity, PatternEntity } from '@/app/types/model'
-import { patternColor, toVec3 } from './utils'
+import { formatLoadValue, patternColor, toVec3 } from './utils'
 import { ScreenSize } from './ScreenSize'
 import { worldUnitsPerPixel } from './screenScale'
 
@@ -12,7 +13,26 @@ const ARROW_LENGTH = 48
 const ARROW_HEAD_LENGTH = 8
 const ARROW_HEAD_WIDTH = 5
 
-function NodalLoadGlyph({ coords, values, color }: { coords: number[]; values: number[]; color: string }) {
+const LABEL_FONT_PX = 11
+
+/** Screen-sized, camera-facing text. Pixel-sized like ScreenSize, but the owner can reposition it each frame via the returned group ref. */
+function LoadLabel({ text, color, groupRef }: { text: string; color: string; groupRef: React.RefObject<Group | null> }) {
+  return (
+    <group ref={groupRef}>
+      <Billboard>
+        <Text fontSize={LABEL_FONT_PX} color={color} outlineWidth={1} outlineColor="#ffffff" anchorX="center" anchorY="middle">{text}</Text>
+      </Billboard>
+    </group>
+  )
+}
+
+/** DOF labels by position: 2D is X, Y, rotation about Z; 3D adds Z and the X/Y rotations. Anything past that falls back to a number. */
+function dofName(i: number, ndm: number): string {
+  const names = ndm === 2 ? ['Fx', 'Fy', 'Mz'] : ['Fx', 'Fy', 'Fz', 'Mx', 'My', 'Mz']
+  return names[i] ?? `F${i + 1}`
+}
+
+function NodalLoadGlyph({ coords, values, color, showValues, ndm }: { coords: number[]; values: number[]; color: string; showValues: boolean; ndm: number }) {
   const origin = new Vector3()
   const dir = new Vector3(values[0] ?? 0, values[1] ?? 0, values[2] ?? 0)
   if (dir.length() < 1e-9) return null
@@ -37,6 +57,13 @@ function NodalLoadGlyph({ coords, values, color }: { coords: number[]; values: n
         color={color}
         lineWidth={2}
       />
+      {showValues && (
+        <Billboard position={tip.toArray() as [number, number, number]}>
+          <Text fontSize={LABEL_FONT_PX} color={color} outlineWidth={1} outlineColor="#ffffff" anchorX="center" anchorY="bottom" position={[0, 4, 0]}>
+            {values.map((v, i) => (v ? `${dofName(i, ndm)}: ${formatLoadValue(v)}` : null)).filter(Boolean).join('  ')}
+          </Text>
+        </Billboard>
+      )}
     </ScreenSize>
   )
 }
@@ -44,13 +71,13 @@ function NodalLoadGlyph({ coords, values, color }: { coords: number[]; values: n
 const ARROWS_PER_ELEMENT = 5
 
 /** Global-axis direction of a beam-uniform load: local y/z axes follow the usual OpenSees defaults (2D: y is x rotated 90° CCW in the XY plane; 3D: y is global Y projected normal to the member, z = x × y). */
-function elementLoadVector(a: Vector3, b: Vector3, ndm: number, wy: number, wz: number): Vector3 {
+function elementLoadVector(a: Vector3, b: Vector3, ndm: number, wx: number, wy: number, wz: number): Vector3 {
   const x = b.clone().sub(a).normalize()
-  if (ndm === 2) return new Vector3(-x.y, x.x, 0).multiplyScalar(wy)
+  if (ndm === 2) return new Vector3(-x.y, x.x, 0).multiplyScalar(wy).add(x.clone().multiplyScalar(wx))
   const up = Math.abs(x.y) > 0.999 ? new Vector3(1, 0, 0) : new Vector3(0, 1, 0)
   const y = up.sub(x.clone().multiplyScalar(up.dot(x))).normalize()
   const z = new Vector3().crossVectors(x, y)
-  return y.multiplyScalar(wy).add(z.multiplyScalar(wz))
+  return y.multiplyScalar(wy).add(z.multiplyScalar(wz)).add(x.multiplyScalar(wx))
 }
 
 // Element-load glyph sizes are relative: the largest visible load's arrows are MAX_LEN_PX long, others scale linearly with |w|
@@ -66,8 +93,9 @@ const MAX_STACK_FRACTION = 0.4
  * Row of arrows along a member inside a rectangle: tips sit on a line parallel to the member, `offsetRatio` (in units of the
  * max arrow length) away from it against the load direction so stacked patterns don't overlap; tails sit on the opposite side.
  */
-function ElementLoadGlyph({ a, b, w, ratio, offsetRatio, refPoint, maxUnit, color }: { a: Vector3; b: Vector3; w: Vector3; ratio: number; offsetRatio: number; refPoint: Vector3; maxUnit: number; color: string }) {
+function ElementLoadGlyph({ a, b, w, ratio, offsetRatio, refPoint, maxUnit, color, label }: { a: Vector3; b: Vector3; w: Vector3; ratio: number; offsetRatio: number; refPoint: Vector3; maxUnit: number; color: string; label?: string }) {
   const ref = useRef<{ geometry: { setPositions: (p: number[]) => void } } | null>(null)
+  const labelRef = useRef<Group>(null)
   const dir = useMemo(() => w.clone().normalize(), [w])
   const spread = useMemo(() => {
     // Head wings spread along the member (or in-plane perpendicular when the load is axial).
@@ -98,9 +126,20 @@ function ElementLoadGlyph({ a, b, w, ratio, offsetRatio, refPoint, maxUnit, colo
       seg(tip, tip.clone().add(headBack).sub(wing))
     }
     line.geometry.setPositions(out)
+    // Value label: centred on the box's tail edge, nudged outward, kept a constant pixel size.
+    const lbl = labelRef.current
+    if (lbl) {
+      lbl.position.copy(p0).lerp(p1, 0.5).add(tail).add(dir.clone().multiplyScalar(-worldUnitsPerPixel(camera, refPoint, size.height) * (LABEL_FONT_PX * 0.9)))
+      lbl.scale.setScalar(worldUnitsPerPixel(camera, lbl.position, size.height))
+    }
   })
 
-  return <Line ref={ref as never} segments points={Array.from({ length: (4 + ARROWS_PER_ELEMENT * 3) * 2 }, () => [0, 0, 0] as [number, number, number])} color={color} lineWidth={1.5} frustumCulled={false} />
+  return (
+    <>
+      <Line ref={ref as never} segments points={Array.from({ length: (4 + ARROWS_PER_ELEMENT * 3) * 2 }, () => [0, 0, 0] as [number, number, number])} color={color} lineWidth={1.5} frustumCulled={false} />
+      {label && <LoadLabel text={label} color={color} groupRef={labelRef} />}
+    </>
+  )
 }
 
 /** Renders nodal `load` and uniform `eleLoad` assignments from the patterns not hidden (Model entities, not a command history position). */
@@ -112,6 +151,7 @@ export function LoadsLayer({
   hiddenPatterns,
   showNodal,
   showElement,
+  showValues,
 }: {
   patterns: PatternEntity[]
   nodeMap: Map<number, NodeEntity>
@@ -120,13 +160,14 @@ export function LoadsLayer({
   hiddenPatterns: number[]
   showNodal: boolean
   showElement: boolean
+  showValues: boolean
 }) {
   const ids = patterns.map((p) => p.id).sort((x, y) => x - y)
   const visible = patterns.filter((p) => !hiddenPatterns.includes(p.id))
 
   const elementLoads = showElement ? visible.flatMap((p) => p.children.flatMap((c) => {
     if (c.kind !== 'eleLoad') return []
-    const { eleTags, wy, wz } = c.args as { eleTags: number[]; wy: number; wz: number }
+    const { eleTags, wx, wy, wz } = c.args as { eleTags: number[]; wx?: number; wy: number; wz: number }
     return (eleTags ?? []).flatMap((tag) => {
       const ele = elementMap.get(tag)
       const n1 = ele && nodeMap.get(ele.nodes[0])
@@ -134,9 +175,9 @@ export function LoadsLayer({
       if (!n1 || !n2) return []
       const a = new Vector3(...toVec3(n1.coords)), b = new Vector3(...toVec3(n2.coords))
       if (a.distanceToSquared(b) < 1e-18) return []
-      const w = elementLoadVector(a, b, ndm, Number(wy) || 0, Number(wz) || 0)
+      const w = elementLoadVector(a, b, ndm, Number(wx) || 0, Number(wy) || 0, Number(wz) || 0)
       if (w.length() < 1e-12) return []
-      return [{ pid: p.id, key: `${p.id}-${tag}-${wy}-${wz}`, a, b, w, color: patternColor(ids, p.id) }]
+      return [{ pid: p.id, key: `${p.id}-${tag}-${wx}-${wy}-${wz}`, a, b, w, label: [['wx', wx], ['wy', wy], ['wz', wz]].filter(([, v]) => Number(v)).map(([n, v]) => `${n}: ${formatLoadValue(Number(v))}`).join('  '), color: patternColor(ids, p.id) }]
     })
   })) : []
   const maxW = elementLoads.reduce((m, l) => Math.max(m, l.w.length()), 0)
@@ -168,9 +209,9 @@ export function LoadsLayer({
         const args = c.args as { nodeTag: number; values: number[] }
         const node = nodeMap.get(args.nodeTag)
         if (!node) return null
-        return <NodalLoadGlyph key={`load-${p.id}-${idx}`} coords={node.coords} values={args.values} color={patternColor(ids, p.id)} />
+        return <NodalLoadGlyph key={`load-${p.id}-${idx}`} coords={node.coords} values={args.values} color={patternColor(ids, p.id)} showValues={showValues} ndm={ndm} />
       })}
-      {elementLoads.map((l, i) => <ElementLoadGlyph key={`${l.key}-${i}`} a={l.a} b={l.b} w={l.w} ratio={ratioFor(l)} offsetRatio={offsetByPattern.get(l.pid) ?? 0} refPoint={refPoint} maxUnit={maxUnit} color={l.color} />)}
+      {elementLoads.map((l, i) => <ElementLoadGlyph key={`${l.key}-${i}`} a={l.a} b={l.b} w={l.w} ratio={ratioFor(l)} offsetRatio={offsetByPattern.get(l.pid) ?? 0} refPoint={refPoint} maxUnit={maxUnit} color={l.color} label={showValues ? l.label : undefined} />)}
     </>
   )
 }

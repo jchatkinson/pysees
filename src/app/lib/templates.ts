@@ -246,9 +246,12 @@ export function frameTemplate({ stories, storyH, bays, bayW, eleType, base }: Fr
 
   // Three Plain patterns sharing one Linear series: dead + live as uniform beam loads (kN/m from an
   // area load over a tributary width, applied as -wy in the beams' local y, i.e. downward), and an
-  // inverted-triangle lateral push on every floor node. Gravity stage ramps dead + live and holds them; the
-  // push stage then follows. The RC frame is pushed to 3% roof drift so the response shows
-  // yielding; the elastic one just takes the load.
+  // inverted-triangle lateral push on every floor node. Three stages, in order:
+  //   1. gravity: ramp dead + live (patterns 1, 2) under load control;
+  //   2. hold: freeze them at full value (`holdLoads`: loadConst in the script, held patterns in Carapace);
+  //   3. pushover: drive the roof node in +X under displacement control against the push pattern (3), which
+  //      only starts to exist here — in the exported script it is declared after the hold.
+  // The fiber frame is pushed to 3% roof drift so the response shows yielding; the elastic one to 1%.
   const beamTags = Array.from({ length: bays * stories }, (_, k) => (bays + 1) * stories + k + 1)
   const roofNode = nodeId(bays, stories)
   // Inverted-triangle push: every node on story level j takes j kN in +X (1 kN at the first floor up to `stories` kN at the roof).
@@ -256,20 +259,18 @@ export function frameTemplate({ stories, storyH, bays, bayW, eleType, base }: Fr
   for (let j = 1; j <= stories; j++) for (let i = 0; i <= bays; i++) pushLoads.push({ kind: 'load', args: { nodeTag: nodeId(i, j), values: [1e3 * j, 0, 0] } })
   const pattern = (id: number, name: string, children: LoadAssignment[]): ModelWrite =>
     ({ kind: 'pattern', entity: { id, name, patternType: 'Plain', args: { type: 'Plain', patternTag: id, tsTag: 1, fact: 1 }, children } })
-  const areaLoad = (psf: number): LoadAssignment[] => [{ kind: 'eleLoad', args: { eleTags: beamTags, wy: -psf * PSF_TO_PA * TRIBUTARY_WIDTH, wz: 0 } }]
+  const areaLoad = (psf: number): LoadAssignment[] => [{ kind: 'eleLoad', args: { eleTags: beamTags, wx: 0, wy: -psf * PSF_TO_PA * TRIBUTARY_WIDTH, wz: 0 } }]
   const loadWrites: ModelWrite[] = [
     { kind: 'timeSeries', entity: { id: 1, tsType: 'Linear', args: { type: 'Linear', tag: 1, factor: 1 } } },
     pattern(1, 'Dead Load', areaLoad(DEAD_PSF)),
     pattern(2, 'Live Load', areaLoad(LIVE_PSF)),
     pattern(3, 'Push', pushLoads),
   ]
-  const pushStage: AnalysisCommand = eleType === 'dispBeamColumn'
-    ? { type: 'ANALYSIS_BLOCK', blockId: 'run-pushover-analysis', params: { patterns: [3], nodeTag: roofNode, dof: 1, increment: 0.03 * stories * storyH / PUSHOVER_STEPS, steps: PUSHOVER_STEPS } }
-    : { type: 'ANALYSIS_BLOCK', blockId: 'run-gravity-analysis', params: { patterns: [3], steps: 10 } }
+  const driftRatio = eleType === 'dispBeamColumn' ? 0.03 : 0.01
   const analysisCommands: AnalysisCommand[] = [
     { type: 'ANALYSIS_BLOCK', blockId: 'whole-model-recorder', params: { directory: 'out' } },
-    { type: 'ANALYSIS_BLOCK', blockId: 'run-gravity-analysis', params: { patterns: [1, 2], steps: 10 } },
-    pushStage,
+    { type: 'ANALYSIS_BLOCK', blockId: 'run-gravity-analysis', params: { patterns: [1, 2], steps: 10, holdLoads: 'Yes' } },
+    { type: 'ANALYSIS_BLOCK', blockId: 'run-pushover-analysis', params: { patterns: [3], nodeTag: roofNode, dof: 1, increment: driftRatio * stories * storyH / PUSHOVER_STEPS, steps: PUSHOVER_STEPS } },
   ]
 
   return { ndm: 2, ndf: 3, writes: [...writes, ...loadWrites], analysisCommands, gridlines, levels }
