@@ -173,7 +173,7 @@ export function PlotOverlay() {
       </div>
 
       {pv.showEditor && (
-        <div className="max-h-[40%] shrink-0 overflow-y-auto border-t p-2">
+        <div className="max-h-[50%] shrink-0 overflow-y-auto border-t p-2">
           <SeriesEditor targets={targets} statuses={statuses} />
         </div>
       )}

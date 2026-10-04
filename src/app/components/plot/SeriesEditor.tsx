@@ -9,6 +9,8 @@ import { seriesLabel, type AvailableTargets } from '@/app/lib/plot/channels'
 import { useAppStore } from '@/app/store/useAppStore'
 import type { SeriesSpec } from '@/app/types/plotView'
 
+const SectionTitle = ({ children }: { children: React.ReactNode }) => <div className="text-[11px] font-semibold">{children}</div>
+
 function SeriesRow({ series, targets, selectedNodeIds, sharedX, status }: {
   series: SeriesSpec
   targets: AvailableTargets
@@ -19,7 +21,7 @@ function SeriesRow({ series, targets, selectedNodeIds, sharedX, status }: {
   const update = useAppStore((s) => s.updatePlotSeries)
   const remove = useAppStore((s) => s.removePlotSeries)
   const sharedXChannel = useAppStore((s) => s.plotView.x)
-  const [open, setOpen] = useState(false)
+  const [open, setOpen] = useState(true)
   const label = seriesLabel(series.label, sharedX ? sharedXChannel : series.x, series.y)
 
   return (
@@ -37,9 +39,9 @@ function SeriesRow({ series, targets, selectedNodeIds, sharedX, status }: {
         <Button type="button" size="icon" variant="ghost" className="size-5" onClick={() => remove(series.id)}><Trash2 className="size-3" /></Button>
       </div>
       {open && (
-        <div className="mt-1 grid gap-1.5 pl-6">
-          <div><Label className="text-[10px] text-muted-foreground">Y</Label><ChannelPicker value={series.y} onChange={(y) => update(series.id, { y })} targets={targets} selectedNodeIds={selectedNodeIds} /></div>
-          {!sharedX && <div><Label className="text-[10px] text-muted-foreground">X</Label><ChannelPicker value={series.x} onChange={(x) => update(series.id, { x })} targets={targets} selectedNodeIds={selectedNodeIds} /></div>}
+        <div className="mt-1.5 grid gap-2.5 pl-6 pr-1 pb-1">
+          <div className="grid gap-1"><SectionTitle>Y axis (vertical)</SectionTitle><ChannelPicker value={series.y} onChange={(y) => update(series.id, { y })} targets={targets} selectedNodeIds={selectedNodeIds} /></div>
+          {!sharedX && <div className="grid gap-1"><SectionTitle>X axis (horizontal)</SectionTitle><ChannelPicker value={series.x} onChange={(x) => update(series.id, { x })} targets={targets} selectedNodeIds={selectedNodeIds} /></div>}
         </div>
       )}
     </div>
@@ -58,10 +60,10 @@ export function SeriesEditor({ targets, statuses }: { targets: AvailableTargets;
   return (
     <div className="grid gap-1.5 text-xs">
       <div className="flex items-center gap-2">
-        <Label className="flex items-center gap-1.5 text-[11px] font-normal"><Checkbox checked={sharedX} onCheckedChange={(c) => setPlotView({ sharedX: Boolean(c) })} /> Shared X axis</Label>
+        <Label className="flex items-center gap-1.5 text-[11px] font-normal"><Checkbox checked={sharedX} onCheckedChange={(c) => setPlotView({ sharedX: Boolean(c) })} /> Use the same X axis for all series</Label>
         <Button type="button" variant="outline" size="sm" className="ml-auto h-6 px-2 text-[11px]" disabled={!targets.disp.tags.length} onClick={() => addPlotSeries([{ y: { type: 'response', kind: 'disp', component: targets.disp.components[0] ?? 'dx', mode: 'single', tags: targets.disp.tags.slice(0, 1), scale: 1 } }])}>+ Series</Button>
       </div>
-      {sharedX && <div><Label className="text-[10px] text-muted-foreground">X axis</Label><ChannelPicker value={x} onChange={(c) => setPlotView({ x: c })} targets={targets} selectedNodeIds={selectedNodeIds} /></div>}
+      {sharedX && <div className="grid gap-1 rounded border p-1.5"><SectionTitle>X axis (horizontal, all series)</SectionTitle><ChannelPicker value={x} onChange={(c) => setPlotView({ x: c })} targets={targets} selectedNodeIds={selectedNodeIds} /></div>}
       {series.map((s) => <SeriesRow key={s.id} series={s} targets={targets} selectedNodeIds={selectedNodeIds} sharedX={sharedX} status={statuses.get(s.id) ?? 'loading'} />)}
       {!series.length && <p className="text-[11px] text-muted-foreground">No series yet — pick a preset from the menu above, or add one.</p>}
     </div>

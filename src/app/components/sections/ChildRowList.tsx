@@ -14,6 +14,11 @@ function NumCell({ value, onChange }: { value: number; onChange: (v: number) => 
   return <input type="number" className={CELL_INPUT_CLASS} value={value} onChange={(e) => onChange(Number(e.target.value))} />
 }
 
+/** Subdivision counts are positive integers (OpenSees rejects < 1). */
+function IntCell({ value, onChange }: { value: number; onChange: (v: number) => void }) {
+  return <input type="number" min={1} step={1} className={CELL_INPUT_CLASS} value={value} onChange={(e) => onChange(Math.max(1, Math.round(Number(e.target.value)) || 1))} />
+}
+
 /** Row-level editor for a section's fiber/patch children — bespoke typed inputs per kind (not the generic ArgDef/SchemaFormField system: these are model data, not openseespy-call forms). Editing or adding a row here breaks the draft's link to its parametric template (see useSectionDraft). */
 export function ChildRowList({ children, hoveredIndex, onHoverChild, onUpdateChild, onRemoveChild, onAddFiber }: {
   children: FiberSectionItem[]
@@ -57,12 +62,20 @@ export function ChildRowList({ children, hoveredIndex, onHoverChild, onUpdateChi
                       z1<NumCell value={num(a, 'z1')} onChange={(v) => onUpdateChild(i, { ...c, args: { ...a, z1: v } })} />
                       y2<NumCell value={num(a, 'y2')} onChange={(v) => onUpdateChild(i, { ...c, args: { ...a, y2: v } })} />
                       z2<NumCell value={num(a, 'z2')} onChange={(v) => onUpdateChild(i, { ...c, args: { ...a, z2: v } })} />
+                      <span className="ml-2 text-foreground/70">mesh</span>
+                      nY<IntCell value={num(a, 'numSubdivY') || 1} onChange={(v) => onUpdateChild(i, { ...c, args: { ...a, numSubdivY: v } })} />
+                      nZ<IntCell value={num(a, 'numSubdivZ') || 1} onChange={(v) => onUpdateChild(i, { ...c, args: { ...a, numSubdivZ: v } })} />
+                      <span className="ml-1">= {(num(a, 'numSubdivY') || 1) * (num(a, 'numSubdivZ') || 1)} fibers</span>
                     </div>
                   )}
                   {c.kind === 'patch' && c.subType === 'circ' && (
                     <div className="flex items-center gap-1 text-[10px] text-muted-foreground flex-wrap">
                       r&#8321;<NumCell value={num(a, 'intRad')} onChange={(v) => onUpdateChild(i, { ...c, args: { ...a, intRad: v } })} />
                       r&#8322;<NumCell value={num(a, 'extRad')} onChange={(v) => onUpdateChild(i, { ...c, args: { ...a, extRad: v } })} />
+                      <span className="ml-2 text-foreground/70">mesh</span>
+                      nCirc<IntCell value={num(a, 'numSubdivCirc') || 1} onChange={(v) => onUpdateChild(i, { ...c, args: { ...a, numSubdivCirc: v } })} />
+                      nRad<IntCell value={num(a, 'numSubdivRad') || 1} onChange={(v) => onUpdateChild(i, { ...c, args: { ...a, numSubdivRad: v } })} />
+                      <span className="ml-1">= {(num(a, 'numSubdivCirc') || 1) * (num(a, 'numSubdivRad') || 1)} fibers</span>
                     </div>
                   )}
                   {!(c.kind === 'fiber' || (c.kind === 'patch' && (c.subType === 'rect' || c.subType === 'circ'))) && (

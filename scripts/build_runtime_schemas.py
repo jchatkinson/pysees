@@ -192,6 +192,25 @@ def apply_uniaxial_arg_metadata(
   return out
 
 
+def expand_vec_args(args: list[dict[str, Any]], mat_type: str, curated_defaults: dict[str, Any]) -> list[dict[str, Any]]:
+  """Replaces a dynamic `*vec` arg with named scalar args (e.g. Steel02's `*params` -> r0, cr1, cr2).
+
+  Scalars flatten back to the same positional order on export, so no exporter change is needed.
+  """
+  expansions = curated_defaults.get("expandVecByMaterial", {}).get(mat_type, {})
+  out: list[dict[str, Any]] = []
+  for arg in args:
+    spec = expansions.get(arg.get("name")) if arg.get("kind") == "vec" else None
+    if not spec:
+      out.append(arg)
+      continue
+    for field in spec:
+      scalar = {"kind": "float", "name": field["name"], "description": field.get("description", ""), "required": True}
+      scalar = apply_uniaxial_arg_metadata(scalar, mat_type, {}, curated_defaults)
+      out.append(scalar)
+  return out
+
+
 def build_command_schema(fn: str, variants: list[dict[str, Any]], docs_meta: dict[str, Any], curated_defaults: dict[str, Any]) -> dict[str, Any]:
   parsed: list[dict[str, Any]] = []
   for v in variants:
@@ -233,6 +252,7 @@ def build_command_schema(fn: str, variants: list[dict[str, Any]], docs_meta: dic
       mapped_args = p["args"][1:]
       if fn == "uniaxialMaterial":
         mapped_args = [apply_uniaxial_arg_metadata(arg, lit, docs_meta, curated_defaults) for arg in mapped_args]
+        mapped_args = expand_vec_args(mapped_args, lit, curated_defaults)
       yields[lit].extend(mapped_args)
       yields[lit] = stable_unique_args(yields[lit])
     schema["args"] = [{

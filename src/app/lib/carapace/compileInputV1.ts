@@ -473,6 +473,7 @@ export function compileMaterial(mat: MaterialEntity, diagnostics: CompileDiagnos
     case 'ElasticPP': return { kind: 'elasticPp', e: Number(a.e) || 0, eyp: Number(a.epsyP) || 0 }
     case 'ENT': return { kind: 'ent', e: Number(a.e) || 0 }
     case 'Steel01': return { kind: 'steel01', fy: Number(a.fy) || 0, e0: Number(a.e0) || 0, b: Number(a.b) || 0, a1: Number(a.a1) || 0, a2: Number(a.a2) || 1, a3: Number(a.a3) || 0, a4: Number(a.a4) || 1 }
+    case 'Steel02': return { kind: 'steel02', fy: Number(a.fy) || 0, e0: Number(a.e0) || 0, b: Number(a.b) || 0, r0: Number(a.r0) || 15, cr1: Number(a.cr1) || 0.925, cr2: Number(a.cr2) || 0.15, a1: Number(a.a1) || 0, a2: Number(a.a2) || 1, a3: Number(a.a3) || 0, a4: Number(a.a4) || 1 }
     case 'Concrete01': return { kind: 'concrete01', fpc: Number(a.fpc) || 0, epsc0: Number(a.epsc0) || 0, fpcu: Number(a.fpcu) || 0, epscu: Number(a.epsU) || 0 }
     default:
       diagnostics.push({ severity: 'error', message: `Material ${mat.id} (${mat.matType}) is not yet supported by the Carapace compiler`, commandIndex: -1 })

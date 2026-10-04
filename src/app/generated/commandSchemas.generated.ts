@@ -16581,6 +16581,8 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
               required: true
             },
             {
+              defaultSource: "curated",
+              defaultValue: 0.0,
               description: "damping tangent (optional, default=0.0)",
               kind: "float",
               name: "eta",
@@ -16645,6 +16647,8 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
               required: true
             },
             {
+              defaultSource: "curated",
+              defaultValue: 0.0,
               description: "damping tangent (optional, default=0.0)",
               kind: "float",
               name: "eta",
@@ -17075,6 +17079,8 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
               required: true
             },
             {
+              defaultSource: "curated",
+              defaultValue: 0.0,
               description: "visco-plastic coefficient (optional, default=0.0)",
               kind: "float",
               name: "eta",
@@ -19358,10 +19364,27 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
               required: true
             },
             {
-              description: "parameters to control the transition from elastic to plastic branches.",
-              kind: "vec",
-              length: "dynamic",
-              name: "params",
+              defaultSource: "curated",
+              defaultValue: 15.0,
+              description: "initial curvature parameter R0 controlling the elastic-to-plastic transition (typically 10-20)",
+              kind: "float",
+              name: "r0",
+              required: true
+            },
+            {
+              defaultSource: "curated",
+              defaultValue: 0.925,
+              description: "curvature degradation parameter cR1 (typically 0.925)",
+              kind: "float",
+              name: "cr1",
+              required: true
+            },
+            {
+              defaultSource: "curated",
+              defaultValue: 0.15,
+              description: "curvature degradation parameter cR2 (typically 0.15)",
+              kind: "float",
+              name: "cr2",
               required: true
             },
             {
@@ -19371,18 +19394,24 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
               required: true
             },
             {
+              defaultSource: "curated",
+              defaultValue: 1.0,
               description: "isotropic hardening parameter (see explanation under ``a1``).",
               kind: "float",
               name: "a2",
               required: false
             },
             {
+              defaultSource: "curated",
+              defaultValue: 0.0,
               description: "isotropic hardening parameter, increase of tension yield envelope as proportion of yield strength after a plastic strain of :math:`a_4*(F_y/E_0)`.",
               kind: "float",
               name: "a3",
               required: false
             },
             {
+              defaultSource: "curated",
+              defaultValue: 1.0,
               description: "isotropic hardening parameter (see explanation under ``a3``).",
               kind: "float",
               name: "a4",

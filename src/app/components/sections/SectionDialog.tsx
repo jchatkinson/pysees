@@ -43,8 +43,8 @@ function SectionDialogBody({ editingId, onClose }: { editingId: number | null; o
       <DialogHeader>
         <DialogTitle>{existing ? `Edit Section #${existing.id}` : 'New Fiber Section'}</DialogTitle>
       </DialogHeader>
-      <div className="flex gap-4 items-start">
-        <div className="flex-1 min-w-80">
+      <div className="flex h-[min(640px,calc(100dvh-12rem))] min-h-[260px] gap-4 items-stretch">
+        <div className="flex-1 min-w-80 min-h-0 overflow-y-auto pr-1">
           <Tabs value={tab} onValueChange={(v) => setTab(v as 'template' | 'children')}>
             <TabsList>
               <TabsTrigger value="template">Template</TabsTrigger>

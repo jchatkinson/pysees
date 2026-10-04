@@ -19,8 +19,12 @@
     "lambda": 0.1
   },
   "optionalByMaterial": {
-    "Steel01": ["a1"],
-    "Steel01Thermal": ["a1"]
+    "Steel01": [
+      "a1"
+    ],
+    "Steel01Thermal": [
+      "a1"
+    ]
   },
   "byMaterial": {
     "Elastic": {
@@ -68,6 +72,36 @@
       "E": 200000.0,
       "Fy": 50.0,
       "gap": 0.0
+    },
+    "Steel02": {
+      "Fy": 50.0,
+      "E0": 200000.0,
+      "b": 0.01,
+      "r0": 15.0,
+      "cr1": 0.925,
+      "cr2": 0.15,
+      "a1": 0.0,
+      "a2": 1.0,
+      "a3": 0.0,
+      "a4": 1.0
+    }
+  },
+  "expandVecByMaterial": {
+    "Steel02": {
+      "params": [
+        {
+          "name": "r0",
+          "description": "initial curvature parameter R0 controlling the elastic-to-plastic transition (typically 10-20)"
+        },
+        {
+          "name": "cr1",
+          "description": "curvature degradation parameter cR1 (typically 0.925)"
+        },
+        {
+          "name": "cr2",
+          "description": "curvature degradation parameter cR2 (typically 0.15)"
+        }
+      ]
     }
   }
 }

@@ -155,7 +155,6 @@ interface AppStore {
   requestViewportAction: (kind: 'zoomIn' | 'zoomOut' | 'fit') => void
   importResults: (files: { name: string; data: string }[]) => void
   runMaterialPreview: (protocolOverride?: number[]) => void
-  cancelMaterialPreview: () => void
   setMaterialPreviewPanelOpen: (open: boolean) => void
   setMaterialPreviewProtocol: (points: number[]) => void
   setMaterialPreviewInputMaterial: (input: { matType: string; values: Record<string, unknown> } | null) => void
@@ -508,11 +507,6 @@ export const useAppStore = create<AppStore>((set, get) => {
         set((prev) => ({ materialPreview: { ...prev.materialPreview, running: false, error: error instanceof Error ? error.message : String(error) } }))
       },
     )
-  },
-
-  cancelMaterialPreview: () => {
-    activePreviewJob = null
-    set((s) => ({ materialPreview: { ...s.materialPreview, running: false } }))
   },
 
   clearMaterialPreviewResult: () => {

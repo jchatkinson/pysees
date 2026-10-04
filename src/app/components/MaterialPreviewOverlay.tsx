@@ -1,6 +1,6 @@
 import { memo, useEffect, useMemo, useRef, useState } from 'react'
-import { X, Play, Square } from 'lucide-react'
-import { CartesianGrid, Label as ChartLabel, Line, LineChart, XAxis, YAxis } from 'recharts'
+import { X, Play } from 'lucide-react'
+import { CartesianGrid, Label as ChartLabel, Line, LineChart, ReferenceDot, XAxis, YAxis } from 'recharts'
 import { Card, CardContent, CardHeader, CardTitle } from '@/app/components/ui/card'
 import { Button } from '@/app/components/ui/button'
 import { Textarea } from '@/app/components/ui/textarea'
@@ -20,7 +20,16 @@ const hysteresisChartConfig = {
 } as const
 
 const protocolChartConfig = { eps: { label: 'Strain', color: '#22c55e' } } as const
-const HYSTERESIS_ANIMATION_MS = 3000
+const PROTOCOL_TYPE_ITEMS = [
+  { value: 'monotonic', label: 'Monotonic' },
+  { value: 'cyclic', label: 'Cyclic' },
+  { value: 'custom', label: 'Custom' },
+]
+const STRAIN_INCREMENT_ITEMS = [
+  { value: 'evenly_per_cycle', label: 'Evenly per cycle' },
+  { value: 'none', label: 'None' },
+]
+const HYSTERESIS_ANIMATION_MS = 5000
 
 /** Compact tick text: plain decimals for moderate magnitudes, short scientific otherwise. */
 function formatTick(value: number): string {
@@ -76,7 +85,23 @@ const HysteresisChartPanel = memo(function HysteresisChartPanel({
     return () => cancelAnimationFrame(raf)
   }, [animateToken, points.length, scrubCount])
 
+  // Axis domains come from the full result so the chart doesn't rescale while it animates.
+  const { epsDomain, sigDomain } = useMemo(() => {
+    let minE = 0, maxE = 0, minS = 0, maxS = 0
+    for (const p of points) {
+      if (p.eps < minE) minE = p.eps
+      if (p.eps > maxE) maxE = p.eps
+      if (p.sig < minS) minS = p.sig
+      if (p.sig > maxS) maxS = p.sig
+    }
+    return {
+      epsDomain: [minE, maxE === minE ? minE + 1 : maxE] as [number, number],
+      sigDomain: [minS, maxS === minS ? minS + 1 : maxS] as [number, number],
+    }
+  }, [points])
+
   const animatedPoints = useMemo(() => points.slice(0, effectiveCount), [effectiveCount, points])
+  const leadingPoint = animatedPoints.length > 0 ? animatedPoints[animatedPoints.length - 1] : null
 
   return (
     <div className="rounded border p-2">
@@ -90,7 +115,7 @@ const HysteresisChartPanel = memo(function HysteresisChartPanel({
           <XAxis
             type="number"
             dataKey="eps"
-            domain={['auto', 'auto']}
+            domain={epsDomain}
             tickLine={false}
             axisLine={false}
             minTickGap={20}
@@ -102,7 +127,7 @@ const HysteresisChartPanel = memo(function HysteresisChartPanel({
           </XAxis>
           <YAxis
             type="number"
-            domain={['auto', 'auto']}
+            domain={sigDomain}
             tickLine={false}
             axisLine={false}
             width={52}
@@ -113,6 +138,9 @@ const HysteresisChartPanel = memo(function HysteresisChartPanel({
           </YAxis>
           <ChartTooltip content={<ChartTooltipContent />} />
           <Line type="linear" dataKey="sig" stroke={hysteresisChartConfig.sig.color} strokeWidth={1.75} dot={false} isAnimationActive={false} connectNulls />
+          {leadingPoint && (
+            <ReferenceDot x={leadingPoint.eps} y={leadingPoint.sig} r={4} fill={hysteresisChartConfig.sig.color} stroke="var(--background)" strokeWidth={1.5} isFront />
+          )}
         </LineChart>
       </ChartContainer>
     </div>
@@ -127,24 +155,19 @@ export function MaterialPreviewOverlay() {
   const previewInputMaterial = useAppStore((s) => s.materialPreview.inputMaterial)
   const previewPointCount = useAppStore((s) => s.materialPreview.points.length)
   const runMaterialPreview = useAppStore((s) => s.runMaterialPreview)
-  const cancelMaterialPreview = useAppStore((s) => s.cancelMaterialPreview)
   const setPanelOpen = useAppStore((s) => s.setMaterialPreviewPanelOpen)
   const clearMaterialPreviewResult = useAppStore((s) => s.clearMaterialPreviewResult)
 
-  const [protocolType, setProtocolType] = useState<ProtocolType>('custom')
-  const [maxStrain, setMaxStrain] = useState('0.02')
-  const [numCycles, setNumCycles] = useState('3')
+  const [protocolType, setProtocolType] = useState<ProtocolType>('cyclic')
+  const [maxStrain, setMaxStrain] = useState('0.01')
+  const [numCycles, setNumCycles] = useState('5')
   const [strainIncrement, setStrainIncrement] = useState<CyclicStrainIncrement>('evenly_per_cycle')
   const [approxSteps, setApproxSteps] = useState('200')
   const [protocolText, setProtocolText] = useState(previewProtocol.join(', '))
   const [animateToken, setAnimateToken] = useState(0)
+  const [activeTab, setActiveTab] = useState('protocol')
   const [scrubCount, setScrubCount] = useState<number | null>(null)
   const [syncedPreviewProtocol, setSyncedPreviewProtocol] = useState(previewProtocol)
-
-  if (previewProtocol !== syncedPreviewProtocol) {
-    setSyncedPreviewProtocol(previewProtocol)
-    setProtocolText(previewProtocol.join(', '))
-  }
 
   const generatedProtocol = useMemo(() => generateLoadingProtocol({
     type: protocolType,
@@ -154,6 +177,13 @@ export function MaterialPreviewOverlay() {
     strainIncrement,
     customText: protocolText,
   }), [approxSteps, maxStrain, numCycles, protocolText, protocolType, strainIncrement])
+  // Pull in protocols set from outside this panel. A run stores the protocol it was given, so skip
+  // that echo: rewriting protocolText would trip the stale-result effect below and kill the run.
+  if (previewProtocol !== syncedPreviewProtocol) {
+    setSyncedPreviewProtocol(previewProtocol)
+    if (previewProtocol !== generatedProtocol) setProtocolText(previewProtocol.join(', '))
+  }
+
   const protocolChartData = useMemo(() => generatedProtocol.map((eps, i) => ({ i, eps })), [generatedProtocol])
 
   useEffect(() => {
@@ -187,7 +217,7 @@ export function MaterialPreviewOverlay() {
             <p className="text-[11px] text-destructive">{previewError}</p>
           )}
 
-          <Tabs defaultValue="protocol">
+          <Tabs value={activeTab} onValueChange={setActiveTab}>
             <TabsList className="w-full">
               <TabsTrigger value="protocol">Load Protocol</TabsTrigger>
               <TabsTrigger value="hysteresis">Material Hysteresis</TabsTrigger>
@@ -196,7 +226,7 @@ export function MaterialPreviewOverlay() {
               <div className="grid gap-2 rounded border p-2">
                 <div className="grid gap-1">
                   <Label>Protocol Type</Label>
-                  <Select value={protocolType} onValueChange={(value) => setProtocolType(value as ProtocolType)}>
+                  <Select items={PROTOCOL_TYPE_ITEMS} value={protocolType} onValueChange={(value) => setProtocolType(value as ProtocolType)}>
                     <SelectTrigger className="w-full">
                       <SelectValue />
                     </SelectTrigger>
@@ -222,7 +252,7 @@ export function MaterialPreviewOverlay() {
                         </div>
                         <div className="grid gap-1">
                           <Label>Strain Increment</Label>
-                          <Select value={strainIncrement} onValueChange={(value) => setStrainIncrement(value as CyclicStrainIncrement)}>
+                          <Select items={STRAIN_INCREMENT_ITEMS} value={strainIncrement} onValueChange={(value) => setStrainIncrement(value as CyclicStrainIncrement)}>
                             <SelectTrigger className="w-full">
                               <SelectValue />
                             </SelectTrigger>
@@ -281,20 +311,20 @@ export function MaterialPreviewOverlay() {
             <Button
               size="sm"
               onClick={() => {
+                setScrubCount(null)
+                setActiveTab('hysteresis')
                 runMaterialPreview(generatedProtocol)
               }}
               disabled={!previewInputMaterial || previewRunning}
             >
               <Play className="mr-1 size-3.5" />Run
             </Button>
-            <Button size="sm" variant="outline" onClick={cancelMaterialPreview} disabled={!previewRunning}>
-              <Square className="mr-1 size-3.5" />Cancel
-            </Button>
             <Button
               size="sm"
               variant="outline"
               onClick={() => {
                 setScrubCount(null)
+                setActiveTab('hysteresis')
                 setAnimateToken((v) => v + 1)
               }}
               disabled={previewRunning || previewPointCount === 0}
