@@ -5,6 +5,7 @@ import { GENERATED_COMMAND_SCHEMAS } from '@/app/generated/commandSchemas.genera
 import type { GeneratedArgDef } from '@/app/generated/commandSchemas.generated'
 import { domainForFn, PATTERN_CHILD_FNS, SECTION_CHILD_FNS, type CommandDomain } from '@/app/lib/commandDomain'
 import type { ModelWrite } from '@/app/lib/modelWrite'
+import { orientProblem } from '@/app/lib/orient'
 
 export type SchemaResult =
   | { target: 'model'; write: ModelWrite }
@@ -110,6 +111,9 @@ function elementArgsFromGenerated(): ArgDef[] {
       zeroLengthSection: [
         { kind: 'vec', name: 'nodes', label: 'Node IDs', length: 2, defaultValue: [1, 2], nodeSync: true },
         { kind: 'int', name: 'secTag', label: 'Section Tag', required: true },
+        { kind: 'flag', flag: '-orient', label: 'Custom local axes (-orient)', defaultValue: false, description: 'OpenSees -orient. 2D: x1 x2 x3 (local x; local y is x turned 90° counter-clockwise). 3D: x1 x2 x3 yp1 yp2 yp3 (local z = x × yp). Without this, local axes are the global axes.', args: [
+          { kind: 'vec', name: 'orient', label: '2D: x1 x2 x3 — 3D: x1 x2 x3 yp1 yp2 yp3', length: 'dynamic', defaultValue: [1, 0, 0] },
+        ] },
       ],
     } },
   ]
@@ -170,7 +174,7 @@ const V1_MODEL_SCHEMAS: CommandSchema[] = [
         ? { matTag: Math.trunc(num(values.matTag)) }
         : eleType === 'ElasticBeamColumn'
         ? { A: num(values.A), E: num(values.E), Iz: num(values.Iz), transfTag: Math.trunc(num(values.transfTag)) }
-        : { secTag: Math.trunc(num(values.secTag)) }
+        : { secTag: Math.trunc(num(values.secTag)), ...(values['-orient'] ? { orient: nums(values.orient) } : {}) }
       return {
         target: 'model',
         write: { kind: 'element', entity: { id: existingId ?? model.nextIds.element, eleType, nodes: ints(values.nodes), args } },
@@ -561,6 +565,10 @@ export function validateSchemaResult(result: SchemaResult, model: Model, ctx: Sc
     if (write.entity.nodes.length < 2) return 'Element requires at least 2 node IDs.'
     if (write.entity.nodes.some((id) => !model.nodes.has(id))) return 'Element references one or more missing nodes.'
     if (write.entity.eleType === 'zeroLengthSection' && !model.sections.has(Number(write.entity.args.secTag))) return 'Section does not exist.'
+    if (write.entity.eleType === 'zeroLengthSection' && write.entity.args.orient !== undefined) {
+      const problem = orientProblem(write.entity.args.orient, ctx.ndm)
+      if (problem) return problem
+    }
     if (write.entity.eleType === 'DispBeamColumn' && !model.beamIntegrations.has(Number(write.entity.args.integrationTag))) return 'Beam integration does not exist.'
   }
   if (write.kind === 'fix' && write.entity.dofs.length === 0) return 'Select at least one constrained DOF.'
@@ -602,7 +610,7 @@ export function modelEntityToValues(kind: ModelWrite['kind'], entity: unknown, c
   }
   if (kind === 'element') {
     const e = entity as { eleType: string; nodes: number[]; args: Record<string, unknown> }
-    return { eleType: e.eleType, nodes: [...e.nodes], ...e.args }
+    return { eleType: e.eleType, nodes: [...e.nodes], ...e.args, ...(e.args.orient !== undefined ? { '-orient': true } : {}) }
   }
   // Older/template-built entities may lack the schema's `type` discriminator in args; restore it so the form doesn't fall back to the schema default.
   if (kind === 'pattern') { const e = entity as { patternType: string; args: Record<string, unknown> }; return { type: e.patternType, ...e.args } }

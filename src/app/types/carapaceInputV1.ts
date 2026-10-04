@@ -14,10 +14,13 @@ export type IntegrationSpec = { kind: 'legendre'; points: number } | { kind: 'lo
 export interface TrussTable { nodeI: number[]; nodeJ: number[]; area: number[]; material: number[]; density: number[] }
 export interface ElasticBeamColumnTable { nodeI: number[]; nodeJ: number[]; e: number[]; a: number[]; iz: number[]; transform: TransformSpec[]; density: number[] }
 export interface FiberBeamColumnTable { nodeI: number[]; nodeJ: number[]; fiberSection: number[]; integration: IntegrationSpec[]; corotational: boolean[]; density: number[] }
-/** `materials`: sparse `(row, dof, materialArenaIndex)`. `friction`: sparse `(row, normalDof, shearDof, mu, k0, b)`, at most one per row. */
-export interface ZeroLengthTable { nodeI: number[]; nodeJ: number[]; materials: [number, number, number][]; friction: [number, number, number, number, number, number][] }
+/** Sparse OpenSees `-orient` rows; rows without one use the global axes. 2D: `(row, x1, x2, x3)`; 3D: `(row, x1, x2, x3, yp1, yp2, yp3)`. */
+export type OrientRow2 = [number, number, number, number]
+export type OrientRow3 = [number, number, number, number, number, number, number]
+/** `materials`: sparse `(row, dof, materialArenaIndex)`. `friction`: sparse `(row, normalDof, shearDof, mu, k0, b)`, at most one per row. `orient`: optional local axes per row. */
+export interface ZeroLengthTable { nodeI: number[]; nodeJ: number[]; materials: [number, number, number][]; friction: [number, number, number, number, number, number][]; orient?: OrientRow2[] }
 /** A `ZeroLength` driven by a coupled `FiberSection` (axial + moment) instead of independent per-DOF materials. `materials` is a sparse spring for the one DOF (`uy`) the section has no resultant for. */
-export interface ZeroLengthSectionTable { nodeI: number[]; nodeJ: number[]; fiberSection: number[]; materials: [number, number, number][] }
+export interface ZeroLengthSectionTable { nodeI: number[]; nodeJ: number[]; fiberSection: number[]; materials: [number, number, number][]; orient?: OrientRow2[] }
 export interface FiberTable { sectionOffsets: number[]; y: number[]; area: number[]; material: number[] }
 
 /** Identity multi-point constraints (`core::Domain::equal_dof`): row `i` ties `constrained[i]`'s
@@ -95,8 +98,8 @@ export type TransformSpec3 = { kind: 'linear3'; vecXz: [number, number, number] 
 export interface TrussTable3 { nodeI: number[]; nodeJ: number[]; area: number[]; material: number[]; density: number[] }
 export interface ElasticBeamColumnTable3 { nodeI: number[]; nodeJ: number[]; e: number[]; g: number[]; a: number[]; j: number[]; iy: number[]; iz: number[]; transform: TransformSpec3[]; density: number[] }
 export interface FiberBeamColumnTable3 { nodeI: number[]; nodeJ: number[]; g: number[]; j: number[]; vecXz: [number, number, number][]; fiberSection: number[]; integration: IntegrationSpec[]; density: number[] }
-export interface ZeroLengthTable3 { nodeI: number[]; nodeJ: number[]; materials: [number, number, number][]; friction: [number, number, number, number, number, number, number][] }
-export interface ZeroLengthSectionTable3 { nodeI: number[]; nodeJ: number[]; fiberSection: number[]; materials: [number, number, number][] }
+export interface ZeroLengthTable3 { nodeI: number[]; nodeJ: number[]; materials: [number, number, number][]; friction: [number, number, number, number, number, number, number][]; orient?: OrientRow3[] }
+export interface ZeroLengthSectionTable3 { nodeI: number[]; nodeJ: number[]; fiberSection: number[]; materials: [number, number, number][]; orient?: OrientRow3[] }
 export interface FiberTable3 { sectionOffsets: number[]; y: number[]; z: number[]; area: number[]; material: number[] }
 export type ElementKind3 = 'truss' | 'elasticBeamColumn' | 'dispBeamColumn' | 'forceBeamColumn' | 'zeroLength' | 'zeroLengthSection'
 export type ElementLoadSpec3 = { kind: 'uniform'; wx: number; wy: number; wz: number }

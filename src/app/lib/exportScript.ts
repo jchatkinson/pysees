@@ -3,6 +3,7 @@ import type { AnalysisHistory } from '@/app/types/analysisCommands'
 import type { SchemaContext } from '@/app/types/schema'
 import { fnForModelEntity, renderOpsCall } from '@/app/lib/commandSchemas'
 import { blockPatternTags, resolveAnalysisCommand } from '@/app/lib/analysisBlocks'
+import { readOrient } from '@/app/lib/orient'
 import type { PatternEntity } from '@/app/types/model'
 
 function pyList(nums: number[]): string {
@@ -55,7 +56,8 @@ function renderModel(model: Model, deferredPatterns: ReadonlySet<number>): strin
     } else if (ele.eleType === 'ElasticBeamColumn') {
       lines.push(`ops.element('ElasticBeamColumn', ${ele.id}, ${ele.nodes.join(', ')}, ${ele.args.A}, ${ele.args.E}, ${ele.args.Iz}, ${ele.args.transfTag})`)
     } else if (ele.eleType === 'zeroLengthSection') {
-      lines.push(`ops.element('zeroLengthSection', ${ele.id}, ${ele.nodes.join(', ')}, ${ele.args.secTag})`)
+      const orient = readOrient(ele.args.orient)
+      lines.push(`ops.element('zeroLengthSection', ${ele.id}, ${ele.nodes.join(', ')}, ${ele.args.secTag}${orient ? `, '-orient', ${orient.join(', ')}` : ''})`)
     } else if (ele.eleType === 'DispBeamColumn') {
       lines.push(`ops.element('dispBeamColumn', ${ele.id}, ${ele.nodes.join(', ')}, ${ele.args.transfTag}, ${ele.args.integrationTag})`)
     } else {

@@ -4,6 +4,7 @@ import type { LoadAssignment } from '@/app/types/model'
 import type { GridlineEntity } from '@/app/types/gridlines'
 import type { LevelEntity } from '@/app/types/levels'
 import { alphaLabel, evenlySpacedGridlines } from '@/app/lib/gridlines'
+import { globalOrient } from '@/app/lib/orient'
 
 export interface TemplateResult {
   ndm: 2 | 3
@@ -75,7 +76,7 @@ export function momentCurvatureTemplate(): TemplateResult {
       { kind: 'fiber', subType: 'fiber', args: { yloc: 0.21, zloc: -0.11, A: BAR_AREA, matTag: 1 } },
       { kind: 'fiber', subType: 'fiber', args: { yloc: 0.21, zloc: 0.11, A: BAR_AREA, matTag: 1 } },
     ] } },
-    { kind: 'element', entity: { id: 1, eleType: 'zeroLengthSection', nodes: [1, 2], args: { secTag: 1 } } },
+    { kind: 'element', entity: { id: 1, eleType: 'zeroLengthSection', nodes: [1, 2], args: { secTag: 1, orient: globalOrient(2) } } },
   ]
 
   writes.push(

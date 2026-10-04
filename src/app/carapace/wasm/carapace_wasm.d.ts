@@ -18,6 +18,13 @@ export interface ZeroLengthSectionTable3 {
      * (shear, dofs 1/2) or `rx` (torsion, dof 3).
      */
     materials: [number, number, number][];
+    /**
+     * Sparse `(row, x1, x2, x3, yp1, yp2, yp3)` — OpenSees' `-orient`: local x
+     * is `x`, local z is `x × yp`, local y completes the frame, and every DOF
+     * of the row is evaluated along those axes. Rows without an entry use
+     * the global axes; at most one entry per row.
+     */
+    orient?: [number, number, number, number, number, number, number][];
 }
 
 /**
@@ -38,6 +45,13 @@ export interface ZeroLengthSectionTable {
      * resultant for.
      */
     materials: [number, number, number][];
+    /**
+     * Sparse `(row, x1, x2, x3)` — OpenSees' 2D `-orient x1 x2 x3`: local x is
+     * `(x1, x2)` (`x3` must be 0) and local y is local x turned 90 degrees
+     * counter-clockwise; every DOF of the row is evaluated along those axes.
+     * Rows without an entry use the global axes; at most one entry per row.
+     */
+    orient?: [number, number, number, number][];
 }
 
 /**
@@ -440,7 +454,7 @@ export interface SequenceSpec3 {
  * `Serialize`, not `Deserialize` — a `DecodeError` only ever flows *out*
  * to JS (`boundary.rs`), as a `{ kind: "...", ... }`-shaped object.
  */
-export type DecodeError = { kind: "invalidAnalysisOption"; stage: string; field: string } | { kind: "unsupportedSpace"; got: number } | { kind: "unknownNodeIndex"; table: string; row: number } | { kind: "unknownMaterialIndex"; table: string; row: number } | { kind: "cyclicMaterialReference"; index: number } | { kind: "unknownPatternIndex"; table: string; row: number } | { kind: "unknownFiberSectionIndex"; row: number } | { kind: "unknownElementIndex"; table: string; row: number } | { kind: "unknownStageIndex"; table: string; row: number } | { kind: "unsupportedElementLoad"; elementKind: string } | { kind: "invalidDof"; table: string; row: number; dof: number } | { kind: "unknownConstraintRow"; table: string; row: number };
+export type DecodeError = { kind: "invalidAnalysisOption"; stage: string; field: string } | { kind: "unsupportedSpace"; got: number } | { kind: "unknownNodeIndex"; table: string; row: number } | { kind: "unknownMaterialIndex"; table: string; row: number } | { kind: "cyclicMaterialReference"; index: number } | { kind: "unknownPatternIndex"; table: string; row: number } | { kind: "unknownFiberSectionIndex"; row: number } | { kind: "unknownElementIndex"; table: string; row: number } | { kind: "unknownStageIndex"; table: string; row: number } | { kind: "unsupportedElementLoad"; elementKind: string } | { kind: "invalidDof"; table: string; row: number; dof: number } | { kind: "unknownConstraintRow"; table: string; row: number } | { kind: "invalidOrientation"; table: string; row: number };
 
 /**
  * `advance`'s result — pysees-handoff.md's `{ done, stageComplete,
@@ -680,6 +694,13 @@ export interface ZeroLengthTable {
      * and `shear_dof` must not (checked by `core` via `debug_assert`).
      */
     friction: [number, number, number, number, number, number][];
+    /**
+     * Sparse `(row, x1, x2, x3)` — OpenSees' 2D `-orient x1 x2 x3`: local x is
+     * `(x1, x2)` (`x3` must be 0) and local y is local x turned 90 degrees
+     * counter-clockwise; every DOF of the row is evaluated along those axes.
+     * Rows without an entry use the global axes; at most one entry per row.
+     */
+    orient?: [number, number, number, number][];
 }
 
 export interface ZeroLengthTable3 {
@@ -697,6 +718,13 @@ export interface ZeroLengthTable3 {
      * to the same normal force; see `Friction3`'s doc comment).
      */
     friction: [number, number, number, number, number, number, number][];
+    /**
+     * Sparse `(row, x1, x2, x3, yp1, yp2, yp3)` — OpenSees' `-orient`: local x
+     * is `x`, local z is `x × yp`, local y completes the frame, and every DOF
+     * of the row is evaluated along those axes. Rows without an entry use
+     * the global axes; at most one entry per row.
+     */
+    orient?: [number, number, number, number, number, number, number][];
 }
 
 export type AlgorithmConfigSpec = { kind: "linear" } | { kind: "newton"; tangent?: TangentStrategySpec; lineSearch?: LineSearchSpec } | { kind: "krylovNewton"; tangent: TangentStrategySpec; maxDimension: number };

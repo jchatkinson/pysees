@@ -3,6 +3,7 @@ import type { AnalysisHistory } from '@/app/types/analysisCommands'
 import type { AlgorithmKind, AnalysisStage } from '@/app/types/analysisSequence'
 import type * as W from '@/app/types/carapaceInputV1'
 import { compileAnalysisSequence, type CompileDiagnostic } from '@/app/lib/compileAnalysisSequence'
+import { orientProblem, readOrient } from '@/app/lib/orient'
 
 export interface CompileInputV1Result {
   input: W.CarapaceInputV1 | null
@@ -129,7 +130,7 @@ export function compileInputV1(model: Model, analysisHistory: AnalysisHistory): 
   const trusses: W.TrussTable = { nodeI: [], nodeJ: [], area: [], material: [], density: [] }
   const elasticBeamColumns: W.ElasticBeamColumnTable = { nodeI: [], nodeJ: [], e: [], a: [], iz: [], transform: [], density: [] }
   const dispBeamColumns: W.FiberBeamColumnTable = { nodeI: [], nodeJ: [], fiberSection: [], integration: [], corotational: [], density: [] }
-  const zeroLengthSections: W.ZeroLengthSectionTable = { nodeI: [], nodeJ: [], fiberSection: [], materials: [] }
+  const zeroLengthSections: W.ZeroLengthSectionTable = { nodeI: [], nodeJ: [], fiberSection: [], materials: [], orient: [] }
   const resolveSection = (secTag: number, context: string): number => {
     const idx = sectionIndex.get(secTag)
     if (idx === undefined) {
@@ -178,6 +179,10 @@ export function compileInputV1(model: Model, analysisHistory: AnalysisHistory): 
       zeroLengthSections.nodeI.push(resolveNode(ele.nodes[0], `ZeroLengthSection ${ele.id}`))
       zeroLengthSections.nodeJ.push(resolveNode(ele.nodes[1], `ZeroLengthSection ${ele.id}`))
       zeroLengthSections.fiberSection.push(secIdx)
+      const orient = readOrient(ele.args.orient)
+      const problem = ele.args.orient === undefined ? null : orientProblem(ele.args.orient, 2)
+      if (problem) diagnostics.push({ severity: 'error', message: `ZeroLengthSection ${ele.id}: ${problem}`, commandIndex: -1 })
+      else if (orient) zeroLengthSections.orient!.push([zeroLengthSections.nodeI.length - 1, orient[0], orient[1], orient[2]])
       elementRefs.set(ele.id, { kind: 'zeroLengthSection', index: zeroLengthSections.nodeI.length - 1 })
     } else {
       diagnostics.push({ severity: 'warning', message: `Element ${ele.id} (${ele.eleType}) is not yet supported by the Carapace compiler and was skipped`, commandIndex: -1 })

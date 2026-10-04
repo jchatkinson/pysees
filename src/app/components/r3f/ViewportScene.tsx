@@ -9,6 +9,7 @@ import { SceneHelpers } from './SceneHelpers'
 import { NodesLayer } from './Nodes'
 import { ElementsLayer } from './Elements'
 import { SupportsLayer } from './Supports'
+import { ZeroLengthsLayer } from './ZeroLengths'
 import { LoadsLayer } from './Loads'
 import { GridlinesLayer } from './Gridlines'
 import { LevelsLayer } from './Levels'
@@ -150,6 +151,9 @@ export const ViewportScene = forwardRef<ViewportSceneRef, object>(function Viewp
         showNodes={viewSettings.showNodes}
         showNodeIds={viewSettings.showNodeIds}
       />
+      {viewSettings.showElements && (
+        <ZeroLengthsLayer index={sceneIndex} buffers={displayBuffers} elements={model.elements} ndm={model.config?.ndm === 2 ? 2 : 3} />
+      )}
       {viewSettings.showSupports && (
         <SupportsLayer fixes={fixes} nodeMap={model.nodes} />
       )}
