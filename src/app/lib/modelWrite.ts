@@ -50,6 +50,12 @@ function keyFor(write: Exclude<ModelWrite, { kind: 'sectionChild' | 'patternChil
   }
 }
 
+/** True when a top-level write would overwrite an entity that already has that tag (child writes never do). */
+export function entityExists(model: Model, write: ModelWrite): boolean {
+  if (write.kind === 'sectionChild' || write.kind === 'patternChild') return false
+  return (mapFor(model, write.kind) as Map<number, unknown>).has(keyFor(write))
+}
+
 /** Applies a ModelWrite immutably, returning a new Model. Structural-shares unrelated maps. */
 export function applyModelWrite(model: Model, write: ModelWrite): Model {
   if (write.kind === 'sectionChild') {

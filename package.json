@@ -8,9 +8,11 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
+    "test": "vitest run",
     "preview": "vite preview",
     "schema:extract": "uv run python scripts/generate_opensees_schemas.py",
-    "schema:build": "uv run python scripts/build_runtime_schemas.py"
+    "schema:build": "uv run python scripts/build_runtime_schemas.py",
+    "schema:check": "uv run python scripts/build_runtime_schemas.py --output .schema-check.ts >/dev/null && diff -q .schema-check.ts src/app/generated/commandSchemas.generated.ts; rc=$?; rm -f .schema-check.ts; exit $rc"
   },
   "dependencies": {
     "@base-ui/react": "^1.2.0",
@@ -51,6 +53,7 @@
     "shadcn": "^4.21.0",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.46.4",
-    "vite": "^8.2.2"
+    "vite": "^8.2.2",
+    "vitest": "^5.0.3"
   }
 }

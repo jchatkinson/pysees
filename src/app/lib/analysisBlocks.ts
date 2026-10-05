@@ -68,6 +68,22 @@ export function blockPatternTags(params: Record<string, unknown>): number[] {
   return Array.isArray(raw) ? raw.map(Number).filter((n) => Number.isFinite(n)) : []
 }
 
+/**
+ * Which OpenSees element response matches the force PySees (and Carapace) report. OpenSees `force` is in global axes for every
+ * element, but beams are reported in local axes (N, V, M at each end), which is `localForce`. Trusses and zero-length elements
+ * are reported in global axes, so they use `force`. Verified against OpenSees in carapaceVsOpenSees.test.ts.
+ */
+const LOCAL_FORCE_ELEMENTS = new Set(['ElasticBeamColumn', 'DispBeamColumn'])
+
+/** The element-force recorders a model needs: one OpenSees response per file, since a recorder takes a single response type. */
+export function elementForceRecorders(model: Model): { response: 'force' | 'localForce'; file: string; eleTags: number[] }[] {
+  const tags = (local: boolean) => [...model.elements.values()].filter((e) => LOCAL_FORCE_ELEMENTS.has(e.eleType) === local).map((e) => e.id).sort((a, b) => a - b)
+  return [
+    { response: 'localForce' as const, file: 'eleLocalForce.out', eleTags: tags(true) },
+    { response: 'force' as const, file: 'eleForce.out', eleTags: tags(false) },
+  ].filter((g) => g.eleTags.length > 0)
+}
+
 const wholeModelRecorder: AnalysisBlockDef = {
   id: 'whole-model-recorder',
   label: 'Whole Model Recorder',
@@ -76,15 +92,12 @@ const wholeModelRecorder: AnalysisBlockDef = {
   build: (params, model) => {
     const dir = String(params.directory ?? 'out').replace(/\/$/, '')
     const nodeTags = [...model.nodes.keys()].sort((a, b) => a - b)
-    const eleTags = [...model.elements.keys()].sort((a, b) => a - b)
     const commands: AnalysisCommand[] = []
     if (nodeTags.length) {
       commands.push(ops('recorder', ['Node', '-file', `${dir}/disp.out`, '-time', '-node', ...nodeTags, '-dof', 1, 2, 3, 'disp']))
       commands.push(ops('recorder', ['Node', '-file', `${dir}/reaction.out`, '-time', '-node', ...nodeTags, '-dof', 1, 2, 3, 'reaction']))
     }
-    if (eleTags.length) {
-      commands.push(ops('recorder', ['Element', '-file', `${dir}/eleForce.out`, '-time', '-ele', ...eleTags, 'force']))
-    }
+    for (const g of elementForceRecorders(model)) commands.push(ops('recorder', ['Element', '-file', `${dir}/${g.file}`, '-time', '-ele', ...g.eleTags, g.response]))
     return commands
   },
   toRecorders: (_params, model) => {

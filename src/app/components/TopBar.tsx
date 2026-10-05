@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { Button } from '@/app/components/ui/button'
 import { Separator } from '@/app/components/ui/separator'
 import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger, DropdownMenuTrigger } from '@/app/components/ui/dropdown-menu'
@@ -10,6 +10,10 @@ import { PiscesLogo } from '@/app/components/icons/PiscesLogo'
 import { UserButton } from '@clerk/clerk-react'
 import { patternColor } from '@/app/components/r3f/utils'
 import { downloadScript } from '@/app/lib/exportScript'
+import { importScript } from '@/app/lib/scriptImport'
+import { ImportScriptDialog, type ImportPreview } from '@/app/components/ImportScriptDialog'
+
+const MAX_IMPORT_BYTES = 5_000_000
 
 export function TopBar() {
   const {
@@ -29,8 +33,16 @@ export function TopBar() {
     requestViewportAction,
     setGridlinesDialogOpen,
     newModel,
+    initModel,
   } = useAppStore()
   const [newModelConfirmOpen, setNewModelConfirmOpen] = useState(false)
+  const [importPreview, setImportPreview] = useState<ImportPreview | null>(null)
+  const fileInput = useRef<HTMLInputElement>(null)
+  const pickScript = async (file: File | undefined) => {
+    if (!file) return
+    if (file.size > MAX_IMPORT_BYTES) return window.alert(`${file.name} is too large to import (limit ${MAX_IMPORT_BYTES / 1e6} MB).`)
+    setImportPreview({ fileName: file.name, result: importScript(await file.text(), file.name) })
+  }
   const undo = activePanel === 'model' ? modelUndo : analysisUndo
   const redo = activePanel === 'model' ? modelRedo : analysisRedo
   const canUndo = activePanel === 'model' ? modelPast.length > 0 : analysisHistory.cursor > -1
@@ -48,7 +60,9 @@ export function TopBar() {
         <DropdownMenuTrigger render={<Button variant="ghost" size="sm" className="h-8 px-2 text-xs">File</Button>} />
         <DropdownMenuContent>
           <DropdownMenuItem onClick={() => (model.config ? setNewModelConfirmOpen(true) : newModel())}>New Model</DropdownMenuItem>
-          <DropdownMenuItem disabled={!model.config} onClick={() => downloadScript(model, analysisHistory)}>Export .py</DropdownMenuItem>
+          <DropdownMenuItem onClick={() => fileInput.current?.click()}>Import .tcl / .py…</DropdownMenuItem>
+          <DropdownMenuItem disabled={!model.config} onClick={() => downloadScript(model, analysisHistory, 'py')}>Export .py</DropdownMenuItem>
+          <DropdownMenuItem disabled={!model.config} onClick={() => downloadScript(model, analysisHistory, 'tcl')}>Export .tcl</DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
       <DropdownMenu>
@@ -126,6 +140,13 @@ export function TopBar() {
       <div className="ml-auto">
         <UserButton afterSignOutUrl="/" appearance={{ elements: { avatarBox: 'h-7 w-7' } }} />
       </div>
+      <input ref={fileInput} type="file" accept=".tcl,.py,.txt" className="hidden" onChange={(e) => { void pickScript(e.target.files?.[0]); e.target.value = '' }} />
+      <ImportScriptDialog
+        preview={importPreview}
+        replacing={!!model.config && (model.nodes.size > 0 || model.elements.size > 0)}
+        onCancel={() => setImportPreview(null)}
+        onConfirm={(r) => { initModel(r.ndm, r.ndf, { writes: r.writes }); setImportPreview(null) }}
+      />
       <AlertDialog open={newModelConfirmOpen} onOpenChange={setNewModelConfirmOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>

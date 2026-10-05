@@ -136,7 +136,7 @@ function beamMemberArgs(
       { kind: 'patch', subType: 'rect', args: { matTag: 2, numSubdivY: 8, numSubdivZ: 8, y1: -h / 2, z1: -b / 2, y2: h / 2, z2: b / 2 } },
       ...bars.map(({ y, z }) => ({ kind: 'fiber' as const, subType: 'fiber', args: { yloc: y, zloc: z, A: barArea, matTag: 1 } })),
     ] } },
-    { kind: 'beamIntegration', entity: { id: ids.integrationId, intType: 'Legendre', args: { tag: ids.integrationId, secTag: ids.sectionId, n: 4 } } },
+    { kind: 'beamIntegration', entity: { id: ids.integrationId, intType: 'Legendre', args: { type: 'Legendre', tag: ids.integrationId, secTag: ids.sectionId, n: 4 } } },
   )
   return { eleType: 'DispBeamColumn', args: { transfTag: ids.transfTag, integrationTag: ids.integrationId } }
 }

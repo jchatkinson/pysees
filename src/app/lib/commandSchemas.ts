@@ -6,6 +6,9 @@ import type { GeneratedArgDef } from '@/app/generated/commandSchemas.generated'
 import { domainForFn, PATTERN_CHILD_FNS, SECTION_CHILD_FNS, type CommandDomain } from '@/app/lib/commandDomain'
 import type { ModelWrite } from '@/app/lib/modelWrite'
 import { orientProblem } from '@/app/lib/orient'
+import { encodeArgs } from '@/app/lib/commands/grammar'
+import { elementArgs, elementByType } from '@/app/lib/commands/tables'
+import { pyLiteral } from '@/app/lib/commands/print'
 
 export type SchemaResult =
   | { target: 'model'; write: ModelWrite }
@@ -37,6 +40,9 @@ function nums(v: unknown) {
 function ints(v: unknown) {
   return nums(v).map((x) => Math.trunc(x))
 }
+
+/** Element args that are tags, not magnitudes. */
+const INT_ARGS = new Set(['matTag', 'transfTag', 'integrationTag', 'secTag'])
 
 function titleCase(s: string) {
   return s.replace(/([A-Z])/g, ' $1').replace(/^./, (c) => c.toUpperCase()).trim()
@@ -94,12 +100,16 @@ function elementArgsFromGenerated(): ArgDef[] {
     { kind: 'choice', name: 'eleType', label: 'Element Type', options: ['Truss', 'ElasticBeamColumn', 'DispBeamColumn', 'zeroLengthSection'], defaultValue: 'Truss', yields: {
       Truss: [
         { kind: 'vec', name: 'nodes', label: 'Node IDs', length: 2, defaultValue: [1, 2], nodeSync: true },
+        { kind: 'float', name: 'A', label: 'Area (A)', defaultValue: 1, required: true },
         { kind: 'int', name: 'matTag', label: 'Material Tag', required: true },
       ],
       ElasticBeamColumn: [
         { kind: 'vec', name: 'nodes', label: 'Node IDs', length: 2, defaultValue: [1, 2], nodeSync: true },
         { kind: 'float', name: 'A', label: 'Area (A)', defaultValue: 1, required: true },
         { kind: 'float', name: 'E', label: "Young's Modulus (E)", defaultValue: 1, required: true },
+        { kind: 'float', name: 'G', label: 'Shear Modulus (G)', defaultValue: 1, required: true, ndm: 3 },
+        { kind: 'float', name: 'J', label: 'Torsional Constant (J)', defaultValue: 1, required: true, ndm: 3 },
+        { kind: 'float', name: 'Iy', label: 'Moment of Inertia (Iy)', defaultValue: 1, required: true, ndm: 3 },
         { kind: 'float', name: 'Iz', label: 'Moment of Inertia (Iz)', defaultValue: 1, required: true },
         { kind: 'int', name: 'transfTag', label: 'Transformation Tag', required: true },
       ],
@@ -170,11 +180,10 @@ const V1_MODEL_SCHEMAS: CommandSchema[] = [
     optional: [],
     create: (values, model, existingId) => {
       const eleType = String(values.eleType ?? 'Truss')
-      const args = eleType === 'Truss'
-        ? { matTag: Math.trunc(num(values.matTag)) }
-        : eleType === 'ElasticBeamColumn'
-        ? { A: num(values.A), E: num(values.E), Iz: num(values.Iz), transfTag: Math.trunc(num(values.transfTag)) }
-        : { secTag: Math.trunc(num(values.secTag)), ...(values['-orient'] ? { orient: nums(values.orient) } : {}) }
+      const spec = elementByType(eleType)
+      // The arg layout (which args, in which order, per ndm) is the one script import / export uses.
+      const args: Record<string, unknown> = Object.fromEntries((spec ? elementArgs(spec, model.config?.ndm ?? 2) : []).map((k) => [k, INT_ARGS.has(k) ? Math.trunc(num(values[k])) : num(values[k], k === 'A' ? 1 : 0)]))
+      if (values['-orient']) args.orient = nums(values.orient)
       return {
         target: 'model',
         write: { kind: 'element', entity: { id: existingId ?? model.nextIds.element, eleType, nodes: ints(values.nodes), args } },
@@ -262,17 +271,17 @@ function mapGeneratedArg(arg: GeneratedArgDef): ArgDef {
   if (arg.kind === 'choice') {
     const yields: Record<string, ArgDef[]> = {}
     for (const [key, value] of Object.entries(arg.yields)) yields[key] = value.map(mapGeneratedArg)
-    return { kind: 'choice', name: arg.name, label: titleCase(arg.name), options: arg.options, yields, defaultValue: arg.defaultValue, description: arg.description, required: arg.required, defaultSource: arg.defaultSource }
+    return { kind: 'choice', name: arg.name, label: titleCase(arg.name), ndm: arg.ndm, options: arg.options, yields, defaultValue: arg.defaultValue, description: arg.description, required: arg.required, defaultSource: arg.defaultSource }
   }
   if (arg.kind === 'vec') {
-    const length: ArgLen = arg.length === 'dynamic' || arg.length === 'ndm' || arg.length === 'ndf' ? arg.length : Number(arg.length)
-    return { kind: 'vec', name: arg.name, label: titleCase(arg.name), length, defaultValue: arg.defaultValue ?? [], description: arg.description, required: arg.required, defaultSource: arg.defaultSource }
+    const length: ArgLen = typeof arg.length === 'object' || arg.length === 'dynamic' || arg.length === 'ndm' || arg.length === 'ndf' ? arg.length : Number(arg.length)
+    return { kind: 'vec', name: arg.name, label: titleCase(arg.name), ndm: arg.ndm, length, defaultValue: arg.defaultValue ?? [], description: arg.description, required: arg.required, defaultSource: arg.defaultSource }
   }
   if (arg.kind === 'str') {
     const strDefault = arg.literal ?? (typeof arg.defaultValue === 'string' || typeof arg.defaultValue === 'number' ? arg.defaultValue : '')
-    return { kind: arg.kind, name: arg.name, label: titleCase(arg.name), defaultValue: strDefault, description: arg.description, required: arg.required, defaultSource: arg.defaultSource }
+    return { kind: arg.kind, name: arg.name, label: titleCase(arg.name), ndm: arg.ndm, word: arg.word, defaultValue: strDefault, description: arg.description, required: arg.required, defaultSource: arg.defaultSource }
   }
-  return { kind: arg.kind, name: arg.name, label: titleCase(arg.name), defaultValue: typeof arg.defaultValue === 'number' ? arg.defaultValue : undefined, description: arg.description, required: arg.required, defaultSource: arg.defaultSource }
+  return { kind: arg.kind, name: arg.name, label: titleCase(arg.name), ndm: arg.ndm, defaultValue: typeof arg.defaultValue === 'number' ? arg.defaultValue : undefined, description: arg.description, required: arg.required, defaultSource: arg.defaultSource }
 }
 
 /** Generic entity-kind for model-domain fns that get a dedicated Model map; everything else lands in `misc`. */
@@ -378,8 +387,29 @@ const GENERATED_SCHEMAS: CommandSchema[] = GENERATED_COMMAND_SCHEMAS
     }
   })
 
-export function getAvailableSchemas(ndm: number) {
-  return [...V1_MODEL_SCHEMAS, ...GENERATED_SCHEMAS].filter((schema) => !schema.ndmFilter || schema.ndmFilter.includes(ndm))
+/** An arg list as one model dimension sees it: args tagged for the other dimension are dropped and the tag is stripped. */
+function resolveArgs(args: ArgDef[], ndm: number): ArgDef[] {
+  return args.filter((a) => a.ndm === undefined || a.ndm === ndm).map((a) => {
+    const arg = { ...a } as ArgDef
+    delete arg.ndm
+    if (arg.kind === 'choice') arg.yields = Object.fromEntries(Object.entries(arg.yields).map(([k, v]) => [k, resolveArgs(v, ndm)]))
+    else if (arg.kind === 'flag') arg.args = resolveArgs(arg.args, ndm)
+    return arg
+  })
+}
+
+const schemasByNdm = new Map<number, CommandSchema[]>()
+
+/** Every command's schema for a model dimension, with ndm-specific args resolved. Memoized so a schema keeps its identity between renders. */
+export function getAvailableSchemas(ndm: number): CommandSchema[] {
+  let list = schemasByNdm.get(ndm)
+  if (!list) {
+    list = [...V1_MODEL_SCHEMAS, ...GENERATED_SCHEMAS]
+      .filter((schema) => !schema.ndmFilter || schema.ndmFilter.includes(ndm))
+      .map((schema) => ({ ...schema, args: resolveArgs(schema.args, ndm), optional: resolveArgs(schema.optional, ndm) }))
+    schemasByNdm.set(ndm, list)
+  }
+  return list
 }
 
 export function getPatternChildSchemas() {
@@ -441,7 +471,7 @@ export function getCommandDocUrl(fn: string, values?: Record<string, unknown>) {
 export function resolveArgLen(len: ArgLen, ctx: SchemaContext): number | 'dynamic' {
   if (len === 'ndm') return ctx.ndm
   if (len === 'ndf') return ctx.ndf
-  if (len === 'dynamic') return 'dynamic'
+  if (len === 'dynamic' || typeof len === 'object') return 'dynamic' // a count-referenced length is only known once the count is
   return len
 }
 
@@ -571,6 +601,7 @@ export function validateSchemaResult(result: SchemaResult, model: Model, ctx: Sc
     }
     if (write.entity.eleType === 'DispBeamColumn' && !model.beamIntegrations.has(Number(write.entity.args.integrationTag))) return 'Beam integration does not exist.'
   }
+  if (write.kind === 'geomTransf' && ctx.ndm === 3 && !(Array.isArray(write.entity.args.vecxz) && write.entity.args.vecxz.length === 3)) return '3D transformations need a vecxz (3 numbers).'
   if (write.kind === 'fix' && write.entity.dofs.length === 0) return 'Select at least one constrained DOF.'
   if (write.kind === 'patternChild' && !model.patterns.has(write.patternId)) return `Pattern ${write.patternId} does not exist.`
   if (write.kind === 'sectionChild' && !model.sections.has(write.sectionId)) return `Section ${write.sectionId} does not exist.`
@@ -624,73 +655,10 @@ export function getSchemaForFn(fn: string, ndm: number) {
   return schemas.find((schema) => schema.fn === fn) ?? null
 }
 
-function flattenArgValues(arg: ArgDef, values: Record<string, unknown>, ctx: SchemaContext, fallbackMatTag: number): (string | number | boolean | null)[] {
-  if (arg.kind === 'int') {
-    const rawValue = values[arg.name]
-    if ((rawValue === undefined || rawValue === null || rawValue === '') && arg.name !== 'matTag') return []
-    const raw = Number(rawValue ?? arg.defaultValue)
-    const n = Number.isFinite(raw) && raw > 0 ? Math.trunc(raw) : (arg.name === 'matTag' ? fallbackMatTag : NaN)
-    if (!Number.isFinite(n)) return []
-    return [n]
-  }
-  if (arg.kind === 'float') {
-    const rawValue = values[arg.name]
-    if (rawValue === undefined || rawValue === null || rawValue === '') return []
-    const n = Number(rawValue ?? arg.defaultValue)
-    if (!Number.isFinite(n)) return []
-    return [n]
-  }
-  if (arg.kind === 'str') {
-    if (arg.name === 'literal') return typeof arg.defaultValue === 'string' ? [arg.defaultValue] : []
-    const v = values[arg.name]
-    if (typeof v === 'string') {
-      const trimmed = v.trim()
-      if (trimmed.length === 0) return []
-      const n = Number(trimmed)
-      if (Number.isFinite(n)) return [n]
-      return [v]
-    }
-    if (typeof arg.defaultValue === 'string') {
-      const trimmed = arg.defaultValue.trim()
-      if (trimmed.length === 0) return []
-      const n = Number(trimmed)
-      if (Number.isFinite(n)) return [n]
-      return [arg.defaultValue]
-    }
-    return []
-  }
-  if (arg.kind === 'vec') {
-    const v = Array.isArray(values[arg.name]) ? (values[arg.name] as unknown[]) : []
-    const len = resolveArgLen(arg.length, ctx)
-    if (len === 'dynamic') return v.map((x: unknown) => num(x))
-    return Array.from({ length: len }, (_, i) => num(v[i]))
-  }
-  if (arg.kind === 'flag') {
-    if (!values[arg.flag]) return []
-    return [arg.flag, ...arg.args.flatMap((child) => flattenArgValues(child, values, ctx, fallbackMatTag))]
-  }
-  if (arg.kind === 'choice') {
-    const selected = String(values[arg.name] ?? arg.defaultValue ?? arg.options[0] ?? '')
-    return [selected, ...(arg.yields[selected] ?? []).flatMap((child) => flattenArgValues(child, values, ctx, fallbackMatTag))]
-  }
-  if (arg.kind === 'idlist') {
-    const ids = Array.isArray(values[arg.name]) ? (values[arg.name] as unknown[]) : []
-    return ids.length ? [Math.trunc(num(ids[0]))] : []
-  }
-  return []
-}
-
-function formatPyLiteral(v: string | number | boolean | null): string {
-  if (typeof v === 'string') return `'${v}'`
-  if (typeof v === 'boolean') return v ? 'True' : 'False'
-  if (v === null) return 'None'
-  return String(v)
-}
-
 /** Live python-call preview for a schema using the form's current (or default) values. */
 export function commandPreviewLine(schema: CommandSchema, values: Record<string, unknown>, ctx: SchemaContext, fallbackMatTag = 1): string {
-  const args = [...schema.args, ...schema.optional].flatMap((arg) => flattenArgValues(arg, values, ctx, fallbackMatTag))
-  return `${schema.fn}(${args.map(formatPyLiteral).join(', ')})`
+  const args = encodeArgs([...schema.args, ...schema.optional], values, ctx, fallbackMatTag)
+  return `${schema.fn}(${args.map(pyLiteral).join(', ')})`
 }
 
 export function buildUniaxialMaterialCallArgs(values: Record<string, unknown>, ctx: SchemaContext, fallbackMatTag: number) {
@@ -701,18 +669,16 @@ export function buildUniaxialMaterialCallArgs(values: Record<string, unknown>, c
   const matType = String(values.matType ?? choice.defaultValue ?? choice.options[0] ?? '').trim()
   if (!matType) return null
   const yielded = choice.yields[matType] ?? []
-  const rest = yielded.flatMap((arg) => flattenArgValues(arg, values, ctx, fallbackMatTag))
-  return [matType, ...rest]
+  return [matType, ...encodeArgs(yielded, values, ctx, fallbackMatTag)]
 }
 
 /** Turns a schema-shaped fn + values bag into a rendered `ops.fn(...)` call — used by the script exporter and analysis blocks.
  * `values.__args`, when present (set by analysis blocks), is an exact positional arg list and bypasses schema lookup entirely. */
 export function renderOpsCall(fn: string, values: Record<string, unknown>, ctx: SchemaContext, schemaOverride?: CommandSchema): string {
-  if (Array.isArray(values.__args)) {
-    const args = values.__args as (string | number | boolean | null)[]
-    return `${fn}(${args.map(formatPyLiteral).join(', ')})`
-  }
   const schema = schemaOverride ?? getSchemaForFn(fn, ctx.ndm)
-  if (!schema) return `${fn}(${Object.values(values).map((v) => formatPyLiteral(v as string | number | boolean | null)).join(', ')})`
+  if (Array.isArray(values.__args) || !schema) {
+    const raw = Array.isArray(values.__args) ? values.__args : Object.values(values)
+    return `${fn}(${raw.filter((v): v is string | number => typeof v === 'string' || typeof v === 'number').map(pyLiteral).join(', ')})`
+  }
   return commandPreviewLine(schema, values, ctx, Number(values.matTag) || 1)
 }

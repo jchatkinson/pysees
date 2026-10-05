@@ -1,0 +1,505 @@
+{
+  "_doc": "Corrections to the generated command schemas that the OpenSeesPy docs cannot express. Applied by build_runtime_schemas.py. Key: `command` or `command/Type`. Fields: `args` replaces the whole list; `length` sets a vec's length (a number, 'ndm', 'ndf', 'dynamic', or {ref: <earlier count arg>, times?}); `kind` retypes an arg; an arg may carry `ndm: 2|3` to apply to one model dimension only; `word` marks string args that are never numbers. `_why` is documentation only.",
+  "patches": {
+    "beamIntegration/FixedLocation": {
+      "_why": "N is followed by N section tags and N locations (OpenSees beamIntegration docs).",
+      "length": {
+        "secTags": {
+          "ref": "n"
+        },
+        "locs": {
+          "ref": "n"
+        }
+      }
+    },
+    "beamIntegration/MidDistance": {
+      "_why": "N is followed by N section tags and N locations (OpenSees beamIntegration docs).",
+      "length": {
+        "secTags": {
+          "ref": "n"
+        },
+        "locs": {
+          "ref": "n"
+        }
+      }
+    },
+    "beamIntegration/LowOrder": {
+      "_why": "N is followed by N section tags, locations and weights.",
+      "length": {
+        "secTags": {
+          "ref": "n"
+        },
+        "locs": {
+          "ref": "n"
+        },
+        "wts": {
+          "ref": "n"
+        }
+      }
+    },
+    "beamIntegration/UserDefined": {
+      "_why": "N is followed by N section tags, locations and weights.",
+      "length": {
+        "secTags": {
+          "ref": "n"
+        },
+        "locs": {
+          "ref": "n"
+        },
+        "wts": {
+          "ref": "n"
+        }
+      }
+    },
+    "beamIntegration/UserHinge": {
+      "_why": "npL / npR count each hinge's section tags, locations and weights.",
+      "length": {
+        "secsLTags": {
+          "ref": "npL"
+        },
+        "locsL": {
+          "ref": "npL"
+        },
+        "wtsL": {
+          "ref": "npL"
+        },
+        "secsRTags": {
+          "ref": "npR"
+        },
+        "locsR": {
+          "ref": "npR"
+        },
+        "wtsR": {
+          "ref": "npR"
+        }
+      }
+    },
+    "mesh/line": {
+      "_why": "numnodes counts the entries of *ndtags; eleType is the string name of an element, not an int.",
+      "length": {
+        "ndtags": {
+          "ref": "numnodes"
+        }
+      },
+      "kind": {
+        "eleType": "str"
+      }
+    },
+    "mesh/quad": {
+      "_why": "numlines counts the entries of *ltags; eleType is the string name of an element, not an int.",
+      "length": {
+        "ltags": {
+          "ref": "numlines"
+        }
+      },
+      "kind": {
+        "eleType": "str"
+      }
+    },
+    "mesh/tri": {
+      "_why": "numlines counts the entries of *ltags; eleType is the string name of an element, not an int.",
+      "length": {
+        "ltags": {
+          "ref": "numlines"
+        }
+      },
+      "kind": {
+        "eleType": "str"
+      }
+    },
+    "mesh/tet": {
+      "_why": "nummesh counts the entries of *mtags; eleType is the string name of an element, not an int.",
+      "length": {
+        "mtags": {
+          "ref": "nummesh"
+        }
+      },
+      "kind": {
+        "eleType": "str"
+      }
+    },
+    "mesh/bg": {
+      "_why": "lower / upper are ndm coordinates; locations and snodes are counted by numl and numnodes.",
+      "length": {
+        "lower": "ndm",
+        "upper": "ndm",
+        "locations": {
+          "ref": "numl"
+        },
+        "snodes": {
+          "ref": "numnodes"
+        }
+      }
+    },
+    "mesh/part": {
+      "_why": "pArgs, eleType and eleArgs depend on the part type and cannot be split positionally, so they are kept as one list. The type arg is named partType because `type` is the command's own type choice.",
+      "args": [
+        {
+          "kind": "int",
+          "name": "tag"
+        },
+        {
+          "kind": "str",
+          "name": "partType"
+        },
+        {
+          "kind": "vec",
+          "name": "args",
+          "length": "dynamic"
+        },
+        {
+          "kind": "str",
+          "name": "literal",
+          "literal": "-vel"
+        },
+        {
+          "kind": "vec",
+          "name": "vel0",
+          "length": "dynamic"
+        },
+        {
+          "kind": "str",
+          "name": "literal",
+          "literal": "-pressure"
+        },
+        {
+          "kind": "float",
+          "name": "p0"
+        }
+      ]
+    },
+    "uniaxialMaterial/Hysteretic": {
+      "_why": "Each of p1..p3 / n1..n3 is a (stress, strain) pair.",
+      "length": {
+        "p1": 2,
+        "p2": 2,
+        "p3": 2,
+        "n1": 2,
+        "n2": 2,
+        "n3": 2
+      }
+    },
+    "uniaxialMaterial/Steel4": {
+      "_why": "*params is 3 values (OpenSees rejects 2).",
+      "length": {
+        "params": 3
+      }
+    },
+    "uniaxialMaterial/SteelMPF": {
+      "_why": "*params is 3 values (OpenSees rejects 2).",
+      "length": {
+        "params": 3
+      }
+    },
+    "nDMaterial/PressureDependMultiYield": {
+      "_why": "dilat and liquefac are 2 values each; yieldSurf is (gamma, G/Gmax) pairs, 2 per surface; params is 4 values.",
+      "length": {
+        "dilat": 2,
+        "liquefac": 2,
+        "yieldSurf": {
+          "ref": "noYieldSurf",
+          "times": 2
+        },
+        "params": 4
+      }
+    },
+    "nDMaterial/PressureDependMultiYield02": {
+      "_why": "yieldSurf is 2 values per surface; liquefac 2; params 4.",
+      "length": {
+        "yieldSurf": {
+          "ref": "noYieldSurf",
+          "times": 2
+        },
+        "liquefac": 2,
+        "params": 4
+      }
+    },
+    "nDMaterial/PressureDependMultiYield03": {
+      "_why": "yieldSurf is 2 values per surface.",
+      "length": {
+        "yieldSurf": {
+          "ref": "noYieldSurf",
+          "times": 2
+        }
+      }
+    },
+    "nDMaterial/stressDensity": {
+      "_why": "*ssls is 3 values.",
+      "length": {
+        "ssls": 3
+      }
+    },
+    "responseSpectrumAnalysis": {
+      "_why": "The extractor kept `<'-scale ', scale>` as one malformed arg (trailing space, angle brackets). Only the tsTag form is kept; the Tn/Sa list form has no stable positional layout.",
+      "args": [
+        {
+          "kind": "int",
+          "name": "tsTag"
+        },
+        {
+          "kind": "int",
+          "name": "direction"
+        },
+        {
+          "kind": "str",
+          "name": "literal",
+          "literal": "-scale"
+        },
+        {
+          "kind": "float",
+          "name": "scale"
+        },
+        {
+          "kind": "str",
+          "name": "literal",
+          "literal": "-mode"
+        },
+        {
+          "kind": "int",
+          "name": "mode"
+        }
+      ]
+    },
+    "setParameter": {
+      "_why": "Optional <> groups were parsed as positional args. Parameter-specific trailing *args are not modelled.",
+      "args": [
+        {
+          "kind": "str",
+          "name": "literal",
+          "literal": "-val"
+        },
+        {
+          "kind": "float",
+          "name": "newValue"
+        },
+        {
+          "kind": "str",
+          "name": "literal",
+          "literal": "-ele"
+        },
+        {
+          "kind": "vec",
+          "name": "eleTags",
+          "length": "dynamic"
+        },
+        {
+          "kind": "str",
+          "name": "literal",
+          "literal": "-eleRange"
+        },
+        {
+          "kind": "int",
+          "name": "start"
+        },
+        {
+          "kind": "int",
+          "name": "end"
+        }
+      ]
+    },
+    "printModel": {
+      "_why": "Doc signature mixes -node's id list and -flag. Checked against OpenSeesPy: printModel('-node', 1) and ('-ele', 1) take id lists.",
+      "args": [
+        {
+          "kind": "str",
+          "name": "literal",
+          "literal": "-JSON"
+        },
+        {
+          "kind": "str",
+          "name": "literal",
+          "literal": "-file"
+        },
+        {
+          "kind": "str",
+          "name": "filename"
+        },
+        {
+          "kind": "str",
+          "name": "literal",
+          "literal": "-node"
+        },
+        {
+          "kind": "vec",
+          "name": "nodes",
+          "length": "dynamic"
+        },
+        {
+          "kind": "str",
+          "name": "literal",
+          "literal": "-ele"
+        },
+        {
+          "kind": "vec",
+          "name": "eles",
+          "length": "dynamic"
+        },
+        {
+          "kind": "str",
+          "name": "literal",
+          "literal": "-flag"
+        },
+        {
+          "kind": "int",
+          "name": "flag"
+        }
+      ]
+    },
+    "block2D": {
+      "_why": "eleArgs length depends on the element type and crds follows it, so they cannot be split positionally; kept as one list.",
+      "args": [
+        {
+          "kind": "int",
+          "name": "numX"
+        },
+        {
+          "kind": "int",
+          "name": "numY"
+        },
+        {
+          "kind": "int",
+          "name": "startNode"
+        },
+        {
+          "kind": "int",
+          "name": "startEle"
+        },
+        {
+          "kind": "str",
+          "name": "eleType"
+        },
+        {
+          "kind": "vec",
+          "name": "args",
+          "length": "dynamic"
+        }
+      ]
+    },
+    "block3D": {
+      "_why": "eleArgs length depends on the element type and crds follows it, so they cannot be split positionally; kept as one list.",
+      "args": [
+        {
+          "kind": "int",
+          "name": "numX"
+        },
+        {
+          "kind": "int",
+          "name": "numY"
+        },
+        {
+          "kind": "int",
+          "name": "numZ"
+        },
+        {
+          "kind": "int",
+          "name": "startNode"
+        },
+        {
+          "kind": "int",
+          "name": "startEle"
+        },
+        {
+          "kind": "str",
+          "name": "eleType"
+        },
+        {
+          "kind": "vec",
+          "name": "args",
+          "length": "dynamic"
+        }
+      ]
+    },
+    "geomTransf/Linear": {
+      "_why": "The docs list *vecxz after the -jntOffset values; it comes before the flag (3D only, 0 or 3 values). dI and dJ are one offset per dimension.",
+      "length": {
+        "dI": "ndm",
+        "dJ": "ndm"
+      }
+    },
+    "geomTransf/PDelta": {
+      "_why": "The docs list *vecxz after the -jntOffset values; it comes before the flag (3D only, 0 or 3 values). dI and dJ are one offset per dimension.",
+      "length": {
+        "dI": "ndm",
+        "dJ": "ndm"
+      }
+    },
+    "geomTransf/Corotational": {
+      "_why": "The docs list *vecxz after the -jntOffset values; it comes before the flag (3D only, 0 or 3 values). dI and dJ are one offset per dimension.",
+      "length": {
+        "dI": "ndm",
+        "dJ": "ndm"
+      }
+    },
+    "recorder/Node": {
+      "_why": "respType (disp, vel, accel, reaction, ...) is always a word, which is what ends the preceding -dof list.",
+      "word": [
+        "respType"
+      ]
+    },
+    "recorder/EnvelopeNode": {
+      "_why": "respType (disp, vel, accel, reaction, ...) is always a word, which is what ends the preceding -dof list.",
+      "word": [
+        "respType"
+      ]
+    },
+    "section/Elastic": {
+      "_why": "The 2D layout is `E A Iz [G alphaY]` and the 3D layout is `E A Iz Iy G J [alphaY alphaZ]` (OpenSees rejects the 2D form in 3D). The docs list the two signatures without saying which is which, so each arg carries the ndm it applies to.",
+      "args": [
+        {
+          "kind": "int",
+          "name": "secTag"
+        },
+        {
+          "kind": "float",
+          "name": "eMod",
+          "required": true
+        },
+        {
+          "kind": "float",
+          "name": "a",
+          "required": true
+        },
+        {
+          "kind": "float",
+          "name": "iz",
+          "required": true
+        },
+        {
+          "kind": "float",
+          "name": "iy",
+          "ndm": 3,
+          "required": true
+        },
+        {
+          "kind": "float",
+          "name": "gMod",
+          "ndm": 2,
+          "required": false
+        },
+        {
+          "kind": "float",
+          "name": "gMod",
+          "ndm": 3,
+          "required": true
+        },
+        {
+          "kind": "float",
+          "name": "jxx",
+          "ndm": 3,
+          "required": true
+        },
+        {
+          "kind": "float",
+          "name": "alphaY",
+          "required": false
+        },
+        {
+          "kind": "float",
+          "name": "alphaZ",
+          "ndm": 3,
+          "required": false
+        }
+      ]
+    }
+  }
+}

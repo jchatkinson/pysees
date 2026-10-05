@@ -77,8 +77,21 @@ Forms and OpenSeesPy codegen derive from declarative `ArgDef` schemas (`types/sc
 - `src/app/generated/commandSchemas.generated.ts` is generated from the OpenSeesPyDoc RST:
   `npm run schema:extract` then `npm run schema:build` (see README). Curated uniaxial defaults and
   optional-arg overrides live in `scripts/uniaxial-material-defaults.json`. Prefer fixing the generator
-  inputs over hand-editing generated output (if you must patch it, mirror the change in the generator).
+  inputs over hand-editing generated output (if you must patch it, mirror the change in the generator). `npm run schema:check` fails if the
+  committed file differs from what the generator produces.
+- `scripts/schema-patches.json` holds corrections the docs can't express, applied at build time (`command` or `command/Type` → wholesale `args`,
+  vec `length` (number, `ndm`, `ndf`, or `{ref, times}` = counted by an earlier arg), `kind`, `word`, and per-arg `ndm: 2|3`). Each carries a `_why`. The build also merges a
+  command's several doc signatures into one ordered list and renames repeated arg names (`eleOnlyEles`) so a values bag can hold them all.
 - `lib/templates.ts` provides starter models; their material `args` must use schema names.
+
+---
+
+### ndm-specific layouts
+
+Some commands take different arguments in 2D and 3D (`section Elastic`: `E A Iz [G alphaY]` vs `E A Iz Iy G J [alphaY alphaZ]`; `elasticBeamColumn`: `A E Iz transf` vs
+`A E G J Iy Iz transf`). An `ArgDef` may carry `ndm: 2 | 3`, and `getAvailableSchemas(ndm)` returns schemas resolved to that dimension (memoized), so forms,
+decode and encode only ever see a plain list. Elements get their layout from `commands/tables.ts` (`elementArgs(spec, ndm)`); the element form is checked
+against it in `ndmLayouts.test.ts`. Tag the arg, don't branch on `ndm` in UI or codec code.
 
 ---
 
@@ -105,6 +118,37 @@ Results live in IndexedDB (`lib/resultsStorage`), read per step for display (`us
 (`File > Export .py`); renderers go through the same schemas as the forms. Tcl export and a tidier
 download flow are planned. Importing recorder output from an external OpenSees run is a possible
 future path, but the primary results path is Carapace.
+
+---
+
+## Script import / export (OpenSeesPy and Tcl)
+
+One command layout, read by everything. Tcl and OpenSeesPy share a positional argument sequence, so the language-specific code is only syntax.
+
+```
+.tcl / .py text ─► scriptImport/{tcl,python}.ts ─► Tok[] ─► commands/decode.ts ─► ModelWrite ─► Model
+Model ─► commands/encode.ts ─► Call[] ─► commands/print.ts ─► .py / .tcl text
+```
+
+- `commands/grammar.ts`: `decodeArgs` / `encodeArgs`, the inverse pair over a schema's `ArgDef` tree (generated schemas and the forms). A bare
+  `-flag` is `values['-flag'] = true`; a flag with values is emitted only when those values exist, never dangling.
+- `commands/tables.ts`: layouts the generated schemas can't express (elements, fiber-section children, eleLoad component order), used by both directions.
+- `commands/decode.ts` / `encode.ts`: per-command mapping between positional tokens and entities. Add a command here once; import, export and Tcl follow.
+- `commands/print.ts`: the only place that knows Python vs Tcl syntax (`ops.` prefix, `{}` bodies, `BasicBuilder`). Deterministic.
+- `scriptImport/`: a **static** reader, never an interpreter. It substitutes constants (`set L 6`, `L = 6`) and arithmetic (`expr`, `math.*`);
+  `for`/`if`/`proc`/`def` are reported and skipped. Model building only: analysis commands are ignored with an info diagnostic. Unsupported
+  elements/commands are diagnostics, not silent drops. `File > Import` (`ImportScriptDialog`) replaces the model via `initModel`.
+- Exported scripts must be accepted by real OpenSees. `ElasticBeamColumn` is unknown to OpenSeesPy (it needs `elasticBeamColumn`) and `Truss`
+  needs its area; `opensees.test.ts` runs every export in the repo's `.venv`. This OpenSeesPy build has no Tcl interpreter, so Tcl is covered by
+  the cross-language round trip and golden files only.
+
+Tests (`npm test`): `grammar.test.ts` round-trips every generated command variant and requires none to be ambiguous (fix the schema in `schema-patches.json`, don't
+allowlist); `schemaPatches.test.ts` runs real calls for each patched command through the schema and real OpenSees; `roundtrip.test.ts` (export → import → equal model, in both languages);
+`golden.test.ts` (checked-in exports in `commands/__golden__/`, update with `vitest -u` only for intended changes); `opensees.test.ts`;
+`carapaceVsOpenSees.test.ts` runs the same model in Carapace (the bundled wasm, loaded in Node) and in real OpenSees from the exported script and requires the
+recorded displacements, reactions and element forces to agree step by step (relative tolerance 1e-5; observed ~1e-6). Add a fixture to `trussFixtures` /
+the templates list to cover a new element or material. Element force responses differ by element (`elementForceRecorders` in `analysisBlocks.ts`): OpenSees `force`
+is global, so beams export `localForce` to match the local N/V/M PySees shows; trusses and zero-length elements report global forces and keep `force`.
 
 ---
 

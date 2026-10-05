@@ -31,7 +31,8 @@ OpenSees is optional. Users who want to run their model in OpenSees can export i
 - 3D viewport with nodes, elements, supports, load glyphs, deformed shape and element force diagrams, with step playback.
 - Plot overlay and data tables for recorded channels.
 - Material Preview: chart the response of a uniaxial material under a monotonic, cyclic, or custom strain protocol, computed by Carapace.
-- OpenSeesPy script export (`File > Export .py`).
+- Script export as OpenSeesPy or Tcl (`File > Export .py / .tcl`), checked against real OpenSees in the test suite.
+- Script import (`File > Import .tcl / .py…`): reads an OpenSees Tcl or OpenSeesPy script into an ordinary PySees model. The script is parsed, not executed.
 
 ## Roadmap
 
@@ -51,6 +52,7 @@ OpenSees is optional. Users who want to run their model in OpenSees can export i
    `npm run dev`
 3. Run lint checks:
    `npm run lint`
+   Run tests: `npm test`
 4. Rebuild the bundled Carapace wasm after engine changes (needs the sibling `../carapace` checkout and `wasm-bindgen`):
    `scripts/build-carapace.sh`
 5. Build the app:
