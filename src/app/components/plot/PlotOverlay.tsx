@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Download, GripHorizontal, Maximize2, Minimize2, SlidersHorizontal, X, ChevronDown } from 'lucide-react'
+import { Check, Download, Save, GripHorizontal, Maximize2, Minimize2, SlidersHorizontal, X, ChevronDown } from 'lucide-react'
 import { Button } from '@/app/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/app/components/ui/dropdown-menu'
 import { useAppStore } from '@/app/store/useAppStore'
@@ -34,6 +34,10 @@ export function PlotOverlay() {
   const step = useAppStore((s) => s.resultsView.step)
   const resultsOpen = useAppStore((s) => s.resultsView.open)
   const setResultsView = useAppStore((s) => s.setResultsView)
+  const savePlot = useAppStore((s) => s.savePlot)
+  const updateSavedPlot = useAppStore((s) => s.updateSavedPlot)
+  const activeSaved = useAppStore((s) => s.savedPlots.find((p) => p.id === s.activeSavedPlotId))
+  const [justSaved, setJustSaved] = useState(false)
 
   const source = useResultsSource(runId)
   const targets = useMemo(() => availableTargets(source?.layout ?? null), [source])
@@ -132,6 +136,9 @@ export function PlotOverlay() {
     addPlotSeries(built.series.map((s) => ({ y: s.y, x: built.x })), true)
   }
   const addSelected = () => { const specs = selectedNodeSeries(presetCtx); if (specs.length) addPlotSeries(specs.map((s) => ({ ...s, x: pv.x }))) }
+  const flashSaved = () => { setJustSaved(true); setTimeout(() => setJustSaved(false), 1200) }
+  const saveNew = () => { savePlot(); flashSaved() }
+  const saveIcon = justSaved ? <Check className="size-3.5 text-green-600" /> : <Save className="size-3.5" />
   const exportCsv = () => downloadCsv('results-plot.csv', seriesToCsv(chartSeries))
 
   const panel = (
@@ -144,14 +151,30 @@ export function PlotOverlay() {
         <span className="text-xs font-medium">Plot</span>
         <DropdownMenu>
           <DropdownMenuTrigger render={<Button variant="outline" size="sm" className="ml-2 h-6 gap-1 px-2 text-[11px]">Presets <ChevronDown className="size-3" /></Button>} />
-          <DropdownMenuContent>
-            {PLOT_PRESETS.map((p) => <DropdownMenuItem key={p.id} disabled={!source || !p.build(presetCtx)} onClick={() => applyPreset(p.id)}>{p.label}</DropdownMenuItem>)}
+          <DropdownMenuContent align="start" className="w-56">
+            {PLOT_PRESETS.map((p) => (
+              <DropdownMenuItem key={p.id} className="flex-col items-start gap-0" disabled={!source || !p.build(presetCtx)} onClick={() => applyPreset(p.id)}>
+                <span className="w-full truncate" title={p.label}>{p.label}</span>
+                <span className="w-full truncate text-[10px] text-muted-foreground" title={p.hint}>{p.hint}</span>
+              </DropdownMenuItem>
+            ))}
             <DropdownMenuSeparator />
-            <DropdownMenuItem disabled={!selectedNodeSeries(presetCtx).length} onClick={addSelected}>Add selected nodes (displacement)</DropdownMenuItem>
+            <DropdownMenuItem disabled={!selectedNodeSeries(presetCtx).length} onClick={addSelected}><span className="truncate">Add selected nodes (displacement)</span></DropdownMenuItem>
             <DropdownMenuItem disabled={!pv.series.length} onClick={() => addPlotSeries([], true)}>Clear series</DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
         <div className="ml-auto flex items-center gap-0.5">
+          {activeSaved ? (
+            <DropdownMenu>
+              <DropdownMenuTrigger render={<Button type="button" size="icon" variant="ghost" className="size-6" title="Save to report" disabled={!pv.series.length}>{saveIcon}</Button>} />
+              <DropdownMenuContent align="end" className="w-52">
+                <DropdownMenuItem onClick={() => { updateSavedPlot(activeSaved.id); flashSaved() }}><span className="truncate" title={activeSaved.name}>Update “{activeSaved.name}”</span></DropdownMenuItem>
+                <DropdownMenuItem onClick={saveNew}>Save as new</DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          ) : (
+            <Button type="button" size="icon" variant="ghost" className="size-6" title="Save to report" disabled={!pv.series.length} onClick={saveNew}>{saveIcon}</Button>
+          )}
           <Button type="button" size="icon" variant="ghost" className="size-6" title="Export CSV" disabled={!chartSeries.length} onClick={exportCsv}><Download className="size-3.5" /></Button>
           <Button type="button" size="icon" variant={pv.showEditor ? 'secondary' : 'ghost'} className="size-6" title="Series editor" onClick={() => setPlotView({ showEditor: !pv.showEditor })}><SlidersHorizontal className="size-3.5" /></Button>
           <Button type="button" size="icon" variant="ghost" className="size-6" title={pv.maximized ? 'Restore' : 'Maximize'} onClick={() => setPlotView({ maximized: !pv.maximized })}>{pv.maximized ? <Minimize2 className="size-3.5" /> : <Maximize2 className="size-3.5" />}</Button>

@@ -5,6 +5,8 @@ import type { AvailableTargets } from './channels'
 export interface PlotPreset {
   id: string
   label: string
+  /** One short line shown under the label in the menu. */
+  hint: string
   /** Null when the run lacks the data this preset needs. */
   build: (ctx: PresetContext) => { x: Channel; series: { y: Channel }[] } | null
 }
@@ -41,7 +43,7 @@ function roofNode(ctx: PresetContext): number | null {
 
 export const PLOT_PRESETS: PlotPreset[] = [
   {
-    id: 'disp-vs-step', label: 'Node displacement vs step',
+    id: 'disp-vs-step', label: 'Node displacement', hint: 'Selected nodes, dx vs step',
     build: (ctx) => {
       const tags = nodesFor(ctx)
       if (!tags.length) return null
@@ -50,14 +52,14 @@ export const PLOT_PRESETS: PlotPreset[] = [
     },
   },
   {
-    id: 'base-shear-vs-step', label: 'Base shear (Σ reactions) vs step',
+    id: 'base-shear-vs-step', label: 'Base shear', hint: 'Σ reactions vs step',
     build: (ctx) => {
       if (!ctx.targets.reaction.tags.length) return null
       return { x: { type: 'step' }, series: [{ y: response('reaction', pick(ctx.targets.reaction.components, 'Fx'), 'sum', ctx.targets.reaction.tags, -1) }] }
     },
   },
   {
-    id: 'pushover', label: 'Pushover: base shear vs control node displacement',
+    id: 'pushover', label: 'Pushover', hint: 'Base shear vs control node dx',
     build: (ctx) => {
       const control = ctx.selectedNodeIds.find((t) => ctx.targets.disp.tags.includes(t)) ?? roofNode(ctx)
       if (control === null || !ctx.targets.reaction.tags.length) return null
@@ -68,7 +70,7 @@ export const PLOT_PRESETS: PlotPreset[] = [
     },
   },
   {
-    id: 'moment-vs-rotation', label: 'Hysteresis: element end moment vs end rotation',
+    id: 'moment-vs-rotation', label: 'Moment–rotation hysteresis', hint: 'End moment vs end rotation',
     build: (ctx) => {
       const ele = ctx.targets.force.tags[0]
       const nodes = ele === undefined ? undefined : ctx.model.elements.get(ele)?.nodes

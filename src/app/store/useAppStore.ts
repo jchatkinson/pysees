@@ -13,6 +13,8 @@ import { runCarapaceOnWorker, nextCarapaceRunId } from '@/app/lib/carapace/carap
 import { clearAllRuns } from '@/app/lib/resultsStorage/resultsStorageClient'
 import type { CarapaceRunProgress, CarapaceRunResult } from '@/app/types/carapaceRun'
 import { DEFAULT_RESULTS_VIEW, type ResultsView } from '@/app/types/resultsView'
+import type { SavedPlot } from '@/app/types/savedPlot'
+import { plotNameFor, restorePlot, snapshotPlot, uniqueName } from '@/app/lib/plot/savedPlots'
 import { DEFAULT_PLOT_VIEW, SERIES_COLORS, type Channel, type PlotView, type SeriesSpec } from '@/app/types/plotView'
 import type { CompileDiagnostic } from '@/app/lib/compileAnalysisSequence'
 
@@ -73,8 +75,8 @@ interface AppStore {
     protocol: number[]
     inputMaterial: { matType: string; values: Record<string, unknown> } | null
   }
-  activePanel: 'model' | 'analysis'
-  setActivePanel: (panel: 'model' | 'analysis') => void
+  activePanel: 'model' | 'analysis' | 'report'
+  setActivePanel: (panel: 'model' | 'analysis' | 'report') => void
   activeRightPanel: 'command' | 'results'
   setActiveRightPanel: (panel: 'command' | 'results') => void
 
@@ -131,6 +133,20 @@ interface AppStore {
   addPlotSeries: (specs: { y: Channel; x?: Channel; label?: string }[], replace?: boolean) => void
   updatePlotSeries: (id: string, patch: Partial<Omit<SeriesSpec, 'id'>>) => void
   removePlotSeries: (id: string) => void
+
+  // report: saved plot configurations (config only; results are never stored). Cleared with the model.
+  savedPlots: SavedPlot[]
+  nextSavedPlotId: number
+  /** The entry the open plot was saved to / loaded from; "Update" overwrites it. */
+  activeSavedPlotId: number | null
+  /** Saves the open plot as a new entry (becomes the active one). */
+  savePlot: (name?: string) => void
+  /** Overwrites an entry with the open plot. */
+  updateSavedPlot: (id: number) => void
+  /** Loads an entry into the plot overlay and opens it. */
+  applySavedPlot: (id: number) => void
+  renameSavedPlot: (id: number, name: string) => void
+  deleteSavedPlot: (id: number) => void
 
   // Model actions
   initModel: (ndm: 2 | 3, ndf: number, extra?: { writes?: ModelWrite[]; analysisCommands?: AnalysisCommand[]; gridlines?: GridlineEntity[]; levels?: LevelEntity[] }) => void
@@ -313,6 +329,26 @@ export const useAppStore = create<AppStore>((set, get) => {
   updatePlotSeries: (id, patch) => set((s) => ({ plotView: { ...s.plotView, series: s.plotView.series.map((x) => (x.id === id ? { ...x, ...patch } : x)) } })),
   removePlotSeries: (id) => set((s) => ({ plotView: { ...s.plotView, series: s.plotView.series.filter((x) => x.id !== id) } })),
 
+  savedPlots: [],
+  nextSavedPlotId: 1,
+  activeSavedPlotId: null,
+  savePlot: (name) => set((s) => {
+    if (!s.plotView.series.length) return s
+    const config = snapshotPlot(s.plotView)
+    const id = s.nextSavedPlotId
+    const entry: SavedPlot = { kind: 'plot', id, name: uniqueName(name?.trim() || plotNameFor(config), s.savedPlots), config }
+    return { savedPlots: [...s.savedPlots, entry], nextSavedPlotId: id + 1, activeSavedPlotId: id }
+  }),
+  updateSavedPlot: (id) => set((s) => (s.plotView.series.length && s.savedPlots.some((p) => p.id === id)
+    ? { savedPlots: s.savedPlots.map((p) => (p.id === id ? { ...p, config: snapshotPlot(s.plotView) } : p)), activeSavedPlotId: id }
+    : s)),
+  applySavedPlot: (id) => set((s) => {
+    const entry = s.savedPlots.find((p) => p.id === id)
+    return entry ? { plotView: { ...s.plotView, ...restorePlot(entry.config) }, activeSavedPlotId: id } : s
+  }),
+  renameSavedPlot: (id, name) => set((s) => (name.trim() ? { savedPlots: s.savedPlots.map((p) => (p.id === id ? { ...p, name: uniqueName(name.trim(), s.savedPlots, id) } : p)) } : s)),
+  deleteSavedPlot: (id) => set((s) => ({ savedPlots: s.savedPlots.filter((p) => p.id !== id), activeSavedPlotId: s.activeSavedPlotId === id ? null : s.activeSavedPlotId })),
+
   initModel: (ndm, ndf, extra) => set(() => {
     void clearAllRuns()
     let model = emptyModel()
@@ -335,6 +371,9 @@ export const useAppStore = create<AppStore>((set, get) => {
       analysisInsertionIndex: null,
       resultsView: DEFAULT_RESULTS_VIEW,
       plotView: DEFAULT_PLOT_VIEW,
+      savedPlots: [],
+      nextSavedPlotId: 1,
+      activeSavedPlotId: null,
     }
   }),
 
@@ -358,6 +397,9 @@ export const useAppStore = create<AppStore>((set, get) => {
       results: null,
       resultsView: DEFAULT_RESULTS_VIEW,
       plotView: DEFAULT_PLOT_VIEW,
+      savedPlots: [],
+      nextSavedPlotId: 1,
+      activeSavedPlotId: null,
     })
   },
 

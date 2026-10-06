@@ -3,6 +3,7 @@ import { TopBar } from '@/app/components/TopBar'
 import { ActionBar } from '@/app/components/ActionBar'
 import { ModelPanel } from '@/app/components/ModelPanel'
 import { AnalysisPanel } from '@/app/components/AnalysisPanel'
+import { ReportPanel } from '@/app/components/ReportPanel'
 import { CommandForm } from '@/app/components/CommandForm'
 import { ResultsPanel } from '@/app/components/ResultsPanel'
 import { Viewport } from '@/app/components/Viewport'
@@ -19,23 +20,12 @@ function LeftPanel() {
   return (
     <div className="flex flex-col h-full">
       <div className="flex border-b shrink-0">
-        <Button
-          variant="ghost"
-          className={`flex-1 h-7 rounded-none text-[11px] ${activePanel === 'model' ? 'bg-accent text-accent-foreground' : ''}`}
-          onClick={() => setActivePanel('model')}
-        >
-          Model
-        </Button>
-        <Button
-          variant="ghost"
-          className={`flex-1 h-7 rounded-none text-[11px] ${activePanel === 'analysis' ? 'bg-accent text-accent-foreground' : ''}`}
-          onClick={() => setActivePanel('analysis')}
-        >
-          Analysis
-        </Button>
+        {([['model', 'Model'], ['analysis', 'Analysis'], ['report', 'Report']] as const).map(([id, label]) => (
+          <Button key={id} variant="ghost" className={`flex-1 h-7 rounded-none text-[11px] ${activePanel === id ? 'bg-accent text-accent-foreground' : ''}`} onClick={() => setActivePanel(id)}>{label}</Button>
+        ))}
       </div>
       <div className="flex-1 min-h-0">
-        {activePanel === 'model' ? <ModelPanel /> : <AnalysisPanel />}
+        {activePanel === 'model' ? <ModelPanel /> : activePanel === 'analysis' ? <AnalysisPanel /> : <ReportPanel />}
       </div>
     </div>
   )
