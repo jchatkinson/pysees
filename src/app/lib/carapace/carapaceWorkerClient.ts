@@ -19,7 +19,7 @@ export interface RunCarapaceOnWorkerOptions {
   onProgress?: (progress: CarapaceRunProgress) => void
 }
 
-function runMetadataFor(runId: string, input: CarapaceInputV1, nodeCount: number, dofsPerNode: number, columnCount: number): RunMetadata {
+function runMetadataFor(runId: string, input: CarapaceInputV1, nodeCount: number, dofsPerNode: number, columnCount: number, nodeTags: number[]): RunMetadata {
   return {
     runId,
     // pysees's compiler doesn't produce model/sequence provenance hashes yet
@@ -34,6 +34,7 @@ function runMetadataFor(runId: string, input: CarapaceInputV1, nodeCount: number
     dofsPerNode,
     nodeCount,
     columnCount,
+    nodeTags,
     sampleCount: 0,
   }
 }
@@ -67,6 +68,7 @@ export function runCarapaceOnWorker(
   recordedNodeTags: number[],
   dofsPerNode: number,
   recorderPlans: RecorderPlan[],
+  nodeTags: number[],
   options: RunCarapaceOnWorkerOptions = {},
 ): { promise: Promise<CarapaceRunResult>; cancel: () => void } {
   const w = getWorker()
@@ -77,7 +79,7 @@ export function runCarapaceOnWorker(
     // model-hash provenance yet to tell an old run apart from the current one).
     await resultsStorage.clearAllRuns()
     await resultsStorage.beginRun(
-      runMetadataFor(runId, input, nodeCount, dofsPerNode, input.sequence.recorders.length),
+      runMetadataFor(runId, input, nodeCount, dofsPerNode, input.sequence.recorders.length, nodeTags),
       stageMetadataFor(runId, input),
       recorderMetadataFor(runId, recorderPlans),
     )

@@ -8,11 +8,15 @@ import { Label } from '@/app/components/ui/label'
 import { Slider } from '@/app/components/ui/slider'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/app/components/ui/select'
 import { useAppStore } from '@/app/store/useAppStore'
-import { listRuns } from '@/app/lib/resultsStorage/resultsStorageClient'
 import { useResultsSource } from '@/app/lib/resultsStorage/useResultsSource'
+import { useModalResults } from '@/app/lib/resultsStorage/useModalResults'
+import { useCurrentCase } from '@/app/lib/resultsStorage/useCases'
+import type { CaseInfo } from '@/app/lib/resultsStorage/stepFrames'
 import { usePlayback } from '@/app/lib/usePlayback'
-import { autoScale, modelMetrics } from '@/app/lib/resultsScale'
-import type { RunExtents, RunMetadata } from '@/app/types/resultsStorage'
+import { useModeAnimation } from '@/app/lib/useModeAnimation'
+import { modeFrequencyHz, modePeriod, modeTimingText, modeTranslationPeak } from '@/app/lib/modal'
+import { autoModeScale, autoScale, modelMetrics } from '@/app/lib/resultsScale'
+import type { RunExtents } from '@/app/types/resultsStorage'
 import type { ResultType, ScaleKey } from '@/app/types/resultsView'
 
 const RESULT_TYPES: { id: ResultType; label: string }[] = [
@@ -21,38 +25,48 @@ const RESULT_TYPES: { id: ResultType; label: string }[] = [
   { id: 'axial', label: 'Axial force (N)' },
   { id: 'shear', label: 'Shear force (V)' },
   { id: 'moment', label: 'Bending moment (M)' },
+  { id: 'mode', label: 'Mode shape' },
 ]
+const DIRECTIONS = ['UX', 'UY', 'UZ']
 
 const fmt = (v: number) => (v === 0 ? '0' : Number(v.toPrecision(4)).toString())
-const shortRun = (id: string) => (id.length > 10 ? `${id.slice(0, 8)}…` : id)
+const caseLabel = (c: CaseInfo) => `${c.stageId} · ${c.kind === 'modal' ? 'modal' : `${Math.max(0, c.count - 1)} steps`}`
 
 /** ETABS-style "Display Results" panel docked in the viewport: case, step, result type and display settings. */
 export function ResultsDisplayPanel() {
   const rv = useAppStore((s) => s.resultsView)
   const set = useAppStore((s) => s.setResultsView)
   const model = useAppStore((s) => s.model)
-  const runStatus = useAppStore((s) => s.carapaceRun.status)
 
-  const [runs, setRuns] = useState<RunMetadata[]>([])
   const [extents, setExtents] = useState<{ runId: string; value: RunExtents } | null>(null)
   const [time, setTime] = useState<{ runId: string; step: number; value: number } | null>(null)
 
   const source = useResultsSource(rv.runId)
-  const sampleCount = source?.sampleCount ?? 0
-  usePlayback(sampleCount)
+  // The selected case (analysis stage): steps, extents and playback are all scoped to its sample range.
+  const { cases, current, series } = useCurrentCase()
+  const count = series?.count ?? 0
+  const first = series?.first ?? 0
+  const lastStep = series ? series.first + series.count - 1 : 0
+  usePlayback(first, lastStep)
+  useModeAnimation()
+  const modal = useModalResults(rv.runId)
+  const modalStage = current?.kind === 'modal' ? modal?.stages.find((s) => s.stageIndex === current.stageIndex) : undefined
+  const mode = modalStage?.modes[rv.mode] ?? modalStage?.modes[0]
+  const isModalCase = current?.kind === 'modal'
+
+  // Keep the result type valid for the case: modes for a modal case, steps' results otherwise.
+  useEffect(() => {
+    if (!current) return
+    if (current.kind === 'modal' && rv.type !== 'mode' && rv.type !== 'none') set({ type: 'mode' })
+    else if (current.kind !== 'modal' && rv.type === 'mode') set({ type: 'deformed' })
+  }, [current, rv.type, set])
 
   useEffect(() => {
+    if (!source || !series) return
     let live = true
-    listRuns().then((r) => { if (live) setRuns(r.runs.filter((x) => x.sampleCount > 0).sort((a, b) => b.startedAt - a.startedAt)) }).catch(() => {})
+    source.extents({ first: series.first, last: series.first + series.count - 1 }).then((value) => { if (live) setExtents({ runId: source.runId, value }) }).catch(() => {})
     return () => { live = false }
-  }, [runStatus])
-
-  useEffect(() => {
-    if (!source) return
-    let live = true
-    source.extents().then((value) => { if (live) setExtents({ runId: source.runId, value }) }).catch(() => {})
-    return () => { live = false }
-  }, [source])
+  }, [source, series])
 
   useEffect(() => {
     if (!source) return
@@ -65,7 +79,7 @@ export function ResultsDisplayPanel() {
   const metrics = useMemo(() => modelMetrics(model), [model])
   const runExtents = extents && extents.runId === rv.runId ? extents.value : null
   const scaleKey: ScaleKey | null = rv.type === 'none' ? null : rv.type
-  const auto = scaleKey ? autoScale(scaleKey, runExtents, metrics) : 1
+  const auto = !scaleKey ? 1 : scaleKey === 'mode' ? autoModeScale(modalStage && mode ? modeTranslationPeak(modalStage, mode) : 0, metrics) : autoScale(scaleKey, runExtents, metrics)
   const manual = scaleKey ? rv.scales[scaleKey] : null
   const scale = manual ?? auto
   const plotOpen = useAppStore((s) => s.plotView.open)
@@ -81,11 +95,24 @@ export function ResultsDisplayPanel() {
     ) : null
   }
 
-  const lastStep = Math.max(0, sampleCount - 1)
-  const goto = (step: number) => set({ step: Math.min(lastStep, Math.max(0, step)), stepFrac: 0 })
+  const goto = (step: number) => set({ step: Math.min(lastStep, Math.max(first, step)), stepFrac: 0 })
+  const rel = rv.step - first
+  const selectCase = (stageIndex: number) => {
+    const c = cases?.find((x) => x.stageIndex === stageIndex)
+    if (!c) return
+    set(c.kind === 'modal'
+      ? { caseStage: stageIndex, playing: false, phase: 0, mode: 0, type: 'mode' }
+      : { caseStage: stageIndex, playing: false, phase: 0, step: c.first + c.count - 1, stepFrac: 0, type: rv.type === 'mode' || rv.type === 'none' ? 'deformed' : rv.type })
+  }
   const stepTime = time && time.runId === rv.runId && time.step === rv.step ? time.value : null
 
   return (
+    <>
+    {rv.type === 'mode' && mode && modalStage && (
+      <div className="pointer-events-none absolute bottom-3 left-3 z-40 rounded-md bg-background/85 px-3 py-1.5 text-sm shadow">
+        <span className="font-medium">Mode {Math.min(rv.mode, modalStage.modes.length - 1) + 1}</span> — {modeTimingText(mode)}
+      </div>
+    )}
     <div className="absolute right-3 top-3 z-40 w-72 max-w-[calc(100%-1.5rem)]">
       <Card className="shadow-lg">
         <CardHeader className="pb-2">
@@ -100,36 +127,66 @@ export function ResultsDisplayPanel() {
         <CardContent className="grid gap-3 text-xs">
           <div className="grid gap-1">
             <Label className="text-[11px]">Case</Label>
-            <Select value={rv.runId ?? ''} onValueChange={(v) => set({ runId: (v as string) || null, step: 0, stepFrac: 0, playing: false })}>
-              <SelectTrigger className="w-full"><SelectValue placeholder="No stored runs" /></SelectTrigger>
+            <Select items={(cases ?? []).map((c) => ({ value: String(c.stageIndex), label: caseLabel(c) }))} value={current ? String(current.stageIndex) : ''} onValueChange={(v) => selectCase(Number(v))}>
+              <SelectTrigger className="w-full"><SelectValue placeholder="No results" /></SelectTrigger>
               <SelectContent>
-                {runs.map((r) => <SelectItem key={r.runId} value={r.runId}>{shortRun(r.runId)} · {r.status} · {r.sampleCount} steps</SelectItem>)}
+                {(cases ?? []).map((c) => <SelectItem key={c.stageIndex} value={String(c.stageIndex)}>{caseLabel(c)}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>
 
           <div className="grid gap-1">
             <Label className="text-[11px]">Result</Label>
-            <Select value={rv.type} onValueChange={(v) => set({ type: v as ResultType })}>
+            <Select items={RESULT_TYPES.map((t) => ({ value: t.id, label: t.label }))} value={rv.type} onValueChange={(v) => set({ type: v as ResultType, phase: 0 })}>
               <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
-              <SelectContent>{RESULT_TYPES.map((t) => <SelectItem key={t.id} value={t.id}>{t.label}</SelectItem>)}</SelectContent>
+              <SelectContent>{RESULT_TYPES.filter((t) => t.id === 'none' || (t.id === 'mode' ? isModalCase : !isModalCase)).map((t) => <SelectItem key={t.id} value={t.id}>{t.label}</SelectItem>)}</SelectContent>
             </Select>
           </div>
 
-          <div className="grid gap-1">
+          {rv.type === 'mode' && modalStage && (
+            <div className="grid gap-2">
+              <div className="grid gap-1">
+                <Label className="text-[11px]">Mode</Label>
+                <Select items={modalStage.modes.map((m, i) => ({ value: String(i), label: `${i + 1} · T = ${fmt(modePeriod(m.frequency))} s · f = ${fmt(modeFrequencyHz(m.frequency))} Hz` }))} value={String(rv.mode)} onValueChange={(v) => set({ mode: Number(v), phase: 0 })}>
+                  <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+                  <SelectContent>{modalStage.modes.map((m, i) => <SelectItem key={i} value={String(i)}>{i + 1} · T = {fmt(modePeriod(m.frequency))} s · f = {fmt(modeFrequencyHz(m.frequency))} Hz</SelectItem>)}</SelectContent>
+                </Select>
+              </div>
+              {mode && (
+                <div className="grid gap-0.5 rounded-md bg-muted/50 px-2 py-1.5 text-[11px]">
+                  <span className="font-medium">Mode {Math.min(rv.mode, modalStage.modes.length - 1) + 1}: {modeTimingText(mode)}</span>
+                  <span className="text-muted-foreground">ω = {fmt(mode.frequency)} rad/s · mass ratio {mode.massRatio.map((r, d) => `${DIRECTIONS[d]} ${(r * 100).toFixed(1)}%`).join(' · ')}</span>
+                </div>
+              )}
+              <div className="flex items-center gap-2">
+                <Button size="icon" variant="outline" className="size-7" onClick={() => set({ playing: !rv.playing })}>{rv.playing ? <Pause className="size-3.5" /> : <Play className="size-3.5" />}</Button>
+                <Label className="w-12 shrink-0 text-[11px]">Speed</Label>
+                <Input
+                  key={rv.modeSpeed}
+                  defaultValue={String(rv.modeSpeed)}
+                  className="h-7 flex-1 text-xs"
+                  onBlur={(e) => { const v = Number(e.target.value); if (Number.isFinite(v) && v > 0 && v !== rv.modeSpeed) set({ modeSpeed: Math.min(v, 10) }) }}
+                  onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur() }}
+                />
+                <span className="text-[10px] text-muted-foreground">cycles/s</span>
+              </div>
+            </div>
+          )}
+
+          {rv.type !== 'mode' && <div className="grid gap-1">
             <div className="flex items-center justify-between">
               <Label className="text-[11px]">Step</Label>
-              <span className="text-[10px] text-muted-foreground">{sampleCount ? `${rv.step} / ${lastStep}` : '–'}{stepTime !== null && ` · t = ${fmt(stepTime)}`}</span>
+              <span className="text-[10px] text-muted-foreground">{count ? `${rel} / ${lastStep - first}` : '–'}{count > 0 && rel === 0 && ' (initial)'}{stepTime !== null && ` · t = ${fmt(stepTime)}`}</span>
             </div>
-            <Slider value={[Math.min(rv.step + rv.stepFrac, lastStep)]} min={0} max={Math.max(1, lastStep)} step={0.01} disabled={sampleCount < 2} className="w-full" onValueChange={(v) => goto(Math.round((Array.isArray(v) ? v[0] : v) ?? 0))} />
+            <Slider value={[Math.min(rv.step + rv.stepFrac, lastStep)]} min={first} max={Math.max(first + 1, lastStep)} step={0.01} disabled={count < 2} className="w-full" onValueChange={(v) => goto(Math.round((Array.isArray(v) ? v[0] : v) ?? 0))} />
             <div className="flex items-center justify-center gap-1">
-              <Button size="icon" variant="ghost" className="size-6" disabled={!sampleCount} onClick={() => goto(0)}><ChevronsLeft className="size-3.5" /></Button>
-              <Button size="icon" variant="ghost" className="size-6" disabled={!sampleCount} onClick={() => goto(rv.step - 1)}><ChevronLeft className="size-3.5" /></Button>
-              <Button size="icon" variant="outline" className="size-7" disabled={sampleCount < 2} onClick={() => set({ playing: !rv.playing })}>{rv.playing ? <Pause className="size-3.5" /> : <Play className="size-3.5" />}</Button>
-              <Button size="icon" variant="ghost" className="size-6" disabled={!sampleCount} onClick={() => goto(rv.step + 1)}><ChevronRight className="size-3.5" /></Button>
-              <Button size="icon" variant="ghost" className="size-6" disabled={!sampleCount} onClick={() => goto(lastStep)}><ChevronsRight className="size-3.5" /></Button>
+              <Button size="icon" variant="ghost" className="size-6" disabled={!count} onClick={() => goto(first)}><ChevronsLeft className="size-3.5" /></Button>
+              <Button size="icon" variant="ghost" className="size-6" disabled={!count} onClick={() => goto(rv.step - 1)}><ChevronLeft className="size-3.5" /></Button>
+              <Button size="icon" variant="outline" className="size-7" disabled={count < 2} onClick={() => set({ playing: !rv.playing })}>{rv.playing ? <Pause className="size-3.5" /> : <Play className="size-3.5" />}</Button>
+              <Button size="icon" variant="ghost" className="size-6" disabled={!count} onClick={() => goto(rv.step + 1)}><ChevronRight className="size-3.5" /></Button>
+              <Button size="icon" variant="ghost" className="size-6" disabled={!count} onClick={() => goto(lastStep)}><ChevronsRight className="size-3.5" /></Button>
             </div>
-          </div>
+          </div>}
 
           <div className="grid gap-2 border-t pt-2">
             <div className="flex items-center gap-2">
@@ -176,5 +233,6 @@ export function ResultsDisplayPanel() {
         </CardContent>
       </Card>
     </div>
+    </>
   )
 }

@@ -16,6 +16,7 @@ export const wasmmaterialprobe_applyStrain: (a: number, b: number) => [number, n
 export const wasmmaterialprobe_reset: (a: number) => [number, number];
 export const wasmsession_advance: (a: number, b: number) => [number, number, number];
 export const wasmsession_currentStageId: (a: number) => [number, number];
+export const wasmsession_modalResults: (a: number) => [number, number, number];
 export const zero_length_ent_displacement: (a: number, b: number) => number;
 export const __wbindgen_malloc: (a: number, b: number) => number;
 export const __wbindgen_realloc: (a: number, b: number, c: number, d: number) => number;

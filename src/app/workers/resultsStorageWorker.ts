@@ -1,5 +1,5 @@
 import type { StorageReply, StorageRequest } from '@/app/types/resultsStorage'
-import { beginRun, clearAllRuns, deleteRun, finishRun, getRunLayout, listRuns, query, queryBlock, queryColumns, queryJointDisplacements, queryRunExtents, writeBlocks } from '@/app/lib/resultsStorage/db'
+import { beginRun, clearAllRuns, deleteRun, finishRun, getRunLayout, listRuns, query, queryBlock, queryColumns, queryJointDisplacements, queryModal, queryRunExtents, writeBlocks, writeModal } from '@/app/lib/resultsStorage/db'
 
 /** carapace/docs/results-storage-indexeddb.md's results-storage worker: owns the IndexedDB
  * connection (db.ts), answers write/query/lifecycle requests, and stays reusable across runs in
@@ -30,6 +30,13 @@ async function handleRequest(request: StorageRequest): Promise<StorageReply> {
       const result = await writeBlocks(request.runId, request.blocks)
       return { type: 'writeBlocksAck', requestId: request.requestId, runId: request.runId, batchId: request.batchId, ...result }
     }
+    case 'writeModal':
+      await writeModal(request.runId, request.stages)
+      return { type: 'writeModalAck', requestId: request.requestId, runId: request.runId }
+    case 'queryModal': {
+      const result = await queryModal(request.runId)
+      return { type: 'queryModalResult', requestId: request.requestId, runId: request.runId, ...result }
+    }
     case 'query': {
       const result = await query(request.runId, request.recorderId, request.firstSample, request.limit)
       return { type: 'queryResult', requestId: request.requestId, runId: request.runId, recorderId: request.recorderId, samples: result.samples, nextFirstSample: result.nextFirstSample }
@@ -53,8 +60,8 @@ async function handleRequest(request: StorageRequest): Promise<StorageReply> {
       return { type: 'queryJointDisplacementsResult', requestId: request.requestId, runId: request.runId, recorders: result.recorders, rows: result.rows }
     }
     case 'getRunLayout': {
-      const { run, recorders } = await getRunLayout(request.runId)
-      return { type: 'getRunLayoutResult', requestId: request.requestId, runId: request.runId, run, recorders }
+      const { run, recorders, stages } = await getRunLayout(request.runId)
+      return { type: 'getRunLayoutResult', requestId: request.requestId, runId: request.runId, run, recorders, stages }
     }
     case 'queryBlock': {
       const block = await queryBlock(request.runId, request.sample)
@@ -65,7 +72,7 @@ async function handleRequest(request: StorageRequest): Promise<StorageReply> {
       return { type: 'queryColumnsResult', requestId: request.requestId, runId: request.runId, ...result }
     }
     case 'queryRunExtents': {
-      const extents = await queryRunExtents(request.runId)
+      const extents = await queryRunExtents(request.runId, request.firstSample === undefined || request.lastSample === undefined ? undefined : { first: request.firstSample, last: request.lastSample })
       return { type: 'queryRunExtentsResult', requestId: request.requestId, runId: request.runId, extents }
     }
   }

@@ -1,6 +1,6 @@
 import type { CarapaceInputV1 } from '@/app/types/carapaceInputV1'
 import type { CarapaceRunResult } from '@/app/types/carapaceRun'
-import type { ResultBlock, StorageReply, StorageRequest } from '@/app/types/resultsStorage'
+import type { ModalStageResult, ResultBlock, StorageReply, StorageRequest } from '@/app/types/resultsStorage'
 
 /** pysees-handoff.md's worker protocol: coarse, run-oriented messages, each carrying a runId so
  * the UI can ignore responses for a run it's no longer displaying. `storagePort`, when present,
@@ -97,7 +97,7 @@ class StorageStream {
   }
 
   private onReply(reply: StorageReply) {
-    if (reply.type !== 'writeBlocksAck' && reply.type !== 'storageError') return
+    if (reply.type !== 'writeBlocksAck' && reply.type !== 'writeModalAck' && reply.type !== 'storageError') return
     if (reply.type === 'storageError') this.failure = reply.detail
     const entry = this.pendingAcks.shift()
     if (entry) { this.inFlightBytes -= entry.bytes; entry.resolve() }
@@ -132,6 +132,17 @@ class StorageStream {
       this.pendingRows.push(row)
     }
     if (this.pendingBytes() >= FLUSH_BYTE_TARGET) await this.flush()
+  }
+
+  /** Persists finished modal stages (not part of the step timeline). Waits for the ack. */
+  async writeModal(stages: ModalStageResult[]): Promise<void> {
+    if (this.failure) throw new Error(this.failure)
+    const requestId = `storage-${this.runId}-${this.requestCounter++}`
+    const ack = new Promise<void>((resolve) => this.pendingAcks.push({ bytes: 0, resolve }))
+    const request: StorageRequest = { type: 'writeModal', requestId, runId: this.runId, stages }
+    this.port.postMessage(request)
+    await ack
+    if (this.failure) throw new Error(this.failure)
   }
 
   async flush(): Promise<void> {
@@ -169,9 +180,16 @@ async function runOne(runId: string, input: CarapaceInputV1, storagePort?: Messa
   let lastProgressAt = 0
   let sampleCount = 0
 
+  let modalStageCount = 0
   const finalizeStorage = async () => {
     if (!storageStream) return
-    try { await storageStream.flush() } catch (storageError) { error = { kind: 'storageFailed', detail: String(storageError) } }
+    try {
+      await storageStream.flush()
+      // Modes of every modal stage that finished — kept even if a later stage failed or the run was cancelled.
+      const modal = (session.modalResults() as { stages: ModalStageResult[] }).stages
+      if (modal.length) await storageStream.writeModal(modal)
+      modalStageCount = modal.length
+    } catch (storageError) { error = { kind: 'storageFailed', detail: String(storageError) } }
   }
 
   for (;;) {
@@ -207,7 +225,7 @@ async function runOne(runId: string, input: CarapaceInputV1, storagePort?: Messa
   }
 
   await finalizeStorage()
-  const result: CarapaceRunResult = { stagesRun, finalStageId: session.currentStageId(), error, sampleCount, recordedNodeTags: [] }
+  const result: CarapaceRunResult = { stagesRun, finalStageId: session.currentStageId(), error, sampleCount, recordedNodeTags: [], modalStageCount }
   ctx.postMessage({ type: 'complete', runId, result })
 }
 

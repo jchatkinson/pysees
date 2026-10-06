@@ -17,6 +17,8 @@ export interface CompileInputV1Result {
    * then support reactions, then element forces. Each one owns `componentLayout.length`
    * consecutive columns starting at `columnOffset` (after the leading pseudo-time column). */
   recorderPlans: RecorderPlan[]
+  /** Every model node tag in node-table order (ascending) — the node order of a modal stage's mode shapes. */
+  nodeTags: number[]
 }
 
 export type RecorderPlanKind = 'disp' | 'reaction' | 'force'
@@ -61,7 +63,7 @@ export function compileInputV1(model: Model, analysisHistory: AnalysisHistory): 
   const diagnostics: CompileDiagnostic[] = []
   const fail = (message: string): CompileInputV1Result => {
     diagnostics.push({ severity: 'error', message, commandIndex: -1 })
-    return { input: null, diagnostics, recordedNodeTags: [], dofsPerNode: 0, recorderPlans: [] }
+    return { input: null, diagnostics, recordedNodeTags: [], dofsPerNode: 0, recorderPlans: [], nodeTags: [] }
   }
 
   if (!model.config) return fail('Model is not initialized.')
@@ -103,6 +105,13 @@ export function compileInputV1(model: Model, analysisHistory: AnalysisHistory): 
     mass.push(m.values[0] ?? 0, m.values[1] ?? 0, m.values[2] ?? 0)
   }
   const nodes: W.NodeTable = { coords, fixed, massNodeIndex, mass }
+  // Eigen analysis needs mass on at least as many free DOFs as modes requested (massless DOFs are condensed).
+  const massiveDofs = massNodeIndex.reduce((count, idx, k) => count + [0, 1, 2].filter((d) => mass[k * 3 + d] > 0 && !(fixed[idx] & (1 << d))).length, 0)
+  for (const stage of sequence.stages) {
+    if (stage.kind === 'modal' && stage.modes > massiveDofs) {
+      diagnostics.push({ severity: 'error', message: `Eigen analysis "${stage.id}" requests ${stage.modes} mode(s) but the model has mass on only ${massiveDofs} free DOF(s) — assign nodal masses (mass command) first`, commandIndex: -1 })
+    }
+  }
 
   // --- materials arena ---
   const matIds = [...model.materials.keys()].sort((a, b) => a - b)
@@ -202,18 +211,25 @@ export function compileInputV1(model: Model, analysisHistory: AnalysisHistory): 
   }
   const loadPatterns: W.LoadPatternTable = { series, scaleFactor }
 
-  // Which wire stage ramps each pattern. Wire stage indices count only static stages (the only kind
-  // compileStage emits). A stage's explicit `patterns` claim wins; a pattern no stage claims falls back
+  // Which wire stage ramps each pattern. `wireOfStatic[k]` is the wire stage index of the k-th static stage
+  // (wire stages are the static, modal and reset ones compileStage emits, in order). A stage's explicit `patterns` claim wins; a pattern no stage claims falls back
   // to the stage whose displacement-control node/DOF it loads (its reference-load role), else stage 0.
   const staticStages = sequence.stages.filter((st): st is Extract<AnalysisStage, { kind: 'static' }> => st.kind === 'static')
+  const wireOfStatic: number[] = []
+  let wireCount = 0
+  for (const st of sequence.stages) {
+    if (st.kind === 'static') wireOfStatic.push(wireCount)
+    if (st.kind === 'static' || st.kind === 'modal' || st.kind === 'reset') wireCount++
+  }
+  const firstStaticWire = wireOfStatic[0] ?? 0
   const claimedStage = new Map<number, number>()
   staticStages.forEach((stage, stageIdx) => {
-    for (const tag of stage.patterns ?? []) if (!claimedStage.has(tag)) claimedStage.set(tag, stageIdx)
+    for (const tag of stage.patterns ?? []) if (!claimedStage.has(tag)) claimedStage.set(tag, wireOfStatic[stageIdx])
   })
   const dcStageByNodeDof = new Map<string, number>()
   staticStages.forEach((stage, stageIdx) => {
     if (stage.integrator.kind === 'displacement-control') {
-      dcStageByNodeDof.set(`${stage.integrator.nodeTag}:${stage.integrator.dof}`, stageIdx)
+      dcStageByNodeDof.set(`${stage.integrator.nodeTag}:${stage.integrator.dof}`, wireOfStatic[stageIdx])
     }
   })
   for (const tag of claimedStage.keys()) {
@@ -230,7 +246,7 @@ export function compileInputV1(model: Model, analysisHistory: AnalysisHistory): 
       const nIdx = resolveNode(a.nodeTag, `Load in pattern ${id}`)
       a.values.forEach((v, dof) => {
         if (!v || dof > 2) return
-        const stage = claimedStage.get(id) ?? dcStageByNodeDof.get(`${a.nodeTag}:${dof}`) ?? 0
+        const stage = claimedStage.get(id) ?? dcStageByNodeDof.get(`${a.nodeTag}:${dof}`) ?? firstStaticWire
         nodalLoads.pattern.push(pIdx)
         nodalLoads.node.push(nIdx)
         nodalLoads.dof.push(dof)
@@ -254,7 +270,7 @@ export function compileInputV1(model: Model, analysisHistory: AnalysisHistory): 
       const a = child.args as { nodeTag: number; values: number[] }
       return a.values.flatMap((v, dof) => (v && dof <= 2 && dcStageByNodeDof.has(`${a.nodeTag}:${dof}`) ? [dcStageByNodeDof.get(`${a.nodeTag}:${dof}`)!] : []))
     })[0]
-    const stage = claimedStage.get(id) ?? nodalStage ?? 0
+    const stage = claimedStage.get(id) ?? nodalStage ?? firstStaticWire
     for (const child of pattern.children) {
       if (child.kind !== 'eleLoad') continue
       const a = child.args as { eleTags?: number[]; wx?: number; wy?: number; wz?: number }
@@ -290,7 +306,7 @@ export function compileInputV1(model: Model, analysisHistory: AnalysisHistory): 
   // --- sequence ---
   const stages: W.StageSpec[] = []
   sequence.stages.forEach((stage) => {
-    const wireStage = compileStage(stage, stages.length, patternIndex, claimedStage, resolveNode, diagnostics)
+    const wireStage = compileStage(stage, stages.filter((st) => st.kind === 'static').length, patternIndex, claimedStage, resolveNode, diagnostics)
     if (wireStage) stages.push(wireStage)
   })
   // Every recorded node always captures its full displacement vector — no per-recorder DOF
@@ -353,10 +369,10 @@ export function compileInputV1(model: Model, analysisHistory: AnalysisHistory): 
     }
   }
 
-  if (diagnostics.some((d) => d.severity === 'error')) return { input: null, diagnostics, recordedNodeTags: [], dofsPerNode: 0, recorderPlans: [] }
+  if (diagnostics.some((d) => d.severity === 'error')) return { input: null, diagnostics, recordedNodeTags: [], dofsPerNode: 0, recorderPlans: [], nodeTags: [] }
 
   const input: W.CarapaceInputV1 = {
-    header: { schemaVersion: 1, space: 2, engineVersion: 'pysees-dev' },
+    header: { schemaVersion: 1, space: 2, engineVersion: 'pysees-dev', recordInitial: true },
     nodes,
     materials,
     fibers,
@@ -389,7 +405,7 @@ export function compileInputV1(model: Model, analysisHistory: AnalysisHistory): 
     elementLoads3: { pattern: [], elementKind: [], elementIndex: [], load: [], stage: [] },
     sequence3: { stages: [], recorders: [] },
   }
-  return { input, diagnostics, recordedNodeTags, dofsPerNode, recorderPlans }
+  return { input, diagnostics, recordedNodeTags, dofsPerNode, recorderPlans, nodeTags: nodeIds }
 }
 
 /** Compiles every `model.sections` entry with `secType === 'Fiber'` into one flat, offset-indexed
@@ -524,6 +540,8 @@ function compileStage(
   resolveNode: (id: number, context: string) => number,
   diagnostics: CompileDiagnostic[],
 ): W.StageSpec | null {
+  if (stage.kind === 'modal') return { kind: 'modal', id: stage.id, modes: stage.modes }
+  if (stage.kind === 'reset') return { kind: 'reset', id: stage.id }
   if (stage.kind !== 'static') {
     diagnostics.push({ severity: 'warning', message: `Stage "${stage.id}" (${stage.kind}) is not yet supported by the Carapace decoder and was skipped`, commandIndex: -1 })
     return null

@@ -77,7 +77,7 @@ export function ElementsLayer({
   showElements: boolean
   showElementIds: boolean
 }) {
-  const deformedMode = useAppStore((s) => s.resultsView.type === 'deformed' && s.resultsView.runId !== null)
+  const deformedMode = useAppStore((s) => (s.resultsView.type === 'deformed' || s.resultsView.type === 'mode') && s.resultsView.runId !== null)
   const showUndeformed = useAppStore((s) => s.resultsView.showUndeformed)
   const hasSegments = index.segmentCount > 0
   return (

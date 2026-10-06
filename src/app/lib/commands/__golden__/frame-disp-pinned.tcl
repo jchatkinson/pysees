@@ -4,6 +4,8 @@ node 1 0 0
 node 2 6 0
 node 3 0 3.5
 node 4 6 3.5
+mass 3 2196 2196 0
+mass 4 2196 2196 0
 uniaxialMaterial Steel01 1 400000000 200000000000 0.01
 uniaxialMaterial Concrete01 2 -30000000 -0.002 -6000000 -0.006
 section Fiber 1 {
@@ -28,6 +30,10 @@ timeSeries Linear 1 -factor 1
 recorder Node -file out/disp.out -time -node 1 2 3 4 -dof 1 2 3 disp
 recorder Node -file out/reaction.out -time -node 1 2 3 4 -dof 1 2 3 reaction
 recorder Element -file out/eleLocalForce.out -time -ele 1 2 3 localForce
+constraints Plain
+numberer RCM
+system BandGeneral
+eigen 2
 # Dead Load
 pattern Plain 1 1 -fact 1 {
     eleLoad -ele 3 -type -beamUniform -7182.045 0

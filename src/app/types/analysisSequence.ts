@@ -36,6 +36,8 @@ export type AnalysisStage =
       holdPatternsAfter?: number[]
     }
   | { kind: 'modal'; id: string; modes: number }
+  /** Reverts the model to its initial state (OpenSees `reset`): zero displacements and history, loads un-frozen. */
+  | { kind: 'reset'; id: string }
   | { kind: 'transient'; id: string; config: TransientSpec }
 
 export type RecorderTargetKind = 'node' | 'element'

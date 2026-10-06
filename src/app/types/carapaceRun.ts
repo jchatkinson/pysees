@@ -10,6 +10,8 @@ export interface CarapaceRunResult {
   /** Node tags recorded for displacement, recorderId === String(tag) in the results-storage
    * worker — the order matches compileInputV1's `recordedNodeTags`. */
   recordedNodeTags: number[]
+  /** Modal stages that finished and stored modes (see `queryModal`); a modal-only run has `sampleCount` 0. */
+  modalStageCount: number
 }
 
 export interface CarapaceRunProgress {

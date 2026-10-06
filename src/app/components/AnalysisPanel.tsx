@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { ChevronRight, Play, Loader2, CheckCircle2, XCircle, Square } from 'lucide-react'
+import { ChevronRight, Eye, EyeOff, Play, Loader2, CheckCircle2, XCircle, Square } from 'lucide-react'
 import { ScrollArea } from '@/app/components/ui/scroll-area'
 import { Button } from '@/app/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/app/components/ui/tooltip'
@@ -61,6 +61,7 @@ export function AnalysisPanel() {
     analysisInsertionIndex,
     setAnalysisInsertionIndex,
     moveAnalysisCommand,
+    toggleAnalysisCommandDisabled,
     carapaceRun,
     runCarapace,
     cancelCarapaceRun,
@@ -173,6 +174,7 @@ export function AnalysisPanel() {
             indented ? 'pl-3' : '',
             isSelected ? 'bg-primary/10 ring-1 ring-inset ring-primary/40' : '',
             isFuture ? 'opacity-30' : '',
+            cmd.disabled ? 'opacity-45 line-through' : '',
           ].join(' ')}
           onClick={() => setSelectedAnalysisIndex(i)}
           onDoubleClick={() => setAnalysisInsertionIndex(i + 1)}
@@ -180,6 +182,21 @@ export function AnalysisPanel() {
           {isCurrent && <span className="absolute left-0 top-0.5 bottom-0.5 w-[2px] bg-primary rounded-r" />}
           {summary(cmd)}
         </button>
+        <Tooltip>
+          <TooltipTrigger
+            render={
+              <button
+                className={['shrink-0 px-0.5 transition-opacity hover:text-foreground', cmd.disabled ? 'text-muted-foreground' : 'text-muted-foreground/60 opacity-0 group-hover/row:opacity-100'].join(' ')}
+                onClick={() => toggleAnalysisCommandDisabled(i)}
+                aria-label={cmd.disabled ? 'Enable' : 'Disable'}
+                aria-pressed={!!cmd.disabled}
+              >
+                {cmd.disabled ? <EyeOff className="size-3" /> : <Eye className="size-3" />}
+              </button>
+            }
+          />
+          <TooltipContent>{cmd.disabled ? 'Disabled — click to enable' : 'Disable (skip without removing)'}</TooltipContent>
+        </Tooltip>
         {isBlock && (
           <button
             className="shrink-0 px-0.5 text-muted-foreground/60 hover:text-foreground"
@@ -271,7 +288,7 @@ export function AnalysisPanel() {
               <><Loader2 className="size-3 animate-spin shrink-0" />
               <span>{carapaceRun.progress ? `Running — ${carapaceRun.progress.currentStageId ?? 'stage'}, ${carapaceRun.progress.stepsTaken} step(s)…` : 'Running…'}</span></>
             )}
-            {carapaceRun.status === 'done' && <><CheckCircle2 className="size-3 shrink-0 text-emerald-600" /><span>Run complete — {carapaceRun.result?.stagesRun.length ?? 0} stage(s), {carapaceRun.result?.recordedNodeTags.length ?? 0} node(s), {carapaceRun.result?.sampleCount ?? 0} sample(s)</span></>}
+            {carapaceRun.status === 'done' && <><CheckCircle2 className="size-3 shrink-0 text-emerald-600" /><span>Run complete — {carapaceRun.result?.stagesRun.length ?? 0} stage(s), {carapaceRun.result?.recordedNodeTags.length ?? 0} node(s), {carapaceRun.result?.sampleCount ?? 0} sample(s){carapaceRun.result?.modalStageCount ? `, ${carapaceRun.result.modalStageCount} modal stage(s)` : ''}</span></>}
             {carapaceRun.status === 'cancelled' && <><XCircle className="size-3 shrink-0 text-muted-foreground" /><span>Run cancelled</span></>}
             {carapaceRun.status === 'error' && <><XCircle className="size-3 shrink-0 text-destructive" /><span className="truncate">{carapaceRun.error ?? 'Run failed'}</span></>}
             {carapaceRun.diagnostics.length > 0 && <span className="ml-auto text-muted-foreground/70">{carapaceRun.diagnostics.length} diagnostic(s)</span>}

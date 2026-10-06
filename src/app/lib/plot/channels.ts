@@ -52,16 +52,20 @@ export function seriesLabel(label: string, x: Channel, y: Channel): string {
   return label.trim() || (x.type === 'step' ? describeChannel(y) : `${describeChannel(y)} vs ${describeChannel(x)}`)
 }
 
-/** Values of a channel at every step, or null when the run has no data for it. */
-export async function evaluateChannel(ch: Channel, source: StepFrameSource): Promise<Float64Array | null> {
-  const n = source.sampleCount
+/** A case's steps within the run's samples: `first`..`first + count - 1`. */
+export interface SampleRange { first: number; count: number }
+
+/** Values of a channel at every step (of the run, or only of one case's `range`; its step channel then counts from 0), or null when there is no data for it. */
+export async function evaluateChannel(ch: Channel, source: StepFrameSource, range?: SampleRange | null): Promise<Float64Array | null> {
+  const first = range?.first ?? 0
+  const n = range?.count ?? source.sampleCount
   if (ch.type === 'step') return Float64Array.from({ length: n }, (_, i) => i)
-  if (ch.type === 'time') return (await source.timeline()).pseudoTime
+  if (ch.type === 'time') return (await source.timeline()).pseudoTime.slice(first, first + n)
   const terms = channelTerms(ch, source.layout)
   if (!terms) return null
   const columns = await source.columns(terms.map((t) => t.column))
   const out = new Float64Array(n)
-  columns.forEach((col, k) => { const coef = terms[k].coef; for (let i = 0; i < n; i++) out[i] += coef * col[i] })
+  columns.forEach((col, k) => { const coef = terms[k].coef; for (let i = 0; i < n; i++) out[i] += coef * col[first + i] })
   return out
 }
 

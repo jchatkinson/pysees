@@ -60,6 +60,23 @@ export interface ZeroLengthSectionTable {
 export type AlgorithmSpec = LegacyAlgorithmSpec | AlgorithmConfigSpec;
 
 /**
+ * Everything a finished `Modal` stage computed.
+ */
+export interface ModalStageResult {
+    stageIndex: number;
+    stageId: string;
+    /**
+     * DOFs per node (the stride of `ModeResult::shape`).
+     */
+    ndf: number;
+    modes: ModeResult[];
+    /**
+     * `r_d^T M r_d` per translation direction `d`: the mass the mass ratios are relative to.
+     */
+    totalMass: number[];
+}
+
+/**
  * Fibers for every `DispBeamColumn3`/`ForceBeamColumn3` section, flattened
  * and offset-indexed exactly like [`super::tables::FiberTable`], but with
  * both `y` and `z` coordinates (biaxial bending) — torsion is deliberately
@@ -167,6 +184,23 @@ export interface ArcSeedComponentSpec {
     node: number;
     dof: number;
     value: number;
+}
+
+/**
+ * One computed mode of a finished `Modal` stage. `shape` is node-major over every node in the
+ * input's node-table order (`shape[node * ndf + dof]`, fixed DOFs `0.0`), M-normalized and
+ * sign-fixed so its largest-magnitude entry is positive. `participation[d]` is the modal
+ * participation factor `phi^T M r_d` for global translation direction `d`, and `mass_ratio[d]`
+ * the effective modal mass `participation^2` as a fraction of `ModalStageResult::total_mass[d]`.
+ */
+export interface ModeResult {
+    /**
+     * Natural circular frequency, rad/time.
+     */
+    frequency: number;
+    shape: number[];
+    participation: number[];
+    massRatio: number[];
 }
 
 /**
@@ -306,6 +340,12 @@ export interface Header {
      * `carapace-core`'s version, recorded for run provenance.
      */
     engineVersion: string;
+    /**
+     * Record one sample of every supported recorder at the start of each `Static`/`Transient`
+     * stage, before its first step (the stage's initial conditions, at load factor/time `0`).
+     * Off by default: every stage's samples are then only the ones its steps produce.
+     */
+    recordInitial?: boolean;
 }
 
 /**
@@ -455,6 +495,13 @@ export interface SequenceSpec3 {
  * to JS (`boundary.rs`), as a `{ kind: "...", ... }`-shaped object.
  */
 export type DecodeError = { kind: "invalidAnalysisOption"; stage: string; field: string } | { kind: "unsupportedSpace"; got: number } | { kind: "unknownNodeIndex"; table: string; row: number } | { kind: "unknownMaterialIndex"; table: string; row: number } | { kind: "cyclicMaterialReference"; index: number } | { kind: "unknownPatternIndex"; table: string; row: number } | { kind: "unknownFiberSectionIndex"; row: number } | { kind: "unknownElementIndex"; table: string; row: number } | { kind: "unknownStageIndex"; table: string; row: number } | { kind: "unsupportedElementLoad"; elementKind: string } | { kind: "invalidDof"; table: string; row: number; dof: number } | { kind: "unknownConstraintRow"; table: string; row: number } | { kind: "invalidOrientation"; table: string; row: number };
+
+/**
+ * `Session::modal_results`'s payload: every `Modal` stage that has finished so far, in order.
+ */
+export interface ModalResultsReport {
+    stages: ModalStageResult[];
+}
 
 /**
  * `advance`'s result — pysees-handoff.md's `{ done, stageComplete,
@@ -755,7 +802,7 @@ export type MaterialProbeError = { kind: "unsupportedMaterial"; material: string
 
 export type RecorderSpec = { response: "nodeDisp"; node: number; dof: number } | { response: "nodeVel"; node: number; dof: number } | { response: "nodeAccel"; node: number; dof: number } | { response: "elementForce"; elementKind: ElementKind; elementIndex: number; component: number } | { response: "elementLoad"; elementKind: ElementKind; elementIndex: number; component: number } | { response: "modeShape"; mode: number; node: number; dof: number } | { response: "reaction"; node: number; dof: number } | { response: "fiber"; elementKind: ElementKind; elementIndex: number; point: number; fiber: number; quantity: FiberResponseKind };
 
-export type StageSpec = { kind: "static"; id: string; steps: number; integrator: IntegratorSpec; algorithm: AlgorithmSpec; convergence?: ConvergenceSpec; holdPatternsAfter: number[] } | { kind: "modal"; id: string; modes: number } | { kind: "transient"; id: string; steps: number; dt: number; damping: DampingSpec; groundMotions: GroundMotionSpec[]; algorithm?: AlgorithmSpec; convergence?: ConvergenceSpec };
+export type StageSpec = { kind: "static"; id: string; steps: number; integrator: IntegratorSpec; algorithm: AlgorithmSpec; convergence?: ConvergenceSpec; holdPatternsAfter: number[] } | { kind: "modal"; id: string; modes: number } | { kind: "reset"; id: string } | { kind: "transient"; id: string; steps: number; dt: number; damping: DampingSpec; groundMotions: GroundMotionSpec[]; algorithm?: AlgorithmSpec; convergence?: ConvergenceSpec };
 
 export type StopReasonDetail = "displacementTarget" | "loadFactorTarget" | "loadFactorZeroCrossing" | "chordLength" | "stepCount";
 
@@ -807,6 +854,12 @@ export class WasmSession {
      * completed.
      */
     currentStageId(): string | undefined;
+    /**
+     * Frequencies, mode shapes and participation of every `Modal` stage finished so far
+     * (`{ stages: ModalStageResult[] }`); empty until a modal stage completes. Read it after
+     * `advance` reports `done`, or whenever a stage has completed.
+     */
+    modalResults(): ModalResultsReport;
 }
 
 export function axial_displacement(load: number, length: number, area: number, modulus: number): number;
@@ -905,6 +958,7 @@ export interface InitOutput {
     readonly wasmmaterialprobe_reset: (a: number) => [number, number];
     readonly wasmsession_advance: (a: number, b: number) => [number, number, number];
     readonly wasmsession_currentStageId: (a: number) => [number, number];
+    readonly wasmsession_modalResults: (a: number) => [number, number, number];
     readonly zero_length_ent_displacement: (a: number, b: number) => number;
     readonly __wbindgen_malloc: (a: number, b: number) => number;
     readonly __wbindgen_realloc: (a: number, b: number, c: number, d: number) => number;

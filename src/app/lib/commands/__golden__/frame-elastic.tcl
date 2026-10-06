@@ -9,6 +9,12 @@ node 6 12 3.5
 node 7 0 7
 node 8 6 7
 node 9 12 7
+mass 4 2196 2196 0
+mass 5 4393 4393 0
+mass 6 2196 2196 0
+mass 7 2196 2196 0
+mass 8 4393 4393 0
+mass 9 2196 2196 0
 uniaxialMaterial Elastic 1 200000000000
 geomTransf Linear 1
 element elasticBeamColumn 1 1 4 0.01 200000000000 0.0001 1
@@ -28,6 +34,10 @@ timeSeries Linear 1 -factor 1
 recorder Node -file out/disp.out -time -node 1 2 3 4 5 6 7 8 9 -dof 1 2 3 disp
 recorder Node -file out/reaction.out -time -node 1 2 3 4 5 6 7 8 9 -dof 1 2 3 reaction
 recorder Element -file out/eleLocalForce.out -time -ele 1 2 3 4 5 6 7 8 9 10 localForce
+constraints Plain
+numberer RCM
+system BandGeneral
+eigen 3
 # Dead Load
 pattern Plain 1 1 -fact 1 {
     eleLoad -ele 7 8 9 10 -type -beamUniform -7182.045 0

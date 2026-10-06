@@ -8,8 +8,9 @@ import { useAppStore } from '@/app/store/useAppStore'
 import { formatResult } from '@/app/lib/formatResult'
 import { DataTable } from '@/app/components/ui/data-table'
 import { columnFilterFn } from '@/app/components/ui/column-filter'
-import { listRuns, queryJointDisplacements } from '@/app/lib/resultsStorage/resultsStorageClient'
-import type { RecorderKind, RunMetadata } from '@/app/types/resultsStorage'
+import { modeFrequencyHz, modePeriod } from '@/app/lib/modal'
+import { getRunLayout, listRuns, queryJointDisplacements, queryModal } from '@/app/lib/resultsStorage/resultsStorageClient'
+import type { RecorderKind } from '@/app/types/resultsStorage'
 
 /** ETABS-style pooled results table: every stored run's joint displacements, flattened into one
  * (case, stage, step, node) row shape and sorted/filtered client-side. Other result types
@@ -17,7 +18,9 @@ import type { RecorderKind, RunMetadata } from '@/app/types/resultsStorage'
  * just needs its own flatten query and column set, reusing this same table shell. */
 interface DisplacementRow {
   runId: string
-  stageIndex: number
+  /** The case (analysis stage) the row belongs to. */
+  stageId: string
+  /** Step within the case: 0 is its initial state. */
   step: number
   pseudoTime: number
   node: string
@@ -28,22 +31,29 @@ const RESULT_TYPES = [
   { id: 'joint-displacements', label: 'Joint Displacements' },
   { id: 'element-forces', label: 'Element Forces' },
   { id: 'reactions', label: 'Reactions' },
+  { id: 'modal-periods', label: 'Modal Periods and Frequencies' },
+  { id: 'modal-mass', label: 'Modal Participating Mass Ratios' },
+  { id: 'mode-shapes', label: 'Mode Shapes' },
 ] as const
 
-const KIND_BY_RESULT_TYPE: Record<(typeof RESULT_TYPES)[number]['id'], RecorderKind> = {
+/** One row of a modal table: `node` is only set for mode shapes; `values` line up with that table's `MODAL_VALUE_LABELS`. */
+interface ModalRow { runId: string; stageId: string; mode: number; node: number | null; values: number[] }
+const MODAL_VALUE_LABELS: Record<string, string[]> = {
+  'modal-periods': ['Period (s)', 'Frequency (Hz)', 'ω (rad/s)', 'ω² (rad²/s²)'],
+  'modal-mass': ['UX', 'UY', 'Sum UX', 'Sum UY'],
+  'mode-shapes': ['dx', 'dy', 'rz'],
+}
+const isModalTable = (id: string) => id in MODAL_VALUE_LABELS
+
+const KIND_BY_RESULT_TYPE: Partial<Record<(typeof RESULT_TYPES)[number]['id'], RecorderKind>> = {
   'joint-displacements': 'disp',
   'element-forces': 'force',
   'reactions': 'reaction',
 }
 const TARGET_HEADER: Record<RecorderKind, string> = { disp: 'Node', reaction: 'Node', force: 'Element' }
 
-function shortRunId(runId: string): string {
-  return runId.length > 10 ? `${runId.slice(0, 8)}…` : runId
-}
-
 export function ResultsPanel() {
   const [resultType, setResultType] = useState<string>('joint-displacements')
-  const [runs, setRuns] = useState<RunMetadata[]>([])
   const [rows, setRows] = useState<DisplacementRow[]>([])
   const [componentLabels, setComponentLabels] = useState<string[]>([])
   const [loading, setLoading] = useState(false)
@@ -55,6 +65,8 @@ export function ResultsPanel() {
   const zeroTolerance = useAppStore((s) => s.zeroTolerance)
   const setZeroTolerance = useAppStore((s) => s.setZeroTolerance)
   const kind = KIND_BY_RESULT_TYPE[resultType as keyof typeof KIND_BY_RESULT_TYPE] ?? 'disp'
+  const modalTable = isModalTable(resultType)
+  const [modalRows, setModalRows] = useState<ModalRow[]>([])
 
   const load = () => {
     setLoading(true)
@@ -62,20 +74,46 @@ export function ResultsPanel() {
     void (async () => {
       try {
         const { runs: allRuns } = await listRuns()
+        if (modalTable) {
+          const withModal = allRuns.filter((r) => (r.modalStageCount ?? 0) > 0)
+          const rows: ModalRow[] = []
+          for (const run of withModal) {
+            const { nodeTags, stages } = await queryModal(run.runId)
+            for (const stage of stages) {
+              let cumulative = [0, 0]
+              stage.modes.forEach((m, i) => {
+                const base = { runId: run.runId, stageId: stage.stageId, mode: i + 1 }
+                if (resultType === 'modal-periods') rows.push({ ...base, node: null, values: [modePeriod(m.frequency), modeFrequencyHz(m.frequency), m.frequency, m.frequency ** 2] })
+                else if (resultType === 'modal-mass') {
+                  cumulative = [cumulative[0] + m.massRatio[0], cumulative[1] + m.massRatio[1]]
+                  rows.push({ ...base, node: null, values: [m.massRatio[0], m.massRatio[1], cumulative[0], cumulative[1]] })
+                } else nodeTags.forEach((tag, n) => {
+                  const dofs = Array.from(m.shape.slice(n * stage.ndf, (n + 1) * stage.ndf))
+                  rows.push({ ...base, node: tag, values: [dofs[0], dofs[1], dofs[stage.ndf === 6 ? 5 : 2]] })
+                })
+              })
+            }
+          }
+          setModalRows(rows)
+          return
+        }
         const withData = allRuns.filter((r) => r.sampleCount > 0)
         const results = await Promise.all(withData.map((run) => queryJointDisplacements(run.runId, kind)))
         const nextRows: DisplacementRow[] = []
         let labels: string[] = []
+        const stageNames = await Promise.all(withData.map(async (run) => new Map((await getRunLayout(run.runId)).stages.map((st) => [st.stageIndex, st.stageId]))))
         results.forEach((result, i) => {
           const run = withData[i]
+          // A case's step 0 is its first sample.
+          const firstStep = new Map<number, number>()
+          for (const row of result.rows) firstStep.set(row.stageIndex, Math.min(firstStep.get(row.stageIndex) ?? Infinity, row.step))
           if (result.recorders[0] && result.recorders[0].componentLayout.length > labels.length) {
             labels = result.recorders[0].componentLayout
           }
           for (const row of result.rows) {
-            nextRows.push({ runId: run.runId, stageIndex: row.stageIndex, step: row.step, pseudoTime: row.pseudoTime, node: row.node, values: row.components })
+            nextRows.push({ runId: run.runId, stageId: stageNames[i].get(row.stageIndex) ?? `stage ${row.stageIndex}`, step: row.step - (firstStep.get(row.stageIndex) ?? 0), pseudoTime: row.pseudoTime, node: row.node, values: row.components })
           }
         })
-        setRuns(allRuns)
         setRows(nextRows)
         setComponentLabels(labels)
       } catch (e) {
@@ -86,12 +124,11 @@ export function ResultsPanel() {
     })()
   }
 
-  useEffect(() => { load() }, [kind])
+  useEffect(() => { setCaseFilter('all'); load() }, [kind, resultType])
 
   const columns = useMemo<ColumnDef<DisplacementRow>[]>(() => {
     const base: ColumnDef<DisplacementRow>[] = [
-      { accessorKey: 'runId', header: 'Case', cell: (c) => shortRunId(c.getValue<string>()) },
-      { accessorKey: 'stageIndex', header: 'Stage' },
+      { accessorKey: 'stageId', header: 'Case' },
       { accessorKey: 'step', header: 'Step' },
       { accessorKey: 'pseudoTime', header: 'Time', cell: (c) => c.getValue<number>().toPrecision(5) },
       { accessorKey: 'node', header: TARGET_HEADER[kind] },
@@ -108,7 +145,34 @@ export function ResultsPanel() {
     return [...base, ...dofCols]
   }, [componentLabels, kind, zeroTolerance])
 
-  const filteredRows = useMemo(() => (caseFilter === 'all' ? rows : rows.filter((r) => r.runId === caseFilter)), [rows, caseFilter])
+  const modalColumns = useMemo<ColumnDef<ModalRow>[]>(() => [
+    { accessorKey: 'stageId', header: 'Case' },
+    { accessorKey: 'mode', header: 'Mode' },
+    ...(resultType === 'mode-shapes' ? [{ accessorKey: 'node', header: 'Node' } as ColumnDef<ModalRow>] : []),
+    ...(MODAL_VALUE_LABELS[resultType] ?? []).map((label, i): ColumnDef<ModalRow> => ({
+      id: `v-${i}`,
+      header: label,
+      accessorFn: (row) => row.values[i],
+      cell: (c) => { const v = c.getValue<number | undefined>(); return v === undefined ? '' : formatResult(v, zeroTolerance) },
+    })),
+  ], [resultType, zeroTolerance])
+  const filteredModalRows = useMemo(() => (caseFilter === 'all' ? modalRows : modalRows.filter((r) => r.stageId === caseFilter)), [modalRows, caseFilter])
+  const caseIds = useMemo(() => [...new Set((modalTable ? modalRows : rows).map((r) => r.stageId))], [modalTable, modalRows, rows])
+  const modalTableInstance = useReactTable({
+    data: filteredModalRows,
+    columns: modalColumns,
+    defaultColumn: { filterFn: columnFilterFn },
+    state: { sorting, globalFilter },
+    onSortingChange: setSorting,
+    onGlobalFilterChange: setGlobalFilter,
+    getCoreRowModel: getCoreRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+    getFilteredRowModel: getFilteredRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
+    initialState: { pagination: { pageSize: 50 } },
+  })
+
+  const filteredRows = useMemo(() => (caseFilter === 'all' ? rows : rows.filter((r) => r.stageId === caseFilter)), [rows, caseFilter])
 
   const table = useReactTable({
     data: filteredRows,
@@ -144,8 +208,8 @@ export function ResultsPanel() {
           <Select value={caseFilter} onValueChange={(v) => { if (v) setCaseFilter(v) }}>
             <SelectTrigger className="h-7 flex-1 text-[11px]"><SelectValue /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All cases ({runs.length})</SelectItem>
-              {runs.map((r) => <SelectItem key={r.runId} value={r.runId}>{shortRunId(r.runId)} — {r.status}</SelectItem>)}
+              <SelectItem value="all">All cases ({caseIds.length})</SelectItem>
+              {caseIds.map((id) => <SelectItem key={id} value={id}>{id}</SelectItem>)}
             </SelectContent>
           </Select>
           <Input placeholder="Filter…" value={globalFilter} onChange={(e) => setGlobalFilter(e.target.value)} className="h-7 flex-1 text-[11px]" />
@@ -163,7 +227,9 @@ export function ResultsPanel() {
       </div>
       {error && <p className="shrink-0 px-2 py-1 text-[11px] text-destructive">{error}</p>}
       <div className="min-h-0 flex-1">
-        <DataTable table={table} emptyMessage={loading ? 'Loading…' : 'No stored results yet — run an analysis first.'} />
+        {modalTable
+          ? <DataTable table={modalTableInstance} emptyMessage={loading ? 'Loading…' : 'No modal results — run an Eigen Analysis first.'} />
+          : <DataTable table={table} emptyMessage={loading ? 'Loading…' : 'No stored results yet — run an analysis first.'} />}
       </div>
     </div>
   )

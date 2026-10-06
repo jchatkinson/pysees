@@ -65,18 +65,20 @@ export type ConvergenceSpec =
   | { kind: 'normUnbalance'; tol: number; maxIter: number }
   | { kind: 'normDispIncr'; tol: number; maxIter: number }
   | { kind: 'energyIncr'; tol: number; maxIter: number }
-/** Only the `static` stage kind is modeled here — `compileInputV1.ts` only ever emits that kind
- * (see `compileStage`'s own "not yet supported" diagnostic for `modal`/`transient` stages); the
- * Rust `StageSpec` enum also has `Modal`/`Transient` variants this compiler doesn't produce yet. */
-export type StageSpec = {
-  kind: 'static'
-  id: string
-  steps: number
-  integrator: IntegratorSpec
-  algorithm: AlgorithmSpec
-  convergence?: ConvergenceSpec
-  holdPatternsAfter: number[]
-}
+/** `static` and `modal` stage kinds are modeled here — `compileInputV1.ts` emits only those (see `compileStage`'s
+ * "not yet supported" diagnostic for `transient`); the Rust `StageSpec` enum also has a `Transient` variant. */
+export type StageSpec =
+  | {
+      kind: 'static'
+      id: string
+      steps: number
+      integrator: IntegratorSpec
+      algorithm: AlgorithmSpec
+      convergence?: ConvergenceSpec
+      holdPatternsAfter: number[]
+    }
+  | { kind: 'modal'; id: string; modes: number }
+  | { kind: 'reset'; id: string }
 /** The recorder kinds `compileInputV1.ts` emits: `nodeDisp`, `reaction`, `elementForce` and `elementLoad` (the Rust
  * `RecorderSpec` enum, internally tagged on `response`, also has `nodeVel`/`nodeAccel`/`modeShape`/
  * `fiber`, which the compiler doesn't produce yet). */
@@ -112,7 +114,7 @@ export interface RigidDiaphragmTable3 { retained: number[]; normal: Axis3Spec[];
 export interface SequenceSpec3 { stages: StageSpec[]; recorders: never[] }
 
 export interface CarapaceInputV1 {
-  header: { schemaVersion: number; space: 2; engineVersion: string }
+  header: { schemaVersion: number; space: 2; engineVersion: string; recordInitial?: boolean }
   nodes: NodeTable
   materials: MaterialSpec[]
   fibers: FiberTable

@@ -35,7 +35,9 @@ function encodeAnalysis(analysisHistory: AnalysisHistory, model: Model, ctx: Sch
 }
 
 /** Renders the full Model + Analysis state as an executable OpenSeesPy (default) or OpenSees Tcl script. */
-export function exportScript(model: Model, analysisHistory: AnalysisHistory, lang: ScriptLanguage = 'py'): string {
+export function exportScript(model: Model, fullHistory: AnalysisHistory, lang: ScriptLanguage = 'py'): string {
+  // A disabled command is as good as removed: it neither runs nor claims load patterns.
+  const analysisHistory = { ...fullHistory, commands: fullHistory.commands.filter((c) => !c.disabled) }
   const ctx: SchemaContext = { ndm: model.config?.ndm ?? 3, ndf: model.config?.ndf ?? 6 }
   return printScript([{ fn: 'wipe', args: [] }, ...encodeModel(model, new Set(claimingCommand(analysisHistory).keys())), ...encodeAnalysis(analysisHistory, model, ctx)], lang)
 }

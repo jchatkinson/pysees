@@ -24,6 +24,14 @@ const PSF_TO_PA = 47.8803
 const TRIBUTARY_WIDTH = 6
 const DEAD_PSF = 25
 const LIVE_PSF = 40
+const GRAVITY = 9.81
+
+/** Translational (x, y) nodal mass in kg; no rotational mass, which eigen analysis condenses. */
+const nodalMass = (nodeId: number, kg: number): ModelWrite => ({ kind: 'mass', entity: { nodeId, values: [Math.round(kg), Math.round(kg), 0] } })
+
+/** Eigen analysis of the undeformed model, run before any load is applied. Asks for at most 3 modes, and at most half the `massDofs`
+ * that carry mass: OpenSees' ARPACK solver fails on a tiny, mass-deficient problem when asked for more. */
+const eigenAnalysis = (massDofs: number): AnalysisCommand => ({ type: 'ANALYSIS_BLOCK', blockId: 'run-eigen-analysis', params: { modes: Math.max(1, Math.min(3, Math.floor(massDofs / 2))) } })
 
 /** A one-pattern Plain/Linear static load, registered before a "Whole Model Recorder" +
  * "Run Gravity Analysis" block pair — the minimum a template needs to be immediately
@@ -36,6 +44,7 @@ function staticLoadAnalysis(
   loadValues: number[],
   steps = 10,
   pushoverTo?: number,
+  beforeAnalysis: AnalysisCommand[] = [],
 ): { writes: ModelWrite[]; analysisCommands: AnalysisCommand[] } {
   const patternId = 1
   const tsId = 1
@@ -47,6 +56,7 @@ function staticLoadAnalysis(
     ],
     analysisCommands: [
       { type: 'ANALYSIS_BLOCK', blockId: 'whole-model-recorder', params: { directory: 'out' } },
+      ...beforeAnalysis,
       pushoverTo === undefined
         ? { type: 'ANALYSIS_BLOCK', blockId: 'run-gravity-analysis', params: { patterns: [patternId], steps } }
         : { type: 'ANALYSIS_BLOCK', blockId: 'run-pushover-analysis', params: { patterns: [patternId], nodeTag: loadNode, dof: 1, increment: pushoverTo / PUSHOVER_STEPS, steps: PUSHOVER_STEPS } },
@@ -151,6 +161,8 @@ export interface CantileverParams {
   eleType: 'elasticBeamColumn' | 'dispBeamColumn'
 }
 
+const CANTILEVER_MASS = 1000
+
 export function cantileverTemplate({ n, h, eleType }: CantileverParams): TemplateResult {
   const writes: ModelWrite[] = []
   const dy = h / n
@@ -159,6 +171,8 @@ export function cantileverTemplate({ n, h, eleType }: CantileverParams): Templat
     writes.push({ kind: 'node', entity: { id: i + 1, coords: [0, i * dy] } })
   }
   writes.push({ kind: 'fix', entity: { nodeId: 1, dofs: [1, 2, 3] } })
+  // 1000 kg in total, lumped to the free nodes by tributary length (the tip takes half a segment's share).
+  for (let i = 1; i <= n; i++) writes.push(nodalMass(i + 1, (i === n ? 0.5 : 1) * CANTILEVER_MASS / n))
   writes.push({ kind: 'geomTransf', entity: { id: 1, transfType: 'Linear', args: { type: 'Linear', transfTag: 1 } } })
   if (eleType === 'elasticBeamColumn') writes.push({ kind: 'material', entity: { id: 1, kind: 'uniaxial', matType: 'Elastic', args: { matTag: 1, matType: 'Elastic', e: 200e9 } } })
 
@@ -173,7 +187,7 @@ export function cantileverTemplate({ n, h, eleType }: CantileverParams): Templat
   // Lateral point load at the tip. The RC member is pushed to 4% drift (yield is around 1.3%) so the
   // response actually shows cracking, yielding and hardening; the elastic one just takes the load.
   const tipNode = n + 1
-  const analysis = staticLoadAnalysis(tipNode, [10e3, 0, 0], 10, eleType === 'dispBeamColumn' ? 0.04 * h : undefined)
+  const analysis = staticLoadAnalysis(tipNode, [10e3, 0, 0], 10, eleType === 'dispBeamColumn' ? 0.04 * h : undefined, [eigenAnalysis(2 * n)])
 
   return { ndm: 2, ndf: 3, writes: [...writes, ...analysis.writes], analysisCommands: analysis.analysisCommands }
 }
@@ -206,6 +220,13 @@ export function frameTemplate({ stories, storyH, bays, bayW, eleType, base }: Fr
   const fixDofs = base === 'fixed' ? [1, 2, 3] : [1, 2]
   for (let i = 0; i <= bays; i++) {
     writes.push({ kind: 'fix', entity: { nodeId: nodeId(i, 0), dofs: fixDofs } })
+  }
+
+  // Seismic mass = the dead load on each floor's beams / g, lumped to the floor nodes by tributary beam length
+  // (end nodes take half a bay).
+  const massPerMeter = (DEAD_PSF * PSF_TO_PA * TRIBUTARY_WIDTH) / GRAVITY
+  for (let j = 1; j <= stories; j++) {
+    for (let i = 0; i <= bays; i++) writes.push(nodalMass(nodeId(i, j), massPerMeter * bayW * (i === 0 || i === bays ? 0.5 : 1)))
   }
 
   writes.push({ kind: 'geomTransf', entity: { id: 1, transfType: 'Linear', args: { type: 'Linear', transfTag: 1 } } })
@@ -270,6 +291,7 @@ export function frameTemplate({ stories, storyH, bays, bayW, eleType, base }: Fr
   const driftRatio = eleType === 'dispBeamColumn' ? 0.03 : 0.01
   const analysisCommands: AnalysisCommand[] = [
     { type: 'ANALYSIS_BLOCK', blockId: 'whole-model-recorder', params: { directory: 'out' } },
+    eigenAnalysis(2 * stories * (bays + 1)),
     { type: 'ANALYSIS_BLOCK', blockId: 'run-gravity-analysis', params: { patterns: [1, 2], steps: 10, holdLoads: 'Yes' } },
     { type: 'ANALYSIS_BLOCK', blockId: 'run-pushover-analysis', params: { patterns: [3], nodeTag: roofNode, dof: 1, increment: driftRatio * stories * storyH / PUSHOVER_STEPS, steps: PUSHOVER_STEPS } },
   ]

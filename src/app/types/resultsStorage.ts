@@ -15,6 +15,10 @@
 // instead of one fetch per node; a single node's time-history instead scans the run's blocks and
 // slices its own columns out of each row.
 
+import type { ModalStageResult } from '@/app/carapace/wasm/carapace_wasm'
+
+export type { ModalStageResult }
+
 export type RunStatus = 'running' | 'complete' | 'failed' | 'cancelled' | 'storage-failed' | 'interrupted'
 
 // runs(runId)
@@ -38,6 +42,10 @@ export interface RunMetadata {
    * per-step row is `1 + columnCount` wide. Absent on runs stored before reactions/forces existed,
    * where it is `nodeCount * dofsPerNode`. */
   columnCount?: number
+  /** Every model node tag in input node-table order (ascending) — what a `ModalStageResult` shape's node-major layout is indexed by. Absent on older runs. */
+  nodeTags?: number[]
+  /** Modal stages whose modes are stored (see `queryModal`). Set by `writeModal`; a modal-only run has `sampleCount` 0. */
+  modalStageCount?: number
   /** Samples committed so far — shared across every node, since they're recorded on one timeline. */
   sampleCount: number
 }
@@ -106,6 +114,9 @@ export type RunExtents = Record<RecorderKind, Record<string, number>>
 export type StorageRequest =
   | { type: 'beginRun'; requestId: string; run: RunMetadata; stages: StageMetadata[]; recorders: RecorderMetadata[] }
   | { type: 'writeBlocks'; requestId: string; runId: string; batchId: string; blocks: ResultBlock[] }
+  /** Modal-stage results (modes, shapes, participation); not part of the step timeline. */
+  | { type: 'writeModal'; requestId: string; runId: string; stages: ModalStageResult[] }
+  | { type: 'queryModal'; requestId: string; runId: string }
   | { type: 'query'; requestId: string; runId: string; recorderId: string; firstSample?: number; limit?: number }
   | { type: 'finishRun'; requestId: string; runId: string; status: 'complete' | 'failed' | 'cancelled' | 'storage-failed'; detail?: string }
   | { type: 'deleteRun'; requestId: string; runId: string }
@@ -114,7 +125,8 @@ export type StorageRequest =
   | { type: 'queryJointDisplacements'; requestId: string; runId: string; kind?: RecorderKind }
   | { type: 'getRunLayout'; requestId: string; runId: string }
   | { type: 'queryBlock'; requestId: string; runId: string; sample: number }
-  | { type: 'queryRunExtents'; requestId: string; runId: string }
+  /** Max |value| per kind/label; with `firstSample`/`lastSample` (inclusive) only over those steps — one case's extents. */
+  | { type: 'queryRunExtents'; requestId: string; runId: string; firstSample?: number; lastSample?: number }
   | { type: 'queryColumns'; requestId: string; runId: string; columns: number[] }
 
 // Every reply carries the requestId of the StorageRequest it answers. `storageError` can be
@@ -122,13 +134,16 @@ export type StorageRequest =
 export type StorageReply =
   | { type: 'beginRunAck'; requestId: string; runId: string }
   | { type: 'writeBlocksAck'; requestId: string; runId: string; batchId: string; committedBlockKeys: [runId: string, blockIndex: number][]; committedSampleCount: number }
+  | { type: 'writeModalAck'; requestId: string; runId: string }
+  /** `nodeTags[i]` is node `i` of every stage's node-major shape. */
+  | { type: 'queryModalResult'; requestId: string; runId: string; nodeTags: number[]; stages: ModalStageResult[] }
   | { type: 'queryResult'; requestId: string; runId: string; recorderId: string; samples: ResultSample[]; nextFirstSample?: number }
   | { type: 'finishRunAck'; requestId: string; runId: string; status: RunStatus }
   | { type: 'deleteRunAck'; requestId: string; runId: string }
   | { type: 'clearAllRunsAck'; requestId: string }
   | { type: 'listRunsResult'; requestId: string; runs: RunMetadata[] }
   | { type: 'queryJointDisplacementsResult'; requestId: string; runId: string; recorders: RecorderMetadata[]; rows: JointDisplacementRow[] }
-  | { type: 'getRunLayoutResult'; requestId: string; runId: string; run: RunMetadata | null; recorders: RecorderMetadata[] }
+  | { type: 'getRunLayoutResult'; requestId: string; runId: string; run: RunMetadata | null; recorders: RecorderMetadata[]; stages: StageMetadata[] }
   /** The block containing `sample`, or null if none does. `data` is transferred, not cloned. */
   | { type: 'queryBlockResult'; requestId: string; runId: string; block: ResultBlock | null }
   | { type: 'queryRunExtentsResult'; requestId: string; runId: string; extents: RunExtents }

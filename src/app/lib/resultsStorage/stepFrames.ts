@@ -1,5 +1,5 @@
 import { getRunLayout, queryBlock, queryColumns, queryRunExtents } from './resultsStorageClient'
-import type { RecorderKind, RecorderMetadata, ResultBlock, RunExtents, RunMetadata } from '@/app/types/resultsStorage'
+import type { RecorderKind, RecorderMetadata, ResultBlock, RunExtents, RunMetadata, StageMetadata } from '@/app/types/resultsStorage'
 
 const MAX_CACHED_BLOCKS = 8
 
@@ -7,8 +7,20 @@ const MAX_CACHED_BLOCKS = 8
 export interface RunLayout {
   run: RunMetadata
   stride: number
+  /** Every stage of the run, by wire stage index (the `stageIndex` of its samples). */
+  stages: StageMetadata[]
   /** `kind` -> target tag (node or element) -> first row index and the recorder's component labels. */
   columns: Record<RecorderKind, Map<number, { offset: number; labels: string[] }>>
+}
+
+/** One analysis stage's results: its steps are samples `first`..`first + count - 1` (step 0 of the case is the stage's initial state
+ * when the run recorded one). A modal case has no steps (`count` 0) — its modes live in the modal results. */
+export interface CaseInfo {
+  stageIndex: number
+  stageId: string
+  kind: string
+  first: number
+  count: number
 }
 
 /** Pseudo-time and stage index of every step. */
@@ -24,14 +36,14 @@ export interface StepFrame {
   row: Float64Array
 }
 
-function buildLayout(run: RunMetadata, recorders: RecorderMetadata[]): RunLayout {
+function buildLayout(run: RunMetadata, recorders: RecorderMetadata[], stages: StageMetadata[]): RunLayout {
   const columns: RunLayout['columns'] = { disp: new Map(), reaction: new Map(), force: new Map() }
   for (const rec of recorders) {
     const kind = rec.kind ?? 'disp'
     const tag = Number(rec.recorderId.replace(/^[a-z]+:/, ''))
     columns[kind].set(tag, { offset: 1 + (rec.columnOffset ?? rec.nodeIndex * run.dofsPerNode), labels: rec.componentLayout })
   }
-  return { run, stride: 1 + (run.columnCount ?? run.nodeCount * run.dofsPerNode), columns }
+  return { run, stride: 1 + (run.columnCount ?? run.nodeCount * run.dofsPerNode), stages, columns }
 }
 
 /**
@@ -44,7 +56,7 @@ export class StepFrameSource {
   readonly layout: RunLayout
   private blocks = new Map<number, ResultBlock>() // blockIndex -> block, insertion order = LRU order
   private inflight = new Map<number, Promise<ResultBlock | null>>()
-  private extentsPromise: Promise<RunExtents> | null = null
+  private extentsByRange = new Map<string, Promise<RunExtents>>()
   private columnCache = new Map<number, Float64Array>()
   private columnInflight = new Map<number, Promise<void>>()
   private timelinePromise: Promise<RunTimeline> | null = null
@@ -55,8 +67,8 @@ export class StepFrameSource {
   }
 
   static async open(runId: string): Promise<StepFrameSource | null> {
-    const { run, recorders } = await getRunLayout(runId)
-    return run ? new StepFrameSource(runId, buildLayout(run, recorders)) : null
+    const { run, recorders, stages } = await getRunLayout(runId)
+    return run ? new StepFrameSource(runId, buildLayout(run, recorders, stages)) : null
   }
 
   get sampleCount(): number { return this.layout.run.sampleCount }
@@ -111,9 +123,27 @@ export class StepFrameSource {
     return request
   }
 
-  /** Whole-run max |value| per kind/label, computed once — what autoscale reads. */
-  extents(): Promise<RunExtents> {
-    return (this.extentsPromise ??= queryRunExtents(this.runId).then((r) => r.extents))
+  /** Max |value| per kind/label over the whole run, or over one case's steps (`range`, inclusive), computed once per range — what autoscale reads. */
+  extents(range?: { first: number; last: number }): Promise<RunExtents> {
+    const key = range ? `${range.first}:${range.last}` : 'all'
+    let promise = this.extentsByRange.get(key)
+    if (!promise) { promise = queryRunExtents(this.runId, range).then((r) => r.extents); this.extentsByRange.set(key, promise) }
+    return promise
+  }
+
+  /** The run's time-history cases: each stage that produced steps, with its sample range (`first`..`first + count - 1`). */
+  async cases(): Promise<CaseInfo[]> {
+    const { stage } = await this.timeline()
+    const out: CaseInfo[] = []
+    for (let i = 0; i < stage.length; i++) {
+      const last = out[out.length - 1]
+      if (last && last.stageIndex === stage[i]) last.count++
+      else {
+        const meta = this.layout.stages.find((s) => s.stageIndex === stage[i])
+        out.push({ stageIndex: stage[i], stageId: meta?.stageId ?? `stage ${stage[i]}`, kind: meta?.kind ?? 'static', first: i, count: 1 })
+      }
+    }
+    return out
   }
 
   /** Pseudo-time and stage index of every step, fetched once. */

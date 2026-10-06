@@ -31,6 +31,7 @@ export function compileAnalysisSequence(history: AnalysisHistory, model: Model):
   const recorderIds = new Set<string>()
 
   function visit(cmd: AnalysisCommand, index: number) {
+    if (cmd.disabled) return
     if (cmd.type === 'SCRIPT_GROUP') {
       cmd.commands.forEach((c) => visit(c, index))
       return

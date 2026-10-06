@@ -2,13 +2,14 @@
 // resultsStorageWorker.ts only — the main thread never opens this database directly. Stage 3 of
 // that doc's delivery plan: exercised here with synthetic blocks, not yet wired to a real
 // analysis worker.
-import type { JointDisplacementRow, RecorderKind, RunExtents, RecorderMetadata, ResultBlock, ResultSample, RunMetadata, RunStatus, StageMetadata } from '@/app/types/resultsStorage'
+import type { ModalStageResult, JointDisplacementRow, RecorderKind, RunExtents, RecorderMetadata, ResultBlock, ResultSample, RunMetadata, RunStatus, StageMetadata } from '@/app/types/resultsStorage'
 
 const DB_NAME = 'pysees-results'
 // v2: responseBlocks dropped recorderId from its key — one dense row per chunk covering every
 // recorded node, not one row per node per chunk (see resultsStorage.ts's header comment for why).
 // v3: responseBlocks gets a [runId, firstSample] index so "the block holding step N" is one lookup.
-const DB_VERSION = 3
+// v4: modalResults store ([runId, stageIndex]) holds each modal stage's modes, outside the step timeline.
+const DB_VERSION = 4
 const TERMINAL_STATUSES: ReadonlySet<RunStatus> = new Set(['complete', 'failed', 'cancelled', 'storage-failed', 'interrupted'])
 
 function openDb(): Promise<IDBDatabase> {
@@ -29,6 +30,9 @@ function openDb(): Promise<IDBDatabase> {
       }
       if (e.oldVersion < 3) {
         request.transaction!.objectStore('responseBlocks').createIndex('byFirstSample', ['runId', 'firstSample'])
+      }
+      if (e.oldVersion < 4) {
+        db.createObjectStore('modalResults', { keyPath: ['runId', 'stageIndex'] })
       }
     }
     request.onsuccess = () => resolve(request.result)
@@ -187,6 +191,25 @@ export async function query(runId: string, recorderId: string, firstSample = 0, 
   return { samples, nextFirstSample }
 }
 
+export async function writeModal(runId: string, stages: ModalStageResult[]): Promise<void> {
+  const db = await getDb()
+  const tx = db.transaction(['runs', 'modalResults'], 'readwrite')
+  const run = await reqDone(tx.objectStore('runs').get(runId)) as RunMetadata | undefined
+  if (!run) throw new Error(`writeModal: unknown runId ${runId}`)
+  for (const result of stages) tx.objectStore('modalResults').put({ runId, stageIndex: result.stageIndex, result })
+  tx.objectStore('runs').put({ ...run, modalStageCount: stages.length })
+  await txDone(tx)
+}
+
+export async function queryModal(runId: string): Promise<{ nodeTags: number[]; stages: ModalStageResult[] }> {
+  const db = await getDb()
+  const tx = db.transaction(['runs', 'modalResults'], 'readonly')
+  const run = await reqDone(tx.objectStore('runs').get(runId)) as RunMetadata | undefined
+  const rows = await reqDone(tx.objectStore('modalResults').getAll(IDBKeyRange.bound([runId, 0], [runId, Infinity]))) as { result: ModalStageResult }[]
+  await txDone(tx)
+  return { nodeTags: run?.nodeTags ?? [], stages: rows.map((r) => r.result).sort((a, b) => a.stageIndex - b.stageIndex) }
+}
+
 export async function listRuns(): Promise<RunMetadata[]> {
   const db = await getDb()
   const tx = db.transaction('runs', 'readonly')
@@ -269,7 +292,7 @@ function prefixRange(runId: string): IDBKeyRange {
   return IDBKeyRange.bound([runId], [runId, []])
 }
 
-async function deleteByRunId(tx: IDBTransaction, storeName: 'stages' | 'recorders' | 'responseBlocks', runId: string): Promise<void> {
+async function deleteByRunId(tx: IDBTransaction, storeName: 'stages' | 'recorders' | 'responseBlocks' | 'modalResults', runId: string): Promise<void> {
   const store = tx.objectStore(storeName)
   const cursorRequest = store.openCursor(prefixRange(runId))
   await new Promise<void>((resolve, reject) => {
@@ -290,8 +313,9 @@ async function deleteByRunId(tx: IDBTransaction, storeName: 'stages' | 'recorder
  * current one; clearing on every new run sidesteps needing that hash at all. */
 export async function clearAllRuns(): Promise<void> {
   const db = await getDb()
-  const tx = db.transaction(['runs', 'stages', 'recorders', 'responseBlocks'], 'readwrite')
+  const tx = db.transaction(['runs', 'stages', 'recorders', 'responseBlocks', 'modalResults'], 'readwrite')
   tx.objectStore('runs').clear()
+  tx.objectStore('modalResults').clear()
   tx.objectStore('stages').clear()
   tx.objectStore('recorders').clear()
   tx.objectStore('responseBlocks').clear()
@@ -300,9 +324,10 @@ export async function clearAllRuns(): Promise<void> {
 
 export async function deleteRun(runId: string): Promise<void> {
   const db = await getDb()
-  const tx = db.transaction(['runs', 'stages', 'recorders', 'responseBlocks'], 'readwrite')
+  const tx = db.transaction(['runs', 'stages', 'recorders', 'responseBlocks', 'modalResults'], 'readwrite')
   tx.objectStore('runs').delete(runId)
   await Promise.all([
+    deleteByRunId(tx, 'modalResults', runId),
     deleteByRunId(tx, 'stages', runId),
     deleteByRunId(tx, 'recorders', runId),
     deleteByRunId(tx, 'responseBlocks', runId),
@@ -312,14 +337,15 @@ export async function deleteRun(runId: string): Promise<void> {
 
 /** One run's metadata plus its recorders ordered by first column — enough to locate any node's
  * displacement or element's forces in a dense row. */
-export async function getRunLayout(runId: string): Promise<{ run: RunMetadata | null; recorders: RecorderMetadata[] }> {
+export async function getRunLayout(runId: string): Promise<{ run: RunMetadata | null; recorders: RecorderMetadata[]; stages: StageMetadata[] }> {
   const db = await getDb()
-  const tx = db.transaction(['runs', 'recorders'], 'readonly')
+  const tx = db.transaction(['runs', 'recorders', 'stages'], 'readonly')
   const run = await reqDone(tx.objectStore('runs').get(runId)) as RunMetadata | undefined
-  if (!run) return { run: null, recorders: [] }
+  if (!run) return { run: null, recorders: [], stages: [] }
   const recorders = await reqDone(tx.objectStore('recorders').getAll(prefixRange(runId))) as RecorderMetadata[]
   recorders.sort((a, b) => columnOffsetOf(a, run) - columnOffsetOf(b, run))
-  return { run, recorders }
+  const stages = (await reqDone(tx.objectStore('stages').getAll(prefixRange(runId))) as StageMetadata[]).sort((a, b) => a.stageIndex - b.stageIndex)
+  return { run, recorders, stages }
 }
 
 /** The block whose sample range contains `sample`: the last block starting at or before it. */
@@ -333,8 +359,8 @@ export async function queryBlock(runId: string, sample: number): Promise<ResultB
   return sample < block.firstSample + block.sampleCount ? block : null
 }
 
-/** Max |value| per recorder kind and component label across every step of a run. */
-export async function queryRunExtents(runId: string): Promise<RunExtents> {
+/** Max |value| per recorder kind and component label across every step of a run, or of just the steps in `range` (inclusive). */
+export async function queryRunExtents(runId: string, range?: { first: number; last: number }): Promise<RunExtents> {
   const extents: RunExtents = { disp: {}, reaction: {}, force: {} }
   const { run, recorders } = await getRunLayout(runId)
   if (!run) return extents
@@ -351,6 +377,7 @@ export async function queryRunExtents(runId: string): Promise<RunExtents> {
       const block = cursor.value as ResultBlock
       const view = new Float64Array(block.data)
       for (let i = 0; i < block.sampleCount; i++) {
+        if (range && (block.firstSample + i < range.first || block.firstSample + i > range.last)) continue
         recorders.forEach((rec, k) => {
           const base = i * stride + 1 + columnOffsetOf(rec, run)
           for (let c = 0; c < maxima[k].length; c++) {

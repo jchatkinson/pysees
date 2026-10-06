@@ -38,6 +38,10 @@ export function writeBlocks(runId: string, batchId: string, blocks: ResultBlock[
   return send<Extract<StorageReply, { type: 'writeBlocksAck' }>>({ type: 'writeBlocks', requestId: nextRequestId(), runId, batchId, blocks })
 }
 
+export function queryModal(runId: string) {
+  return send<Extract<StorageReply, { type: 'queryModalResult' }>>({ type: 'queryModal', requestId: nextRequestId(), runId })
+}
+
 export function queryResults(runId: string, recorderId: string, firstSample?: number, limit?: number) {
   return send<Extract<StorageReply, { type: 'queryResult' }>>({ type: 'query', requestId: nextRequestId(), runId, recorderId, firstSample, limit })
 }
@@ -74,8 +78,8 @@ export function queryColumns(runId: string, columns: number[]) {
   return send<Extract<StorageReply, { type: 'queryColumnsResult' }>>({ type: 'queryColumns', requestId: nextRequestId(), runId, columns })
 }
 
-export function queryRunExtents(runId: string) {
-  return send<Extract<StorageReply, { type: 'queryRunExtentsResult' }>>({ type: 'queryRunExtents', requestId: nextRequestId(), runId })
+export function queryRunExtents(runId: string, range?: { first: number; last: number }) {
+  return send<Extract<StorageReply, { type: 'queryRunExtentsResult' }>>({ type: 'queryRunExtents', requestId: nextRequestId(), runId, firstSample: range?.first, lastSample: range?.last })
 }
 
 /** Hands one side of a `MessageChannel` to the storage worker (see resultsStorageWorker.ts's

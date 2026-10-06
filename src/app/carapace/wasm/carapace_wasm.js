@@ -98,6 +98,19 @@ export class WasmSession {
         }
         return v1;
     }
+    /**
+     * Frequencies, mode shapes and participation of every `Modal` stage finished so far
+     * (`{ stages: ModalStageResult[] }`); empty until a modal stage completes. Read it after
+     * `advance` reports `done`, or whenever a stage has completed.
+     * @returns {ModalResultsReport}
+     */
+    modalResults() {
+        const ret = wasm.wasmsession_modalResults(this.__wbg_ptr);
+        if (ret[2]) {
+            throw takeFromExternrefTable0(ret[1]);
+        }
+        return takeFromExternrefTable0(ret[0]);
+    }
 }
 if (Symbol.dispose) WasmSession.prototype[Symbol.dispose] = WasmSession.prototype.free;
 

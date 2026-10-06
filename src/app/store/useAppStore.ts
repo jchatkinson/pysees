@@ -162,6 +162,7 @@ interface AppStore {
   pushAnalysisCommand: (cmd: AnalysisCommand) => void
   insertAnalysisCommandAt: (cmd: AnalysisCommand, index: number | null) => void
   updateAnalysisCommandAt: (index: number, cmd: AnalysisCommand) => void
+  toggleAnalysisCommandDisabled: (index: number) => void
   moveAnalysisCommand: (fromIndex: number, toIndex: number) => void
   deleteAnalysisCommandAt: (index: number) => void
   analysisUndo: () => void
@@ -251,14 +252,14 @@ export const useAppStore = create<AppStore>((set, get) => {
   runCarapace: async () => {
     const { model, analysisHistory } = get()
     set({ carapaceRun: { status: 'compiling', diagnostics: [], result: null, error: null, progress: null, runId: null } })
-    const { input, diagnostics, recordedNodeTags, dofsPerNode, recorderPlans } = compileInputV1(model, analysisHistory)
+    const { input, diagnostics, recordedNodeTags, dofsPerNode, recorderPlans, nodeTags } = compileInputV1(model, analysisHistory)
     if (!input) {
       set({ carapaceRun: { status: 'error', diagnostics, result: null, error: 'Compile failed — see diagnostics.', progress: null, runId: null } })
       return
     }
     const runId = nextCarapaceRunId()
-    set((s) => ({ carapaceRun: { status: 'running', diagnostics, result: null, error: null, progress: null, runId }, resultsView: { ...s.resultsView, runId: null, step: 0, stepFrac: 0, playing: false } }))
-    const { promise, cancel } = runCarapaceOnWorker(runId, input, recordedNodeTags, dofsPerNode, recorderPlans, {
+    set((s) => ({ carapaceRun: { status: 'running', diagnostics, result: null, error: null, progress: null, runId }, resultsView: { ...s.resultsView, runId: null, caseStage: null, step: 0, stepFrac: 0, playing: false } }))
+    const { promise, cancel } = runCarapaceOnWorker(runId, input, recordedNodeTags, dofsPerNode, recorderPlans, nodeTags, {
       onProgress: (progress) => set((s) => (s.carapaceRun.runId === runId ? { carapaceRun: { ...s.carapaceRun, progress } } : {})),
     })
     activeCarapaceCancel = cancel
@@ -267,7 +268,10 @@ export const useAppStore = create<AppStore>((set, get) => {
       set((s) => ({
         carapaceRun: { status: result.error ? 'error' : 'done', diagnostics, result, error: result.error ? JSON.stringify(result.error) : null, progress: null, runId },
         // Show the finished run at its last step; first successful run also opens the panel on the deformed shape.
-        resultsView: result.sampleCount > 0 ? { ...s.resultsView, runId, step: result.sampleCount - 1, stepFrac: 0, open: true, type: s.resultsView.type === 'none' ? 'deformed' : s.resultsView.type } : s.resultsView,
+        // A run with only modal stages has no steps: it opens on the first mode shape instead.
+        resultsView: result.sampleCount > 0
+          ? { ...s.resultsView, runId, caseStage: null, step: result.sampleCount - 1, stepFrac: 0, open: true, type: s.resultsView.type === 'none' || s.resultsView.type === 'mode' ? 'deformed' : s.resultsView.type }
+          : result.modalStageCount > 0 ? { ...s.resultsView, runId, step: 0, stepFrac: 0, mode: 0, caseStage: null, open: true, type: 'mode' } : s.resultsView,
       }))
     } catch (error) {
       const cancelled = error instanceof Error && error.message === 'cancelled'
@@ -464,7 +468,16 @@ export const useAppStore = create<AppStore>((set, get) => {
   updateAnalysisCommandAt: (index, cmd) => set((s) => {
     if (index < 0 || index >= s.analysisHistory.commands.length) return s
     const commands = [...s.analysisHistory.commands]
-    commands[index] = cmd
+    // Editing a command's parameters must not silently re-enable it.
+    commands[index] = commands[index].disabled && cmd.disabled === undefined ? { ...cmd, disabled: true } : cmd
+    return { analysisHistory: { ...s.analysisHistory, commands } }
+  }),
+
+  toggleAnalysisCommandDisabled: (index) => set((s) => {
+    const old = s.analysisHistory.commands[index]
+    if (!old) return s
+    const commands = [...s.analysisHistory.commands]
+    commands[index] = { ...old, disabled: old.disabled ? undefined : true }
     return { analysisHistory: { ...s.analysisHistory, commands } }
   }),
 
@@ -584,6 +597,6 @@ useAppStore.subscribe((s, prev) => {
   void clearAllRuns()
   useAppStore.setState({
     carapaceRun: s.carapaceRun.status === 'done' ? IDLE_CARAPACE_RUN : s.carapaceRun,
-    resultsView: { ...s.resultsView, runId: null, step: 0, stepFrac: 0, playing: false, open: false },
+    resultsView: { ...s.resultsView, runId: null, caseStage: null, step: 0, stepFrac: 0, playing: false, open: false },
   })
 })

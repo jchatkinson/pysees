@@ -230,7 +230,36 @@ const runEarthquakeAnalysis: AnalysisBlockDef = {
   }),
 }
 
-export const ANALYSIS_BLOCKS: AnalysisBlockDef[] = [wholeModelRecorder, runGravityAnalysis, runPushoverAnalysis, runEarthquakeAnalysis]
+const runEigenAnalysis: AnalysisBlockDef = {
+  id: 'run-eigen-analysis',
+  label: 'Run Eigen Analysis',
+  description: 'Eigenvalue (modal) analysis of the current model state: natural frequencies and mode shapes for the lowest `modes` modes.',
+  paramsSchema: [{ kind: 'int', name: 'modes', label: 'Number of Modes', defaultValue: 3, required: true }],
+  build: (params) => [
+    ops('constraints', ['Plain']),
+    ops('numberer', ['RCM']),
+    ops('system', ['BandGeneral']),
+    ops('eigen', [Math.max(1, Math.trunc(Number(params.modes) || 3))]),
+  ],
+  toStage: (params) => ({ kind: 'modal', id: 'eigen', modes: Math.max(1, Math.trunc(Number(params.modes) || 3)) }),
+}
+
+const resetModel: AnalysisBlockDef = {
+  id: 'reset-model',
+  label: 'Reset Model',
+  description: 'Reverts the model to its initial state (OpenSees reset): displacements, velocities and material history return to their starting values and time returns to 0. As in OpenSees, loads frozen by an earlier analysis (loadConst) stay applied at their frozen value, so they are in full from the next analysis\'s first step; loads that were not frozen ramp again. Use it to start the next analysis from an undeformed state instead of continuing from the last one.',
+  build: () => [ops('reset', [])],
+  toStage: () => ({ kind: 'reset', id: 'reset' }),
+}
+
+const wipeAnalysis: AnalysisBlockDef = {
+  id: 'wipe-analysis',
+  label: 'Wipe Analysis',
+  description: 'Removes the analysis objects (OpenSees wipeAnalysis) while keeping the model state, so the next analysis continues from where the last one ended. Carapace creates fresh analysis objects for every stage anyway, so this only affects the exported script.',
+  build: () => [ops('wipeAnalysis', [])],
+}
+
+export const ANALYSIS_BLOCKS: AnalysisBlockDef[] = [wholeModelRecorder, runGravityAnalysis, runPushoverAnalysis, runEarthquakeAnalysis, runEigenAnalysis, resetModel, wipeAnalysis]
 
 export function getAnalysisBlock(id: string): AnalysisBlockDef | null {
   return ANALYSIS_BLOCKS.find((b) => b.id === id) ?? null

@@ -1,4 +1,4 @@
-export type ResultType = 'none' | 'deformed' | 'axial' | 'shear' | 'moment'
+export type ResultType = 'none' | 'deformed' | 'axial' | 'shear' | 'moment' | 'mode'
 
 /** Which scale a result type uses; `none` has no scale. */
 export type ScaleKey = Exclude<ResultType, 'none'>
@@ -19,6 +19,14 @@ export interface ResultsView {
   type: ResultType
   /** Manual scale per type; `null` = auto (computed from the run's extents and the model size). */
   scales: Record<ScaleKey, number | null>
+  /** The case (analysis stage) shown, by stage index; null = the one holding `step`, else the run's last. `step` is always an absolute sample index within that case's range. */
+  caseStage: number | null
+  /** Mode-shape view: the 0-based mode within the selected modal case. */
+  mode: number
+  /** Animation phase in radians: the shape is drawn scaled by cos(phase), so 0 is peak amplitude. Advances while `playing`. */
+  phase: number
+  /** Mode-shape animation speed in cycles per second. */
+  modeSpeed: number
   showUndeformed: boolean
   showValues: boolean
   fillDiagrams: boolean
@@ -34,7 +42,11 @@ export const DEFAULT_RESULTS_VIEW: ResultsView = {
   loop: true,
   smooth: true,
   type: 'none',
-  scales: { deformed: null, axial: null, shear: null, moment: null },
+  scales: { deformed: null, axial: null, shear: null, moment: null, mode: null },
+  caseStage: null,
+  mode: 0,
+  phase: 0,
+  modeSpeed: 0.5,
   showUndeformed: true,
   showValues: false,
   fillDiagrams: true,

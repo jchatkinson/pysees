@@ -5,6 +5,7 @@ import { Button } from '@/app/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/app/components/ui/dropdown-menu'
 import { useAppStore } from '@/app/store/useAppStore'
 import { useResultsSource } from '@/app/lib/resultsStorage/useResultsSource'
+import { useCurrentCase } from '@/app/lib/resultsStorage/useCases'
 import { usePlotData } from '@/app/lib/plot/usePlotData'
 import { availableTargets, describeChannel, seriesLabel } from '@/app/lib/plot/channels'
 import { PLOT_PRESETS, selectedNodeSeries } from '@/app/lib/plot/presets'
@@ -40,8 +41,11 @@ export function PlotOverlay() {
   const [justSaved, setJustSaved] = useState(false)
 
   const source = useResultsSource(runId)
+  // Plots show one case (analysis stage) at a time: the selected one, or the last one with steps when a modal case is selected.
+  const { series: plotCase } = useCurrentCase()
+  const range = useMemo(() => (plotCase ? { first: plotCase.first, count: plotCase.count } : null), [plotCase])
   const targets = useMemo(() => availableTargets(source?.layout ?? null), [source])
-  const data = usePlotData(source, pv.series, pv.sharedX, pv.x)
+  const data = usePlotData(source, pv.series, pv.sharedX, pv.x, range)
 
   const anchorRef = useRef<HTMLSpanElement>(null)
   // Window size, and the viewport's top-right corner in window coordinates (the default position).
@@ -85,7 +89,7 @@ export function PlotOverlay() {
     : 'Value'
 
   const timeline = data.timeline
-  const markerX = pv.showStepMarker && pv.sharedX ? (pv.x.type === 'step' ? step : pv.x.type === 'time' ? timeline?.pseudoTime[step] ?? null : null) : null
+  const markerX = pv.showStepMarker && pv.sharedX ? (pv.x.type === 'step' ? step - (range?.first ?? 0) : pv.x.type === 'time' ? timeline?.pseudoTime[step - (range?.first ?? 0)] ?? null : null) : null
   const stageX = useMemo(() => {
     if (!pv.showStageTicks || !pv.sharedX || !timeline || (pv.x.type !== 'step' && pv.x.type !== 'time')) return []
     const out: number[] = []
@@ -148,7 +152,7 @@ export function PlotOverlay() {
     >
       <div className="flex shrink-0 cursor-grab items-center gap-1 border-b bg-muted/40 px-2 py-1 active:cursor-grabbing" onPointerDown={startDrag('move')}>
         <GripHorizontal className="size-3.5 text-muted-foreground" />
-        <span className="text-xs font-medium">Plot</span>
+        <span className="text-xs font-medium">Plot{plotCase && <span className="font-normal text-muted-foreground"> · {plotCase.stageId}</span>}</span>
         <DropdownMenu>
           <DropdownMenuTrigger render={<Button variant="outline" size="sm" className="ml-2 h-6 gap-1 px-2 text-[11px]">Presets <ChevronDown className="size-3" /></Button>} />
           <DropdownMenuContent align="start" className="w-56">
@@ -187,8 +191,8 @@ export function PlotOverlay() {
           <div className="grid h-full place-items-center text-xs text-muted-foreground">{runId ? 'Loading results…' : 'Run an analysis to plot results.'}</div>
         ) : chartSeries.length ? (
           <PlotChart
-            series={chartSeries} xLabel={xLabel} yLabel={yLabel} step={pv.showStepMarker ? step : null}
-            markerX={markerX} stageX={stageX} onScrub={(i) => setResultsView({ step: i, stepFrac: 0, playing: false })}
+            series={chartSeries} xLabel={xLabel} yLabel={yLabel} step={pv.showStepMarker ? step - (range?.first ?? 0) : null}
+            markerX={markerX} stageX={stageX} onScrub={(i) => setResultsView({ step: (range?.first ?? 0) + i, stepFrac: 0, playing: false })}
           />
         ) : (
           <div className="grid h-full place-items-center px-4 text-center text-xs text-muted-foreground">{data.loading ? 'Loading…' : pv.series.length ? (xChannel ? 'No visible series with data for this run.' : 'No visible series.') : 'Add a series or choose a preset.'}</div>
