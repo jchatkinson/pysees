@@ -71,9 +71,14 @@ export const PLOT_PRESETS: PlotPreset[] = [
     id: 'moment-vs-rotation', label: 'Hysteresis: element end moment vs end rotation',
     build: (ctx) => {
       const ele = ctx.targets.force.tags[0]
-      const nodeI = ele === undefined ? undefined : ctx.model.elements.get(ele)?.nodes[0]
-      if (nodeI === undefined || !ctx.targets.disp.tags.includes(nodeI) || !ctx.targets.disp.components.includes('rz') || !ctx.targets.force.components.includes('Mi')) return null
-      return { x: response('disp', 'rz', 'single', [nodeI]), series: [{ y: response('force', 'Mi', 'single', [ele]) }] }
+      const nodes = ele === undefined ? undefined : ctx.model.elements.get(ele)?.nodes
+      if (!nodes || !ctx.targets.disp.components.includes('rz')) return null
+      // Use the end whose rotation is free: a fixed end (e.g. a zero-length section's base node) never rotates.
+      const rzFixed = (t: number) => ctx.model.fixes.get(t)?.dofs.includes(3) ?? false
+      const end = [0, 1].find((k) => nodes[k] !== undefined && ctx.targets.disp.tags.includes(nodes[k]) && !rzFixed(nodes[k])) ?? 0
+      const comp = end === 0 ? 'Mi' : 'Mj'
+      if (nodes[end] === undefined || !ctx.targets.disp.tags.includes(nodes[end]) || !ctx.targets.force.components.includes(comp)) return null
+      return { x: response('disp', 'rz', 'single', [nodes[end]]), series: [{ y: response('force', comp, 'single', [ele]) }] }
     },
   },
 ]

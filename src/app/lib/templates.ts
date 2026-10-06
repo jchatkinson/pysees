@@ -81,7 +81,7 @@ export function momentCurvatureTemplate(): TemplateResult {
 
   writes.push(
     { kind: 'timeSeries', entity: { id: 1, tsType: 'Linear', args: { type: 'Linear', tag: 1, factor: 1 } } },
-    { kind: 'pattern', entity: { id: 1, patternType: 'Plain', args: { type: 'Plain', patternTag: 1, tsTag: 1, fact: 1 }, children: [] } },
+    { kind: 'pattern', entity: { id: 1, name: 'Gravity', patternType: 'Plain', args: { type: 'Plain', patternTag: 1, tsTag: 1, fact: 1 }, children: [] } },
     { kind: 'patternChild', patternId: 1, child: { kind: 'load', args: { nodeTag: 2, values: [AXIAL_LOAD, 0, 0] } } },
     // A second, deliberately separate pattern carrying a *unit* moment at the same DOF the
     // pushover stage sweeps: `DisplacementControl` picks each step's load factor from the
@@ -92,7 +92,7 @@ export function momentCurvatureTemplate(): TemplateResult {
     // magnitude is arbitrary (only its *direction* matters to the unit-load technique) — 1 is the
     // usual OpenSeesPy moment-curvature convention.
     { kind: 'timeSeries', entity: { id: 2, tsType: 'Linear', args: { type: 'Linear', tag: 2, factor: 1 } } },
-    { kind: 'pattern', entity: { id: 2, patternType: 'Plain', args: { type: 'Plain', patternTag: 2, tsTag: 2, fact: 1 }, children: [] } },
+    { kind: 'pattern', entity: { id: 2, name: 'Pushover', patternType: 'Plain', args: { type: 'Plain', patternTag: 2, tsTag: 2, fact: 1 }, children: [] } },
     { kind: 'patternChild', patternId: 2, child: { kind: 'load', args: { nodeTag: 2, values: [0, 0, 1] } } },
   )
 
