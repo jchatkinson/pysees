@@ -4,7 +4,7 @@ import { runCarapaceModal } from '@/app/lib/commands/carapaceRunner'
 import { opensesAvailable, runOpenSees } from '@/app/lib/commands/opensesRunner'
 import { modelFromWrites, TEMPLATE_FIXTURES } from '@/app/lib/commands/testkit'
 import { applyModelWrite } from '@/app/lib/modelWrite'
-import { frameTemplate } from '@/app/lib/templates'
+import { frame3dTemplate, frameTemplate } from '@/app/lib/templates'
 import { compileInputV1 } from '@/app/lib/carapace/compileInputV1'
 import type { AnalysisHistory } from '@/app/types/analysisCommands'
 import type { Model } from '@/app/types/model'
@@ -18,6 +18,12 @@ function massedFrame(): { model: Model; history: AnalysisHistory } {
   let model = modelFromWrites(t.ndm, t.ndf, t.writes)
   for (const node of model.nodes.values()) if (node.coords[1] > 0) model = applyModelWrite(model, { kind: 'mass', entity: { nodeId: node.id, values: [100, 100, 0] } })
   return { model, history: { commands: [eigenBlock], cursor: 0 } }
+}
+
+/** The 3D frame template (translational mass at every floor node) with only the eigen analysis. */
+function massedFrame3d(): { model: Model; history: AnalysisHistory } {
+  const t = frame3dTemplate({ stories: 2, storyH: 3, baysX: 2, bayX: 5, baysY: 1, bayY: 4 })
+  return { model: modelFromWrites(t.ndm, t.ndf, t.writes), history: { commands: [eigenBlock], cursor: 0 } }
 }
 
 describe('eigen analysis compiles', () => {
@@ -68,6 +74,20 @@ describe.skipIf(!opensesAvailable)('Carapace modal analysis agrees with OpenSees
     expect(opensees.failures, opensees.stderr).toEqual([])
     const line = opensees.stdout.split('\n').find((l) => l.startsWith('@@EIG'))
     const expected = line!.split(/\s+/).slice(1).map((l) => Math.sqrt(Number(l)))
+    expect(expected).toHaveLength(MODES)
+    carapace.stages[0].modes.forEach((m, i) => expect(Math.abs(m.frequency - expected[i]) / expected[i], `mode ${i + 1}`).toBeLessThan(1e-6))
+  })
+
+  it('on natural frequencies of a 3D frame, with a mass ratio per translation direction', () => {
+    const { model, history } = massedFrame3d()
+    const carapace = runCarapaceModal(model, history)
+    expect(carapace.error).toBeNull()
+    expect(carapace.stages[0].ndf).toBe(6)
+    expect(carapace.stages[0].modes[0].massRatio).toHaveLength(3)
+
+    const opensees = runOpenSees(exportScript(model, history, 'py').replace(`ops.eigen(${MODES})`, `print('@@EIG', *ops.eigen(${MODES}))`))
+    expect(opensees.failures, opensees.stderr).toEqual([])
+    const expected = opensees.stdout.split('\n').find((l) => l.startsWith('@@EIG'))!.split(/\s+/).slice(1).map((l) => Math.sqrt(Number(l)))
     expect(expected).toHaveLength(MODES)
     carapace.stages[0].modes.forEach((m, i) => expect(Math.abs(m.frequency - expected[i]) / expected[i], `mode ${i + 1}`).toBeLessThan(1e-6))
   })

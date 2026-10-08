@@ -11,11 +11,12 @@ import {
   momentCurvatureTemplate,
   cantileverTemplate,
   frameTemplate,
+  frame3dTemplate,
   type CantileverParams,
   type FrameParams,
 } from '@/app/lib/templates'
 
-type Choice = 'new' | 'load' | 'momentCurvature' | 'cantilever' | 'frame'
+type Choice = 'new' | 'load' | 'momentCurvature' | 'cantilever' | 'frame' | 'frame3d'
 
 interface CardProps {
   title: string
@@ -70,6 +71,14 @@ function InitDialog() {
   const [frameEle, setFrameEle] = useState<FrameParams['eleType']>('elasticBeamColumn')
   const [frameBase, setFrameBase] = useState<FrameParams['base']>('fixed')
 
+  // 3D Frame
+  const [stories3, setStories3] = useState(3)
+  const [storyH3, setStoryH3] = useState(3.0)
+  const [baysX, setBaysX] = useState(2)
+  const [bayX, setBayX] = useState(5.0)
+  const [baysY, setBaysY] = useState(2)
+  const [bayY, setBayY] = useState(5.0)
+
   function select(c: Choice) {
     setChoice(c)
     setStep(2)
@@ -87,6 +96,9 @@ function InitDialog() {
     } else if (choice === 'frame') {
       const t = frameTemplate({ stories, storyH, bays, bayW, eleType: frameEle, base: frameBase })
       initModel(t.ndm, t.ndf, { writes: t.writes, analysisCommands: t.analysisCommands, gridlines: t.gridlines, levels: t.levels })
+    } else if (choice === 'frame3d') {
+      const t = frame3dTemplate({ stories: stories3, storyH: storyH3, baysX, bayX, baysY, bayY })
+      initModel(t.ndm, t.ndf, { writes: t.writes, analysisCommands: t.analysisCommands, levels: t.levels })
     }
   }
 
@@ -95,6 +107,7 @@ function InitDialog() {
     momentCurvature: 'Moment-Curvature',
     cantilever: 'Cantilever Column',
     frame: '2D Frame',
+    frame3d: '3D Frame',
   }
 
   return (
@@ -130,6 +143,11 @@ function InitDialog() {
                 title="2D Frame"
                 description="Story-bay grid with columns and beams."
                 onClick={() => select('frame')}
+              />
+              <Card
+                title="3D Frame"
+                description="Story-bay grid in X and Y (Z up), elastic members, fixed base."
+                onClick={() => select('frame3d')}
               />
             </div>
           </>
@@ -261,6 +279,38 @@ function InitDialog() {
                     </Select>
                   </div>
                 </div>
+              </div>
+            )}
+
+            {choice === 'frame3d' && (
+              <div className="grid gap-4 py-2">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="grid gap-1.5">
+                    <Label>Stories</Label>
+                    <Input type="number" value={stories3} min={1} onChange={(e) => setStories3(Math.max(1, Number(e.target.value)))} />
+                  </div>
+                  <div className="grid gap-1.5">
+                    <Label>Story height (m)</Label>
+                    <Input type="number" value={storyH3} min={0.1} step={0.5} onChange={(e) => setStoryH3(Math.max(0.1, Number(e.target.value)))} />
+                  </div>
+                  <div className="grid gap-1.5">
+                    <Label>Bays in X</Label>
+                    <Input type="number" value={baysX} min={1} onChange={(e) => setBaysX(Math.max(1, Number(e.target.value)))} />
+                  </div>
+                  <div className="grid gap-1.5">
+                    <Label>Bay width in X (m)</Label>
+                    <Input type="number" value={bayX} min={0.1} step={0.5} onChange={(e) => setBayX(Math.max(0.1, Number(e.target.value)))} />
+                  </div>
+                  <div className="grid gap-1.5">
+                    <Label>Bays in Y</Label>
+                    <Input type="number" value={baysY} min={1} onChange={(e) => setBaysY(Math.max(1, Number(e.target.value)))} />
+                  </div>
+                  <div className="grid gap-1.5">
+                    <Label>Bay width in Y (m)</Label>
+                    <Input type="number" value={bayY} min={0.1} step={0.5} onChange={(e) => setBayY(Math.max(0.1, Number(e.target.value)))} />
+                  </div>
+                </div>
+                <p className="text-xs text-muted-foreground">3D model (ndm=3, ndf=6), Z up.</p>
               </div>
             )}
 

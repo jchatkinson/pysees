@@ -4,6 +4,7 @@ import { Html } from '@react-three/drei'
 import { DoubleSide } from 'three'
 import type { Mesh } from 'three'
 import { useAppStore } from '@/app/store/useAppStore'
+import { isDiagramType } from '@/app/types/resultsView'
 import { BufferLines } from './BufferLines'
 import type { DiagramLabel, DisplayBuffers } from './displayBuffers'
 
@@ -53,9 +54,9 @@ function DiagramLabels({ buffers }: { buffers: DisplayBuffers }) {
   )
 }
 
-/** N/V/M force diagrams (filled, outlined, optionally labelled) drawn from the buffers ResultsDriver fills. */
+/** N/V/M/T force diagrams (filled, outlined, optionally labelled) drawn from the buffers ResultsDriver fills. */
 export function DiagramLayer({ buffers }: { buffers: DisplayBuffers }) {
-  const active = useAppStore((s) => s.resultsView.runId !== null && (s.resultsView.type === 'axial' || s.resultsView.type === 'shear' || s.resultsView.type === 'moment'))
+  const active = useAppStore((s) => s.resultsView.runId !== null && isDiagramType(s.resultsView.type))
   const fill = useAppStore((s) => s.resultsView.fillDiagrams)
   const showValues = useAppStore((s) => s.resultsView.showValues)
   if (!active) return null

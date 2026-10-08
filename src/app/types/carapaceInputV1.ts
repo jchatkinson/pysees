@@ -1,7 +1,7 @@
 // Mirrors carapace/wasm-bridge/src/input_v1/{mod,tables,materials,sequence}.rs's serde (camelCase)
 // wire shape — what decodeInput() in carapace_wasm expects (see src/app/lib/carapace/compileInputV1.ts,
-// the only place that constructs one). One format serves 2D and 3D (`header.ndm`); this compiler only
-// targets 2D (ndm=2/ndf=3). Every table is optional on the wire; the ones this compiler always
+// the only place that constructs one). One format serves 2D and 3D (`header.ndm`): the compiler targets
+// ndm=2/ndf=3 and ndm=3/ndf=6, emitting the other profile's tables empty. Every table is optional on the wire; the ones this compiler always
 // emits are required here, and tables it never emits (force beam-columns, zero-lengths, equal DOFs,
 // diaphragms, rigid links, linear constraints, plane materials, triangles, quads) are left out. The model has no
 // continuum elements yet; when it does, mirror `planeMaterials`/`triangles`/`quads` and the body/edge loads and
@@ -10,10 +10,15 @@
 export interface NodeTable { coords: number[]; fixed: number[]; massNodeIndex: number[]; mass: number[] }
 
 export type TransformSpec = 'linear' | 'pDelta' | 'corotational'
+/** 3D transformation: `vecXz` is a vector not parallel to the member axis, fixing its local y/z (OpenSees `vecxz`). */
+export type TransformSpec3 = { kind: 'linear3'; vecXz: [number, number, number] } | { kind: 'pDelta3'; vecXz: [number, number, number] }
 export type IntegrationSpec = { kind: 'legendre'; points: number } | { kind: 'lobatto'; points: number }
 
 export interface TrussTable { nodeI: number[]; nodeJ: number[]; area: number[]; material: number[]; density: number[] }
 export interface ElasticBeamColumn2dTable { nodeI: number[]; nodeJ: number[]; e: number[]; a: number[]; iz: number[]; transform: TransformSpec[]; density: number[] }
+export interface ElasticBeamColumn3dTable { nodeI: number[]; nodeJ: number[]; e: number[]; g: number[]; a: number[]; j: number[]; iy: number[]; iz: number[]; transform: TransformSpec3[]; density: number[] }
+/** 3D `DispBeamColumn`: `g`/`j` supply the decoupled elastic torsion (a fiber section carries none); no `corotational` flag. */
+export interface FiberBeamColumn3dTable { nodeI: number[]; nodeJ: number[]; g: number[]; j: number[]; vecXz: [number, number, number][]; fiberSection: number[]; integration: IntegrationSpec[]; density: number[] }
 export interface FiberBeamColumn2dTable { nodeI: number[]; nodeJ: number[]; fiberSection: number[]; integration: IntegrationSpec[]; corotational: boolean[]; density: number[] }
 /** Sparse OpenSees `-orient` row; rows without one use the global axes. 2D: `x = [x1, x2, 0]` and no `yp`; 3D adds `yp`. */
 export interface OrientRow { row: number; x: [number, number, number]; yp?: [number, number, number] }
@@ -34,8 +39,8 @@ export interface LoadPatternTable { series: TimeSeriesSpec[]; scaleFactor: numbe
 export interface NodalLoadTable { pattern: number[]; node: number[]; dof: number[]; value: number[]; stage: number[] }
 
 export type ElementKind = 'truss' | 'elasticBeamColumn2d' | 'elasticBeamColumn3d' | 'dispBeamColumn2d' | 'dispBeamColumn3d' | 'forceBeamColumn2d' | 'forceBeamColumn3d' | 'zeroLength' | 'zeroLengthSection' | 'tri3' | 'quad4'
-/** Uniform load per length in the element's local axes: `wx` along the member, `wy` transverse. */
-export type ElementLoadSpec = { kind: 'uniform'; wx: number; wy: number }
+/** Uniform load per length in the element's local axes: `wx` along the member, `wy` (and, in 3D, `wz`) transverse. */
+export type ElementLoadSpec = { kind: 'uniform'; wx: number; wy: number; wz?: number }
 export interface ElementLoadTable { pattern: number[]; elementKind: ElementKind[]; elementIndex: number[]; load: ElementLoadSpec[]; stage: number[] }
 
 export type MaterialSpec =
@@ -90,13 +95,15 @@ export type RecorderSpecWire =
 export interface SequenceSpec { stages: StageSpec[]; recorders: RecorderSpecWire[] }
 
 export interface CarapaceInputV1 {
-  header: { schemaVersion: number; ndm: 2; engineVersion: string; recordInitial?: boolean }
+  header: { schemaVersion: number; ndm: 2 | 3; engineVersion: string; recordInitial?: boolean }
   nodes: NodeTable
   materials: MaterialSpec[]
   fibers: FiberTable
   trusses: TrussTable
   elasticBeamColumns2d: ElasticBeamColumn2dTable
   dispBeamColumns2d: FiberBeamColumn2dTable
+  elasticBeamColumns3d?: ElasticBeamColumn3dTable
+  dispBeamColumns3d?: FiberBeamColumn3dTable
   zeroLengthSections: ZeroLengthSectionTable
   loadPatterns: LoadPatternTable
   nodalLoads: NodalLoadTable

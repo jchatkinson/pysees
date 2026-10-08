@@ -78,7 +78,7 @@ export const PLOT_PRESETS: PlotPreset[] = [
       // Use the end whose rotation is free: a fixed end (e.g. a zero-length section's base node) never rotates.
       const rzFixed = (t: number) => ctx.model.fixes.get(t)?.dofs.includes(3) ?? false
       const end = [0, 1].find((k) => nodes[k] !== undefined && ctx.targets.disp.tags.includes(nodes[k]) && !rzFixed(nodes[k])) ?? 0
-      const comp = end === 0 ? 'Mi' : 'Mj'
+      const comp = `M${ctx.model.config?.ndm === 3 ? 'z' : ''}${end === 0 ? 'i' : 'j'}`
       if (nodes[end] === undefined || !ctx.targets.disp.tags.includes(nodes[end]) || !ctx.targets.force.components.includes(comp)) return null
       return { x: response('disp', 'rz', 'single', [nodes[end]]), series: [{ y: response('force', comp, 'single', [ele]) }] }
     },

@@ -1,4 +1,8 @@
-export type ResultType = 'none' | 'deformed' | 'axial' | 'shear' | 'moment' | 'mode'
+/** Force diagrams: in 2D `shear`/`moment` are V and M; in 3D Vy and Mz, with `shearZ`/`momentY` the x–z plane and `torsion` T. */
+export const DIAGRAM_TYPES = ['axial', 'shear', 'shearZ', 'torsion', 'moment', 'momentY'] as const
+export type DiagramType = typeof DIAGRAM_TYPES[number]
+export type ResultType = 'none' | 'deformed' | DiagramType | 'mode'
+export const isDiagramType = (t: ResultType): t is DiagramType => (DIAGRAM_TYPES as readonly string[]).includes(t)
 
 /** Which scale a result type uses; `none` has no scale. */
 export type ScaleKey = Exclude<ResultType, 'none'>
@@ -42,7 +46,7 @@ export const DEFAULT_RESULTS_VIEW: ResultsView = {
   loop: true,
   smooth: true,
   type: 'none',
-  scales: { deformed: null, axial: null, shear: null, moment: null, mode: null },
+  scales: { deformed: null, axial: null, shear: null, shearZ: null, torsion: null, moment: null, momentY: null, mode: null },
   caseStage: null,
   mode: 0,
   phase: 0,

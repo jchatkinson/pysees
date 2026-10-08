@@ -36,14 +36,17 @@ const RESULT_TYPES = [
   { id: 'mode-shapes', label: 'Mode Shapes' },
 ] as const
 
-/** One row of a modal table: `node` is only set for mode shapes; `values` line up with that table's `MODAL_VALUE_LABELS`. */
+/** One row of a modal table: `node` is only set for mode shapes; `values` line up with `modalValueLabels`. */
 interface ModalRow { runId: string; stageId: string; mode: number; node: number | null; values: number[] }
-const MODAL_VALUE_LABELS: Record<string, string[]> = {
-  'modal-periods': ['Period (s)', 'Frequency (Hz)', 'ω (rad/s)', 'ω² (rad²/s²)'],
-  'modal-mass': ['UX', 'UY', 'Sum UX', 'Sum UY'],
-  'mode-shapes': ['dx', 'dy', 'rz'],
+const MODAL_TABLES = ['modal-periods', 'modal-mass', 'mode-shapes']
+const isModalTable = (id: string) => MODAL_TABLES.includes(id)
+/** Value columns of a modal table; mass ratios and shape components follow the model's dimension. */
+function modalValueLabels(id: string, ndm: number): string[] {
+  const dirs = ndm === 3 ? ['UX', 'UY', 'UZ'] : ['UX', 'UY']
+  if (id === 'modal-periods') return ['Period (s)', 'Frequency (Hz)', 'ω (rad/s)', 'ω² (rad²/s²)']
+  if (id === 'modal-mass') return [...dirs, ...dirs.map((d) => `Sum ${d}`)]
+  return ndm === 3 ? ['dx', 'dy', 'dz', 'rx', 'ry', 'rz'] : ['dx', 'dy', 'rz']
 }
-const isModalTable = (id: string) => id in MODAL_VALUE_LABELS
 
 const KIND_BY_RESULT_TYPE: Partial<Record<(typeof RESULT_TYPES)[number]['id'], RecorderKind>> = {
   'joint-displacements': 'disp',
@@ -66,6 +69,7 @@ export function ResultsPanel() {
   const setZeroTolerance = useAppStore((s) => s.setZeroTolerance)
   const kind = KIND_BY_RESULT_TYPE[resultType as keyof typeof KIND_BY_RESULT_TYPE] ?? 'disp'
   const modalTable = isModalTable(resultType)
+  const modelNdm = useAppStore((s) => s.model.config?.ndm ?? 2)
   const [modalRows, setModalRows] = useState<ModalRow[]>([])
 
   const load = () => {
@@ -75,21 +79,22 @@ export function ResultsPanel() {
       try {
         const { runs: allRuns } = await listRuns()
         if (modalTable) {
+          const m0 = Array.from({ length: modelNdm }, () => 0)
           const withModal = allRuns.filter((r) => (r.modalStageCount ?? 0) > 0)
           const rows: ModalRow[] = []
           for (const run of withModal) {
             const { nodeTags, stages } = await queryModal(run.runId)
             for (const stage of stages) {
-              let cumulative = [0, 0]
+              let cumulative = m0.map(() => 0)
               stage.modes.forEach((m, i) => {
                 const base = { runId: run.runId, stageId: stage.stageId, mode: i + 1 }
                 if (resultType === 'modal-periods') rows.push({ ...base, node: null, values: [modePeriod(m.frequency), modeFrequencyHz(m.frequency), m.frequency, m.frequency ** 2] })
                 else if (resultType === 'modal-mass') {
-                  cumulative = [cumulative[0] + m.massRatio[0], cumulative[1] + m.massRatio[1]]
-                  rows.push({ ...base, node: null, values: [m.massRatio[0], m.massRatio[1], cumulative[0], cumulative[1]] })
+                  cumulative = cumulative.map((c, d) => c + (m.massRatio[d] ?? 0))
+                  rows.push({ ...base, node: null, values: [...m0.map((_, d) => m.massRatio[d] ?? 0), ...cumulative] })
                 } else nodeTags.forEach((tag, n) => {
                   const dofs = Array.from(m.shape.slice(n * stage.ndf, (n + 1) * stage.ndf))
-                  rows.push({ ...base, node: tag, values: [dofs[0], dofs[1], dofs[stage.ndf === 6 ? 5 : 2]] })
+                  rows.push({ ...base, node: tag, values: stage.ndf === 6 ? dofs : [dofs[0], dofs[1], dofs[2]] })
                 })
               })
             }
@@ -149,13 +154,13 @@ export function ResultsPanel() {
     { accessorKey: 'stageId', header: 'Case' },
     { accessorKey: 'mode', header: 'Mode' },
     ...(resultType === 'mode-shapes' ? [{ accessorKey: 'node', header: 'Node' } as ColumnDef<ModalRow>] : []),
-    ...(MODAL_VALUE_LABELS[resultType] ?? []).map((label, i): ColumnDef<ModalRow> => ({
+    ...(isModalTable(resultType) ? modalValueLabels(resultType, modelNdm) : []).map((label, i): ColumnDef<ModalRow> => ({
       id: `v-${i}`,
       header: label,
       accessorFn: (row) => row.values[i],
       cell: (c) => { const v = c.getValue<number | undefined>(); return v === undefined ? '' : formatResult(v, zeroTolerance) },
     })),
-  ], [resultType, zeroTolerance])
+  ], [resultType, zeroTolerance, modelNdm])
   const filteredModalRows = useMemo(() => (caseFilter === 'all' ? modalRows : modalRows.filter((r) => r.stageId === caseFilter)), [modalRows, caseFilter])
   const caseIds = useMemo(() => [...new Set((modalTable ? modalRows : rows).map((r) => r.stageId))], [modalTable, modalRows, rows])
   const modalTableInstance = useReactTable({

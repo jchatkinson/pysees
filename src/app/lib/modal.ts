@@ -40,6 +40,7 @@ export function readModeShape(index: SceneIndex, rows: Map<number, number>, stag
     out.disp[i * 3] = mode.shape[base]
     out.disp[i * 3 + 1] = mode.shape[base + 1]
     if (ndf === 6) out.disp[i * 3 + 2] = mode.shape[base + 2]
-    out.rot[i] = mode.shape[base + (ndf === 6 ? 5 : 2)]
+    if (ndf === 6) { out.rot[i * 3] = mode.shape[base + 3]; out.rot[i * 3 + 1] = mode.shape[base + 4] }
+    out.rot[i * 3 + 2] = mode.shape[base + (ndf === 6 ? 5 : 2)]
   }
 }

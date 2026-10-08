@@ -29,15 +29,15 @@ function Gridline({
   ndm: 2 | 3
   elevationRange: [number, number]
 }) {
-  // Grids only ever store plan (ground-plane) coordinates — the vertical axis (Y)
-  // belongs to Levels, never to a grid. In 3D a grid is a plan line drawn at
-  // ground (Y=0); in 2D (no depth) a grid is a single X position drawn as a
+  // Grids only ever store plan (ground-plane) coordinates — the vertical axis
+  // (Z in 3D, Y in 2D) belongs to Levels, never to a grid. In 3D a grid is a plan line
+  // `[x, y]` drawn at ground (Z=0); in 2D (no depth) a grid is a single X position drawn as a
   // vertical line spanning the model's defined levels.
   const start: [number, number, number] = ndm === 3
-    ? [gridline.start[0] ?? 0, 0, gridline.start[1] ?? 0]
+    ? [gridline.start[0] ?? 0, gridline.start[1] ?? 0, 0]
     : [gridline.start[0] ?? 0, elevationRange[0], 0]
   const end: [number, number, number] = ndm === 3
-    ? [gridline.end[0] ?? 0, 0, gridline.end[1] ?? 0]
+    ? [gridline.end[0] ?? 0, gridline.end[1] ?? 0, 0]
     : [gridline.start[0] ?? 0, elevationRange[1], 0]
 
   return (

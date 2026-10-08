@@ -3,7 +3,8 @@ import { useFrame } from '@react-three/fiber'
 import { Billboard, Line, Text } from '@react-three/drei'
 import type { Group } from 'three'
 import { Vector3 } from 'three'
-import type { ElementEntity, NodeEntity, PatternEntity } from '@/app/types/model'
+import type { ElementEntity, GeomTransfEntity, NodeEntity, PatternEntity } from '@/app/types/model'
+import { memberFrame } from '@/app/lib/memberFrame'
 import { formatLoadValue, patternColor, toVec3 } from './utils'
 import { ScreenSize } from './ScreenSize'
 import { worldUnitsPerPixel } from './screenScale'
@@ -38,7 +39,8 @@ function NodalLoadGlyph({ coords, values, color, showValues, ndm }: { coords: nu
   if (dir.length() < 1e-9) return null
   const tip = origin.clone().add(dir.normalize().multiplyScalar(ARROW_LENGTH))
   const side = dir.clone().normalize().multiplyScalar(ARROW_HEAD_LENGTH)
-  const up = new Vector3(0, 0, 1)
+  // Head wings spread perpendicular to the arrow; use whichever of Z / Y is less aligned with it so a vertical load (the usual case) still gets a head.
+  const up = Math.abs(dir.clone().normalize().z) > 0.9 ? new Vector3(0, 1, 0) : new Vector3(0, 0, 1)
   const right = new Vector3().crossVectors(side, up).normalize().multiplyScalar(ARROW_HEAD_WIDTH)
   return (
     <ScreenSize position={toVec3(coords)}>
@@ -70,14 +72,12 @@ function NodalLoadGlyph({ coords, values, color, showValues, ndm }: { coords: nu
 
 const ARROWS_PER_ELEMENT = 5
 
-/** Global-axis direction of a beam-uniform load: local y/z axes follow the usual OpenSees defaults (2D: y is x rotated 90° CCW in the XY plane; 3D: y is global Y projected normal to the member, z = x × y). */
-function elementLoadVector(a: Vector3, b: Vector3, ndm: number, wx: number, wy: number, wz: number): Vector3 {
-  const x = b.clone().sub(a).normalize()
-  if (ndm === 2) return new Vector3(-x.y, x.x, 0).multiplyScalar(wy).add(x.clone().multiplyScalar(wx))
-  const up = Math.abs(x.y) > 0.999 ? new Vector3(1, 0, 0) : new Vector3(0, 1, 0)
-  const y = up.sub(x.clone().multiplyScalar(up.dot(x))).normalize()
-  const z = new Vector3().crossVectors(x, y)
-  return y.multiplyScalar(wy).add(z.multiplyScalar(wz)).add(x.multiplyScalar(wx))
+/** Global-axis direction of a beam-uniform load, from the member's local axes (see `memberFrame`: 2D y is x turned 90° CCW; 3D follows the transformation's `vecxz`). */
+function elementLoadVector(a: Vector3, b: Vector3, ndm: 2 | 3, vecxz: unknown, wx: number, wy: number, wz: number): Vector3 {
+  const frame = memberFrame(a.toArray(), b.toArray(), ndm, vecxz)
+  if (!frame) return new Vector3()
+  const [x, y, z] = [frame.x, frame.y, frame.z].map((v) => new Vector3(...v))
+  return x.multiplyScalar(wx).add(y.multiplyScalar(wy)).add(z.multiplyScalar(ndm === 3 ? wz : 0))
 }
 
 // Element-load glyph sizes are relative: the largest visible load's arrows are MAX_LEN_PX long, others scale linearly with |w|
@@ -101,7 +101,7 @@ function ElementLoadGlyph({ a, b, w, ratio, offsetRatio, refPoint, maxUnit, colo
     // Head wings spread along the member (or in-plane perpendicular when the load is axial).
     const along = b.clone().sub(a).normalize()
     const v = along.sub(dir.clone().multiplyScalar(along.dot(dir)))
-    if (v.lengthSq() < 1e-9) v.set(dir.y, -dir.x, 0)
+    if (v.lengthSq() < 1e-9) v.crossVectors(dir, Math.abs(dir.z) > 0.9 ? new Vector3(1, 0, 0) : new Vector3(0, 0, 1))
     return v.normalize()
   }, [a, b, dir])
 
@@ -147,6 +147,7 @@ export function LoadsLayer({
   patterns,
   nodeMap,
   elementMap,
+  geomTransfs,
   ndm,
   hiddenPatterns,
   showNodal,
@@ -156,6 +157,7 @@ export function LoadsLayer({
   patterns: PatternEntity[]
   nodeMap: Map<number, NodeEntity>
   elementMap: Map<number, ElementEntity>
+  geomTransfs: Map<number, GeomTransfEntity>
   ndm: number
   hiddenPatterns: number[]
   showNodal: boolean
@@ -175,7 +177,7 @@ export function LoadsLayer({
       if (!n1 || !n2) return []
       const a = new Vector3(...toVec3(n1.coords)), b = new Vector3(...toVec3(n2.coords))
       if (a.distanceToSquared(b) < 1e-18) return []
-      const w = elementLoadVector(a, b, ndm, Number(wx) || 0, Number(wy) || 0, Number(wz) || 0)
+      const w = elementLoadVector(a, b, ndm === 2 ? 2 : 3, geomTransfs.get(Number(ele.args.transfTag))?.args.vecxz, Number(wx) || 0, Number(wy) || 0, Number(wz) || 0)
       if (w.length() < 1e-12) return []
       return [{ pid: p.id, key: `${p.id}-${tag}-${wx}-${wy}-${wz}`, a, b, w, label: [['wx', wx], ['wy', wy], ['wz', wz]].filter(([, v]) => Number(v)).map(([n, v]) => `${n}: ${formatLoadValue(Number(v))}`).join('  '), color: patternColor(ids, p.id) }]
     })

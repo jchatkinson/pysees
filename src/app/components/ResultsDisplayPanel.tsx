@@ -19,12 +19,16 @@ import { autoModeScale, autoScale, modelMetrics } from '@/app/lib/resultsScale'
 import type { RunExtents } from '@/app/types/resultsStorage'
 import type { ResultType, ScaleKey } from '@/app/types/resultsView'
 
-const RESULT_TYPES: { id: ResultType; label: string }[] = [
+/** `only3d` types exist only in a 3D model; the 2D labels of V and M drop their axis suffix. */
+const RESULT_TYPES: { id: ResultType; label: string; label3d?: string; only3d?: boolean }[] = [
   { id: 'none', label: 'None' },
   { id: 'deformed', label: 'Deformed shape' },
   { id: 'axial', label: 'Axial force (N)' },
-  { id: 'shear', label: 'Shear force (V)' },
-  { id: 'moment', label: 'Bending moment (M)' },
+  { id: 'shear', label: 'Shear force (V)', label3d: 'Shear force (Vy)' },
+  { id: 'shearZ', label: 'Shear force (Vz)', only3d: true },
+  { id: 'torsion', label: 'Torsion (T)', only3d: true },
+  { id: 'moment', label: 'Bending moment (M)', label3d: 'Bending moment (Mz)' },
+  { id: 'momentY', label: 'Bending moment (My)', only3d: true },
   { id: 'mode', label: 'Mode shape' },
 ]
 const DIRECTIONS = ['UX', 'UY', 'UZ']
@@ -37,6 +41,7 @@ export function ResultsDisplayPanel() {
   const rv = useAppStore((s) => s.resultsView)
   const set = useAppStore((s) => s.setResultsView)
   const model = useAppStore((s) => s.model)
+  const is3d = model.config?.ndm === 3
 
   const [extents, setExtents] = useState<{ runId: string; value: RunExtents } | null>(null)
   const [time, setTime] = useState<{ runId: string; step: number; value: number } | null>(null)
@@ -137,9 +142,9 @@ export function ResultsDisplayPanel() {
 
           <div className="grid gap-1">
             <Label className="text-[11px]">Result</Label>
-            <Select items={RESULT_TYPES.map((t) => ({ value: t.id, label: t.label }))} value={rv.type} onValueChange={(v) => set({ type: v as ResultType, phase: 0 })}>
+            <Select items={RESULT_TYPES.map((t) => ({ value: t.id, label: (is3d && t.label3d) || t.label }))} value={rv.type} onValueChange={(v) => set({ type: v as ResultType, phase: 0 })}>
               <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
-              <SelectContent>{RESULT_TYPES.filter((t) => t.id === 'none' || (t.id === 'mode' ? isModalCase : !isModalCase)).map((t) => <SelectItem key={t.id} value={t.id}>{t.label}</SelectItem>)}</SelectContent>
+              <SelectContent>{RESULT_TYPES.filter((t) => (!t.only3d || is3d) && (t.id === 'none' || (t.id === 'mode' ? isModalCase : !isModalCase))).map((t) => <SelectItem key={t.id} value={t.id}>{(is3d && t.label3d) || t.label}</SelectItem>)}</SelectContent>
             </Select>
           </div>
 

@@ -2,7 +2,7 @@ import { emptyModel, type Model } from '@/app/types/model'
 import type { AnalysisHistory } from '@/app/types/analysisCommands'
 import type { ModelWrite } from '@/app/lib/modelWrite'
 import { applyModelWrite } from '@/app/lib/modelWrite'
-import { cantileverTemplate, frameTemplate, momentCurvatureTemplate, type TemplateResult } from '@/app/lib/templates'
+import { cantileverTemplate, frameTemplate, frame3dTemplate, momentCurvatureTemplate, type TemplateResult } from '@/app/lib/templates'
 
 export function modelFromWrites(ndm: 2 | 3, ndf: number, writes: ModelWrite[]): Model {
   let m: Model = { ...emptyModel(), config: { ndm, ndf } }
@@ -21,6 +21,7 @@ export const TEMPLATE_FIXTURES: Fixture[] = [
   fromTemplate('cantilever-disp', cantileverTemplate({ n: 4, h: 3, eleType: 'dispBeamColumn' })),
   fromTemplate('frame-elastic', frameTemplate({ stories: 2, storyH: 3.5, bays: 2, bayW: 6, eleType: 'elasticBeamColumn', base: 'fixed' })),
   fromTemplate('frame-disp-pinned', frameTemplate({ stories: 1, storyH: 3.5, bays: 1, bayW: 6, eleType: 'dispBeamColumn', base: 'pinned' })),
+  fromTemplate('frame3d-elastic', frame3dTemplate({ stories: 2, storyH: 3, baysX: 2, bayX: 5, baysY: 1, bayY: 4 })),
 ]
 
 /** A model with the entities no template covers (trusses, element loads, 3D transformation, masses, constraints, inline-numbered series). */
@@ -63,6 +64,40 @@ export function fixture3d(): Fixture {
     { kind: 'patternChild', patternId: 1, child: { kind: 'eleLoad', args: { eleTags: [1], wx: 0.5, wy: -1, wz: -2 } } },
   ])
   return { name: '3d-frame', model, history: { commands: [], cursor: -1 } }
+}
+
+/** Z-up 3D cantilevers (fixed at node 1, two elements) for comparing Carapace against OpenSees. The elastic one has unequal Iy/Iz, a transverse element load in each local direction and a
+ * tip load on all six DOFs, so every component of the 12-wide local force is non-zero. The fiber one is pushed in X until it yields (biaxial fiber section, `-GJ` torsion). */
+export function cantilever3dFixtures(): Fixture[] {
+  const recorder = { type: 'ANALYSIS_BLOCK', blockId: 'whole-model-recorder', params: { directory: 'out' } } as const
+  const geometry = (eleType: string, args: Record<string, unknown>): ModelWrite[] => [
+    { kind: 'node', entity: { id: 1, coords: [0, 0, 0] } }, { kind: 'node', entity: { id: 2, coords: [0, 0, 2] } }, { kind: 'node', entity: { id: 3, coords: [0, 0, 4] } },
+    { kind: 'fix', entity: { nodeId: 1, dofs: [1, 2, 3, 4, 5, 6] } },
+    { kind: 'geomTransf', entity: { id: 1, transfType: 'Linear', args: { type: 'Linear', transfTag: 1, vecxz: [1, 0, 0] } } },
+    { kind: 'element', entity: { id: 1, eleType, nodes: [1, 2], args } }, { kind: 'element', entity: { id: 2, eleType, nodes: [2, 3], args } },
+    { kind: 'timeSeries', entity: { id: 1, tsType: 'Linear', args: { type: 'Linear', tag: 1, factor: 1 } } },
+    { kind: 'pattern', entity: { id: 1, patternType: 'Plain', args: { type: 'Plain', patternTag: 1, tsTag: 1, fact: 1 }, children: [] } },
+  ]
+  const elastic: ModelWrite[] = [
+    ...geometry('ElasticBeamColumn', { A: 0.04, E: 3e10, G: 1.2e10, J: 1.5e-3, Iy: 8e-5, Iz: 2e-4, transfTag: 1 }),
+    { kind: 'patternChild', patternId: 1, child: { kind: 'load', args: { nodeTag: 3, values: [1e4, 2e4, -5e4, 3e3, 4e3, 5e3] } } },
+    { kind: 'patternChild', patternId: 1, child: { kind: 'eleLoad', args: { eleTags: [1, 2], wx: 500, wy: -3e3, wz: 2e3 } } },
+  ]
+  const fiberWrites: ModelWrite[] = [
+    ...geometry('DispBeamColumn', { transfTag: 1, integrationTag: 1 }),
+    { kind: 'material', entity: { id: 1, kind: 'uniaxial', matType: 'Steel01', args: { matTag: 1, matType: 'Steel01', fy: 400e6, e0: 200e9, b: 0.01 } } },
+    { kind: 'material', entity: { id: 2, kind: 'uniaxial', matType: 'Concrete01', args: { matTag: 2, matType: 'Concrete01', fpc: -30e6, epsc0: -0.002, fpcu: -6e6, epsU: -0.006 } } },
+    { kind: 'section', entity: { id: 1, secType: 'Fiber', args: { type: 'Fiber', secTag: 1, gJ: 1e7 }, children: [
+      { kind: 'patch', subType: 'rect', args: { matTag: 2, numSubdivY: 6, numSubdivZ: 4, y1: -0.25, z1: -0.2, y2: 0.25, z2: 0.2 } },
+      ...[[-0.2, -0.15], [-0.2, 0.15], [0.2, -0.15], [0.2, 0.15]].map(([yloc, zloc]) => ({ kind: 'fiber' as const, subType: 'fiber', args: { yloc, zloc, A: 3e-4, matTag: 1 } })),
+    ] } },
+    { kind: 'beamIntegration', entity: { id: 1, intType: 'Legendre', args: { type: 'Legendre', tag: 1, secTag: 1, n: 3 } } },
+    { kind: 'patternChild', patternId: 1, child: { kind: 'load', args: { nodeTag: 3, values: [1, 0, 0, 0, 0, 0] } } },
+  ]
+  return [
+    { name: 'cantilever3d-elastic', model: modelFromWrites(3, 6, elastic), history: { commands: [recorder, { type: 'ANALYSIS_BLOCK', blockId: 'run-gravity-analysis', params: { patterns: [1], steps: 4 } }], cursor: 1 } },
+    { name: 'cantilever3d-fiber-pushover', model: modelFromWrites(3, 6, fiberWrites), history: { commands: [recorder, { type: 'ANALYSIS_BLOCK', blockId: 'run-pushover-analysis', params: { patterns: [1], nodeTag: 3, dof: 1, increment: 0.0016, steps: 60 } }], cursor: 1 } },
+  ]
 }
 
 /** Planar trusses with analysis, for comparing Carapace against OpenSees: one stays elastic, one yields (Steel01) under a displacement-controlled push. */

@@ -4,7 +4,7 @@ export interface EvenlySpacedGridParams {
   /**
    * Plan-axis index that steps between lines. Grids only carry plan (ground-plane)
    * coordinates — index 0 is the first plan axis (X), index 1 is the second plan
-   * axis (Z, 3D models only). The vertical axis (Y) is never part of a grid; it's
+   * axis (Y, 3D models only). The vertical axis (Z in 3D, Y in 2D) is never part of a grid; it's
    * owned by Levels.
    */
   axis: number

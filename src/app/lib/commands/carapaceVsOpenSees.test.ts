@@ -3,7 +3,7 @@ import { exportScript } from '@/app/lib/exportScript'
 import { runCarapace } from '@/app/lib/commands/carapaceRunner'
 import { compareRuns } from '@/app/lib/commands/comparison'
 import { opensesAvailable, runOpenSees } from '@/app/lib/commands/opensesRunner'
-import { TEMPLATE_FIXTURES, trussFixtures } from '@/app/lib/commands/testkit'
+import { TEMPLATE_FIXTURES, cantilever3dFixtures, trussFixtures } from '@/app/lib/commands/testkit'
 
 /**
  * The same model, run twice: in Carapace (the wasm engine the app uses) and in real OpenSees from the script the app exports. The
@@ -13,7 +13,7 @@ import { TEMPLATE_FIXTURES, trussFixtures } from '@/app/lib/commands/testkit'
  * Tolerance is relative to the largest OpenSees value of each quantity. Observed agreement is ~1e-6; the limit leaves a few-fold margin.
  */
 const RTOL = 1e-5
-const fixtures = [...TEMPLATE_FIXTURES, ...trussFixtures()]
+const fixtures = [...TEMPLATE_FIXTURES, ...trussFixtures(), ...cantilever3dFixtures()]
 
 describe.skipIf(!opensesAvailable)('Carapace agrees with OpenSees', () => {
   it.each(fixtures)('$name', ({ model, history }) => {

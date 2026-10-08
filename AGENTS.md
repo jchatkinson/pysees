@@ -52,6 +52,7 @@ AnalysisHistory      ─┼─► compileInputV1 ─► Carapace wasm worker ─
 
 ## Carapace pipeline
 
+- Carapace runs 2D (ndm=2/ndf=3) and 3D (ndm=3/ndf=6) models: `ElasticBeamColumn`, `DispBeamColumn` (fiber, with `-GJ` torsion in 3D) and `Truss`; 3D `Corotational`, `-jntOffset`, zero-length and `forceBeamColumn` are diagnostics. **3D models are Z-up** (plan is X–Y, levels rise in Z; 2D models are in the XY plane, Y up). A beam's local axes come from its transformation's `vecxz` (`lib/memberFrame.ts`, OpenSees rule: `y = vecxz × x`, `z = x × y`), and loads, the deformed shape and the 3D force diagrams (Vy/Vz, Mz/My, T) all use them.
 - `lib/carapace/compileInputV1.ts` compiles Model + sequence into `CarapaceInputV1`
   (`types/carapaceInputV1.ts`, mirrors Rust `input_v1` in `../carapace/wasm-bridge`), returning
   diagnostics for anything unsupported. Material/section arg names are the **schema** names (lowercase,

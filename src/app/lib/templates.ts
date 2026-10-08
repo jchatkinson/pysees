@@ -298,3 +298,77 @@ export function frameTemplate({ stories, storyH, bays, bayW, eleType, base }: Fr
 
   return { ndm: 2, ndf: 3, writes: [...writes, ...loadWrites], analysisCommands, gridlines, levels }
 }
+
+// ---------------------------------------------------------------------------
+// 3D Frame
+// ndm=3, ndf=6, elastic stories × baysX × baysY grid, fixed base. Z is up; plan is X–Y.
+// Node numbering: id = (j*(baysY+1) + k)*(baysX+1) + i + 1, coords = [i*bayX, k*bayY, j*storyH]
+//   i = X grid index, k = Y grid index, j = story index (0..stories)
+// ---------------------------------------------------------------------------
+export interface Frame3dParams {
+  stories: number
+  storyH: number
+  baysX: number
+  bayX: number
+  baysY: number
+  bayY: number
+}
+
+// 400×400 mm concrete members, E 30 GPa, G 12.5 GPa; uniform beam dead load of 20 kN/m.
+const FRAME3D_SECTION = { A: 0.16, E: 30e9, G: 12.5e9, J: 3.6e-3, Iy: 2.13e-3, Iz: 2.13e-3 }
+const FRAME3D_BEAM_LOAD = 20e3
+
+export function frame3dTemplate({ stories, storyH, baysX, bayX, baysY, bayY }: Frame3dParams): TemplateResult {
+  const writes: ModelWrite[] = []
+  const nodeId = (i: number, j: number, k: number) => (j * (baysY + 1) + k) * (baysX + 1) + i + 1
+
+  for (let j = 0; j <= stories; j++) for (let k = 0; k <= baysY; k++) for (let i = 0; i <= baysX; i++) {
+    writes.push({ kind: 'node', entity: { id: nodeId(i, j, k), coords: [i * bayX, k * bayY, j * storyH] } })
+  }
+  for (let k = 0; k <= baysY; k++) for (let i = 0; i <= baysX; i++) writes.push({ kind: 'fix', entity: { nodeId: nodeId(i, 0, k), dofs: [1, 2, 3, 4, 5, 6] } })
+
+  // Columns run along Z, beams along X or Y. `vecxz` lies in the local x–z plane, so columns take X and
+  // plan beams take Z; for the latter local z is then global Z, which makes a downward load a negative `wz`.
+  writes.push(
+    { kind: 'geomTransf', entity: { id: 1, transfType: 'Linear', args: { type: 'Linear', transfTag: 1, vecxz: [1, 0, 0] } } },
+    { kind: 'geomTransf', entity: { id: 2, transfType: 'Linear', args: { type: 'Linear', transfTag: 2, vecxz: [0, 0, 1] } } },
+  )
+  const member = (transfTag: number) => ({ ...FRAME3D_SECTION, transfTag })
+  let eleId = 1
+  for (let k = 0; k <= baysY; k++) for (let i = 0; i <= baysX; i++) for (let j = 0; j < stories; j++) {
+    writes.push({ kind: 'element', entity: { id: eleId++, eleType: 'ElasticBeamColumn', nodes: [nodeId(i, j, k), nodeId(i, j + 1, k)], args: member(1) } })
+  }
+  const beamTags: number[] = []
+  const mass = new Map<number, number>()
+  const addBeam = (a: number, b: number, length: number) => {
+    beamTags.push(eleId)
+    writes.push({ kind: 'element', entity: { id: eleId++, eleType: 'ElasticBeamColumn', nodes: [a, b], args: member(2) } })
+    for (const n of [a, b]) mass.set(n, (mass.get(n) ?? 0) + (FRAME3D_BEAM_LOAD * length / GRAVITY) / 2) // half of each beam's mass to each end
+  }
+  for (let j = 1; j <= stories; j++) for (let k = 0; k <= baysY; k++) for (let i = 0; i < baysX; i++) addBeam(nodeId(i, j, k), nodeId(i + 1, j, k), bayX)
+  for (let j = 1; j <= stories; j++) for (let i = 0; i <= baysX; i++) for (let k = 0; k < baysY; k++) addBeam(nodeId(i, j, k), nodeId(i, j, k + 1), bayY)
+  for (const [nodeIdTag, kg] of [...mass].sort((a, b) => a[0] - b[0])) writes.push({ kind: 'mass', entity: { nodeId: nodeIdTag, values: [Math.round(kg), Math.round(kg), Math.round(kg), 0, 0, 0] } })
+
+  // Dead load on every beam, then a +X push on each floor node proportional to its level, applied to the roof corner.
+  const pushLoads: LoadAssignment[] = []
+  for (let j = 1; j <= stories; j++) for (let k = 0; k <= baysY; k++) for (let i = 0; i <= baysX; i++) pushLoads.push({ kind: 'load', args: { nodeTag: nodeId(i, j, k), values: [1e3 * j, 0, 0, 0, 0, 0] } })
+  const pattern = (id: number, name: string, children: LoadAssignment[]): ModelWrite =>
+    ({ kind: 'pattern', entity: { id, name, patternType: 'Plain', args: { type: 'Plain', patternTag: id, tsTag: 1, fact: 1 }, children } })
+  const loadWrites: ModelWrite[] = [
+    { kind: 'timeSeries', entity: { id: 1, tsType: 'Linear', args: { type: 'Linear', tag: 1, factor: 1 } } },
+    pattern(1, 'Dead Load', [{ kind: 'eleLoad', args: { eleTags: beamTags, wx: 0, wy: 0, wz: -FRAME3D_BEAM_LOAD } }]),
+    pattern(2, 'Push', pushLoads),
+  ]
+
+  const levels: LevelEntity[] = [{ id: 1, label: 'A', height: 0 }]
+  for (let j = 1; j <= stories; j++) levels.push({ id: j + 1, label: alphaLabel(j), height: storyH })
+
+  const analysisCommands: AnalysisCommand[] = [
+    { type: 'ANALYSIS_BLOCK', blockId: 'whole-model-recorder', params: { directory: 'out' } },
+    eigenAnalysis(3 * stories * (baysX + 1) * (baysY + 1)),
+    { type: 'ANALYSIS_BLOCK', blockId: 'run-gravity-analysis', params: { patterns: [1], steps: 10, holdLoads: 'Yes' } },
+    { type: 'ANALYSIS_BLOCK', blockId: 'run-pushover-analysis', params: { patterns: [2], nodeTag: nodeId(baysX, stories, 0), dof: 1, increment: 0.01 * stories * storyH / PUSHOVER_STEPS, steps: PUSHOVER_STEPS } },
+  ]
+
+  return { ndm: 3, ndf: 6, writes: [...writes, ...loadWrites], analysisCommands, levels }
+}

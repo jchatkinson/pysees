@@ -9,10 +9,10 @@ const TEXT_OFFSET = 0.4
 
 function anchorPoint(gridlines: GridlineEntity[], ndm: 2 | 3): [number, number] {
   const xs = gridlines.flatMap((g) => [g.start[0] ?? 0, g.end[0] ?? 0])
-  const zs = ndm === 3 ? gridlines.flatMap((g) => [g.start[1] ?? 0, g.end[1] ?? 0]) : []
+  const ys = ndm === 3 ? gridlines.flatMap((g) => [g.start[1] ?? 0, g.end[1] ?? 0]) : []
   return [
     xs.length ? Math.min(...xs) : -DEFAULT_HALF_EXTENT,
-    zs.length ? Math.min(...zs) : (ndm === 3 ? -DEFAULT_HALF_EXTENT : 0),
+    ys.length ? Math.min(...ys) : (ndm === 3 ? -DEFAULT_HALF_EXTENT : 0),
   ]
 }
 
@@ -37,8 +37,8 @@ function Level({
           <Line
             key={g.id}
             points={[
-              [g.start[0] ?? 0, elevation, g.start[1] ?? 0],
-              [g.end[0] ?? 0, elevation, g.end[1] ?? 0],
+              [g.start[0] ?? 0, g.start[1] ?? 0, elevation],
+              [g.end[0] ?? 0, g.end[1] ?? 0, elevation],
             ]}
             color={GRID_LINE_COLOR}
             lineWidth={1}
@@ -58,7 +58,7 @@ function Level({
             dashScale={8}
           />
         )}
-      <Billboard position={[anchor[0] - TEXT_OFFSET, elevation, anchor[1] - TEXT_OFFSET]}>
+      <Billboard position={ndm === 3 ? [anchor[0] - TEXT_OFFSET, anchor[1] - TEXT_OFFSET, elevation] : [anchor[0] - TEXT_OFFSET, elevation, anchor[1] - TEXT_OFFSET]}>
         <Text fontSize={0.28} color={GRID_LINE_COLOR} anchorX="right" anchorY="middle">
           {level.label}
         </Text>

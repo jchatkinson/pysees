@@ -92,10 +92,11 @@ const wholeModelRecorder: AnalysisBlockDef = {
   build: (params, model) => {
     const dir = String(params.directory ?? 'out').replace(/\/$/, '')
     const nodeTags = [...model.nodes.keys()].sort((a, b) => a - b)
+    const dofs = Array.from({ length: model.config?.ndf ?? 3 }, (_, i) => i + 1)
     const commands: AnalysisCommand[] = []
     if (nodeTags.length) {
-      commands.push(ops('recorder', ['Node', '-file', `${dir}/disp.out`, '-time', '-node', ...nodeTags, '-dof', 1, 2, 3, 'disp']))
-      commands.push(ops('recorder', ['Node', '-file', `${dir}/reaction.out`, '-time', '-node', ...nodeTags, '-dof', 1, 2, 3, 'reaction']))
+      commands.push(ops('recorder', ['Node', '-file', `${dir}/disp.out`, '-time', '-node', ...nodeTags, '-dof', ...dofs, 'disp']))
+      commands.push(ops('recorder', ['Node', '-file', `${dir}/reaction.out`, '-time', '-node', ...nodeTags, '-dof', ...dofs, 'reaction']))
     }
     for (const g of elementForceRecorders(model)) commands.push(ops('recorder', ['Element', '-file', `${dir}/${g.file}`, '-time', '-ele', ...g.eleTags, g.response]))
     return commands

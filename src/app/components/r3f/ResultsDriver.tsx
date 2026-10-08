@@ -38,7 +38,6 @@ export function ResultsDriver({ index, buffers }: { index: SceneIndex; buffers: 
   const last = series ? series.first + series.count - 1 : undefined
   const rows = useMemo(() => nodeRows(modal?.nodeTags ?? []), [modal])
   const metrics = useMemo(() => modelMetrics(model), [model])
-  const planar = model.config?.ndm === 2
   const nodeDisplacements = useMemo(() => createNodeDisplacements(index.nodeIds.length), [index])
 
   const blendedRow = useMemo(() => (source ? new Float64Array(source.layout.stride) : null), [source])
@@ -58,17 +57,17 @@ export function ResultsDriver({ index, buffers }: { index: SceneIndex; buffers: 
       if (type === 'deformed') {
         readNodeDisplacements(index, source.layout, row, nodeDisplacements)
         displaceNodes(index, nodeDisplacements, scale, buffers.nodePositions)
-        fillDeformedSegments(index, nodeDisplacements, scale, planar, buffers.deformedSegments)
+        fillDeformedSegments(index, nodeDisplacements, scale, buffers.deformedSegments)
         buffers.publish(showValues ? nodeValueLabels(index, source.layout, row, buffers.nodePositions) : [])
         buffers.resetDiagram()
       } else {
         // Diagrams sit on the undeformed shape.
         buffers.reset()
-        buffers.publishDiagram(planar ? fillDiagram(index, source.layout, row, type, scale, diagramArrays) : { fillVertices: 0, lineSegments: 0, labels: [] })
+        buffers.publishDiagram(fillDiagram(index, source.layout, row, type, scale, diagramArrays))
       }
     }).catch(() => { if (live) { buffers.reset(); buffers.resetDiagram() } })
     return () => { live = false }
-  }, [index, buffers, source, type, step, stepFrac, blendedRow, manualScale, showValues, metrics, planar, nodeDisplacements, diagramArrays, first, last])
+  }, [index, buffers, source, type, step, stepFrac, blendedRow, manualScale, showValues, metrics, nodeDisplacements, diagramArrays, first, last])
 
   // Mode shapes: the stored shape scaled by cos(phase), through the same deformed-shape drawing as a step's displacements.
   useEffect(() => {
@@ -79,10 +78,10 @@ export function ResultsDriver({ index, buffers }: { index: SceneIndex; buffers: 
     const scale = (manualScale ?? autoModeScale(modeTranslationPeak(stage, mode), metrics)) * Math.cos(phase)
     readModeShape(index, rows, stage, mode, nodeDisplacements)
     displaceNodes(index, nodeDisplacements, scale, buffers.nodePositions)
-    fillDeformedSegments(index, nodeDisplacements, scale, planar, buffers.deformedSegments)
+    fillDeformedSegments(index, nodeDisplacements, scale, buffers.deformedSegments)
     buffers.publish([])
     buffers.resetDiagram()
-  }, [index, buffers, type, modal, rows, current, modeIndex, phase, manualScale, metrics, planar, nodeDisplacements])
+  }, [index, buffers, type, modal, rows, current, modeIndex, phase, manualScale, metrics, nodeDisplacements])
 
   // Leaving the scene (or a new index) must not leave stale displaced nodes behind.
   useEffect(() => () => { buffers.reset(); buffers.resetDiagram() }, [buffers])

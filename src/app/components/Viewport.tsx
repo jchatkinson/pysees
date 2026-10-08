@@ -10,6 +10,7 @@ type MarqueeRect = { x1: number; y1: number; x2: number; y2: number }
 
 export function Viewport() {
   const hasConfig = useAppStore((s) => Boolean(s.model.config))
+  const ndm = useAppStore((s) => s.model.config?.ndm)
 
   const sceneRef = useRef<ViewportSceneRef>(null)
   const [marquee, setMarquee] = useState<MarqueeRect | null>(null)
@@ -63,8 +64,10 @@ export function Viewport() {
           }
         }}
       >
+        {/* 3D models are Z-up. The orbit controls fix their up axis when created, so a different ndm remounts the canvas. */}
         <Canvas
-          camera={{ position: [8, 8, 10], fov: 45, near: 0.1, far: 2000 }}
+          key={ndm}
+          camera={ndm === 3 ? { position: [10, -12, 8], up: [0, 0, 1], fov: 45, near: 0.1, far: 2000 } : { position: [8, 8, 10], fov: 45, near: 0.1, far: 2000 }}
           gl={{ antialias: true }}
         >
           <ViewportScene ref={sceneRef} />

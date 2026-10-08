@@ -18,7 +18,7 @@ const PREVIEW_SIZE = 220
 const CELL_INPUT_CLASS = 'h-6 px-1.5 text-xs border-transparent rounded-none bg-transparent hover:border-input focus-visible:border-ring focus-visible:ring-0'
 
 function planAxisLabels(ndm: 2 | 3): string[] {
-  return ndm === 3 ? ['X', 'Z'] : ['X']
+  return ndm === 3 ? ['X', 'Y'] : ['X']
 }
 
 function GridPlanPreview({ gridlines }: { gridlines: GridlineEntity[] }) {

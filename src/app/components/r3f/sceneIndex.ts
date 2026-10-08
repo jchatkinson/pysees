@@ -1,4 +1,5 @@
-import type { ElementEntity, NodeEntity } from '@/app/types/model'
+import type { ElementEntity, GeomTransfEntity, NodeEntity } from '@/app/types/model'
+import { memberFrame } from '@/app/lib/memberFrame'
 import { toVec3 } from './utils'
 
 /** Line segments each element span is split into. Fixed so the line buffer layout never changes
@@ -12,6 +13,8 @@ export const SEGMENTS_PER_SPAN = 8
 export type ElementKind = 'beam' | 'truss' | 'other'
 
 export interface SceneIndex {
+  /** Model dimension: 2D elements live in the XY plane. */
+  ndm: 2 | 3
   nodeIds: number[]
   nodeIndex: Map<number, number>
   /** Undeformed xyz per node, `3 * nodeIds.length`. */
@@ -22,6 +25,8 @@ export interface SceneIndex {
   elementNodes: number[][]
   /** Per element: beam-columns get cubic displaced shapes and N/V/M diagrams; trusses only axial; the rest interpolate linearly. */
   elementKind: ElementKind[]
+  /** Per element, 9 floats: local x, y, z axes (global components) of its first span; zeros for a zero-length element. */
+  elementFrames: Float32Array
   segmentsPerSpan: number
   /** Per element: first segment index in the line buffer; `elementSegmentStart[elementIds.length]` is the total. */
   elementSegmentStart: Uint32Array
@@ -31,6 +36,8 @@ export interface SceneIndex {
 export function buildSceneIndex(
   nodes: Map<number, NodeEntity>,
   elements: Map<number, ElementEntity>,
+  geomTransfs: Map<number, GeomTransfEntity>,
+  ndm: 2 | 3,
 ): SceneIndex {
   const sortedNodes = [...nodes.values()].sort((a, b) => a.id - b.id)
   const nodeIds = sortedNodes.map((n) => n.id)
@@ -41,6 +48,7 @@ export function buildSceneIndex(
   const elementIds: number[] = []
   const elementNodes: number[][] = []
   const elementKind: ElementKind[] = []
+  const frames: number[] = []
   const starts: number[] = []
   let segmentCount = 0
   for (const el of [...elements.values()].sort((a, b) => a.id - b.id)) {
@@ -49,12 +57,14 @@ export function buildSceneIndex(
     elementIds.push(el.id)
     elementNodes.push(rows)
     elementKind.push(/BeamColumn$/i.test(el.eleType) ? 'beam' : /^truss$/i.test(el.eleType) ? 'truss' : 'other')
+    const frame = memberFrame(nodeCoords.subarray(rows[0] * 3, rows[0] * 3 + 3), nodeCoords.subarray(rows[1] * 3, rows[1] * 3 + 3), ndm, geomTransfs.get(Number(el.args.transfTag))?.args.vecxz)
+    frames.push(...(frame ? [...frame.x, ...frame.y, ...frame.z] : [0, 0, 0, 0, 0, 0, 0, 0, 0]))
     starts.push(segmentCount)
     segmentCount += (rows.length - 1) * SEGMENTS_PER_SPAN
   }
   starts.push(segmentCount)
 
-  return { nodeIds, nodeIndex, nodeCoords, elementIds, elementNodes, elementKind, segmentsPerSpan: SEGMENTS_PER_SPAN, elementSegmentStart: Uint32Array.from(starts), segmentCount }
+  return { ndm, nodeIds, nodeIndex, nodeCoords, elementIds, elementNodes, elementKind, elementFrames: Float32Array.from(frames), segmentsPerSpan: SEGMENTS_PER_SPAN, elementSegmentStart: Uint32Array.from(starts), segmentCount }
 }
 
 /**

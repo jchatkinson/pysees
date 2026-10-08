@@ -49,7 +49,7 @@ export const ViewportScene = forwardRef<ViewportSceneRef, object>(function Viewp
   const controlsRef = useRef<OrbitControlsImpl | null>(null)
   const { camera, size } = useThree()
 
-  const sceneIndex = useMemo(() => buildSceneIndex(model.nodes, model.elements), [model.nodes, model.elements])
+  const sceneIndex = useMemo(() => buildSceneIndex(model.nodes, model.elements, model.geomTransfs, model.config?.ndm === 2 ? 2 : 3), [model.nodes, model.elements, model.geomTransfs, model.config?.ndm])
   const displayBuffers = useMemo(() => new DisplayBuffers(sceneIndex), [sceneIndex])
   const fixes = useMemo(() => [...model.fixes.values()].sort((a, b) => a.nodeId - b.nodeId), [model.fixes])
 
@@ -124,7 +124,7 @@ export const ViewportScene = forwardRef<ViewportSceneRef, object>(function Viewp
 
   return (
     <>
-      <SceneHelpers showGrid={viewSettings.showGrid} />
+      <SceneHelpers showGrid={viewSettings.showGrid} ndm={model.config?.ndm ?? 3} />
       <GridlinesLayer
         gridlines={gridlines}
         showGridlines={viewSettings.showGridlines}
@@ -161,6 +161,7 @@ export const ViewportScene = forwardRef<ViewportSceneRef, object>(function Viewp
         patterns={[...model.patterns.values()]}
         nodeMap={model.nodes}
         elementMap={model.elements}
+        geomTransfs={model.geomTransfs}
         ndm={model.config?.ndm ?? 3}
         hiddenPatterns={hiddenLoadPatterns}
         showNodal={viewSettings.showNodalLoads}
