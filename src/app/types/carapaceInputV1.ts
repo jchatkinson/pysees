@@ -1,10 +1,11 @@
-// Mirrors carapace/wasm-bridge/src/input_v1/{mod,tables,tables3,materials,sequence}.rs's serde
-// (camelCase) wire shape exactly — every field `CarapaceInputV1` declares is required by serde
-// (no `#[serde(default)]` anywhere on that struct), so a value missing even one field fails
-// decodeInput() outright. This is what decodeInput() in carapace_wasm expects — see
-// src/app/lib/carapace/compileInputV1.ts, the only place that constructs one; that compiler only
-// ever targets the planar profile (ndm=2/ndf=3), so every `*3` (spatial) field it emits is always
-// an empty table, but still has to be *present* and correctly shaped.
+// Mirrors carapace/wasm-bridge/src/input_v1/{mod,tables,materials,sequence}.rs's serde (camelCase)
+// wire shape — what decodeInput() in carapace_wasm expects (see src/app/lib/carapace/compileInputV1.ts,
+// the only place that constructs one). One format serves 2D and 3D (`header.ndm`); this compiler only
+// targets 2D (ndm=2/ndf=3). Every table is optional on the wire; the ones this compiler always
+// emits are required here, and tables it never emits (force beam-columns, zero-lengths, equal DOFs,
+// diaphragms, rigid links, linear constraints, plane materials, triangles, quads) are left out. The model has no
+// continuum elements yet; when it does, mirror `planeMaterials`/`triangles`/`quads` and the body/edge loads and
+// `gaussPoint` recorders from carapace_wasm.d.ts.
 
 export interface NodeTable { coords: number[]; fixed: number[]; massNodeIndex: number[]; mass: number[] }
 
@@ -12,21 +13,19 @@ export type TransformSpec = 'linear' | 'pDelta' | 'corotational'
 export type IntegrationSpec = { kind: 'legendre'; points: number } | { kind: 'lobatto'; points: number }
 
 export interface TrussTable { nodeI: number[]; nodeJ: number[]; area: number[]; material: number[]; density: number[] }
-export interface ElasticBeamColumnTable { nodeI: number[]; nodeJ: number[]; e: number[]; a: number[]; iz: number[]; transform: TransformSpec[]; density: number[] }
-export interface FiberBeamColumnTable { nodeI: number[]; nodeJ: number[]; fiberSection: number[]; integration: IntegrationSpec[]; corotational: boolean[]; density: number[] }
-/** Sparse OpenSees `-orient` rows; rows without one use the global axes. 2D: `(row, x1, x2, x3)`; 3D: `(row, x1, x2, x3, yp1, yp2, yp3)`. */
-export type OrientRow2 = [number, number, number, number]
-export type OrientRow3 = [number, number, number, number, number, number, number]
-/** `materials`: sparse `(row, dof, materialArenaIndex)`. `friction`: sparse `(row, normalDof, shearDof, mu, k0, b)`, at most one per row. `orient`: optional local axes per row. */
-export interface ZeroLengthTable { nodeI: number[]; nodeJ: number[]; materials: [number, number, number][]; friction: [number, number, number, number, number, number][]; orient?: OrientRow2[] }
+export interface ElasticBeamColumn2dTable { nodeI: number[]; nodeJ: number[]; e: number[]; a: number[]; iz: number[]; transform: TransformSpec[]; density: number[] }
+export interface FiberBeamColumn2dTable { nodeI: number[]; nodeJ: number[]; fiberSection: number[]; integration: IntegrationSpec[]; corotational: boolean[]; density: number[] }
+/** Sparse OpenSees `-orient` row; rows without one use the global axes. 2D: `x = [x1, x2, 0]` and no `yp`; 3D adds `yp`. */
+export interface OrientRow { row: number; x: [number, number, number]; yp?: [number, number, number] }
 /** A `ZeroLength` driven by a coupled `FiberSection` (axial + moment) instead of independent per-DOF materials. `materials` is a sparse spring for the one DOF (`uy`) the section has no resultant for. */
-export interface ZeroLengthSectionTable { nodeI: number[]; nodeJ: number[]; fiberSection: number[]; materials: [number, number, number][]; orient?: OrientRow2[] }
-export interface FiberTable { sectionOffsets: number[]; y: number[]; area: number[]; material: number[] }
+export interface ZeroLengthSectionTable { nodeI: number[]; nodeJ: number[]; fiberSection: number[]; materials: [number, number, number][]; orient?: OrientRow[] }
+/** `z` is empty in 2D and parallel to `y` in 3D. */
+export interface FiberTable { sectionOffsets: number[]; y: number[]; z?: number[]; area: number[]; material: number[] }
 
 /** Identity multi-point constraints (`core::Domain::equal_dof`): row `i` ties `constrained[i]`'s
  * dofs listed in `dofs` (sparse `(row, dof)` pairs) exactly to the same dofs of `retained[i]`. */
 export interface EqualDofTable { retained: number[]; constrained: number[]; dofs: [number, number][] }
-/** Planar rigid diaphragm (`core::Domain::rigid_diaphragm`): row `i` ties every node listed
+/** 2D rigid diaphragm (`core::Domain::rigid_diaphragm`): row `i` ties every node listed
  * against it in `constrained` (sparse `(row, nodeIndex)` pairs) own `ux` to `retained[i]`'s `ux`. */
 export interface RigidDiaphragmTable { retained: number[]; constrained: [number, number][] }
 
@@ -34,7 +33,7 @@ export type TimeSeriesSpec = { kind: 'constant' } | { kind: 'linear'; slope: num
 export interface LoadPatternTable { series: TimeSeriesSpec[]; scaleFactor: number[] }
 export interface NodalLoadTable { pattern: number[]; node: number[]; dof: number[]; value: number[]; stage: number[] }
 
-export type ElementKind = 'truss' | 'elasticBeamColumn' | 'dispBeamColumn' | 'forceBeamColumn' | 'zeroLength' | 'zeroLengthSection'
+export type ElementKind = 'truss' | 'elasticBeamColumn2d' | 'elasticBeamColumn3d' | 'dispBeamColumn2d' | 'dispBeamColumn3d' | 'forceBeamColumn2d' | 'forceBeamColumn3d' | 'zeroLength' | 'zeroLengthSection' | 'tri3' | 'quad4'
 /** Uniform load per length in the element's local axes: `wx` along the member, `wy` transverse. */
 export type ElementLoadSpec = { kind: 'uniform'; wx: number; wy: number }
 export interface ElementLoadTable { pattern: number[]; elementKind: ElementKind[]; elementIndex: number[]; load: ElementLoadSpec[]; stage: number[] }
@@ -86,63 +85,21 @@ export type RecorderSpecWire =
   | { response: 'nodeDisp'; node: number; dof: number }
   | { response: 'reaction'; node: number; dof: number }
   | { response: 'elementForce'; elementKind: ElementKind; elementIndex: number; component: number }
-  /** The uniform load the element carries at each sample (local axes; component 0 = wx, 1 = wy). */
+  /** The uniform load the element carries at each sample (local axes; component 0 = wx, 1 = wy; the 2D wire row is 16 wide, the rest are continuum body/edge terms the compiler never reads). */
   | { response: 'elementLoad'; elementKind: ElementKind; elementIndex: number; component: number }
 export interface SequenceSpec { stages: StageSpec[]; recorders: RecorderSpecWire[] }
 
-// --- Spatial ("space: 3") counterparts -------------------------------------------------------
-// `compileInputV1.ts` targets the planar profile only, so every value below is always an empty
-// table — these types exist purely so that empty table is *correctly shaped* (`CarapaceInputV1`
-// requires every field, planar or spatial, to be present regardless of `header.space`).
-
-export interface NodeTable3 { coords: number[]; fixed: number[]; massNodeIndex: number[]; mass: number[] }
-export type TransformSpec3 = { kind: 'linear3'; vecXz: [number, number, number] } | { kind: 'pDelta3'; vecXz: [number, number, number] }
-export interface TrussTable3 { nodeI: number[]; nodeJ: number[]; area: number[]; material: number[]; density: number[] }
-export interface ElasticBeamColumnTable3 { nodeI: number[]; nodeJ: number[]; e: number[]; g: number[]; a: number[]; j: number[]; iy: number[]; iz: number[]; transform: TransformSpec3[]; density: number[] }
-export interface FiberBeamColumnTable3 { nodeI: number[]; nodeJ: number[]; g: number[]; j: number[]; vecXz: [number, number, number][]; fiberSection: number[]; integration: IntegrationSpec[]; density: number[] }
-export interface ZeroLengthTable3 { nodeI: number[]; nodeJ: number[]; materials: [number, number, number][]; friction: [number, number, number, number, number, number, number][]; orient?: OrientRow3[] }
-export interface ZeroLengthSectionTable3 { nodeI: number[]; nodeJ: number[]; fiberSection: number[]; materials: [number, number, number][]; orient?: OrientRow3[] }
-export interface FiberTable3 { sectionOffsets: number[]; y: number[]; z: number[]; area: number[]; material: number[] }
-export type ElementKind3 = 'truss' | 'elasticBeamColumn' | 'dispBeamColumn' | 'forceBeamColumn' | 'zeroLength' | 'zeroLengthSection'
-export type ElementLoadSpec3 = { kind: 'uniform'; wx: number; wy: number; wz: number }
-export interface ElementLoadTable3 { pattern: number[]; elementKind: ElementKind3[]; elementIndex: number[]; load: ElementLoadSpec3[]; stage: number[] }
-export type Axis3Spec = 'x' | 'y' | 'z'
-export interface EqualDofTable3 { retained: number[]; constrained: number[]; dofs: [number, number][] }
-export interface RigidDiaphragmTable3 { retained: number[]; normal: Axis3Spec[]; constrained: [number, number][] }
-/** `stages` reuses the planar `StageSpec` (the Rust `SequenceSpec3` does too — stage/integrator
- * compilation never touches element physics). `recorders` is never populated by this compiler. */
-export interface SequenceSpec3 { stages: StageSpec[]; recorders: never[] }
-
 export interface CarapaceInputV1 {
-  header: { schemaVersion: number; space: 2; engineVersion: string; recordInitial?: boolean }
+  header: { schemaVersion: number; ndm: 2; engineVersion: string; recordInitial?: boolean }
   nodes: NodeTable
   materials: MaterialSpec[]
   fibers: FiberTable
   trusses: TrussTable
-  elasticBeamColumns: ElasticBeamColumnTable
-  dispBeamColumns: FiberBeamColumnTable
-  forceBeamColumns: FiberBeamColumnTable
-  zeroLengths: ZeroLengthTable
+  elasticBeamColumns2d: ElasticBeamColumn2dTable
+  dispBeamColumns2d: FiberBeamColumn2dTable
   zeroLengthSections: ZeroLengthSectionTable
-  equalDofs: EqualDofTable
-  rigidDiaphragms: RigidDiaphragmTable
   loadPatterns: LoadPatternTable
   nodalLoads: NodalLoadTable
   elementLoads: ElementLoadTable
   sequence: SequenceSpec
-
-  nodes3: NodeTable3
-  fibers3: FiberTable3
-  trusses3: TrussTable3
-  elasticBeamColumns3: ElasticBeamColumnTable3
-  dispBeamColumns3: FiberBeamColumnTable3
-  forceBeamColumns3: FiberBeamColumnTable3
-  zeroLengths3: ZeroLengthTable3
-  zeroLengthSections3: ZeroLengthSectionTable3
-  equalDofs3: EqualDofTable3
-  rigidDiaphragms3: RigidDiaphragmTable3
-  /** Nodal loads for the spatial profile reuse `NodalLoadTable` as-is (Rust's own field comment). */
-  nodalLoads3: NodalLoadTable
-  elementLoads3: ElementLoadTable3
-  sequence3: SequenceSpec3
 }

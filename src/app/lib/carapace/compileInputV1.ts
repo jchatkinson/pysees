@@ -137,8 +137,8 @@ export function compileInputV1(model: Model, analysisHistory: AnalysisHistory): 
 
   // --- elements ---
   const trusses: W.TrussTable = { nodeI: [], nodeJ: [], area: [], material: [], density: [] }
-  const elasticBeamColumns: W.ElasticBeamColumnTable = { nodeI: [], nodeJ: [], e: [], a: [], iz: [], transform: [], density: [] }
-  const dispBeamColumns: W.FiberBeamColumnTable = { nodeI: [], nodeJ: [], fiberSection: [], integration: [], corotational: [], density: [] }
+  const elasticBeamColumns: W.ElasticBeamColumn2dTable = { nodeI: [], nodeJ: [], e: [], a: [], iz: [], transform: [], density: [] }
+  const dispBeamColumns: W.FiberBeamColumn2dTable = { nodeI: [], nodeJ: [], fiberSection: [], integration: [], corotational: [], density: [] }
   const zeroLengthSections: W.ZeroLengthSectionTable = { nodeI: [], nodeJ: [], fiberSection: [], materials: [], orient: [] }
   const resolveSection = (secTag: number, context: string): number => {
     const idx = sectionIndex.get(secTag)
@@ -167,7 +167,7 @@ export function compileInputV1(model: Model, analysisHistory: AnalysisHistory): 
       elasticBeamColumns.iz.push(Number(ele.args.Iz) || 0)
       elasticBeamColumns.transform.push(compileTransform(transfType, `ElasticBeamColumn ${ele.id}`, diagnostics))
       elasticBeamColumns.density.push(0)
-      elementRefs.set(ele.id, { kind: 'elasticBeamColumn', index: elasticBeamColumns.nodeI.length - 1 })
+      elementRefs.set(ele.id, { kind: 'elasticBeamColumn2d', index: elasticBeamColumns.nodeI.length - 1 })
     } else if (ele.eleType === 'DispBeamColumn') {
       const integrationTag = Number(ele.args.integrationTag)
       const integration = model.beamIntegrations.get(integrationTag)
@@ -182,7 +182,7 @@ export function compileInputV1(model: Model, analysisHistory: AnalysisHistory): 
       dispBeamColumns.integration.push(compileIntegration(integration, `DispBeamColumn ${ele.id}`, diagnostics))
       dispBeamColumns.corotational.push(false)
       dispBeamColumns.density.push(0)
-      elementRefs.set(ele.id, { kind: 'dispBeamColumn', index: dispBeamColumns.nodeI.length - 1 })
+      elementRefs.set(ele.id, { kind: 'dispBeamColumn2d', index: dispBeamColumns.nodeI.length - 1 })
     } else if (ele.eleType === 'zeroLengthSection') {
       const secIdx = resolveSection(Number(ele.args.secTag), `ZeroLengthSection ${ele.id}`)
       zeroLengthSections.nodeI.push(resolveNode(ele.nodes[0], `ZeroLengthSection ${ele.id}`))
@@ -191,7 +191,7 @@ export function compileInputV1(model: Model, analysisHistory: AnalysisHistory): 
       const orient = readOrient(ele.args.orient)
       const problem = ele.args.orient === undefined ? null : orientProblem(ele.args.orient, 2)
       if (problem) diagnostics.push({ severity: 'error', message: `ZeroLengthSection ${ele.id}: ${problem}`, commandIndex: -1 })
-      else if (orient) zeroLengthSections.orient!.push([zeroLengthSections.nodeI.length - 1, orient[0], orient[1], orient[2]])
+      else if (orient) zeroLengthSections.orient!.push({ row: zeroLengthSections.nodeI.length - 1, x: [orient[0], orient[1], orient[2]] })
       elementRefs.set(ele.id, { kind: 'zeroLengthSection', index: zeroLengthSections.nodeI.length - 1 })
     } else {
       diagnostics.push({ severity: 'warning', message: `Element ${ele.id} (${ele.eleType}) is not yet supported by the Carapace compiler and was skipped`, commandIndex: -1 })
@@ -286,7 +286,7 @@ export function compileInputV1(model: Model, analysisHistory: AnalysisHistory): 
             : { severity: 'error', message: `Element load in pattern ${id} references unknown element ${tag}`, commandIndex: -1 })
           continue
         }
-        if (ref.kind !== 'elasticBeamColumn' && ref.kind !== 'dispBeamColumn' && ref.kind !== 'forceBeamColumn') {
+        if (ref.kind !== 'elasticBeamColumn2d' && ref.kind !== 'dispBeamColumn2d' && ref.kind !== 'forceBeamColumn2d') {
           diagnostics.push({ severity: 'warning', message: `Element loads on ${model.elements.get(tag)?.eleType ?? ref.kind} ${tag} (pattern ${id}) are not yet supported by the Carapace compiler and were skipped`, commandIndex: -1 })
           continue
         }
@@ -372,38 +372,18 @@ export function compileInputV1(model: Model, analysisHistory: AnalysisHistory): 
   if (diagnostics.some((d) => d.severity === 'error')) return { input: null, diagnostics, recordedNodeTags: [], dofsPerNode: 0, recorderPlans: [], nodeTags: [] }
 
   const input: W.CarapaceInputV1 = {
-    header: { schemaVersion: 1, space: 2, engineVersion: 'pysees-dev', recordInitial: true },
+    header: { schemaVersion: 1, ndm: 2, engineVersion: 'pysees-dev', recordInitial: true },
     nodes,
     materials,
     fibers,
     trusses,
-    elasticBeamColumns,
-    dispBeamColumns,
-    forceBeamColumns: { nodeI: [], nodeJ: [], fiberSection: [], integration: [], corotational: [], density: [] },
-    zeroLengths: { nodeI: [], nodeJ: [], materials: [], friction: [] },
+    elasticBeamColumns2d: elasticBeamColumns,
+    dispBeamColumns2d: dispBeamColumns,
     zeroLengthSections,
-    equalDofs: { retained: [], constrained: [], dofs: [] },
-    rigidDiaphragms: { retained: [], constrained: [] },
     loadPatterns,
     nodalLoads,
     elementLoads,
     sequence: { stages, recorders },
-
-    // Planar-only compiler — every spatial (`*3`) table is required by `CarapaceInputV1` but
-    // always empty (see carapaceInputV1.ts's own module doc comment).
-    nodes3: { coords: [], fixed: [], massNodeIndex: [], mass: [] },
-    fibers3: { sectionOffsets: [], y: [], z: [], area: [], material: [] },
-    trusses3: { nodeI: [], nodeJ: [], area: [], material: [], density: [] },
-    elasticBeamColumns3: { nodeI: [], nodeJ: [], e: [], g: [], a: [], j: [], iy: [], iz: [], transform: [], density: [] },
-    dispBeamColumns3: { nodeI: [], nodeJ: [], g: [], j: [], vecXz: [], fiberSection: [], integration: [], density: [] },
-    forceBeamColumns3: { nodeI: [], nodeJ: [], g: [], j: [], vecXz: [], fiberSection: [], integration: [], density: [] },
-    zeroLengths3: { nodeI: [], nodeJ: [], materials: [], friction: [] },
-    zeroLengthSections3: { nodeI: [], nodeJ: [], fiberSection: [], materials: [] },
-    equalDofs3: { retained: [], constrained: [], dofs: [] },
-    rigidDiaphragms3: { retained: [], normal: [], constrained: [] },
-    nodalLoads3: { pattern: [], node: [], dof: [], value: [], stage: [] },
-    elementLoads3: { pattern: [], elementKind: [], elementIndex: [], load: [], stage: [] },
-    sequence3: { stages: [], recorders: [] },
   }
   return { input, diagnostics, recordedNodeTags, dofsPerNode, recorderPlans, nodeTags: nodeIds }
 }
