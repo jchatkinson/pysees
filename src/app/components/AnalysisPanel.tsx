@@ -1,4 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
+import { DndContext, PointerSensor, KeyboardSensor, closestCenter, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core'
+import { SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 import { ChevronRight, Eye, EyeOff, Play, Loader2, CheckCircle2, XCircle, Square } from 'lucide-react'
 import { ScrollArea } from '@/app/components/ui/scroll-area'
 import { Button } from '@/app/components/ui/button'
@@ -52,6 +55,18 @@ function computeGroups(commands: AnalysisCommand[]): DisplayGroup[] {
 
 const AUTO_COLLAPSE_THRESHOLD = 4
 
+// One sortable command row; the whole row is a drop target, so the thin divider gaps no longer matter.
+function SortableRow({ id, children }: { id: number; children: (handle: React.HTMLAttributes<HTMLButtonElement>) => React.ReactNode }) {
+  // Ids are positional and the store reorders on drop, so rows must not animate back to rest afterwards.
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging, isSorting } = useSortable({ id, animateLayoutChanges: () => false })
+  const style = { transform: CSS.Transform.toString(transform && { ...transform, x: 0, scaleX: 1, scaleY: 1 }), transition: isSorting ? transition : undefined }
+  return (
+    <div ref={setNodeRef} style={style} className={isDragging ? 'relative z-10 bg-background shadow-md opacity-90' : ''}>
+      {children({ ...attributes, ...listeners })}
+    </div>
+  )
+}
+
 export function AnalysisPanel() {
   const {
     model,
@@ -77,8 +92,16 @@ export function AnalysisPanel() {
     if (next.has(i)) next.delete(i); else next.add(i)
     return next
   })
-  const [dragIndex, setDragIndex] = useState<number | null>(null)
-  const [dragTarget, setDragTarget] = useState<number | null>(null)
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  )
+  const onDragEnd = ({ active, over }: DragEndEvent) => {
+    if (!over || active.id === over.id) return
+    const from = Number(active.id), overIdx = Number(over.id)
+    // Dropping on a row below the source lands after it; above lands before it.
+    moveAnalysisCommand(from, overIdx > from ? overIdx + 1 : overIdx)
+  }
   const [diagnosticsOpen, setDiagnosticsOpen] = useState(false)
   const busy = carapaceRun.status === 'compiling' || carapaceRun.status === 'running'
 
@@ -114,32 +137,22 @@ export function AnalysisPanel() {
     return overrides.has(g.startIndex) ? !defaultCollapsed : defaultCollapsed
   }
 
+  const visibleIds = groups.flatMap((g) => isGroupCollapsed(g) ? [] : Array.from({ length: g.count }, (_, k) => g.startIndex + k))
+
   const toggleGroup = (g: DisplayGroup) => setOverrides((prev) => {
     const next = new Set(prev)
     if (next.has(g.startIndex)) next.delete(g.startIndex); else next.add(g.startIndex)
     return next
   })
 
+  // Click-only: sets where new commands are inserted. Reordering is handled by the sortable rows.
   const renderInsertZone = (index: number) => (
-    <div
-      className={[
-        'h-1 mx-1 rounded transition-colors cursor-pointer',
-        dragTarget === index ? 'bg-primary/50' : '',
-        analysisInsertionIndex === index && dragTarget === null ? 'bg-primary/20' : '',
-      ].join(' ')}
-      onDragOver={(e) => { e.preventDefault(); setDragTarget(index) }}
-      onDragLeave={() => setDragTarget((prev) => (prev === index ? null : prev))}
-      onDrop={(e) => {
-        e.preventDefault()
-        if (dragIndex !== null) moveAnalysisCommand(dragIndex, index)
-        setDragIndex(null)
-        setDragTarget(null)
-      }}
-      onClick={() => setAnalysisInsertionIndex(index)}
-    />
+    <div className="group/zone h-2 mx-1 flex items-center cursor-pointer" onClick={() => setAnalysisInsertionIndex(index)}>
+      <div className={['h-px w-full transition-colors group-hover/zone:bg-primary/50', analysisInsertionIndex === index ? 'h-0.5 bg-primary/40' : ''].join(' ')} />
+    </div>
   )
 
-  const renderCmdRow = (i: number, indented?: boolean) => {
+  const renderCmdRow = (i: number, handle: React.HTMLAttributes<HTMLButtonElement>, indented?: boolean) => {
     const cmd = commands[i]
     const isCurrent = i === cursor
     const isFuture = i > cursor
@@ -149,24 +162,12 @@ export function AnalysisPanel() {
     return (
       <>
       <div className="flex items-center gap-0.5 group/row">
-        <Tooltip>
-          <TooltipTrigger
-            render={
-              <button
-                className={[
-                  'shrink-0 opacity-0 group-hover/row:opacity-100 transition-opacity',
-                  'text-muted-foreground/40 hover:text-muted-foreground/80',
-                  'cursor-grab active:cursor-grabbing px-0.5 text-[9px] leading-none',
-                ].join(' ')}
-                draggable
-                onDragStart={() => { setDragIndex(i); setDragTarget(null) }}
-                onDragEnd={() => { setDragIndex(null); setDragTarget(null) }}
-                aria-label="Drag to reorder"
-              >⠿</button>
-            }
-          />
-          <TooltipContent>Drag to reorder</TooltipContent>
-        </Tooltip>
+        <button
+          {...handle}
+          className="shrink-0 opacity-0 group-hover/row:opacity-100 focus-visible:opacity-100 transition-opacity text-muted-foreground/50 hover:text-muted-foreground cursor-grab active:cursor-grabbing touch-none px-1 py-0.5 text-[10px] leading-none"
+          title="Drag to reorder"
+          aria-label="Drag to reorder"
+        >⠿</button>
         <button
           className={[
             'flex-1 text-left px-1.5 py-px rounded text-[10px] font-mono relative truncate',
@@ -247,6 +248,8 @@ export function AnalysisPanel() {
             {commands.length === 0 && (
               <p className="text-[10px] text-muted-foreground text-center py-6">No analysis commands.</p>
             )}
+            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
+            <SortableContext items={visibleIds} strategy={verticalListSortingStrategy}>
             {groups.map((group, gi) => {
               const collapsed = isGroupCollapsed(group)
               const showHeader = group.count > 1
@@ -266,13 +269,15 @@ export function AnalysisPanel() {
                   )}
                   {!collapsed && indices.map((absIdx, k) => (
                     <div key={absIdx}>
-                      {renderCmdRow(absIdx, showHeader)}
+                      <SortableRow id={absIdx}>{(handle) => renderCmdRow(absIdx, handle, showHeader)}</SortableRow>
                       {k < group.count - 1 && renderInsertZone(absIdx + 1)}
                     </div>
                   ))}
                 </div>
               )
             })}
+            </SortableContext>
+            </DndContext>
             {commands.length > 0 && renderInsertZone(commands.length)}
           </div>
         </ScrollArea>
