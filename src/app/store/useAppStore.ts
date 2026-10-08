@@ -100,6 +100,12 @@ interface AppStore {
   selectedNodeIds: number[]
   setSelectedNodeIds: (ids: number[]) => void
   toggleNodeInSelection: (id: number, additive: boolean) => void
+  /** Scene -> properties: after a node click or marquee, show the one selected node in the command panel (or drop a stale node view). Model panel only, and not while a form is picking nodes. */
+  selectNodesFromScene: () => void
+  /** Scene -> properties: a clicked element becomes the selected model entity. */
+  selectElementFromScene: (id: number) => void
+  /** Scene -> properties: a click on empty space clears the node selection and a node/element properties view. */
+  clearSceneSelection: () => void
   nodePickMode: 'none' | 'idlist' | 'vec-sequential'
   setNodePickMode: (mode: 'none' | 'idlist' | 'vec-sequential') => void
   pendingNodePick: number | null
@@ -282,7 +288,11 @@ export const useAppStore = create<AppStore>((set, get) => {
   },
 
   selectedModelEntity: null,
-  setSelectedModelEntity: (sel) => set({ selectedModelEntity: sel }),
+  // The scene highlights a selected node, so a node picked from the list (or deselected) keeps `selectedNodeIds` in step.
+  setSelectedModelEntity: (sel) => set((s) => {
+    if (sel?.kind === 'node') return { selectedModelEntity: sel, selectedNodeIds: [sel.id] }
+    return { selectedModelEntity: sel, ...(s.selectedModelEntity?.kind === 'node' ? { selectedNodeIds: [] } : {}) }
+  }),
 
   selectedAnalysisIndex: null,
   analysisInsertionIndex: null,
@@ -295,6 +305,18 @@ export const useAppStore = create<AppStore>((set, get) => {
     if (!additive) return { selectedNodeIds: [id] }
     const has = s.selectedNodeIds.includes(id)
     return { selectedNodeIds: has ? s.selectedNodeIds.filter((x) => x !== id) : [...s.selectedNodeIds, id] }
+  }),
+  selectNodesFromScene: () => set((s) => {
+    if (s.activePanel !== 'model' || s.nodePickMode !== 'none') return s
+    const ids = s.selectedNodeIds
+    if (ids.length === 1 && s.model.nodes.has(ids[0])) return { selectedModelEntity: { kind: 'node', id: ids[0] } }
+    return s.selectedModelEntity?.kind === 'node' ? { selectedModelEntity: null } : s
+  }),
+  selectElementFromScene: (id) => set((s) => (s.activePanel !== 'model' || s.nodePickMode !== 'none' ? s : { selectedModelEntity: { kind: 'element', id }, selectedNodeIds: [] })),
+  clearSceneSelection: () => set((s) => {
+    if (s.nodePickMode !== 'none') return s
+    const kind = s.selectedModelEntity?.kind
+    return { selectedNodeIds: [], ...(s.activePanel === 'model' && (kind === 'node' || kind === 'element') ? { selectedModelEntity: null } : {}) }
   }),
   nodePickMode: 'none',
   setNodePickMode: (mode) => set({ nodePickMode: mode }),

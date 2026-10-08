@@ -1,6 +1,8 @@
-import { useState } from 'react'
-import { ChevronRight } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { ChevronRight, ChevronsDownUp, ChevronsUpDown } from 'lucide-react'
 import { ScrollArea } from '@/app/components/ui/scroll-area'
+import { Button } from '@/app/components/ui/button'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/app/components/ui/tooltip'
 import { useAppStore } from '@/app/store/useAppStore'
 import type { ModelDeletableKind } from '@/app/lib/modelWrite'
 import type { Model } from '@/app/types/model'
@@ -81,18 +83,43 @@ export function ModelPanel() {
     return next
   })
 
+  // A selection made elsewhere (the scene) should be visible here: open its group (adjusted during render, as React recommends for state derived from a prop) and scroll to it.
+  const listRef = useRef<HTMLDivElement>(null)
+  const [seenSelection, setSeenSelection] = useState(selectedModelEntity)
+  if (seenSelection !== selectedModelEntity) {
+    setSeenSelection(selectedModelEntity)
+    const label = selectedModelEntity && groups.find((g) => g.rows.some((r) => r.kind === selectedModelEntity.kind && r.id === selectedModelEntity.id))?.label
+    if (label && collapsed.has(label)) setCollapsed((prev) => { const next = new Set(prev); next.delete(label); return next })
+  }
+  useEffect(() => {
+    if (!selectedModelEntity) return
+    const row = `${selectedModelEntity.kind}-${selectedModelEntity.id}`
+    requestAnimationFrame(() => listRef.current?.querySelector(`[data-row="${row}"]`)?.scrollIntoView({ block: 'nearest' }))
+  }, [selectedModelEntity])
+
+  const collapseAll = () => setCollapsed(new Set(groups.map((g) => g.label)))
+  const expandAll = () => setCollapsed(new Set())
+
   return (
     <div className="flex flex-col h-full">
       <div className="px-2 py-1 flex items-center justify-between border-b shrink-0">
         <span className="text-[10px] font-medium uppercase tracking-widest text-muted-foreground">Model</span>
         <div className="flex items-center gap-1">
+          <Tooltip>
+            <TooltipTrigger render={<Button variant="ghost" size="icon" className="size-5" disabled={groups.length === 0} onClick={expandAll} aria-label="Expand all"><ChevronsUpDown className="size-3" /></Button>} />
+            <TooltipContent>Expand all</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger render={<Button variant="ghost" size="icon" className="size-5" disabled={groups.length === 0} onClick={collapseAll} aria-label="Collapse all"><ChevronsDownUp className="size-3" /></Button>} />
+            <TooltipContent>Collapse all</TooltipContent>
+          </Tooltip>
           <button className="text-[10px] text-muted-foreground hover:text-foreground disabled:opacity-30" disabled={!canUndo} onClick={modelUndo}>Undo</button>
           <button className="text-[10px] text-muted-foreground hover:text-foreground disabled:opacity-30" disabled={!canRedo} onClick={modelRedo}>Redo</button>
         </div>
       </div>
       <div className="flex-1 min-h-0 overflow-hidden">
         <ScrollArea className="h-full">
-          <div className="py-0.5 px-0.5">
+          <div ref={listRef} className="py-0.5 px-0.5">
             {groups.length === 0 && (
               <p className="text-[10px] text-muted-foreground text-center py-6">No model entities yet.</p>
             )}
@@ -113,6 +140,7 @@ export function ModelPanel() {
                     return (
                       <button
                         key={`${row.kind}-${row.id}`}
+                        data-row={`${row.kind}-${row.id}`}
                         className={[
                           'block w-full text-left px-1.5 py-px pl-3 rounded text-[10px] leading-3 font-mono truncate transition-colors hover:bg-accent hover:text-accent-foreground',
                           isSelected ? 'bg-primary/10 ring-1 ring-inset ring-primary/40' : '',

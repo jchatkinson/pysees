@@ -45,6 +45,8 @@ export const ViewportScene = forwardRef<ViewportSceneRef, object>(function Viewp
   // Results are drawn on the structure, so applied loads would just clutter them (same condition ResultsDriver draws under).
   const showingResults = useAppStore((s) => s.resultsView.type !== 'none' && s.resultsView.runId !== null)
   const setSelectedNodeIds = useAppStore((s) => s.setSelectedNodeIds)
+  const selectNodesFromScene = useAppStore((s) => s.selectNodesFromScene)
+  const clearSceneSelection = useAppStore((s) => s.clearSceneSelection)
 
   const controlsRef = useRef<OrbitControlsImpl | null>(null)
   const { camera, size } = useThree()
@@ -76,6 +78,7 @@ export const ViewportScene = forwardRef<ViewportSceneRef, object>(function Viewp
         if (hit) selected.push(sceneIndex.nodeIds[i])
       }
       setSelectedNodeIds(selected)
+      selectNodesFromScene()
     },
     hitTestNode(x, y) {
       let closestId: number | null = null
@@ -89,7 +92,7 @@ export const ViewportScene = forwardRef<ViewportSceneRef, object>(function Viewp
       }
       return closestId
     },
-  }), [camera, size, sceneIndex, displayBuffers, setSelectedNodeIds])
+  }), [camera, size, sceneIndex, displayBuffers, setSelectedNodeIds, selectNodesFromScene])
 
   useEffect(() => {
     if (!viewportAction) return
@@ -183,7 +186,7 @@ export const ViewportScene = forwardRef<ViewportSceneRef, object>(function Viewp
       {/* Deselect all when clicking empty canvas space (only when not in a pick mode) */}
       <mesh
         visible={false}
-        onClick={() => { if (nodePickMode === 'none') setSelectedNodeIds([]) }}
+        onClick={() => { if (nodePickMode === 'none') clearSceneSelection() }}
       >
         <planeGeometry args={[10000, 10000]} />
       </mesh>

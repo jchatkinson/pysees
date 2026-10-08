@@ -154,6 +154,7 @@ export function NodesLayer({
 }) {
   const selectedNodeIds = useAppStore((s) => s.selectedNodeIds)
   const toggleNodeInSelection = useAppStore((s) => s.toggleNodeInSelection)
+  const selectNodesFromScene = useAppStore((s) => s.selectNodesFromScene)
   const nodePickMode = useAppStore((s) => s.nodePickMode)
   const setPendingNodePick = useAppStore((s) => s.setPendingNodePick)
 
@@ -163,6 +164,7 @@ export function NodesLayer({
   const handleToggle = (id: number, shiftKey: boolean) => {
     const seq = nodePickMode === 'vec-sequential'
     toggleNodeInSelection(id, shiftKey || seq)
+    selectNodesFromScene()
     if (seq) setPendingNodePick(id)
   }
 

@@ -67,6 +67,8 @@ export function Viewport() {
         {/* 3D models are Z-up. The orbit controls fix their up axis when created, so a different ndm remounts the canvas. */}
         <Canvas
           key={ndm}
+          // Member lines are 2 px wide; give them a forgiving click target.
+          raycaster={{ params: { Line2: { threshold: 6 } } } as never}
           camera={ndm === 3 ? { position: [10, -12, 8], up: [0, 0, 1], fov: 45, near: 0.1, far: 2000 } : { position: [8, 8, 10], fov: 45, near: 0.1, far: 2000 }}
           gl={{ antialias: true }}
         >

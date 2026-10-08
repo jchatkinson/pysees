@@ -1,6 +1,6 @@
 import { useEffect, useMemo } from 'react'
-import { useThree } from '@react-three/fiber'
-import { Html } from '@react-three/drei'
+import { useThree, type ThreeEvent } from '@react-three/fiber'
+import { Html, Line } from '@react-three/drei'
 import { LineMaterial, LineSegments2, LineSegmentsGeometry } from 'three-stdlib'
 import { useAppStore } from '@/app/store/useAppStore'
 import { BufferLines } from './BufferLines'
@@ -12,6 +12,8 @@ const ELEMENT_LINE_WIDTH_PX = 2
 const GHOST_COLOR = 0x9ca3af
 const GHOST_LINE_WIDTH_PX = 1
 const DEFORMED_COLOR = 0x2563eb
+const SELECTED_COLOR = '#2563eb'
+const SELECTED_LINE_WIDTH_PX = 4
 
 const LABEL_STYLE: React.CSSProperties = {
   fontSize: 9,
@@ -29,6 +31,7 @@ const LABEL_STYLE: React.CSSProperties = {
 /** Every element as one batched fat-line draw call; `ghost` draws the thin undeformed reference under a displaced shape. */
 function ElementLines({ index, ghost }: { index: SceneIndex; ghost: boolean }) {
   const size = useThree((s) => s.size)
+  const selectElementFromScene = useAppStore((s) => s.selectElementFromScene)
 
   const material = useMemo(() => new LineMaterial({ color: ghost ? GHOST_COLOR : ELEMENT_COLOR, linewidth: ghost ? GHOST_LINE_WIDTH_PX : ELEMENT_LINE_WIDTH_PX }), [ghost])
   const { lines, geometry } = useMemo(() => {
@@ -46,7 +49,27 @@ function ElementLines({ index, ghost }: { index: SceneIndex; ghost: boolean }) {
   useEffect(() => () => geometry.dispose(), [geometry])
   useEffect(() => () => material.dispose(), [material])
 
-  return <primitive object={lines} />
+  // Clicking a member selects it (the ghost reference under a deformed shape isn't pickable). The hit is a segment index; map it back to its element.
+  const onClick = ghost ? undefined : (e: ThreeEvent<MouseEvent>) => {
+    const segment = e.index ?? e.faceIndex
+    if (segment == null) return
+    e.stopPropagation()
+    const starts = index.elementSegmentStart
+    let lo = 0, hi = index.elementIds.length - 1
+    while (lo < hi) { const mid = (lo + hi + 1) >> 1; if (starts[mid] <= segment) lo = mid; else hi = mid - 1 }
+    selectElementFromScene(index.elementIds[lo])
+  }
+
+  return <primitive object={lines} onClick={onClick} />
+}
+
+/** The element chosen in the model list or the scene, drawn over the model lines. */
+function SelectedElement({ index }: { index: SceneIndex }) {
+  const id = useAppStore((s) => (s.selectedModelEntity?.kind === 'element' ? s.selectedModelEntity.id : null))
+  const e = id === null ? -1 : index.elementIds.indexOf(id)
+  if (e < 0) return null
+  const points = index.elementNodes[e].map((r) => [index.nodeCoords[r * 3], index.nodeCoords[r * 3 + 1], index.nodeCoords[r * 3 + 2]] as [number, number, number])
+  return <Line points={points} color={SELECTED_COLOR} lineWidth={SELECTED_LINE_WIDTH_PX} />
 }
 
 function ElementLabels({ index }: { index: SceneIndex }) {
@@ -84,6 +107,7 @@ export function ElementsLayer({
     <>
       {showElements && hasSegments && (!deformedMode || showUndeformed) && <ElementLines index={index} ghost={deformedMode} />}
       {deformedMode && hasSegments && <BufferLines positions={buffers.deformedSegments} color={DEFORMED_COLOR} widthPx={ELEMENT_LINE_WIDTH_PX} isActive={() => buffers.active} getVersion={() => buffers.version} />}
+      {showElements && !deformedMode && <SelectedElement index={index} />}
       {showElementIds && <ElementLabels index={index} />}
     </>
   )
