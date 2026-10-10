@@ -28,6 +28,7 @@ export function ResultsDriver({ index, buffers }: { index: SceneIndex; buffers: 
   const type = useAppStore((s) => s.resultsView.type)
   const manualScale = useAppStore((s) => (s.resultsView.type === 'none' ? null : s.resultsView.scales[s.resultsView.type === 'contour' ? 'deformed' : s.resultsView.type]))
   const contour = useAppStore((s) => s.resultsView.contour)
+  const contourDeformed = useAppStore((s) => s.resultsView.contourDeformed)
   const setContourRange = useAppStore((s) => s.setContourRange)
   const modeIndex = useAppStore((s) => s.resultsView.mode)
   const phase = useAppStore((s) => s.resultsView.phase)
@@ -58,7 +59,8 @@ export function ResultsDriver({ index, buffers }: { index: SceneIndex; buffers: 
       if (!live) return
       if (!frame) { buffers.reset(); buffers.resetDiagram(); return }
       const row = nextFrame && blendedRow ? blendRows(frame.row, nextFrame.row, stepFrac, blendedRow) : frame.row
-      const scale = manualScale ?? autoScale(type === 'contour' ? 'deformed' : type, extents, metrics)
+      // A contour on the undeformed geometry is the same drawing at scale 0.
+      const scale = type === 'contour' && !contourDeformed ? 0 : manualScale ?? autoScale(type === 'contour' ? 'deformed' : type, extents, metrics)
       if (type === 'deformed' || type === 'contour') {
         readNodeDisplacements(index, source.layout, row, nodeDisplacements)
         displaceNodes(index, nodeDisplacements, scale, buffers.nodePositions)
@@ -76,7 +78,7 @@ export function ResultsDriver({ index, buffers }: { index: SceneIndex; buffers: 
       }
     }).catch(() => { if (live) { buffers.reset(); buffers.resetDiagram() } })
     return () => { live = false }
-  }, [index, buffers, source, type, step, stepFrac, blendedRow, manualScale, showValues, metrics, nodeDisplacements, diagramArrays, first, last, contour, contourValues, setContourRange])
+  }, [index, buffers, source, type, step, stepFrac, blendedRow, manualScale, showValues, metrics, nodeDisplacements, diagramArrays, first, last, contour, contourDeformed, contourValues, setContourRange])
 
   // Mode shapes: the stored shape scaled by cos(phase), through the same deformed-shape drawing as a step's displacements.
   useEffect(() => {

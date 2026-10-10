@@ -41,6 +41,7 @@ OpenSees is optional. Users who want to run their model in OpenSees can export i
 3. Scripting workflow for parametric model generation (see `docs/SCRIPTINGPLAN.md`).
 4. Richer results: more force/stress views, reactions, time-history tools.
 5. Optional import of recorder output from external OpenSees runs.
+6. Shell stiffness modifiers (`f11 f22 f12 m11 m22 m12 v13 v23`) per section. Carapace-only: OpenSees has no equivalent, so export is exact only for uniform `f` and `m` and refused otherwise (see `docs/shell-plan.md`).
 
 ## Usage
 

@@ -7,6 +7,14 @@ Differences from OpenSees found while implementing:
 - `ShellMITC4` applies `-selfWeight` with the opposite sign of a gravity vector and includes it in the element's resisting force, so Carapace's body load is `+rho h b` and the exporter negates it. `ShellDKGT` also applies twice the self-weight (its integration weight lacks the 0.5 the mass and stiffness use), so the exporter writes a triangle's self-weight as nodal loads instead.
 - Carapace reports a loaded shell's element force net of its pressure and self-weight; OpenSees (where pressure is a nodal load) does not, so pressured fixtures skip the element-force comparison.
 
+## TODO: stiffness modifiers (breaks OpenSees compatibility)
+
+ETABS-style modifiers on the shell section, each scaling one term of `D`: membrane `f11 f22 f12`, bending `m11 m22 m12`, transverse shear `v13 v23` (MITC4 only), all defaulting to 1.
+
+- **Carapace:** an optional `modifiers` object on `ShellSection::ElasticMembranePlate` and on the wire `ShellSectionSpec`. The coupling terms `D12` scale by `sqrt(f11 f22)` and `sqrt(m11 m22)` so `D` stays symmetric positive definite. Elements need no change (they take `D` from `section.tangent()`); the drilling penalty follows the modified membrane block. Resultants come from the modified stiffness.
+- **PySees:** PySees-only data on the section entity (`args.modifiers`), a "Stiffness modifiers" group in the section form, passed through `compileShellSections`. Section-level first; per-element modifiers later if needed.
+- **OpenSees compatibility:** `ElasticMembranePlateSection` has only `Ep_modifier`, so this feature cannot round-trip. Export is exact only when all `f` are equal and all `m` are equal (write `E*f` and `Ep_modifier = m/f`; OpenSees also scales shear by that ratio, so `v` must equal it). Anything else must produce an export diagnostic, not silently unmodified stiffness, and the OpenSees comparison tests skip such models. Import cannot recover the factors.
+
 ## Results format
 
 A shell records its stress resultants, not strains: `shell:<elementTag>` recorders in the results store (`RecorderKind` `'shell'`), 32 columns per element, point-major over the 4 Gauss points (`Nx#1`..`Qy#1`, `Nx#2`..), in the element's local axes with OpenSees' order and sign (what `eleResponse(tag, 'stresses')` returns, so the OpenSees comparison reads the same layout). Both element types have 4 Gauss points. On the wire they are `gaussPoint` recorders (`quantity: stress`, `component` 0..8). Element forces stay the global nodal forces (`force:<tag>`, 24 or 18 columns).

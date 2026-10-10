@@ -160,6 +160,9 @@ export function ResultsDisplayPanel() {
                 <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
                 <SelectContent>{SHELL_RESULTANTS.map((r) => <SelectItem key={r} value={r}>{SHELL_RESULTANT_LABELS[r]}</SelectItem>)}</SelectContent>
               </Select>
+              <Label className="flex items-center gap-2 text-[11px] font-normal">
+                <Checkbox checked={rv.contourDeformed} onCheckedChange={(c) => set({ contourDeformed: Boolean(c) })} /> Plot on deformed shape
+              </Label>
               <div className="h-2.5 w-full rounded-sm" style={{ background: RAMP_CSS }} />
               <div className="flex justify-between text-[10px] text-muted-foreground">
                 <span>{contourRange ? fmt(contourRange.min) : '–'}</span>
@@ -220,7 +223,7 @@ export function ResultsDisplayPanel() {
               <Input
                 key={`${scaleKey}-${scale}`}
                 defaultValue={fmt(scale)}
-                disabled={!scaleKey}
+                disabled={!scaleKey || (rv.type === 'contour' && !rv.contourDeformed)}
                 className="h-7 flex-1 text-xs"
                 onBlur={(e) => { const v = Number(e.target.value); if (Number.isFinite(v) && v > 0 && v !== scale) setScale(v) }}
                 onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur() }}

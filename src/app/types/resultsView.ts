@@ -36,6 +36,8 @@ export interface ResultsView {
   modeSpeed: number
   /** The shell resultant the contour view colours by. */
   contour: ShellResultant
+  /** Draw the contour on the deformed shape (at the deformed scale) rather than the undeformed one. */
+  contourDeformed: boolean
   showUndeformed: boolean
   showValues: boolean
   fillDiagrams: boolean
@@ -57,6 +59,7 @@ export const DEFAULT_RESULTS_VIEW: ResultsView = {
   phase: 0,
   modeSpeed: 0.5,
   contour: 'Mx',
+  contourDeformed: true,
   showUndeformed: true,
   showValues: false,
   fillDiagrams: true,
