@@ -25,7 +25,7 @@ function encodeAnalysis(analysisHistory: AnalysisHistory, model: Model, ctx: Sch
     // Declare the patterns this stage claims first, so the stage's own commands (e.g. DisplacementControl) can see them.
     for (const [tag, at] of claimed) {
       const pattern = model.patterns.get(tag)
-      if (at === i && pattern) calls.push(encodePattern(pattern, ctx))
+      if (at === i && pattern) calls.push(encodePattern(pattern, ctx, model))
     }
     for (const resolved of resolveAnalysisCommand(cmd, model)) {
       if (resolved.type === 'ANALYSIS_OPS') calls.push(encodeOps(resolved.fn, resolved.values, ctx))

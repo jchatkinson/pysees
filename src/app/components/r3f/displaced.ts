@@ -1,6 +1,6 @@
 import type { RunLayout } from '@/app/lib/resultsStorage/stepFrames'
 import type { NodeLabel } from './displayBuffers'
-import type { SceneIndex } from './sceneIndex'
+import { spanCount, spanEnds, type SceneIndex } from './sceneIndex'
 
 /** Per-node displacement read from a step row. `rot` holds `[rx, ry, rz]` per node (a 2D model only has rz), NaN where not recorded. */
 export interface NodeDisplacements {
@@ -50,9 +50,8 @@ export function fillDeformedSegments(index: SceneIndex, nd: NodeDisplacements, s
   let o = 0
   index.elementNodes.forEach((rows, e) => {
     const f = index.elementFrames.subarray(e * 9, e * 9 + 9)
-    for (let span = 0; span < rows.length - 1; span++) {
-      const a = rows[span]
-      const b = rows[span + 1]
+    for (let span = 0; span < spanCount(index.elementKind[e], rows.length); span++) {
+      const [a, b] = spanEnds(rows, span)
       const len = Math.hypot(c[b * 3] - c[a * 3], c[b * 3 + 1] - c[a * 3 + 1], c[b * 3 + 2] - c[a * 3 + 2])
       const rotOk = (i: number) => !Number.isNaN(nd.rot[i * 3 + 2]) && (!ndm3 || !Number.isNaN(nd.rot[i * 3 + 1]))
       const cubic = span === 0 && index.elementKind[e] === 'beam' && len > 1e-9 && rows.length === 2 && rotOk(a) && rotOk(b)

@@ -33,6 +33,10 @@ export class DisplayBuffers {
   active = false
   version = 0
 
+  /** Shell contour: per-node rgb (`3 * nodeCount`), live while `contourActive`. */
+  readonly contourColors: Float32Array
+  contourActive = false
+
   /** Diagram fill triangles (xyz per vertex) and their per-vertex rgb; first `diagramFillVertices` vertices are live. */
   readonly diagramFill: Float32Array
   readonly diagramFillColor: Float32Array
@@ -49,6 +53,7 @@ export class DisplayBuffers {
   constructor(index: SceneIndex) {
     this.undeformed = index.nodeCoords
     this.nodePositions = new Float32Array(index.nodeCoords)
+    this.contourColors = new Float32Array(index.nodeIds.length * 3)
     this.deformedSegments = new Float32Array(index.segmentCount * 6)
     this.diagramFill = new Float32Array(index.segmentCount * 18)
     this.diagramFillColor = new Float32Array(index.segmentCount * 18)
@@ -56,10 +61,11 @@ export class DisplayBuffers {
     this.diagramLines = new Float32Array((index.segmentCount + 2 * index.elementIds.length) * 6)
   }
 
-  /** Call after writing `nodePositions` / `deformedSegments`. */
-  publish(nodeLabels: NodeLabel[] = []): void {
+  /** Call after writing `nodePositions` / `deformedSegments` (and `contourColors` when `contour`). */
+  publish(nodeLabels: NodeLabel[] = [], contour = false): void {
     this.nodeLabels = nodeLabels
     this.active = true
+    this.contourActive = contour
     this.version++
   }
 
@@ -67,6 +73,7 @@ export class DisplayBuffers {
   reset(): void {
     if (!this.active) return
     this.active = false
+    this.contourActive = false
     this.nodeLabels = []
     this.nodePositions.set(this.undeformed)
     this.version++

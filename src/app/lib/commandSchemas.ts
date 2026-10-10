@@ -7,8 +7,9 @@ import { domainForFn, PATTERN_CHILD_FNS, SECTION_CHILD_FNS, type CommandDomain }
 import type { ModelWrite } from '@/app/lib/modelWrite'
 import { orientProblem } from '@/app/lib/orient'
 import { encodeArgs } from '@/app/lib/commands/grammar'
-import { elementArgs, elementByType } from '@/app/lib/commands/tables'
+import { elementArgs, elementByType, elementNodeCount, isShell } from '@/app/lib/commands/tables'
 import { pyLiteral } from '@/app/lib/commands/print'
+import { ELE_LOAD_TYPES, eleLoadKind } from '@/app/lib/shells'
 
 export type SchemaResult =
   | { target: 'model'; write: ModelWrite }
@@ -97,7 +98,7 @@ function massArgs(): ArgDef[] {
 
 function elementArgsFromGenerated(): ArgDef[] {
   return [
-    { kind: 'choice', name: 'eleType', label: 'Element Type', options: ['Truss', 'ElasticBeamColumn', 'DispBeamColumn', 'zeroLengthSection'], defaultValue: 'Truss', yields: {
+    { kind: 'choice', name: 'eleType', label: 'Element Type', options: ['Truss', 'ElasticBeamColumn', 'DispBeamColumn', 'ShellMITC4', 'ShellDKGT', 'zeroLengthSection'], defaultValue: 'Truss', yields: {
       Truss: [
         { kind: 'vec', name: 'nodes', label: 'Node IDs', length: 2, defaultValue: [1, 2], nodeSync: true },
         { kind: 'float', name: 'A', label: 'Area (A)', defaultValue: 1, required: true },
@@ -117,6 +118,14 @@ function elementArgsFromGenerated(): ArgDef[] {
         { kind: 'vec', name: 'nodes', label: 'Node IDs', length: 2, defaultValue: [1, 2], nodeSync: true },
         { kind: 'int', name: 'transfTag', label: 'Transformation Tag', required: true },
         { kind: 'int', name: 'integrationTag', label: 'Beam Integration Tag', required: true },
+      ],
+      ShellMITC4: [
+        { kind: 'vec', name: 'nodes', label: 'Node IDs (counter-clockwise, normal by the right-hand rule)', length: 4, defaultValue: [1, 2, 3, 4], nodeSync: true },
+        { kind: 'int', name: 'secTag', label: 'Section Tag', required: true, description: 'An ElasticMembranePlateSection. Shells need a 3D model.' },
+      ],
+      ShellDKGT: [
+        { kind: 'vec', name: 'nodes', label: 'Node IDs (counter-clockwise, normal by the right-hand rule)', length: 3, defaultValue: [1, 2, 3], nodeSync: true },
+        { kind: 'int', name: 'secTag', label: 'Section Tag', required: true, description: 'An ElasticMembranePlateSection. Shells need a 3D model.' },
       ],
       zeroLengthSection: [
         { kind: 'vec', name: 'nodes', label: 'Node IDs', length: 2, defaultValue: [1, 2], nodeSync: true },
@@ -240,26 +249,42 @@ const PATTERN_CHILD_SCHEMAS: CommandSchema[] = [
   {
     cmd: 'PATTERN_CHILD:eleLoad',
     fn: 'eleLoad',
-    label: 'Element Load (uniform)',
+    label: 'Element Load',
     domain: 'model',
     childOnly: 'pattern',
-    description: 'Apply a uniform load (force/length, in the element local axes) to elements under this pattern: wx axial, wy/wz transverse',
+    description: 'Apply a load to elements under this pattern: a uniform beam load (force/length, element local axes), or a shell pressure or self-weight',
     args: [
       { kind: 'idlist', name: 'eleTags', label: 'Element Tag(s)' },
-      { kind: 'float', name: 'wx', label: 'wx (axial)', defaultValue: 0 },
-      { kind: 'float', name: 'wy', label: 'wy (local y)', defaultValue: 0 },
-      { kind: 'float', name: 'wz', label: 'wz (local z, 3D)', defaultValue: 0 },
+      { kind: 'choice', name: 'loadType', label: 'Load type', options: [...ELE_LOAD_TYPES], defaultValue: ELE_LOAD_TYPES[0], yields: {
+        [ELE_LOAD_TYPES[0]]: [
+          { kind: 'float', name: 'wx', label: 'wx (axial)', defaultValue: 0 },
+          { kind: 'float', name: 'wy', label: 'wy (local y)', defaultValue: 0 },
+          { kind: 'float', name: 'wz', label: 'wz (local z, 3D)', defaultValue: 0 },
+        ],
+        [ELE_LOAD_TYPES[1]]: [
+          { kind: 'float', name: 'pressure', label: 'Pressure (force/area)', defaultValue: 0, description: 'Positive along the shell normal (right-hand rule from the node order). Exported to OpenSees as equivalent nodal loads.' },
+        ],
+        [ELE_LOAD_TYPES[2]]: [
+          { kind: 'float', name: 'bx', label: 'bx (global X)', defaultValue: 0, description: 'Body acceleration: the force per area is rho·h times it, so gravity is (0, 0, -g) in a Z-up model.' },
+          { kind: 'float', name: 'by', label: 'by (global Y)', defaultValue: 0 },
+          { kind: 'float', name: 'bz', label: 'bz (global Z)', defaultValue: 0 },
+        ],
+      } },
     ],
     optional: [],
-    create: (values) => ({
-      target: 'model',
-      write: {
-        kind: 'patternChild',
-        patternId: Math.trunc(num(values.patternId)),
-        child: { kind: 'eleLoad', args: { eleTags: ints(values.eleTags), wx: num(values.wx), wy: num(values.wy), wz: num(values.wz) } },
-        childIndex: typeof values.childIndex === 'number' ? values.childIndex : undefined,
-      },
-    }),
+    create: (values) => {
+      const loadType = String(values.loadType ?? ELE_LOAD_TYPES[0])
+      const eleTags = ints(values.eleTags)
+      const args: Record<string, unknown> = loadType === ELE_LOAD_TYPES[1]
+        ? { eleTags, loadType, pressure: num(values.pressure) }
+        : loadType === ELE_LOAD_TYPES[2]
+          ? { eleTags, loadType, bx: num(values.bx), by: num(values.by), bz: num(values.bz) }
+          : { eleTags, wx: num(values.wx), wy: num(values.wy), wz: num(values.wz) }
+      return {
+        target: 'model',
+        write: { kind: 'patternChild', patternId: Math.trunc(num(values.patternId)), child: { kind: 'eleLoad', args }, childIndex: typeof values.childIndex === 'number' ? values.childIndex : undefined },
+      }
+    },
   },
 ]
 
@@ -592,7 +617,15 @@ export function validateSchemaResult(result: SchemaResult, model: Model, ctx: Sc
   if (write.kind === 'fix' && !model.nodes.has(write.entity.nodeId)) return `Node ${write.entity.nodeId} does not exist.`
   if (write.kind === 'mass' && !model.nodes.has(write.entity.nodeId)) return `Node ${write.entity.nodeId} does not exist.`
   if (write.kind === 'element') {
-    if (write.entity.nodes.length < 2) return 'Element requires at least 2 node IDs.'
+    const count = elementNodeCount(elementByType(write.entity.eleType))
+    if (write.entity.nodes.length !== count) return `${write.entity.eleType} connects ${count} nodes.`
+    if (new Set(write.entity.nodes).size !== count) return 'Element nodes must be distinct.'
+    if (isShell(write.entity.eleType)) {
+      if (ctx.ndm !== 3) return 'Shell elements need a 3D model.'
+      const section = model.sections.get(Number(write.entity.args.secTag))
+      if (!section) return 'Section does not exist.'
+      if (section.secType !== 'ElasticMembranePlateSection') return 'Shells take an ElasticMembranePlateSection.'
+    }
     if (write.entity.nodes.some((id) => !model.nodes.has(id))) return 'Element references one or more missing nodes.'
     if (write.entity.eleType === 'zeroLengthSection' && !model.sections.has(Number(write.entity.args.secTag))) return 'Section does not exist.'
     if (write.entity.eleType === 'zeroLengthSection' && write.entity.args.orient !== undefined) {
@@ -604,6 +637,13 @@ export function validateSchemaResult(result: SchemaResult, model: Model, ctx: Sc
   if (write.kind === 'geomTransf' && ctx.ndm === 3 && !(Array.isArray(write.entity.args.vecxz) && write.entity.args.vecxz.length === 3)) return '3D transformations need a vecxz (3 numbers).'
   if (write.kind === 'fix' && write.entity.dofs.length === 0) return 'Select at least one constrained DOF.'
   if (write.kind === 'patternChild' && !model.patterns.has(write.patternId)) return `Pattern ${write.patternId} does not exist.`
+  if (write.kind === 'patternChild' && write.child.kind === 'eleLoad') {
+    const tags = (write.child.args.eleTags as number[] | undefined) ?? []
+    const missing = tags.find((tag) => !model.elements.has(tag))
+    if (missing !== undefined) return `Element ${missing} does not exist.`
+    const shells = tags.filter((tag) => isShell(model.elements.get(tag)!.eleType)).length
+    if (eleLoadKind(write.child.args) === 'beam' ? shells > 0 : shells < tags.length) return eleLoadKind(write.child.args) === 'beam' ? 'A uniform beam load does not apply to shell elements.' : 'Shell pressure and self-weight apply to shell elements only.'
+  }
   if (write.kind === 'sectionChild' && !model.sections.has(write.sectionId)) return `Section ${write.sectionId} does not exist.`
   return null
 }

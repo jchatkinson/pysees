@@ -2,7 +2,7 @@ import { emptyModel, type Model } from '@/app/types/model'
 import type { AnalysisHistory } from '@/app/types/analysisCommands'
 import type { ModelWrite } from '@/app/lib/modelWrite'
 import { applyModelWrite } from '@/app/lib/modelWrite'
-import { cantileverTemplate, frameTemplate, frame3dTemplate, momentCurvatureTemplate, type TemplateResult } from '@/app/lib/templates'
+import { cantileverTemplate, frameTemplate, frame3dTemplate, momentCurvatureTemplate, plateTemplate, type TemplateResult } from '@/app/lib/templates'
 
 export function modelFromWrites(ndm: 2 | 3, ndf: number, writes: ModelWrite[]): Model {
   let m: Model = { ...emptyModel(), config: { ndm, ndf } }
@@ -10,7 +10,8 @@ export function modelFromWrites(ndm: 2 | 3, ndf: number, writes: ModelWrite[]): 
   return m
 }
 
-export interface Fixture { name: string; model: Model; history: AnalysisHistory }
+/** `skip` names the quantities the OpenSees comparison leaves out, where the engines legitimately report different things. */
+export interface Fixture { name: string; model: Model; history: AnalysisHistory; skip?: ('force')[] }
 
 const fromTemplate = (name: string, t: TemplateResult): Fixture => ({ name, model: modelFromWrites(t.ndm, t.ndf, t.writes), history: { commands: t.analysisCommands, cursor: t.analysisCommands.length - 1 } })
 
@@ -121,7 +122,55 @@ export function trussFixtures(): Fixture[] {
   ]
 }
 
-export const ALL_FIXTURES = (): Fixture[] => [...TEMPLATE_FIXTURES, extrasFixture(), fixture3d()]
+/** Two distorted ShellMITC4 quads on the tilted plane z = 0.3x + 0.1y, clamped at nodes 1 and 4, loaded at nodes 5 and 6; `selfWeight` and `pressure` add shell loads on top.
+ * With `triangle`, a ShellDKGT hangs off node 6 (valid in OpenSees; Carapace does not support it yet). */
+function shellWrites({ selfWeight = false, pressure = false, triangle = false } = {}): ModelWrite[] {
+  const xy = [[0, 0], [2, 0.2], [2.3, 1.7], [-0.1, 1.4], [4.2, 0.1], [4.5, 1.6], [6, 0.9]]
+  // The triangle takes the loads only with a pressure (self-weight on a ShellDKGT is exported as nodal loads, so it cannot be read back).
+  const loaded = triangle && pressure ? [1, 2, 3] : [1, 2]
+  const nodes = xy.slice(0, triangle ? 7 : 6).map(([x, y], i): ModelWrite => ({ kind: 'node', entity: { id: i + 1, coords: [x, y, 0.3 * x + 0.1 * y] } }))
+  return [
+    ...nodes,
+    { kind: 'fix', entity: { nodeId: 1, dofs: [1, 2, 3, 4, 5, 6] } }, { kind: 'fix', entity: { nodeId: 4, dofs: [1, 2, 3, 4, 5, 6] } },
+    { kind: 'section', entity: { id: 1, secType: 'ElasticMembranePlateSection', args: { type: 'ElasticMembranePlateSection', secTag: 1, eMod: 3e4, nu: 0.25, h: 0.4, rho: 2e-3 }, children: [] } },
+    { kind: 'element', entity: { id: 1, eleType: 'ShellMITC4', nodes: [1, 2, 3, 4], args: { secTag: 1 } } },
+    { kind: 'element', entity: { id: 2, eleType: 'ShellMITC4', nodes: [2, 5, 6, 3], args: { secTag: 1 } } },
+    ...(triangle ? [{ kind: 'element', entity: { id: 3, eleType: 'ShellDKGT', nodes: [5, 7, 6], args: { secTag: 1 } } } as ModelWrite] : []),
+    { kind: 'timeSeries', entity: { id: 1, tsType: 'Linear', args: { type: 'Linear', tag: 1, factor: 1 } } },
+    { kind: 'pattern', entity: { id: 1, patternType: 'Plain', args: { type: 'Plain', patternTag: 1, tsTag: 1, fact: 1 }, children: [] } },
+    { kind: 'patternChild', patternId: 1, child: { kind: 'load', args: { nodeTag: 5, values: [1, -2, 3, 0.5, -0.7, 0.2] } } },
+    { kind: 'patternChild', patternId: 1, child: { kind: 'load', args: { nodeTag: 6, values: [-0.5, 1.5, -4, 0.1, 0.3, -0.9] } } },
+    ...(selfWeight ? [{ kind: 'patternChild', patternId: 1, child: { kind: 'eleLoad', args: { eleTags: loaded, loadType: 'Shell self-weight', bx: 0, by: 0, bz: -9.81 } } } as ModelWrite] : []),
+    ...(pressure ? [{ kind: 'patternChild', patternId: 1, child: { kind: 'eleLoad', args: { eleTags: loaded, loadType: 'Shell pressure', pressure: 0.35 } } } as ModelWrite] : []),
+  ]
+}
+
+/** Shell elements and their self-weight, round-trippable (a shell pressure is exported as nodal loads, so it cannot be read back). */
+export function shellFixture(): Fixture {
+  return { name: '3d-shells', model: modelFromWrites(3, 6, shellWrites({ selfWeight: true, triangle: true })), history: { commands: [], cursor: -1 } }
+}
+
+/** A shell pressure: exported as the equivalent nodal loads, so it is in the golden files and the OpenSees comparison but not the round-trip test. */
+export function shellPressureFixture(): Fixture {
+  return { name: '3d-shell-pressure', model: modelFromWrites(3, 6, shellWrites({ selfWeight: true, pressure: true })), history: { commands: [], cursor: -1 } }
+}
+
+/** Shell models with analysis, for comparing Carapace against OpenSees: point loads, then self-weight and pressure on top. */
+export function shellFixtures(): Fixture[] {
+  const commands = [{ type: 'ANALYSIS_BLOCK', blockId: 'whole-model-recorder', params: { directory: 'out' } }, { type: 'ANALYSIS_BLOCK', blockId: 'run-gravity-analysis', params: { patterns: [1], steps: 2 } }] as const
+  return [
+    { name: 'shell-patch-with-triangle', model: modelFromWrites(3, 6, shellWrites({ triangle: true, selfWeight: true, pressure: true })), history: { commands: [...commands], cursor: 1 }, skip: ['force'] },
+    { name: 'shell-patch', model: modelFromWrites(3, 6, shellWrites()), history: { commands: [...commands], cursor: 1 } },
+    // Carapace reports a loaded element's force net of its element load (like a beam's end forces with the fixed-end effect); OpenSees has no shell
+    // pressure (the export expands it to nodal loads, which are not part of any element), so the element forces differ by exactly the pressure load.
+    { name: 'shell-patch-self-weight-pressure', model: modelFromWrites(3, 6, shellWrites({ selfWeight: true, pressure: true })), history: { commands: [...commands], cursor: 1 }, skip: ['force'] },
+  ]
+}
+
+/** The plate starter model (self-weight and pressure). Its element forces are left out of the OpenSees comparison like any pressured shell's. */
+export const plateFixture = (): Fixture => ({ ...fromTemplate('plate', plateTemplate({ nx: 4, ny: 2, lx: 4, ly: 2, h: 0.2 })), skip: ['force'] })
+
+export const ALL_FIXTURES = (): Fixture[] => [...TEMPLATE_FIXTURES, extrasFixture(), fixture3d(), shellFixture()]
 
 /** Models as comparable plain data: entity maps as id-sorted arrays, so deep equality ignores insertion order. */
 export function plain(m: Model) {

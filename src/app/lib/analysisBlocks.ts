@@ -3,6 +3,7 @@ import type { AnalysisCommand } from '@/app/types/analysisCommands'
 import type { ArgDef } from '@/app/types/schema'
 import type { CommandSchema } from '@/app/lib/commandSchemas'
 import type { AlgorithmKind, AnalysisStage, ConvergenceSpec, RecorderSpec } from '@/app/types/analysisSequence'
+import { isShell } from '@/app/lib/commands/tables'
 
 export interface AnalysisBlockDef {
   id: string
@@ -76,11 +77,14 @@ export function blockPatternTags(params: Record<string, unknown>): number[] {
 const LOCAL_FORCE_ELEMENTS = new Set(['ElasticBeamColumn', 'DispBeamColumn'])
 
 /** The element-force recorders a model needs: one OpenSees response per file, since a recorder takes a single response type. */
-export function elementForceRecorders(model: Model): { response: 'force' | 'localForce'; file: string; eleTags: number[] }[] {
+export function elementForceRecorders(model: Model): { response: 'force' | 'localForce' | 'stresses'; file: string; eleTags: number[] }[] {
   const tags = (local: boolean) => [...model.elements.values()].filter((e) => LOCAL_FORCE_ELEMENTS.has(e.eleType) === local).map((e) => e.id).sort((a, b) => a - b)
+  // A shell's stress resultants at its Gauss points: the contour view's data, and what the `shell` results columns hold.
+  const shells = [...model.elements.values()].filter((e) => isShell(e.eleType)).map((e) => e.id).sort((a, b) => a - b)
   return [
     { response: 'localForce' as const, file: 'eleLocalForce.out', eleTags: tags(true) },
     { response: 'force' as const, file: 'eleForce.out', eleTags: tags(false) },
+    { response: 'stresses' as const, file: 'eleShellStress.out', eleTags: shells },
   ].filter((g) => g.eleTags.length > 0)
 }
 

@@ -52,7 +52,7 @@ AnalysisHistory      ─┼─► compileInputV1 ─► Carapace wasm worker ─
 
 ## Carapace pipeline
 
-- Carapace runs 2D (ndm=2/ndf=3) and 3D (ndm=3/ndf=6) models: `ElasticBeamColumn`, `DispBeamColumn` (fiber, with `-GJ` torsion in 3D) and `Truss`; 3D `Corotational`, `-jntOffset`, zero-length and `forceBeamColumn` are diagnostics. **3D models are Z-up** (plan is X–Y, levels rise in Z; 2D models are in the XY plane, Y up). A beam's local axes come from its transformation's `vecxz` (`lib/memberFrame.ts`, OpenSees rule: `y = vecxz × x`, `z = x × y`), and loads, the deformed shape and the 3D force diagrams (Vy/Vz, Mz/My, T) all use them.
+- Carapace runs 2D (ndm=2/ndf=3) and 3D (ndm=3/ndf=6) models: `ElasticBeamColumn`, `DispBeamColumn` (fiber, with `-GJ` torsion in 3D) and `Truss`, plus 3D `ShellMITC4` / `ShellDKGT` (4- and 3-node shells with `ElasticMembranePlateSection`; nodal, self-weight and pressure loads); 3D `Corotational`, `-jntOffset`, zero-length and `forceBeamColumn` are diagnostics. **3D models are Z-up** (plan is X–Y, levels rise in Z; 2D models are in the XY plane, Y up). A beam's local axes come from its transformation's `vecxz` (`lib/memberFrame.ts`, OpenSees rule: `y = vecxz × x`, `z = x × y`), and loads, the deformed shape and the 3D force diagrams (Vy/Vz, Mz/My, T) all use them.
 - `lib/carapace/compileInputV1.ts` compiles Model + sequence into `CarapaceInputV1`
   (`types/carapaceInputV1.ts`, mirrors Rust `input_v1` in `../carapace/wasm-bridge`), returning
   diagnostics for anything unsupported. Material/section arg names are the **schema** names (lowercase,
@@ -139,6 +139,7 @@ Model ─► commands/encode.ts ─► Call[] ─► commands/print.ts ─► .p
 - `scriptImport/`: a **static** reader, never an interpreter. It substitutes constants (`set L 6`, `L = 6`) and arithmetic (`expr`, `math.*`);
   `for`/`if`/`proc`/`def` are reported and skipped. Model building only: analysis commands are ignored with an info diagnostic. Unsupported
   elements/commands are diagnostics, not silent drops. `File > Import` (`ImportScriptDialog`) replaces the model via `initModel`.
+- Shell pressure has no OpenSees equivalent: `encode.ts` expands it into per-node `load` commands (`lib/shells.ts` holds the consistent integral, a copy of Carapace's) and `-selfWeight` is exported with the sign OpenSees uses (negated). Pressure fixtures are therefore excluded from `roundtrip.test.ts` and from the element-force comparison. A `ShellDKGT`'s self-weight is expanded the same way (OpenSees doubles it). Shell stress resultants are recorded as `shell:<tag>` columns (see `docs/shell-plan.md`, Results format) and drawn by the `contour` result type (`lib/shellContour.ts`).
 - Exported scripts must be accepted by real OpenSees. `ElasticBeamColumn` is unknown to OpenSeesPy (it needs `elasticBeamColumn`) and `Truss`
   needs its area; `opensees.test.ts` runs every export in the repo's `.venv`. This OpenSeesPy build has no Tcl interpreter, so Tcl is covered by
   the cross-language round trip and golden files only.
@@ -161,4 +162,4 @@ is global, so beams export `localForce` to match the local N/V/M PySees shows; t
 - Anything the Carapace compiler can't yet express must surface as a compile diagnostic, not silently degrade.
 - Exported scripts must remain valid OpenSeesPy.
 - Results never enter the model or analysis history; they are derived and discarded when either changes.
-- Scripting (`SCRIPTINGPLAN.md`) is deferred.
+- Scripting (`docs/SCRIPTINGPLAN.md`) is deferred.

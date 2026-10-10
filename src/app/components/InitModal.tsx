@@ -12,11 +12,12 @@ import {
   cantileverTemplate,
   frameTemplate,
   frame3dTemplate,
+  plateTemplate,
   type CantileverParams,
   type FrameParams,
 } from '@/app/lib/templates'
 
-type Choice = 'new' | 'load' | 'momentCurvature' | 'cantilever' | 'frame' | 'frame3d'
+type Choice = 'new' | 'load' | 'momentCurvature' | 'cantilever' | 'frame' | 'frame3d' | 'plate'
 
 interface CardProps {
   title: string
@@ -79,6 +80,13 @@ function InitDialog() {
   const [baysY, setBaysY] = useState(2)
   const [bayY, setBayY] = useState(5.0)
 
+  // Plate
+  const [plateNx, setPlateNx] = useState(8)
+  const [plateNy, setPlateNy] = useState(4)
+  const [plateLx, setPlateLx] = useState(4.0)
+  const [plateLy, setPlateLy] = useState(2.0)
+  const [plateH, setPlateH] = useState(0.2)
+
   function select(c: Choice) {
     setChoice(c)
     setStep(2)
@@ -99,6 +107,9 @@ function InitDialog() {
     } else if (choice === 'frame3d') {
       const t = frame3dTemplate({ stories: stories3, storyH: storyH3, baysX, bayX, baysY, bayY })
       initModel(t.ndm, t.ndf, { writes: t.writes, analysisCommands: t.analysisCommands, levels: t.levels })
+    } else if (choice === 'plate') {
+      const t = plateTemplate({ nx: plateNx, ny: plateNy, lx: plateLx, ly: plateLy, h: plateH })
+      initModel(t.ndm, t.ndf, { writes: t.writes, analysisCommands: t.analysisCommands })
     }
   }
 
@@ -108,6 +119,7 @@ function InitDialog() {
     cantilever: 'Cantilever Column',
     frame: '2D Frame',
     frame3d: '3D Frame',
+    plate: 'Plate',
   }
 
   return (
@@ -148,6 +160,11 @@ function InitDialog() {
                 title="3D Frame"
                 description="Story-bay grid in X and Y (Z up), elastic members, fixed base."
                 onClick={() => select('frame3d')}
+              />
+              <Card
+                title="Plate"
+                description="Cantilever slab of shell elements (Z up) under self-weight and pressure."
+                onClick={() => select('plate')}
               />
             </div>
           </>
@@ -311,6 +328,34 @@ function InitDialog() {
                   </div>
                 </div>
                 <p className="text-xs text-muted-foreground">3D model (ndm=3, ndf=6), Z up.</p>
+              </div>
+            )}
+
+            {choice === 'plate' && (
+              <div className="grid gap-4 py-2">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="grid gap-1.5">
+                    <Label>Elements in X</Label>
+                    <Input type="number" value={plateNx} min={1} onChange={(e) => setPlateNx(Math.max(1, Math.trunc(Number(e.target.value))))} />
+                  </div>
+                  <div className="grid gap-1.5">
+                    <Label>Elements in Y</Label>
+                    <Input type="number" value={plateNy} min={1} onChange={(e) => setPlateNy(Math.max(1, Math.trunc(Number(e.target.value))))} />
+                  </div>
+                  <div className="grid gap-1.5">
+                    <Label>Length in X (m)</Label>
+                    <Input type="number" value={plateLx} min={0.1} step={0.5} onChange={(e) => setPlateLx(Math.max(0.1, Number(e.target.value)))} />
+                  </div>
+                  <div className="grid gap-1.5">
+                    <Label>Width in Y (m)</Label>
+                    <Input type="number" value={plateLy} min={0.1} step={0.5} onChange={(e) => setPlateLy(Math.max(0.1, Number(e.target.value)))} />
+                  </div>
+                  <div className="grid gap-1.5">
+                    <Label>Thickness (m)</Label>
+                    <Input type="number" value={plateH} min={0.01} step={0.05} onChange={(e) => setPlateH(Math.max(0.01, Number(e.target.value)))} />
+                  </div>
+                </div>
+                <p className="text-xs text-muted-foreground">3D model (ndm=3, ndf=6), Z up, clamped along x = 0. Four-node MITC4 shells.</p>
               </div>
             )}
 

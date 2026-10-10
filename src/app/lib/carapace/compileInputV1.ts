@@ -4,6 +4,8 @@ import type { AlgorithmKind, AnalysisStage } from '@/app/types/analysisSequence'
 import type * as W from '@/app/types/carapaceInputV1'
 import { compileAnalysisSequence, type CompileDiagnostic } from '@/app/lib/compileAnalysisSequence'
 import { orientProblem, readOrient } from '@/app/lib/orient'
+import { eleLoadKind } from '@/app/lib/shells'
+import { isShell } from '@/app/lib/commands/tables'
 
 export interface CompileInputV1Result {
   input: W.CarapaceInputV1 | null
@@ -21,7 +23,7 @@ export interface CompileInputV1Result {
   nodeTags: number[]
 }
 
-export type RecorderPlanKind = 'disp' | 'reaction' | 'force'
+export type RecorderPlanKind = 'disp' | 'reaction' | 'force' | 'shell'
 export interface RecorderPlan {
   recorderId: string
   kind: RecorderPlanKind
@@ -35,6 +37,14 @@ export interface RecorderPlan {
 const ELEMENT_FORCE_LABELS = ['Ni', 'Vi', 'Mi', 'Nj', 'Vj', 'Mj']
 /** 3D beam-columns: per end `[N, Vy, Vz, T, My, Mz]` (local DOF order), i then j. */
 const ELEMENT_FORCE_LABELS_3D = ['Ni', 'Vyi', 'Vzi', 'Ti', 'Myi', 'Mzi', 'Nj', 'Vyj', 'Vzj', 'Tj', 'Myj', 'Mzj']
+/** Shells report their 24 global nodal forces and moments, node by node. */
+const SHELL_FORCE_LABELS = [1, 2, 3, 4].flatMap((n) => ['Fx', 'Fy', 'Fz', 'Mx', 'My', 'Mz'].map((l) => `${l}${n}`))
+/** A triangle reports its 18. */
+const SHELL3_FORCE_LABELS = SHELL_FORCE_LABELS.slice(0, 18)
+/** Shell stress resultants at each of a shell's 4 Gauss points, point-major: `Nx#1`..`Qy#1`, `Nx#2`.. (OpenSees' `stresses` order and sign). */
+export const SHELL_RESULTANTS = ['Nx', 'Ny', 'Nxy', 'Mx', 'My', 'Mxy', 'Qx', 'Qy'] as const
+export const SHELL_GAUSS_POINTS = 4
+const SHELL_RESULTANT_LABELS = Array.from({ length: SHELL_GAUSS_POINTS }, (_, g) => SHELL_RESULTANTS.map((r) => `${r}#${g + 1}`)).flat()
 /** 3D trusses report global nodal forces (and moments, always zero) rather than local ones. */
 const TRUSS_FORCE_LABELS_3D = ['Fxi', 'Fyi', 'Fzi', 'Mxi', 'Myi', 'Mzi', 'Fxj', 'Fyj', 'Fzj', 'Mxj', 'Myj', 'Mzj']
 /** Appended to a loaded element's force columns: the uniform load it carries at each sample (local axes), so a
@@ -77,7 +87,7 @@ export function compileInputV1(model: Model, analysisHistory: AnalysisHistory): 
   if (!((ndm === 2 && ndf === 3) || (ndm === 3 && ndf === 6))) {
     return fail(`Only 2D (ndm=2, ndf=3) and 3D (ndm=3, ndf=6) models are supported by Carapace — this model is ndm=${ndm}, ndf=${ndf}.`)
   }
-  const forceLabels = (kind: W.ElementKind): string[] => (ndm === 2 ? ELEMENT_FORCE_LABELS : kind === 'truss' ? TRUSS_FORCE_LABELS_3D : ELEMENT_FORCE_LABELS_3D)
+  const forceLabels = (kind: W.ElementKind): string[] => (kind === 'shell4' ? SHELL_FORCE_LABELS : kind === 'shell3' ? SHELL3_FORCE_LABELS : ndm === 2 ? ELEMENT_FORCE_LABELS : kind === 'truss' ? TRUSS_FORCE_LABELS_3D : ELEMENT_FORCE_LABELS_3D)
   const loadLabels = elementLoadLabels(ndm)
 
   const { sequence, diagnostics: seqDiagnostics } = compileAnalysisSequence(analysisHistory, model)
@@ -116,9 +126,16 @@ export function compileInputV1(model: Model, analysisHistory: AnalysisHistory): 
   const nodes: W.NodeTable = { coords, fixed, massNodeIndex, mass }
   // Eigen analysis needs mass on at least as many free DOFs as modes requested (massless DOFs are condensed).
   const massiveDofs = massNodeIndex.reduce((count, idx, k) => count + Array.from({ length: ndf }, (_, d) => d).filter((d) => mass[k * ndf + d] > 0 && !(fixed[idx] & (1 << d))).length, 0)
+  // A shell with density carries lumped translational mass at each of its free nodes.
+  const shellMassNodes = new Set<number>()
+  for (const ele of model.elements.values()) {
+    if (!isShell(ele.eleType) || !(Number(model.sections.get(Number(ele.args.secTag))?.args.rho) > 0)) continue
+    for (const n of ele.nodes) shellMassNodes.add(n)
+  }
+  const shellMassDofs = [...shellMassNodes].reduce((count, n) => count + [0, 1, 2].filter((d) => !(model.fixes.get(n)?.dofs.includes(d + 1))).length, 0)
   for (const stage of sequence.stages) {
-    if (stage.kind === 'modal' && stage.modes > massiveDofs) {
-      diagnostics.push({ severity: 'error', message: `Eigen analysis "${stage.id}" requests ${stage.modes} mode(s) but the model has mass on only ${massiveDofs} free DOF(s) — assign nodal masses (mass command) first`, commandIndex: -1 })
+    if (stage.kind === 'modal' && stage.modes > massiveDofs + shellMassDofs) {
+      diagnostics.push({ severity: 'error', message: `Eigen analysis "${stage.id}" requests ${stage.modes} mode(s) but the model has mass on only ${massiveDofs + shellMassDofs} free DOF(s) — assign nodal masses (mass command) first`, commandIndex: -1 })
     }
   }
 
@@ -143,6 +160,7 @@ export function compileInputV1(model: Model, analysisHistory: AnalysisHistory): 
   // beamIntegration-referenced one) — compiled once per `model.sections` entry, up front, so
   // both element loops below can resolve a `secTag` to a `fibers`-table offset by simple lookup. ---
   const { fibers, sectionIndex } = compileFiberSections(model, ndm, resolveMaterial, diagnostics)
+  const { shellSections, shellSectionIndex } = compileShellSections(model, diagnostics)
 
   // --- elements ---
   const trusses: W.TrussTable = { nodeI: [], nodeJ: [], area: [], material: [], density: [] }
@@ -151,6 +169,8 @@ export function compileInputV1(model: Model, analysisHistory: AnalysisHistory): 
   const elasticBeamColumns3d: W.ElasticBeamColumn3dTable = { nodeI: [], nodeJ: [], e: [], g: [], a: [], j: [], iy: [], iz: [], transform: [], density: [] }
   const dispBeamColumns3d: W.FiberBeamColumn3dTable = { nodeI: [], nodeJ: [], g: [], j: [], vecXz: [], fiberSection: [], integration: [], density: [] }
   const zeroLengthSections: W.ZeroLengthSectionTable = { nodeI: [], nodeJ: [], fiberSection: [], materials: [], orient: [] }
+  const shell3s: W.Shell3Table = { nodeIds: [], section: [] }
+  const shell4s: W.Shell4Table = { nodeIds: [], section: [] }
   const resolveSection = (secTag: number, context: string): number => {
     const idx = sectionIndex.get(secTag)
     if (idx === undefined) {
@@ -206,6 +226,18 @@ export function compileInputV1(model: Model, analysisHistory: AnalysisHistory): 
       dispBeamColumns3d.integration.push(compileIntegration(integration, ctx, diagnostics))
       dispBeamColumns3d.density.push(0)
       elementRefs.set(ele.id, { kind: 'dispBeamColumn3d', index: dispBeamColumns3d.nodeI.length - 1 })
+    } else if (isShell(ele.eleType)) {
+      const ctx = `${ele.eleType} ${ele.id}`
+      if (ndm !== 3) diagnostics.push({ severity: 'error', message: `${ctx}: shell elements need a 3D model`, commandIndex: -1 })
+      else {
+        const secTag = Number(ele.args.secTag)
+        const secIdx = shellSectionIndex.get(secTag)
+        if (secIdx === undefined) diagnostics.push({ severity: 'error', message: `${ctx} references section ${secTag}, which is not a supported ElasticMembranePlateSection`, commandIndex: -1 })
+        const table = ele.eleType === 'ShellDKGT' ? shell3s : shell4s
+        for (const node of ele.nodes) table.nodeIds.push(resolveNode(node, ctx))
+        table.section.push(secIdx ?? NO_INDEX)
+        elementRefs.set(ele.id, { kind: ele.eleType === 'ShellDKGT' ? 'shell3' : 'shell4', index: table.section.length - 1 })
+      }
     } else if (ndm === 3 && ele.eleType === 'zeroLengthSection') {
       diagnostics.push({ severity: 'warning', message: `Element ${ele.id} (zeroLengthSection) is not yet supported in 3D models by the Carapace compiler and was skipped`, commandIndex: -1 })
     } else if (ele.eleType === 'ElasticBeamColumn') {
@@ -324,7 +356,29 @@ export function compileInputV1(model: Model, analysisHistory: AnalysisHistory): 
     const stage = claimedStage.get(id) ?? nodalStage ?? firstStaticWire
     for (const child of pattern.children) {
       if (child.kind !== 'eleLoad') continue
-      const a = child.args as { eleTags?: number[]; wx?: number; wy?: number; wz?: number }
+      const a = child.args as { eleTags?: number[]; wx?: number; wy?: number; wz?: number; pressure?: number; bx?: number; by?: number; bz?: number }
+      const loadKind = eleLoadKind(child.args)
+      if (loadKind !== 'beam') {
+        const spec: W.ElementLoadSpec = loadKind === 'pressure' ? { kind: 'shellPressure', pressure: Number(a.pressure) || 0 } : { kind: 'shellBody', bx: Number(a.bx) || 0, by: Number(a.by) || 0, bz: Number(a.bz) || 0 }
+        for (const tag of a.eleTags ?? []) {
+          const ref = elementRefs.get(tag)
+          if (ref?.kind !== 'shell3' && ref?.kind !== 'shell4') {
+            const ele = model.elements.get(tag)
+            diagnostics.push(!ele
+              ? { severity: 'error', message: `Element load in pattern ${id} references unknown element ${tag}`, commandIndex: -1 }
+              : isShell(ele.eleType)
+                ? { severity: 'warning', message: `Shell loads on ${ele.eleType} ${tag} (pattern ${id}) are not supported by the Carapace compiler and were skipped`, commandIndex: -1 }
+                : { severity: 'error', message: `Shell pressure and self-weight in pattern ${id} cannot load ${ele.eleType} ${tag}, which is not a shell`, commandIndex: -1 })
+            continue
+          }
+          elementLoads.pattern.push(pIdx)
+          elementLoads.elementKind.push(ref.kind)
+          elementLoads.elementIndex.push(ref.index)
+          elementLoads.load.push(spec)
+          elementLoads.stage.push(stage)
+        }
+        continue
+      }
       const [wx, wy, wz] = [Number(a.wx) || 0, Number(a.wy) || 0, Number(a.wz) || 0]
       if (wz && ndm === 2) diagnostics.push({ severity: 'warning', message: `Element load in pattern ${id} sets wz, which has no meaning in a 2D model and was ignored`, commandIndex: -1 })
       if (!wx && !wy && !(wz && ndm === 3)) continue
@@ -408,7 +462,7 @@ export function compileInputV1(model: Model, analysisHistory: AnalysisHistory): 
     // An element the compiler skipped already produced its own "not yet supported" warning.
     if (!ref) continue
     // A loaded element also records the load it carries, in the same column group, right after its end forces.
-    const loaded = loadedElementTags.has(tag)
+    const loaded = loadedElementTags.has(tag) && ref.kind !== 'shell3' && ref.kind !== 'shell4'
     const labels = forceLabels(ref.kind)
     plan('force', tag, loaded ? [...labels, ...loadLabels] : labels)
     for (let component = 0; component < labels.length; component++) {
@@ -417,6 +471,17 @@ export function compileInputV1(model: Model, analysisHistory: AnalysisHistory): 
     if (loaded) {
       for (let component = 0; component < loadLabels.length; component++) {
         recorders.push({ response: 'elementLoad', elementKind: ref.kind, elementIndex: ref.index, component })
+      }
+    }
+  }
+  // Shells also record their stress resultants at the 4 Gauss points (32 columns each), which the contour view reads.
+  for (const tag of recordedElementTags) {
+    const ref = elementRefs.get(tag)
+    if (ref?.kind !== 'shell3' && ref?.kind !== 'shell4') continue
+    plan('shell', tag, SHELL_RESULTANT_LABELS)
+    for (let point = 0; point < SHELL_GAUSS_POINTS; point++) {
+      for (let component = 0; component < SHELL_RESULTANTS.length; component++) {
+        recorders.push({ response: 'gaussPoint', elementKind: ref.kind, elementIndex: ref.index, point, quantity: 'stress', component })
       }
     }
   }
@@ -431,7 +496,7 @@ export function compileInputV1(model: Model, analysisHistory: AnalysisHistory): 
     trusses,
     elasticBeamColumns2d: elasticBeamColumns,
     dispBeamColumns2d: dispBeamColumns,
-    ...(ndm === 3 ? { elasticBeamColumns3d, dispBeamColumns3d } : {}),
+    ...(ndm === 3 ? { elasticBeamColumns3d, dispBeamColumns3d, shellSections, shell3s, shell4s } : {}),
     zeroLengthSections,
     loadPatterns,
     nodalLoads,
@@ -439,6 +504,24 @@ export function compileInputV1(model: Model, analysisHistory: AnalysisHistory): 
     sequence: { stages, recorders },
   }
   return { input, diagnostics, recordedNodeTags, dofsPerNode, recorderPlans, nodeTags: nodeIds }
+}
+
+/** Compiles the `ElasticMembranePlateSection` sections (the shells' arena); `shellSectionIndex` maps a section tag to its arena row. */
+function compileShellSections(model: Model, diagnostics: CompileDiagnostic[]): { shellSections: W.ShellSectionSpec[]; shellSectionIndex: Map<number, number> } {
+  const shellSections: W.ShellSectionSpec[] = []
+  const shellSectionIndex = new Map<number, number>()
+  for (const [tag, section] of [...model.sections].sort((a, b) => a[0] - b[0])) {
+    if (section.secType !== 'ElasticMembranePlateSection') continue
+    const a = section.args
+    const ep = a.epModifier === undefined || a.epModifier === '' ? 1 : Number(a.epModifier)
+    if (ep !== 1) {
+      diagnostics.push({ severity: 'error', message: `Section ${tag} (ElasticMembranePlateSection) sets a plate modifier of ${ep}, which Carapace does not support`, commandIndex: -1 })
+      continue
+    }
+    shellSectionIndex.set(tag, shellSections.length)
+    shellSections.push({ kind: 'elasticMembranePlate', e: Number(a.eMod), nu: Number(a.nu), h: Number(a.h), rho: Number(a.rho) || 0 })
+  }
+  return { shellSections, shellSectionIndex }
 }
 
 /** Compiles every `model.sections` entry with `secType === 'Fiber'` into one flat, offset-indexed
@@ -467,6 +550,7 @@ function compileFiberSections(
   const secTags = [...model.sections.keys()].sort((a, b) => a - b)
   for (const secTag of secTags) {
     const section = model.sections.get(secTag)!
+    if (section.secType === 'ElasticMembranePlateSection') continue // compiled by compileShellSections
     if (section.secType !== 'Fiber') {
       diagnostics.push({ severity: 'warning', message: `Section ${secTag} (${section.secType}) is not yet supported by the Carapace compiler and was skipped`, commandIndex: -1 })
       continue

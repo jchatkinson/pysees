@@ -18,6 +18,8 @@ import { modeFrequencyHz, modePeriod, modeTimingText, modeTranslationPeak } from
 import { autoModeScale, autoScale, modelMetrics } from '@/app/lib/resultsScale'
 import type { RunExtents } from '@/app/types/resultsStorage'
 import type { ResultType, ScaleKey } from '@/app/types/resultsView'
+import { RAMP_CSS, SHELL_RESULTANTS, SHELL_RESULTANT_LABELS, type ShellResultant } from '@/app/lib/shellContour'
+import { isShell } from '@/app/lib/commands/tables'
 
 /** `only3d` types exist only in a 3D model; the 2D labels of V and M drop their axis suffix. */
 const RESULT_TYPES: { id: ResultType; label: string; label3d?: string; only3d?: boolean }[] = [
@@ -29,6 +31,7 @@ const RESULT_TYPES: { id: ResultType; label: string; label3d?: string; only3d?: 
   { id: 'torsion', label: 'Torsion (T)', only3d: true },
   { id: 'moment', label: 'Bending moment (M)', label3d: 'Bending moment (Mz)' },
   { id: 'momentY', label: 'Bending moment (My)', only3d: true },
+  { id: 'contour', label: 'Shell stress resultants', only3d: true },
   { id: 'mode', label: 'Mode shape' },
 ]
 const DIRECTIONS = ['UX', 'UY', 'UZ']
@@ -42,6 +45,8 @@ export function ResultsDisplayPanel() {
   const set = useAppStore((s) => s.setResultsView)
   const model = useAppStore((s) => s.model)
   const is3d = model.config?.ndm === 3
+  const hasShells = useMemo(() => [...model.elements.values()].some((e) => isShell(e.eleType)), [model.elements])
+  const contourRange = useAppStore((s) => s.contourRange)
 
   const [extents, setExtents] = useState<{ runId: string; value: RunExtents } | null>(null)
   const [time, setTime] = useState<{ runId: string; step: number; value: number } | null>(null)
@@ -83,7 +88,8 @@ export function ResultsDisplayPanel() {
 
   const metrics = useMemo(() => modelMetrics(model), [model])
   const runExtents = extents && extents.runId === rv.runId ? extents.value : null
-  const scaleKey: ScaleKey | null = rv.type === 'none' ? null : rv.type
+  // A contour is drawn on the deformed shape, so it shares that scale.
+  const scaleKey: ScaleKey | null = rv.type === 'none' ? null : rv.type === 'contour' ? 'deformed' : rv.type
   const auto = !scaleKey ? 1 : scaleKey === 'mode' ? autoModeScale(modalStage && mode ? modeTranslationPeak(modalStage, mode) : 0, metrics) : autoScale(scaleKey, runExtents, metrics)
   const manual = scaleKey ? rv.scales[scaleKey] : null
   const scale = manual ?? auto
@@ -144,9 +150,24 @@ export function ResultsDisplayPanel() {
             <Label className="text-[11px]">Result</Label>
             <Select items={RESULT_TYPES.map((t) => ({ value: t.id, label: (is3d && t.label3d) || t.label }))} value={rv.type} onValueChange={(v) => set({ type: v as ResultType, phase: 0 })}>
               <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
-              <SelectContent>{RESULT_TYPES.filter((t) => (!t.only3d || is3d) && (t.id === 'none' || (t.id === 'mode' ? isModalCase : !isModalCase))).map((t) => <SelectItem key={t.id} value={t.id}>{(is3d && t.label3d) || t.label}</SelectItem>)}</SelectContent>
+              <SelectContent>{RESULT_TYPES.filter((t) => (!t.only3d || is3d) && (t.id !== 'contour' || hasShells) && (t.id === 'none' || (t.id === 'mode' ? isModalCase : !isModalCase))).map((t) => <SelectItem key={t.id} value={t.id}>{(is3d && t.label3d) || t.label}</SelectItem>)}</SelectContent>
             </Select>
           </div>
+
+          {rv.type === 'contour' && (
+            <div className="grid gap-1.5">
+              <Select items={SHELL_RESULTANTS.map((r) => ({ value: r, label: SHELL_RESULTANT_LABELS[r] }))} value={rv.contour} onValueChange={(v) => set({ contour: v as ShellResultant })}>
+                <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+                <SelectContent>{SHELL_RESULTANTS.map((r) => <SelectItem key={r} value={r}>{SHELL_RESULTANT_LABELS[r]}</SelectItem>)}</SelectContent>
+              </Select>
+              <div className="h-2.5 w-full rounded-sm" style={{ background: RAMP_CSS }} />
+              <div className="flex justify-between text-[10px] text-muted-foreground">
+                <span>{contourRange ? fmt(contourRange.min) : '–'}</span>
+                <span>local axes, per unit length</span>
+                <span>{contourRange ? fmt(contourRange.max) : '–'}</span>
+              </div>
+            </div>
+          )}
 
           {rv.type === 'mode' && modalStage && (
             <div className="grid gap-2">

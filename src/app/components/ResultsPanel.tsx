@@ -30,6 +30,7 @@ interface DisplacementRow {
 const RESULT_TYPES = [
   { id: 'joint-displacements', label: 'Joint Displacements' },
   { id: 'element-forces', label: 'Element Forces' },
+  { id: 'shell-resultants', label: 'Shell Stress Resultants' },
   { id: 'reactions', label: 'Reactions' },
   { id: 'modal-periods', label: 'Modal Periods and Frequencies' },
   { id: 'modal-mass', label: 'Modal Participating Mass Ratios' },
@@ -51,9 +52,10 @@ function modalValueLabels(id: string, ndm: number): string[] {
 const KIND_BY_RESULT_TYPE: Partial<Record<(typeof RESULT_TYPES)[number]['id'], RecorderKind>> = {
   'joint-displacements': 'disp',
   'element-forces': 'force',
+  'shell-resultants': 'shell',
   'reactions': 'reaction',
 }
-const TARGET_HEADER: Record<RecorderKind, string> = { disp: 'Node', reaction: 'Node', force: 'Element' }
+const TARGET_HEADER: Record<RecorderKind, string> = { disp: 'Node', reaction: 'Node', force: 'Element', shell: 'Element' }
 
 export function ResultsPanel() {
   const [resultType, setResultType] = useState<string>('joint-displacements')

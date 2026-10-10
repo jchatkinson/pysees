@@ -4,7 +4,9 @@ export interface ElementSpec {
   eleType: string
   /** Name OpenSees accepts (case matters in OpenSeesPy: `ElasticBeamColumn` is unknown, `elasticBeamColumn` is not). */
   opsName: string
-  /** Positional args after the two node tags, in order (the 2D layout when `args3d` is given). */
+  /** Node tags the element connects (2 when omitted). */
+  nodeCount?: number
+  /** Positional args after the node tags, in order (the 2D layout when `args3d` is given). */
   args: string[]
   /** The 3D layout, for elements whose arguments differ with the model dimension. */
   args3d?: string[]
@@ -18,8 +20,14 @@ export const ELEMENTS: ElementSpec[] = [
   { eleType: 'Truss', opsName: 'Truss', args: ['A', 'matTag'], flags: { '-rho': { key: 'rho' } } },
   { eleType: 'ElasticBeamColumn', opsName: 'elasticBeamColumn', args: ['A', 'E', 'Iz', 'transfTag'], args3d: ['A', 'E', 'G', 'J', 'Iy', 'Iz', 'transfTag'], exact: true },
   { eleType: 'DispBeamColumn', opsName: 'dispBeamColumn', args: ['transfTag', 'integrationTag'] },
+  { eleType: 'ShellMITC4', opsName: 'ShellMITC4', nodeCount: 4, args: ['secTag'], exact: true },
+  { eleType: 'ShellDKGT', opsName: 'ShellDKGT', nodeCount: 3, args: ['secTag'], exact: true },
   { eleType: 'zeroLengthSection', opsName: 'zeroLengthSection', args: ['secTag'], flags: { '-orient': { key: 'orient', vec: true } } },
 ]
+/** Number of nodes an element type connects. */
+export const elementNodeCount = (spec: ElementSpec | undefined) => spec?.nodeCount ?? 2
+/** Shell elements (3D only), which carry a section and take pressure and self-weight. */
+export const isShell = (eleType: string) => eleType === 'ShellMITC4' || eleType === 'ShellDKGT'
 /** An element's positional args for a model dimension. */
 export const elementArgs = (spec: ElementSpec, ndm: number) => (ndm === 3 && spec.args3d ? spec.args3d : spec.args)
 export const elementByOpsName = (name: string) => ELEMENTS.find((e) => e.opsName.toLowerCase() === name.toLowerCase())

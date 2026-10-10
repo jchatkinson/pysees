@@ -500,6 +500,40 @@
           "required": false
         }
       ]
+    },
+    "section/ElasticMembranePlateSection": {
+      "_why": "The docs type E, nu, h, rho and the optional plate modifier as strings; they are numbers, in this order (`E nu h rho [Ep_modifier]`).",
+      "args": [
+        {
+          "kind": "int",
+          "name": "secTag"
+        },
+        {
+          "kind": "float",
+          "name": "eMod",
+          "required": true
+        },
+        {
+          "kind": "float",
+          "name": "nu",
+          "required": true
+        },
+        {
+          "kind": "float",
+          "name": "h",
+          "required": true
+        },
+        {
+          "kind": "float",
+          "name": "rho",
+          "required": true
+        },
+        {
+          "kind": "float",
+          "name": "epModifier",
+          "required": false
+        }
+      ]
     }
   }
 }

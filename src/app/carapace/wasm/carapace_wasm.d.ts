@@ -1,6 +1,15 @@
 /* tslint:disable */
 /* eslint-disable */
 /**
+ * 3-node DKT/Allman shells (3D models only). `nodeIds` has stride 3 (the node order sets the local normal by the
+ * right-hand rule); `section` indexes `shellSections`.
+ */
+export interface Shell3Table {
+    nodeIds: number[];
+    section: number[];
+}
+
+/**
  * 3-node constant-strain triangles (2D models only). `nodeIds` has stride 3
  * (counter-clockwise); `material` indexes `planeMaterials`.
  */
@@ -9,6 +18,15 @@ export interface TriangleTable {
     thickness: number[];
     material: number[];
     density: number[];
+}
+
+/**
+ * 4-node MITC4 shells (3D models only). `nodeIds` has stride 4 (the node order fixes the
+ * local normal by the right-hand rule); `section` indexes `shellSections`.
+ */
+export interface Shell4Table {
+    nodeIds: number[];
+    section: number[];
 }
 
 /**
@@ -53,6 +71,12 @@ export interface ZeroLengthSectionTable {
 export type PlaneMaterialSpec = { kind: "isotropic"; e: number; nu: number; state: PlaneStateSpec } | { kind: "orthotropic"; ex: number; ey: number; nuXy: number; gXy: number; angle: number } | { kind: "elasticMatrix"; d: [number, number, number, number, number, number] };
 
 /**
+ * A shell section, referenced by `shell4s` rows through the `shellSections` arena. Generalized
+ * strain and resultants follow OpenSees' `ElasticMembranePlateSection` ordering.
+ */
+export type ShellSectionSpec = { kind: "elasticMembranePlate"; e: number; nu: number; h: number; rho: number };
+
+/**
  * Accepts the original bare strings and configurable algorithm objects.
  */
 export type AlgorithmSpec = LegacyAlgorithmSpec | AlgorithmConfigSpec;
@@ -61,7 +85,7 @@ export type AlgorithmSpec = LegacyAlgorithmSpec | AlgorithmConfigSpec;
  * Every element formulation, 2D and 3D. A kind that does not belong to the
  * model's `ndm` is `DecodeError::ElementKindNotInProfile`.
  */
-export type ElementKind = "truss" | "elasticBeamColumn2d" | "elasticBeamColumn3d" | "dispBeamColumn2d" | "dispBeamColumn3d" | "forceBeamColumn2d" | "forceBeamColumn3d" | "zeroLength" | "zeroLengthSection" | "tri3" | "quad4";
+export type ElementKind = "truss" | "elasticBeamColumn2d" | "elasticBeamColumn3d" | "dispBeamColumn2d" | "dispBeamColumn3d" | "forceBeamColumn2d" | "forceBeamColumn3d" | "zeroLength" | "zeroLengthSection" | "tri3" | "quad4" | "shell3" | "shell4";
 
 /**
  * Everything a finished `Modal` stage computed.
@@ -210,9 +234,8 @@ export interface RecorderBatch {
 
 /**
  * One recorder: a single scalar channel's history against its stage's load
- * factor. `NodeDisp` was M10's first (and, until now, only) variant
- * (pysees-handoff.md's "selected node displacement/load-factor history for
- * the static pushover"); `ElementForce` (results-storage-indexeddb.md's
+ * factor. `NodeDisp` was the first variant (node displacement/load-factor
+ * history for a static pushover); `ElementForce` (results-storage-indexeddb.md's
  * "several more types of recorders" plan) is the second, sharing the exact
  * same batching/storage machinery — see `session::ResolvedRecorder` and
  * `StepOutcome::recorder_batches`, neither of which needed to change shape
@@ -436,6 +459,12 @@ export interface CarapaceInputV1 {
     planeMaterials?: PlaneMaterialSpec[];
     triangles?: TriangleTable;
     quads?: QuadTable;
+    /**
+     * Arena of shell sections for `shell4s` (3D models only).
+     */
+    shellSections?: ShellSectionSpec[];
+    shell3s?: Shell3Table;
+    shell4s?: Shell4Table;
     rigidDiaphragms?: RigidDiaphragmTable;
     rigidLinks?: RigidLinkTable;
     linearConstraints?: LinearConstraintTable;
@@ -480,7 +509,7 @@ export type Pinching4DmgCycSpec = "energyBased" | "cycleBased";
 /**
  * `AnalysisError`'s fields, restated so `advance`'s result doesn't need to
  * name `carapace_core`'s error type directly — kept in the same tagged-
- * variant style (implementation-plan.md §2.8).
+ * variant style.
  */
 export type AnalysisErrorDetail = { kind: "failedToConverge"; step: number } | { kind: "singularSystem" } | { kind: "invalidConstraint" } | { kind: "invalidModeCount"; requested: number; freeDofs: number } | { kind: "invalidOption"; field: string } | { kind: "unsupportedLoadSeries" } | { kind: "zeroLoadSensitivity" } | { kind: "initialStateNotInEquilibrium"; measure: number } | { kind: "missingSeedDirection" } | { kind: "cutbacksExhausted"; step: number; attempts: number; radius: number; lastFailure: ArcFailureDetail } | { kind: "continuationComplete" } | { kind: "invalidModel"; error: ModelErrorDetail };
 
@@ -494,7 +523,7 @@ export type TransformSpec3 = { kind: "linear3"; vecXz: [number, number, number] 
  * `Serialize`, not `Deserialize` — a `DecodeError` only ever flows *out*
  * to JS (`boundary.rs`), as a `{ kind: "...", ... }`-shaped object.
  */
-export type DecodeError = { kind: "invalidAnalysisOption"; stage: string; field: string } | { kind: "unsupportedNdm"; got: number } | { kind: "tableNotInProfile"; table: string } | { kind: "elementKindNotInProfile"; table: string } | { kind: "invalidRecorderComponent"; recorder: number; component: number; width: number } | { kind: "invalidGaussPoint"; recorder: number; point: number; count: number } | { kind: "invalidPlaneMaterial"; index: number; reason: string } | { kind: "invalidRow"; table: string; row: number; reason: string } | { kind: "unknownNodeIndex"; table: string; row: number } | { kind: "unknownMaterialIndex"; table: string; row: number } | { kind: "cyclicMaterialReference"; index: number } | { kind: "unknownPatternIndex"; table: string; row: number } | { kind: "unknownFiberSectionIndex"; row: number } | { kind: "unknownElementIndex"; table: string; row: number } | { kind: "unknownStageIndex"; table: string; row: number } | { kind: "unsupportedElementLoad"; elementKind: string } | { kind: "invalidDof"; table: string; row: number; dof: number } | { kind: "unknownConstraintRow"; table: string; row: number } | { kind: "invalidOrientation"; table: string; row: number } | { kind: "invalidModel"; error: ModelErrorDetail };
+export type DecodeError = { kind: "invalidAnalysisOption"; stage: string; field: string } | { kind: "unsupportedNdm"; got: number } | { kind: "tableNotInProfile"; table: string } | { kind: "elementKindNotInProfile"; table: string } | { kind: "invalidRecorderComponent"; recorder: number; component: number; width: number } | { kind: "invalidGaussPoint"; recorder: number; point: number; count: number } | { kind: "invalidPlaneMaterial"; index: number; reason: string } | { kind: "invalidShellSection"; index: number; reason: string } | { kind: "invalidRow"; table: string; row: number; reason: string } | { kind: "unknownNodeIndex"; table: string; row: number } | { kind: "unknownMaterialIndex"; table: string; row: number } | { kind: "cyclicMaterialReference"; index: number } | { kind: "unknownPatternIndex"; table: string; row: number } | { kind: "unknownFiberSectionIndex"; row: number } | { kind: "unknownElementIndex"; table: string; row: number } | { kind: "unknownStageIndex"; table: string; row: number } | { kind: "unsupportedElementLoad"; elementKind: string } | { kind: "invalidDof"; table: string; row: number; dof: number } | { kind: "unknownConstraintRow"; table: string; row: number } | { kind: "invalidOrientation"; table: string; row: number } | { kind: "invalidModel"; error: ModelErrorDetail };
 
 /**
  * `Session::modal_results`'s payload: every `Modal` stage that has finished so far, in order.
@@ -504,8 +533,8 @@ export interface ModalResultsReport {
 }
 
 /**
- * `advance`'s result — pysees-handoff.md's `{ done, stageComplete,
- * stepsTaken, progressSnapshot, recorderBatch? }`, minus the parts that
+ * `advance`'s result — `{ done, stageComplete, stepsTaken,
+ * progressSnapshot, recorderBatch? }`, minus the parts that
  * are the worker/JS boundary's job (`progressSnapshot`'s throttling,
  * `recorderBatch`'s `response_blocks` byte layout): `load_factor` here is
  * the raw signal those would be built from — for a `Static` stage the
@@ -684,7 +713,7 @@ export interface NodalLoadTable {
      * pseudo-time with every unfrozen pattern (core/src/analysis/
      * integrator.rs) — a pattern's reference load must not exist yet if
      * an earlier stage isn't meant to ramp it too (the same reason
-     * core/tests/m8_force_beam_column.rs's native two-phase test adds its
+     * core/tests/elements/force_beam.rs's native two-phase test adds its
      * lateral pattern's load only between phases, not upfront).
      */
     stage: number[];
@@ -718,7 +747,7 @@ export type ArcPredictorSpec = "secant" | "tangent";
 
 export type ConvergenceSpec = { kind: "normUnbalance"; tol: number; maxIter: number } | { kind: "normDispIncr"; tol: number; maxIter: number } | { kind: "energyIncr"; tol: number; maxIter: number } | { kind: "combined"; forceTol: number; momentTol?: number; relativeTol?: number; displacementTol?: number; maxIter: number };
 
-export type ElementLoadSpec = { kind: "uniform"; wx: number; wy: number; wz?: number } | { kind: "body"; bx: number; by: number } | { kind: "edgeTraction"; edge: number; tx: number; ty: number } | { kind: "edgePressure"; edge: number; pressure: number };
+export type ElementLoadSpec = { kind: "uniform"; wx: number; wy: number; wz?: number } | { kind: "body"; bx: number; by: number } | { kind: "edgeTraction"; edge: number; tx: number; ty: number } | { kind: "edgePressure"; edge: number; pressure: number } | { kind: "shellPressure"; pressure: number } | { kind: "shellBody"; bx: number; by: number; bz: number };
 
 export type IntegrationSpec = { kind: "legendre"; points: number } | { kind: "lobatto"; points: number };
 
@@ -796,26 +825,7 @@ export class WasmSession {
     modalResults(): ModalResultsReport;
 }
 
-export function axial_displacement(load: number, length: number, area: number, modulus: number): number;
-
-/**
- * Same 2-node truss case as `axial_displacement`, but computed through the
- * real `Domain`/`Element::Truss`/`Analysis` architecture (M1) rather than
- * the closed-form placeholder — see implementation-plan.md M1 acceptance
- * criteria. Kept alongside the M0 export for wasm/Node verification.
- */
-export function axial_displacement_via_analysis(load: number, length: number, area: number, modulus: number): number;
-
 export function createMaterialProbe(config: MaterialProbeConfig): WasmMaterialProbe;
-
-/**
- * M6 wiring check: Newmark + Rayleigh-damped SDOF free vibration, closed
- * form `u(t) = exp(-xi*omega*t) * u0 * [cos(omega_d*t) +
- * (xi*omega/omega_d)*sin(omega_d*t)]` — see `core/tests/m6_dynamics.rs`
- * for the native equivalent and derivation. Returns the displacement
- * after `steps` steps of size `dt`.
- */
-export function damped_sdof_free_vibration_displacement(steps: number, dt: number): number;
 
 /**
  * Decodes a `CarapaceInputV1`-shaped JS value (see `input_v1`'s table
@@ -827,73 +837,19 @@ export function damped_sdof_free_vibration_displacement(steps: number, dt: numbe
  */
 export function decodeInput(value: CarapaceInputV1): WasmSession;
 
-/**
- * M7 stage-1 wiring check: a `DispBeamColumn` (fiber-discretized,
- * displacement-based) cantilever with a 2-fiber elastic section that
- * reproduces `E*A`/`E*Iz` exactly — must match `ElasticBeamColumn`'s
- * closed-form tip deflection exactly, not approximately. See
- * `core/tests/m7_disp_beam_column.rs` for the native equivalent.
- */
-export function disp_beam_column_cantilever_tip_deflection(e: number, area: number, iz: number, length: number, tip_load: number): number;
-
-/**
- * M5 wiring check: the 2-DOF "1-1-1-1" mass-spring chain's natural
- * frequencies, closed form `1/phi` and `phi` (golden ratio) — see
- * `core/tests/m5_modal.rs` for the native equivalent and derivation.
- * Returns `[omega1, omega2]`.
- */
-export function mass_spring_chain_frequencies(): Float64Array;
-
-/**
- * M4 wiring check: a `Truss` (elastic) in parallel with a `ZeroLength`+
- * `ElasticPP` (elastic-perfectly-plastic) spring, loaded past the EPP
- * spring's yield point within a single step — needs `Algorithm::Newton`'s
- * iteration to resolve correctly (`Algorithm::Linear`'s one-shot solve
- * can't cross a material regime boundary within a step).
- * See `core/tests/m4_analysis.rs` for the native equivalent and the
- * closed-form derivation.
- */
-export function newton_raphson_elastic_plastic_displacement(force: number): number;
-
-/**
- * M3 wiring check: a simply-supported `ElasticBeamColumn` under a uniform
- * transverse element load, returning the node_i end rotation — closed form
- * `theta = w*L^3/(24*E*I)`. See `core/tests/m3_beam.rs` for the native
- * equivalent and why a single element is exact here.
- */
-export function simply_supported_beam_end_rotation(e: number, iz: number, area: number, length: number, w: number): number;
-
-/**
- * M2 wiring check: a `ZeroLength` + `Material::Ent` ("no tension")
- * connector under a compressive load, computed through the same real
- * architecture — proves the `Element`/`Material` enum dispatch generalizes
- * beyond `Truss`/`Elastic` on wasm32 + Node, not just natively (see
- * `core/tests/m2_zero_length.rs` for the native-side equivalent and the
- * single-linear-regime caveat this test shares with it).
- */
-export function zero_length_ent_displacement(load: number, modulus: number): number;
-
 export type InitInput = RequestInfo | URL | Response | BufferSource | WebAssembly.Module;
 
 export interface InitOutput {
     readonly memory: WebAssembly.Memory;
     readonly __wbg_wasmmaterialprobe_free: (a: number, b: number) => void;
     readonly __wbg_wasmsession_free: (a: number, b: number) => void;
-    readonly axial_displacement: (a: number, b: number, c: number, d: number) => number;
-    readonly axial_displacement_via_analysis: (a: number, b: number, c: number, d: number) => number;
     readonly createMaterialProbe: (a: any) => [number, number, number];
-    readonly damped_sdof_free_vibration_displacement: (a: number, b: number) => number;
     readonly decodeInput: (a: any) => [number, number, number];
-    readonly disp_beam_column_cantilever_tip_deflection: (a: number, b: number, c: number, d: number, e: number) => number;
-    readonly mass_spring_chain_frequencies: () => [number, number];
-    readonly newton_raphson_elastic_plastic_displacement: (a: number) => number;
-    readonly simply_supported_beam_end_rotation: (a: number, b: number, c: number, d: number, e: number) => number;
     readonly wasmmaterialprobe_applyStrain: (a: number, b: number) => [number, number, number];
     readonly wasmmaterialprobe_reset: (a: number) => [number, number];
     readonly wasmsession_advance: (a: number, b: number) => [number, number, number];
     readonly wasmsession_currentStageId: (a: number) => [number, number];
     readonly wasmsession_modalResults: (a: number) => [number, number, number];
-    readonly zero_length_ent_displacement: (a: number, b: number) => number;
     readonly __wbindgen_malloc: (a: number, b: number) => number;
     readonly __wbindgen_realloc: (a: number, b: number, c: number, d: number) => number;
     readonly __wbindgen_exn_store: (a: number) => void;

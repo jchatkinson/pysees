@@ -372,3 +372,51 @@ export function frame3dTemplate({ stories, storyH, baysX, bayX, baysY, bayY }: F
 
   return { ndm: 3, ndf: 6, writes: [...writes, ...loadWrites], analysisCommands, levels }
 }
+
+// ---------------------------------------------------------------------------
+// Plate
+// ndm=3, ndf=6, a flat slab of ShellMITC4 quads in the X–Y plane (Z up), clamped along x = 0. Quads run counter-clockwise seen from +Z, so
+// their normal points up and a downward pressure is negative.
+// Node numbering: id = k*(nx+1) + i + 1, coords = [i*lx/nx, k*ly/ny, 0]; element id = k*nx + i + 1.
+// ---------------------------------------------------------------------------
+export interface PlateParams {
+  nx: number
+  ny: number
+  lx: number
+  ly: number
+  /** Thickness. */
+  h: number
+}
+
+// Concrete: E 30 GPa, ν 0.2, 2400 kg/m³; 5 kN/m² of imposed load.
+const PLATE_E = 30e9
+const PLATE_NU = 0.2
+const PLATE_DENSITY = 2400
+const PLATE_PRESSURE = -5e3
+
+export function plateTemplate({ nx, ny, lx, ly, h }: PlateParams): TemplateResult {
+  const writes: ModelWrite[] = []
+  const nodeId = (i: number, k: number) => k * (nx + 1) + i + 1
+  for (let k = 0; k <= ny; k++) for (let i = 0; i <= nx; i++) writes.push({ kind: 'node', entity: { id: nodeId(i, k), coords: [(i * lx) / nx, (k * ly) / ny, 0] } })
+  for (let k = 0; k <= ny; k++) writes.push({ kind: 'fix', entity: { nodeId: nodeId(0, k), dofs: [1, 2, 3, 4, 5, 6] } })
+  writes.push({ kind: 'section', entity: { id: 1, secType: 'ElasticMembranePlateSection', args: { type: 'ElasticMembranePlateSection', secTag: 1, eMod: PLATE_E, nu: PLATE_NU, h, rho: PLATE_DENSITY }, children: [] } })
+  const shellTags: number[] = []
+  let eleId = 1
+  for (let k = 0; k < ny; k++) for (let i = 0; i < nx; i++) {
+    shellTags.push(eleId)
+    writes.push({ kind: 'element', entity: { id: eleId++, eleType: 'ShellMITC4', nodes: [nodeId(i, k), nodeId(i + 1, k), nodeId(i + 1, k + 1), nodeId(i, k + 1)], args: { secTag: 1 } } })
+  }
+  const pattern = (id: number, name: string, children: LoadAssignment[]): ModelWrite =>
+    ({ kind: 'pattern', entity: { id, name, patternType: 'Plain', args: { type: 'Plain', patternTag: id, tsTag: 1, fact: 1 }, children } })
+  const loadWrites: ModelWrite[] = [
+    { kind: 'timeSeries', entity: { id: 1, tsType: 'Linear', args: { type: 'Linear', tag: 1, factor: 1 } } },
+    pattern(1, 'Self weight', [{ kind: 'eleLoad', args: { eleTags: shellTags, loadType: 'Shell self-weight', bx: 0, by: 0, bz: -GRAVITY } }]),
+    pattern(2, 'Imposed load', [{ kind: 'eleLoad', args: { eleTags: shellTags, loadType: 'Shell pressure', pressure: PLATE_PRESSURE } }]),
+  ]
+  const analysisCommands: AnalysisCommand[] = [
+    { type: 'ANALYSIS_BLOCK', blockId: 'whole-model-recorder', params: { directory: 'out' } },
+    eigenAnalysis(3 * nx * (ny + 1)),
+    { type: 'ANALYSIS_BLOCK', blockId: 'run-gravity-analysis', params: { patterns: [1, 2], steps: 4 } },
+  ]
+  return { ndm: 3, ndf: 6, writes: [...writes, ...loadWrites], analysisCommands }
+}

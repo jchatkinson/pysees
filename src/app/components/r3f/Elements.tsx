@@ -6,6 +6,7 @@ import { useAppStore } from '@/app/store/useAppStore'
 import { BufferLines } from './BufferLines'
 import type { DisplayBuffers } from './displayBuffers'
 import { fillSegmentPositions, type SceneIndex } from './sceneIndex'
+import { ShellSurfaces } from './Shells'
 
 const ELEMENT_COLOR = 0x4b5563
 const ELEMENT_LINE_WIDTH_PX = 2
@@ -68,7 +69,8 @@ function SelectedElement({ index }: { index: SceneIndex }) {
   const id = useAppStore((s) => (s.selectedModelEntity?.kind === 'element' ? s.selectedModelEntity.id : null))
   const e = id === null ? -1 : index.elementIds.indexOf(id)
   if (e < 0) return null
-  const points = index.elementNodes[e].map((r) => [index.nodeCoords[r * 3], index.nodeCoords[r * 3 + 1], index.nodeCoords[r * 3 + 2]] as [number, number, number])
+  const rows = index.elementKind[e] === 'shell' ? [...index.elementNodes[e], index.elementNodes[e][0]] : index.elementNodes[e]
+  const points = rows.map((r) => [index.nodeCoords[r * 3], index.nodeCoords[r * 3 + 1], index.nodeCoords[r * 3 + 2]] as [number, number, number])
   return <Line points={points} color={SELECTED_COLOR} lineWidth={SELECTED_LINE_WIDTH_PX} />
 }
 
@@ -105,6 +107,7 @@ export function ElementsLayer({
   const hasSegments = index.segmentCount > 0
   return (
     <>
+      {showElements && <ShellSurfaces index={index} buffers={buffers} />}
       {showElements && hasSegments && (!deformedMode || showUndeformed) && <ElementLines index={index} ghost={deformedMode} />}
       {deformedMode && hasSegments && <BufferLines positions={buffers.deformedSegments} color={DEFORMED_COLOR} widthPx={ELEMENT_LINE_WIDTH_PX} isActive={() => buffers.active} getVersion={() => buffers.version} />}
       {showElements && !deformedMode && <SelectedElement index={index} />}

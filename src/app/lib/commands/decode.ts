@@ -3,7 +3,8 @@ import type { SchemaContext } from '@/app/types/schema'
 import type { ModelWrite } from '@/app/lib/modelWrite'
 import { getSchemaForFn } from '@/app/lib/commandSchemas'
 import { decodeArgs } from '@/app/lib/commands/grammar'
-import { CHILD_SHAPES, INLINE_SERIES, beamUniformOrder, childShapeKey, elementArgs, elementByOpsName } from '@/app/lib/commands/tables'
+import { CHILD_SHAPES, INLINE_SERIES, beamUniformOrder, childShapeKey, elementArgs, elementByOpsName, elementNodeCount } from '@/app/lib/commands/tables'
+import { ELE_LOAD_TYPES } from '@/app/lib/shells'
 import { isFlag, isNum, need, numsFrom, skip, tag, type Tok } from '@/app/lib/commands/tokens'
 
 /** What decoding needs from its caller: the model so far, the enclosing pattern / fiber section, and a way to emit writes and notes. */
@@ -55,9 +56,10 @@ function element(t: Tok[], s: DecodeSink) {
   if (!spec) return skip(`element type "${t[0]}" is not supported by PySees yet`)
   const id = tag(t[1], 'element tag')
   const rest = t.slice(2)
-  const nodes = numsFrom(rest, 0).slice(0, 2)
-  if (nodes.length !== 2) return skip('expected two node tags')
-  const tail = rest.slice(2)
+  const count = elementNodeCount(spec)
+  const nodes = numsFrom(rest, 0).slice(0, count)
+  if (nodes.length !== count) return skip(`expected ${count} node tags`)
+  const tail = rest.slice(count)
   const nums = numsFrom(tail, 0)
   const keys = elementArgs(spec, s.ndm)
   const put = (args: Record<string, unknown>) => s.emit({ kind: 'element', entity: { id, eleType: spec.eleType, nodes, args } })
@@ -122,11 +124,17 @@ function sp(t: Tok[], s: DecodeSink) {
 function eleLoad(t: Tok[], s: DecodeSink) {
   const patternId = inPattern(s)
   const type = t.indexOf('-type')
-  if (type < 0 || t[type + 1] !== '-beamUniform') return skip('only -type -beamUniform is supported')
+  if (t[type + 1] === '-shellPressure' || t[type + 1] === '-surfaceLoad') return skip('shell pressure loads are exported as nodal loads and cannot be read back as a pressure; the load was skipped')
+  if (type < 0 || (t[type + 1] !== '-beamUniform' && t[type + 1] !== '-selfWeight')) return skip('only -type -beamUniform and -selfWeight are supported')
   const ele = t.indexOf('-ele')
   const range = t.indexOf('-range')
   const eleTags = ele >= 0 ? numsFrom(t, ele + 1) : range >= 0 ? (([a, b]) => Array.from({ length: b - a + 1 }, (_, i) => a + i))(need(t, range + 1, 2, 'a range')) : skip('expected -ele or -range')
   const c = numsFrom(t, type + 2)
+  if (t[type + 1] === '-selfWeight') {
+    // A shell's self-weight factors, which OpenSees applies with the opposite sign of a gravity vector.
+    if (c.length < 3) return skip('missing self-weight factors')
+    return s.emit({ kind: 'patternChild', patternId, child: { kind: 'eleLoad', args: { eleTags, loadType: ELE_LOAD_TYPES[2], bx: 0 - c[0], by: 0 - c[1], bz: 0 - c[2] } } })
+  }
   const order = beamUniformOrder(s.ndm)
   if (c.length < order.length - 1) return skip('missing load components')
   const args: Record<string, unknown> = { eleTags, wx: 0, wy: 0, wz: 0 }

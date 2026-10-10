@@ -25,6 +25,12 @@ export interface OrientRow { row: number; x: [number, number, number]; yp?: [num
 /** A `ZeroLength` driven by a coupled `FiberSection` (axial + moment) instead of independent per-DOF materials. `materials` is a sparse spring for the one DOF (`uy`) the section has no resultant for. */
 export interface ZeroLengthSectionTable { nodeI: number[]; nodeJ: number[]; fiberSection: number[]; materials: [number, number, number][]; orient?: OrientRow[] }
 /** `z` is empty in 2D and parallel to `y` in 3D. */
+/** Shell section arena entry (3D). Strain and resultants follow OpenSees' ElasticMembranePlateSection. */
+export type ShellSectionSpec = { kind: 'elasticMembranePlate'; e: number; nu: number; h: number; rho: number }
+/** 3-node DKT/Allman shells (ShellDKGT): `nodeIds` has stride 3, `section` indexes `shellSections`. */
+export interface Shell3Table { nodeIds: number[]; section: number[] }
+/** 4-node MITC4 shells: `nodeIds` has stride 4 (the node order fixes the normal), `section` indexes `shellSections`. */
+export interface Shell4Table { nodeIds: number[]; section: number[] }
 export interface FiberTable { sectionOffsets: number[]; y: number[]; z?: number[]; area: number[]; material: number[] }
 
 /** Identity multi-point constraints (`core::Domain::equal_dof`): row `i` ties `constrained[i]`'s
@@ -38,9 +44,10 @@ export type TimeSeriesSpec = { kind: 'constant' } | { kind: 'linear'; slope: num
 export interface LoadPatternTable { series: TimeSeriesSpec[]; scaleFactor: number[] }
 export interface NodalLoadTable { pattern: number[]; node: number[]; dof: number[]; value: number[]; stage: number[] }
 
-export type ElementKind = 'truss' | 'elasticBeamColumn2d' | 'elasticBeamColumn3d' | 'dispBeamColumn2d' | 'dispBeamColumn3d' | 'forceBeamColumn2d' | 'forceBeamColumn3d' | 'zeroLength' | 'zeroLengthSection' | 'tri3' | 'quad4'
-/** Uniform load per length in the element's local axes: `wx` along the member, `wy` (and, in 3D, `wz`) transverse. */
-export type ElementLoadSpec = { kind: 'uniform'; wx: number; wy: number; wz?: number }
+export type ElementKind = 'truss' | 'elasticBeamColumn2d' | 'elasticBeamColumn3d' | 'dispBeamColumn2d' | 'dispBeamColumn3d' | 'forceBeamColumn2d' | 'forceBeamColumn3d' | 'zeroLength' | 'zeroLengthSection' | 'tri3' | 'quad4' | 'shell3' | 'shell4'
+/** Uniform load per length in the element's local axes: `wx` along the member, `wy` (and, in 3D, `wz`) transverse.
+ * Shells take a pressure per area along the local normal, or a body acceleration in global axes (force per area `rho h b`). */
+export type ElementLoadSpec = { kind: 'uniform'; wx: number; wy: number; wz?: number } | { kind: 'shellPressure'; pressure: number } | { kind: 'shellBody'; bx: number; by: number; bz: number }
 export interface ElementLoadTable { pattern: number[]; elementKind: ElementKind[]; elementIndex: number[]; load: ElementLoadSpec[]; stage: number[] }
 
 export type MaterialSpec =
@@ -92,6 +99,8 @@ export type RecorderSpecWire =
   | { response: 'elementForce'; elementKind: ElementKind; elementIndex: number; component: number }
   /** The uniform load the element carries at each sample (local axes; component 0 = wx, 1 = wy; the 2D wire row is 16 wide, the rest are continuum body/edge terms the compiler never reads). */
   | { response: 'elementLoad'; elementKind: ElementKind; elementIndex: number; component: number }
+  /** One shell resultant (`component` 0..8: Nx Ny Nxy Mx My Mxy Qx Qy, OpenSees' order and sign) at Gauss point `point` (0..4). */
+  | { response: 'gaussPoint'; elementKind: ElementKind; elementIndex: number; point: number; quantity: 'stress' | 'strain'; component: number }
 export interface SequenceSpec { stages: StageSpec[]; recorders: RecorderSpecWire[] }
 
 export interface CarapaceInputV1 {
@@ -105,6 +114,9 @@ export interface CarapaceInputV1 {
   elasticBeamColumns3d?: ElasticBeamColumn3dTable
   dispBeamColumns3d?: FiberBeamColumn3dTable
   zeroLengthSections: ZeroLengthSectionTable
+  shellSections?: ShellSectionSpec[]
+  shell3s?: Shell3Table
+  shell4s?: Shell4Table
   loadPatterns: LoadPatternTable
   nodalLoads: NodalLoadTable
   elementLoads: ElementLoadTable

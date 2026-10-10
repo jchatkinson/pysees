@@ -8,6 +8,7 @@ import { autoModeScale, autoScale, modelMetrics } from '@/app/lib/resultsScale'
 import type { DisplayBuffers } from './displayBuffers'
 import { createNodeDisplacements, displaceNodes, fillDeformedSegments, nodeValueLabels, readNodeDisplacements } from './displaced'
 import { fillDiagram } from './diagrams'
+import { fillContourColors, shellNodalValues } from '@/app/lib/shellContour'
 import type { SceneIndex } from './sceneIndex'
 
 /** `out = a + t (b - a)`, element-wise. */
@@ -25,7 +26,9 @@ export function ResultsDriver({ index, buffers }: { index: SceneIndex; buffers: 
   const step = useAppStore((s) => s.resultsView.step)
   const stepFrac = useAppStore((s) => s.resultsView.stepFrac)
   const type = useAppStore((s) => s.resultsView.type)
-  const manualScale = useAppStore((s) => (s.resultsView.type === 'none' ? null : s.resultsView.scales[s.resultsView.type]))
+  const manualScale = useAppStore((s) => (s.resultsView.type === 'none' ? null : s.resultsView.scales[s.resultsView.type === 'contour' ? 'deformed' : s.resultsView.type]))
+  const contour = useAppStore((s) => s.resultsView.contour)
+  const setContourRange = useAppStore((s) => s.setContourRange)
   const modeIndex = useAppStore((s) => s.resultsView.mode)
   const phase = useAppStore((s) => s.resultsView.phase)
   const showValues = useAppStore((s) => s.resultsView.showValues)
@@ -39,12 +42,14 @@ export function ResultsDriver({ index, buffers }: { index: SceneIndex; buffers: 
   const rows = useMemo(() => nodeRows(modal?.nodeTags ?? []), [modal])
   const metrics = useMemo(() => modelMetrics(model), [model])
   const nodeDisplacements = useMemo(() => createNodeDisplacements(index.nodeIds.length), [index])
+  const contourValues = useMemo(() => ({ values: new Float32Array(index.nodeIds.length), counts: new Uint16Array(index.nodeIds.length) }), [index])
 
   const blendedRow = useMemo(() => (source ? new Float64Array(source.layout.stride) : null), [source])
   const diagramArrays = useMemo(() => ({ fill: buffers.diagramFill, fillColor: buffers.diagramFillColor, lines: buffers.diagramLines }), [buffers])
 
   useEffect(() => {
     if (type === 'mode') return // drawn by the mode-shape effect below
+    if (type !== 'contour') setContourRange(null)
     if (type === 'none' || !source) { buffers.reset(); buffers.resetDiagram(); return }
     let live = true
     // Smooth playback sits between two steps: blend their rows (linear in every recorded column).
@@ -53,12 +58,16 @@ export function ResultsDriver({ index, buffers }: { index: SceneIndex; buffers: 
       if (!live) return
       if (!frame) { buffers.reset(); buffers.resetDiagram(); return }
       const row = nextFrame && blendedRow ? blendRows(frame.row, nextFrame.row, stepFrac, blendedRow) : frame.row
-      const scale = manualScale ?? autoScale(type, extents, metrics)
-      if (type === 'deformed') {
+      const scale = manualScale ?? autoScale(type === 'contour' ? 'deformed' : type, extents, metrics)
+      if (type === 'deformed' || type === 'contour') {
         readNodeDisplacements(index, source.layout, row, nodeDisplacements)
         displaceNodes(index, nodeDisplacements, scale, buffers.nodePositions)
         fillDeformedSegments(index, nodeDisplacements, scale, buffers.deformedSegments)
-        buffers.publish(showValues ? nodeValueLabels(index, source.layout, row, buffers.nodePositions) : [])
+        // The contour colours the shells by the chosen resultant, extrapolated from their Gauss points and averaged at shared nodes.
+        const range = type === 'contour' ? shellNodalValues(index, source.layout, row, contour, contourValues.values, contourValues.counts) : null
+        if (range) fillContourColors(contourValues.values, range, buffers.contourColors)
+        setContourRange(range)
+        buffers.publish(showValues ? nodeValueLabels(index, source.layout, row, buffers.nodePositions) : [], range !== null)
         buffers.resetDiagram()
       } else {
         // Diagrams sit on the undeformed shape.
@@ -67,7 +76,7 @@ export function ResultsDriver({ index, buffers }: { index: SceneIndex; buffers: 
       }
     }).catch(() => { if (live) { buffers.reset(); buffers.resetDiagram() } })
     return () => { live = false }
-  }, [index, buffers, source, type, step, stepFrac, blendedRow, manualScale, showValues, metrics, nodeDisplacements, diagramArrays, first, last])
+  }, [index, buffers, source, type, step, stepFrac, blendedRow, manualScale, showValues, metrics, nodeDisplacements, diagramArrays, first, last, contour, contourValues, setContourRange])
 
   // Mode shapes: the stored shape scaled by cos(phase), through the same deformed-shape drawing as a step's displacements.
   useEffect(() => {

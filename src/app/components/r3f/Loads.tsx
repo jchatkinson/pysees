@@ -5,6 +5,8 @@ import type { Group } from 'three'
 import { Vector3 } from 'three'
 import type { ElementEntity, GeomTransfEntity, NodeEntity, PatternEntity } from '@/app/types/model'
 import { memberFrame } from '@/app/lib/memberFrame'
+import { eleLoadKind, shellFrame } from '@/app/lib/shells'
+import { isShell } from '@/app/lib/commands/tables'
 import { formatLoadValue, patternColor, toVec3 } from './utils'
 import { ScreenSize } from './ScreenSize'
 import { worldUnitsPerPixel } from './screenScale'
@@ -33,7 +35,7 @@ function dofName(i: number, ndm: number): string {
   return names[i] ?? `F${i + 1}`
 }
 
-function NodalLoadGlyph({ coords, values, color, showValues, ndm }: { coords: number[]; values: number[]; color: string; showValues: boolean; ndm: number }) {
+function NodalLoadGlyph({ coords, values, color, showValues, ndm, label }: { coords: number[]; values: number[]; color: string; showValues: boolean; ndm: number; label?: string }) {
   const origin = new Vector3()
   const dir = new Vector3(values[0] ?? 0, values[1] ?? 0, values[2] ?? 0)
   if (dir.length() < 1e-9) return null
@@ -62,7 +64,7 @@ function NodalLoadGlyph({ coords, values, color, showValues, ndm }: { coords: nu
       {showValues && (
         <Billboard position={tip.toArray() as [number, number, number]}>
           <Text fontSize={LABEL_FONT_PX} color={color} outlineWidth={1} outlineColor="#ffffff" anchorX="center" anchorY="bottom" position={[0, 4, 0]}>
-            {values.map((v, i) => (v ? `${dofName(i, ndm)}: ${formatLoadValue(v)}` : null)).filter(Boolean).join('  ')}
+            {label ?? values.map((v, i) => (v ? `${dofName(i, ndm)}: ${formatLoadValue(v)}` : null)).filter(Boolean).join('  ')}
           </Text>
         </Billboard>
       )}
@@ -168,7 +170,7 @@ export function LoadsLayer({
   const visible = patterns.filter((p) => !hiddenPatterns.includes(p.id))
 
   const elementLoads = showElement ? visible.flatMap((p) => p.children.flatMap((c) => {
-    if (c.kind !== 'eleLoad') return []
+    if (c.kind !== 'eleLoad' || eleLoadKind(c.args) !== 'beam') return []
     const { eleTags, wx, wy, wz } = c.args as { eleTags: number[]; wx?: number; wy: number; wz: number }
     return (eleTags ?? []).flatMap((tag) => {
       const ele = elementMap.get(tag)
@@ -200,13 +202,38 @@ export function LoadsLayer({
 
   let minLen = Infinity
   for (const e of elementMap.values()) {
+    if (isShell(e.eleType)) continue
     const n1 = nodeMap.get(e.nodes[0]), n2 = nodeMap.get(e.nodes[1])
     if (n1 && n2) minLen = Math.min(minLen, new Vector3(...toVec3(n1.coords)).distanceTo(new Vector3(...toVec3(n2.coords))))
   }
   const maxUnit = Number.isFinite(minLen) && stacked > 0 ? (MAX_STACK_FRACTION * minLen) / stacked : Infinity
 
+  // Shell pressure and self-weight: arrows at the centroid and near each corner, along the shell's normal (pressure) or the body acceleration.
+  const shellLoads = showElement ? visible.flatMap((p) => p.children.flatMap((c, idx) => {
+    if (c.kind !== 'eleLoad') return []
+    const kind = eleLoadKind(c.args)
+    if (kind === 'beam') return []
+    const a = c.args as { eleTags?: number[]; pressure?: number; bx?: number; by?: number; bz?: number }
+    return (a.eleTags ?? []).flatMap((tag) => {
+      const ele = elementMap.get(tag)
+      const xyz = ele && isShell(ele.eleType) ? ele.nodes.map((n) => nodeMap.get(n)?.coords) : []
+      if (!ele || xyz.length < 3 || xyz.some((q) => !q)) return []
+      const pts = xyz.map((q) => toVec3(q!))
+      const frame = shellFrame(pts)
+      if (!frame) return []
+      const sign = Math.sign(Number(a.pressure) || 0)
+      const dir = kind === 'pressure' ? frame.e3.map((v) => v * sign) : [Number(a.bx) || 0, Number(a.by) || 0, Number(a.bz) || 0]
+      if (Math.hypot(...dir) < 1e-12) return []
+      const centroid = [0, 1, 2].map((k) => pts.reduce((sum, q) => sum + q[k], 0) / pts.length)
+      const label = kind === 'pressure' ? `p: ${formatLoadValue(Number(a.pressure))}` : `b: ${[a.bx, a.by, a.bz].map((v) => formatLoadValue(Number(v) || 0)).join(', ')}`
+      const anchors = kind === 'pressure' ? [centroid, ...pts.map((q) => q.map((v, k) => v + 0.5 * (centroid[k] - v)))] : [centroid]
+      return anchors.map((at, i) => ({ key: `shell-${p.id}-${idx}-${tag}-${i}`, at, dir, label: i === 0 ? label : undefined, color: patternColor(ids, p.id) }))
+    })
+  })) : []
+
   return (
     <>
+      {shellLoads.map((l) => <NodalLoadGlyph key={l.key} coords={l.at} values={l.dir} color={l.color} showValues={showValues && l.label !== undefined} ndm={3} label={l.label} />)}
       {showNodal && visible.flatMap((p) => p.children.map((c, idx) => ({ p, c, idx })).filter(({ c }) => c.kind === 'load')).map(({ p, c, idx }) => {
         const args = c.args as { nodeTag: number; values: number[] }
         const node = nodeMap.get(args.nodeTag)

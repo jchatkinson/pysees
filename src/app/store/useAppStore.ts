@@ -45,6 +45,9 @@ interface AppStore {
   gridlines: GridlineEntity[]
   /** Results with |value| below this display as a plain 0 instead of scientific notation. */
   zeroTolerance: number
+  /** Range of the shell contour on screen (set by the results driver; null when no contour is drawn). */
+  contourRange: { min: number; max: number } | null
+  setContourRange: (range: { min: number; max: number } | null) => void
   setZeroTolerance: (tol: number) => void
   nextGridlineId: number
   levels: LevelEntity[]
@@ -198,6 +201,8 @@ export const useAppStore = create<AppStore>((set, get) => {
   gridlines: [],
   zeroTolerance: DEFAULT_ZERO_TOLERANCE,
   setZeroTolerance: (zeroTolerance) => set({ zeroTolerance }),
+  contourRange: null,
+  setContourRange: (contourRange) => set((s) => (s.contourRange?.min === contourRange?.min && s.contourRange?.max === contourRange?.max ? s : { contourRange })),
   nextGridlineId: 1,
   gridlinesDialogOpen: false,
   setGridlinesDialogOpen: (open) => set({ gridlinesDialogOpen: open }),

@@ -115,34 +115,6 @@ export class WasmSession {
 if (Symbol.dispose) WasmSession.prototype[Symbol.dispose] = WasmSession.prototype.free;
 
 /**
- * @param {number} load
- * @param {number} length
- * @param {number} area
- * @param {number} modulus
- * @returns {number}
- */
-export function axial_displacement(load, length, area, modulus) {
-    const ret = wasm.axial_displacement(load, length, area, modulus);
-    return ret;
-}
-
-/**
- * Same 2-node truss case as `axial_displacement`, but computed through the
- * real `Domain`/`Element::Truss`/`Analysis` architecture (M1) rather than
- * the closed-form placeholder — see implementation-plan.md M1 acceptance
- * criteria. Kept alongside the M0 export for wasm/Node verification.
- * @param {number} load
- * @param {number} length
- * @param {number} area
- * @param {number} modulus
- * @returns {number}
- */
-export function axial_displacement_via_analysis(load, length, area, modulus) {
-    const ret = wasm.axial_displacement_via_analysis(load, length, area, modulus);
-    return ret;
-}
-
-/**
  * @param {MaterialProbeConfig} config
  * @returns {WasmMaterialProbe}
  */
@@ -152,21 +124,6 @@ export function createMaterialProbe(config) {
         throw takeFromExternrefTable0(ret[1]);
     }
     return WasmMaterialProbe.__wrap(ret[0]);
-}
-
-/**
- * M6 wiring check: Newmark + Rayleigh-damped SDOF free vibration, closed
- * form `u(t) = exp(-xi*omega*t) * u0 * [cos(omega_d*t) +
- * (xi*omega/omega_d)*sin(omega_d*t)]` — see `core/tests/m6_dynamics.rs`
- * for the native equivalent and derivation. Returns the displacement
- * after `steps` steps of size `dt`.
- * @param {number} steps
- * @param {number} dt
- * @returns {number}
- */
-export function damped_sdof_free_vibration_displacement(steps, dt) {
-    const ret = wasm.damped_sdof_free_vibration_displacement(steps, dt);
-    return ret;
 }
 
 /**
@@ -185,87 +142,6 @@ export function decodeInput(value) {
         throw takeFromExternrefTable0(ret[1]);
     }
     return WasmSession.__wrap(ret[0]);
-}
-
-/**
- * M7 stage-1 wiring check: a `DispBeamColumn` (fiber-discretized,
- * displacement-based) cantilever with a 2-fiber elastic section that
- * reproduces `E*A`/`E*Iz` exactly — must match `ElasticBeamColumn`'s
- * closed-form tip deflection exactly, not approximately. See
- * `core/tests/m7_disp_beam_column.rs` for the native equivalent.
- * @param {number} e
- * @param {number} area
- * @param {number} iz
- * @param {number} length
- * @param {number} tip_load
- * @returns {number}
- */
-export function disp_beam_column_cantilever_tip_deflection(e, area, iz, length, tip_load) {
-    const ret = wasm.disp_beam_column_cantilever_tip_deflection(e, area, iz, length, tip_load);
-    return ret;
-}
-
-/**
- * M5 wiring check: the 2-DOF "1-1-1-1" mass-spring chain's natural
- * frequencies, closed form `1/phi` and `phi` (golden ratio) — see
- * `core/tests/m5_modal.rs` for the native equivalent and derivation.
- * Returns `[omega1, omega2]`.
- * @returns {Float64Array}
- */
-export function mass_spring_chain_frequencies() {
-    const ret = wasm.mass_spring_chain_frequencies();
-    var v1 = getArrayF64FromWasm0(ret[0], ret[1]).slice();
-    wasm.__wbindgen_free(ret[0], ret[1] * 8, 8);
-    return v1;
-}
-
-/**
- * M4 wiring check: a `Truss` (elastic) in parallel with a `ZeroLength`+
- * `ElasticPP` (elastic-perfectly-plastic) spring, loaded past the EPP
- * spring's yield point within a single step — needs `Algorithm::Newton`'s
- * iteration to resolve correctly (`Algorithm::Linear`'s one-shot solve
- * can't cross a material regime boundary within a step).
- * See `core/tests/m4_analysis.rs` for the native equivalent and the
- * closed-form derivation.
- * @param {number} force
- * @returns {number}
- */
-export function newton_raphson_elastic_plastic_displacement(force) {
-    const ret = wasm.newton_raphson_elastic_plastic_displacement(force);
-    return ret;
-}
-
-/**
- * M3 wiring check: a simply-supported `ElasticBeamColumn` under a uniform
- * transverse element load, returning the node_i end rotation — closed form
- * `theta = w*L^3/(24*E*I)`. See `core/tests/m3_beam.rs` for the native
- * equivalent and why a single element is exact here.
- * @param {number} e
- * @param {number} iz
- * @param {number} area
- * @param {number} length
- * @param {number} w
- * @returns {number}
- */
-export function simply_supported_beam_end_rotation(e, iz, area, length, w) {
-    const ret = wasm.simply_supported_beam_end_rotation(e, iz, area, length, w);
-    return ret;
-}
-
-/**
- * M2 wiring check: a `ZeroLength` + `Material::Ent` ("no tension")
- * connector under a compressive load, computed through the same real
- * architecture — proves the `Element`/`Material` enum dispatch generalizes
- * beyond `Truss`/`Elastic` on wasm32 + Node, not just natively (see
- * `core/tests/m2_zero_length.rs` for the native-side equivalent and the
- * single-linear-regime caveat this test shares with it).
- * @param {number} load
- * @param {number} modulus
- * @returns {number}
- */
-export function zero_length_ent_displacement(load, modulus) {
-    const ret = wasm.zero_length_ent_displacement(load, modulus);
-    return ret;
 }
 function __wbg_get_imports() {
     const import0 = {
@@ -578,11 +454,6 @@ function debugString(val) {
     return className;
 }
 
-function getArrayF64FromWasm0(ptr, len) {
-    ptr = ptr >>> 0;
-    return getFloat64ArrayMemory0().subarray(ptr / 8, ptr / 8 + len);
-}
-
 function getArrayU8FromWasm0(ptr, len) {
     ptr = ptr >>> 0;
     return getUint8ArrayMemory0().subarray(ptr / 1, ptr / 1 + len);
@@ -594,14 +465,6 @@ function getDataViewMemory0() {
         cachedDataViewMemory0 = new DataView(wasm.memory.buffer);
     }
     return cachedDataViewMemory0;
-}
-
-let cachedFloat64ArrayMemory0 = null;
-function getFloat64ArrayMemory0() {
-    if (cachedFloat64ArrayMemory0 === null || cachedFloat64ArrayMemory0.byteLength === 0) {
-        cachedFloat64ArrayMemory0 = new Float64Array(wasm.memory.buffer);
-    }
-    return cachedFloat64ArrayMemory0;
 }
 
 function getStringFromWasm0(ptr, len) {
@@ -707,7 +570,6 @@ function __wbg_finalize_init(instance, module) {
     wasm = instance.exports;
     wasmModule = module;
     cachedDataViewMemory0 = null;
-    cachedFloat64ArrayMemory0 = null;
     cachedUint8ArrayMemory0 = null;
     wasm.__wbindgen_start();
     return wasm;

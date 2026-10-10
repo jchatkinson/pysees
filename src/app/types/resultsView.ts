@@ -1,11 +1,14 @@
+import type { ShellResultant } from '@/app/lib/shellContour'
+
 /** Force diagrams: in 2D `shear`/`moment` are V and M; in 3D Vy and Mz, with `shearZ`/`momentY` the x–z plane and `torsion` T. */
 export const DIAGRAM_TYPES = ['axial', 'shear', 'shearZ', 'torsion', 'moment', 'momentY'] as const
 export type DiagramType = typeof DIAGRAM_TYPES[number]
-export type ResultType = 'none' | 'deformed' | DiagramType | 'mode'
+/** `contour` colours the shells by one stress resultant (`ResultsView.contour`) on the deformed shape. */
+export type ResultType = 'none' | 'deformed' | DiagramType | 'mode' | 'contour'
 export const isDiagramType = (t: ResultType): t is DiagramType => (DIAGRAM_TYPES as readonly string[]).includes(t)
 
-/** Which scale a result type uses; `none` has no scale. */
-export type ScaleKey = Exclude<ResultType, 'none'>
+/** Which scale a result type uses; `none` has no scale and `contour` is drawn at the deformed shape's. */
+export type ScaleKey = Exclude<ResultType, 'none' | 'contour'>
 
 export interface ResultsView {
   /** Display Results panel visible. */
@@ -31,6 +34,8 @@ export interface ResultsView {
   phase: number
   /** Mode-shape animation speed in cycles per second. */
   modeSpeed: number
+  /** The shell resultant the contour view colours by. */
+  contour: ShellResultant
   showUndeformed: boolean
   showValues: boolean
   fillDiagrams: boolean
@@ -51,6 +56,7 @@ export const DEFAULT_RESULTS_VIEW: ResultsView = {
   mode: 0,
   phase: 0,
   modeSpeed: 0.5,
+  contour: 'Mx',
   showUndeformed: true,
   showValues: false,
   fillDiagrams: true,

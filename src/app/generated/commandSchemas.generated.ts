@@ -12603,24 +12603,29 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
               name: "secTag"
             },
             {
-              kind: "str",
-              name: "eMod"
+              kind: "float",
+              name: "eMod",
+              required: true
             },
             {
-              kind: "str",
-              name: "nu"
+              kind: "float",
+              name: "nu",
+              required: true
             },
             {
-              kind: "str",
-              name: "h"
+              kind: "float",
+              name: "h",
+              required: true
             },
             {
-              kind: "str",
-              name: "rho"
+              kind: "float",
+              name: "rho",
+              required: true
             },
             {
-              kind: "str",
-              name: "epModifier"
+              kind: "float",
+              name: "epModifier",
+              required: false
             }
           ],
           Fiber: [

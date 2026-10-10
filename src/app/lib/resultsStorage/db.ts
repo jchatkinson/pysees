@@ -361,7 +361,7 @@ export async function queryBlock(runId: string, sample: number): Promise<ResultB
 
 /** Max |value| per recorder kind and component label across every step of a run, or of just the steps in `range` (inclusive). */
 export async function queryRunExtents(runId: string, range?: { first: number; last: number }): Promise<RunExtents> {
-  const extents: RunExtents = { disp: {}, reaction: {}, force: {} }
+  const extents: RunExtents = { disp: {}, reaction: {}, force: {}, shell: {} }
   const { run, recorders } = await getRunLayout(runId)
   if (!run) return extents
   const stride = strideOf(run)

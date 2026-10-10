@@ -38,7 +38,7 @@ OpenSees is optional. Users who want to run their model in OpenSees can export i
 
 1. Broaden Carapace coverage in the compiler: more materials, modal and transient stages, 3D elements.
 2. Script export polish: dedicated download flow and Tcl output.
-3. Scripting workflow for parametric model generation (see `SCRIPTINGPLAN.md`).
+3. Scripting workflow for parametric model generation (see `docs/SCRIPTINGPLAN.md`).
 4. Richer results: more force/stress views, reactions, time-history tools.
 5. Optional import of recorder output from external OpenSees runs.
 
