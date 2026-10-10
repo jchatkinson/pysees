@@ -8,7 +8,7 @@ local OpenSees process or agent.
 
 ## IMPORTANT NOTES
 
-- Do not build or run the dev server unless specifically asked.
+- Do not build pysees or run the pysees dev server unless specifically asked.
 - Use standard shadcn components (Base UI flavor, not Radix) and architecture wherever possible.
 - Keep code compact. Do not newline every property of a JSX element or object literal.
 - When a task has an unclear outcome, ask for more information.

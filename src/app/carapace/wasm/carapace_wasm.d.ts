@@ -77,11 +77,6 @@ export type PlaneMaterialSpec = { kind: "isotropic"; e: number; nu: number; stat
 export type ShellSectionSpec = { kind: "elasticMembranePlate"; e: number; nu: number; h: number; rho: number };
 
 /**
- * Accepts the original bare strings and configurable algorithm objects.
- */
-export type AlgorithmSpec = LegacyAlgorithmSpec | AlgorithmConfigSpec;
-
-/**
  * Every element formulation, 2D and 3D. A kind that does not belong to the
  * model's `ndm` is `DecodeError::ElementKindNotInProfile`.
  */
@@ -304,6 +299,10 @@ export interface ArcStopSpec {
 export interface DampingSpec {
     alphaM: number;
     betaK: number;
+    /**
+     * Resolve these modal anchors from the current domain at transient-stage entry.
+     */
+    modalAnchors?: ModalDampingAnchors;
 }
 
 /**
@@ -695,6 +694,12 @@ export interface MaterialProbeResponse {
     stress: number;
 }
 
+export interface ModalDampingAnchors {
+    mode1: number;
+    mode2: number;
+    ratio: number;
+}
+
 export interface NodalLoadTable {
     /**
      * Index into `LoadPatternTable`.
@@ -739,7 +744,7 @@ export interface ZeroLengthTable {
     orient?: OrientRow[];
 }
 
-export type AlgorithmConfigSpec = { kind: "linear" } | { kind: "newton"; tangent?: TangentStrategySpec; lineSearch?: LineSearchSpec } | { kind: "krylovNewton"; tangent: TangentStrategySpec; maxDimension: number };
+export type AlgorithmSpec = { kind: "linear" } | { kind: "newton"; tangent?: TangentStrategySpec; lineSearch?: LineSearchSpec } | { kind: "krylovNewton"; tangent: TangentStrategySpec; maxDimension: number };
 
 export type ArcDirectionSpec = "increasing" | "decreasing";
 
@@ -752,8 +757,6 @@ export type ElementLoadSpec = { kind: "uniform"; wx: number; wy: number; wz?: nu
 export type IntegrationSpec = { kind: "legendre"; points: number } | { kind: "lobatto"; points: number };
 
 export type IntegratorSpec = { kind: "loadControl"; increment: number } | { kind: "displacementControl"; node: number; dof: number; increment: number } | ({ kind: "arcLength" } & ArcLengthSpec);
-
-export type LegacyAlgorithmSpec = "linear" | "newtonRaphson";
 
 export type LineSearchSpec = { kind: "bisection"; tol: number; maxIter: number; maxEta: number } | { kind: "regulaFalsi"; tol: number; maxIter: number; maxEta: number };
 
@@ -771,7 +774,7 @@ export type StopReasonDetail = "displacementTarget" | "loadFactorTarget" | "load
 
 export type TangentStrategySpec = "current" | "reuseAtStepStart" | "initial";
 
-export type TimeSeriesSpec = { kind: "constant" } | { kind: "linear"; slope: number } | { kind: "path"; times: number[]; factors: number[] };
+export type TimeSeriesSpec = { kind: "constant" } | { kind: "linear"; slope: number } | { kind: "path"; times: number[]; factors: number[] } | { kind: "boundedPath"; times: number[]; factors: number[]; useLast: boolean };
 
 export type TransformSpec = "linear" | "pDelta" | "corotational";
 

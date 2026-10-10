@@ -7,7 +7,14 @@ import { TEMPLATE_FIXTURES } from '@/app/lib/commands/testkit'
 import { compileInputV1 } from '@/app/lib/carapace/compileInputV1'
 import type { AnalysisCommand, AnalysisHistory } from '@/app/types/analysisCommands'
 
-const frame = TEMPLATE_FIXTURES.find((f) => f.name === 'frame-elastic')!
+const template = TEMPLATE_FIXTURES.find((f) => f.name === 'frame-elastic')!
+// These tests isolate static stage inheritance from the template's earthquake case.
+const staticCommands = ['whole-model-recorder', 'run-eigen-analysis', 'run-gravity-analysis', 'run-pushover-analysis'].map((id) =>
+  template.history.commands.find((c) => c.type === 'ANALYSIS_BLOCK' && c.blockId === id)!)
+const frame = {
+  model: { ...template.model, patterns: new Map([...template.model.patterns].filter(([, p]) => p.patternType !== 'UniformExcitation')) },
+  history: { commands: staticCommands, cursor: staticCommands.length - 1 },
+}
 const block = (blockId: string, params: Record<string, unknown> = {}): AnalysisCommand => ({ type: 'ANALYSIS_BLOCK', blockId, params })
 const recorder = block('whole-model-recorder', { directory: 'out' })
 const gravity = block('run-gravity-analysis', { patterns: [1, 2], steps: 4, holdLoads: 'Yes' })

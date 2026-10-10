@@ -7,6 +7,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "wasm": "bash scripts/build-carapace.sh",
     "lint": "eslint .",
     "test": "vitest run",
     "preview": "vite preview",

@@ -11,6 +11,8 @@ import type { Tok } from '@/app/lib/commands/tokens'
  */
 interface Case { name: string; fn: string; ndm: 2 | 3; args: Tok[] }
 const cases: Case[] = [
+  { name: 'Path has numeric dt, factor and start time', fn: 'timeSeries', ndm: 2, args: ['Path', 10, '-dt', .01, '-values', 0, 1, 0, '-factor', 9.80665, '-startTime', 0] },
+  { name: 'UniformExcitation has numeric direction and factor', fn: 'pattern', ndm: 2, args: ['UniformExcitation', 10, 1, '-accel', 10, '-fact', 0] },
   { name: 'FixedLocation counts N sections and N locations', fn: 'beamIntegration', ndm: 2, args: ['FixedLocation', 1, 2, 1, 2, 0, 1] },
   { name: 'MidDistance', fn: 'beamIntegration', ndm: 2, args: ['MidDistance', 1, 2, 1, 2, 0.25, 0.75] },
   { name: 'LowOrder adds N weights', fn: 'beamIntegration', ndm: 2, args: ['LowOrder', 1, 2, 1, 2, 0, 1, 0.5, 0.5] },
@@ -46,7 +48,7 @@ describe('schema patches', () => {
         { fn: 'uniaxialMaterial', args: ['Elastic', 1, 1e6] },
         ...[1, 2, 3].map((n) => ({ fn: 'section', args: ndm === 3 ? ['Fiber', n, '-GJ', 1e6] : ['Fiber', n] })), // a 3D fiber section needs torsion
       ]
-      const r = runOpenSees(printScript([...prelude, { fn, args }], 'py'))
+      const r = runOpenSees(printScript([...prelude, ...(fn === 'pattern' ? [{ fn: 'timeSeries', args: ['Path', 10, '-dt', .01, '-values', 0, 1, 0] }] : []), { fn, args }], 'py'))
       expect(r.failures, r.stderr).toEqual([])
       expect(r.ok).toBe(true)
     })

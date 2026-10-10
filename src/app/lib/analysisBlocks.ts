@@ -3,6 +3,7 @@ import type { AnalysisCommand } from '@/app/types/analysisCommands'
 import type { ArgDef } from '@/app/types/schema'
 import type { CommandSchema } from '@/app/lib/commandSchemas'
 import type { AlgorithmKind, AnalysisStage, ConvergenceSpec, RecorderSpec } from '@/app/types/analysisSequence'
+import { rayleighDamping } from '@/app/lib/rayleighDamping'
 import { isShell } from '@/app/lib/commands/tables'
 
 export interface AnalysisBlockDef {
@@ -92,7 +93,7 @@ const wholeModelRecorder: AnalysisBlockDef = {
   id: 'whole-model-recorder',
   label: 'Whole Model Recorder',
   description: 'Node displacement, support reactions, and element forces for every node/element currently in the model.',
-  paramsSchema: [{ kind: 'str', name: 'directory', label: 'Output Directory', defaultValue: 'out' }],
+  paramsSchema: [{ kind: 'str', name: 'directory', label: 'Output Directory', defaultValue: 'out' }, { kind: 'choice', name: 'dynamic', label: 'Record velocity and relative acceleration', options: ['No', 'Yes'], yields: { No: [], Yes: [] }, defaultValue: 'No' }],
   build: (params, model) => {
     const dir = String(params.directory ?? 'out').replace(/\/$/, '')
     const nodeTags = [...model.nodes.keys()].sort((a, b) => a - b)
@@ -102,10 +103,11 @@ const wholeModelRecorder: AnalysisBlockDef = {
       commands.push(ops('recorder', ['Node', '-file', `${dir}/disp.out`, '-time', '-node', ...nodeTags, '-dof', ...dofs, 'disp']))
       commands.push(ops('recorder', ['Node', '-file', `${dir}/reaction.out`, '-time', '-node', ...nodeTags, '-dof', ...dofs, 'reaction']))
     }
+    if (params.dynamic === 'Yes' && nodeTags.length) for (const response of ['vel', 'accel']) commands.push(ops('recorder', ['Node', '-file', `${dir}/${response}.out`, '-time', '-node', ...nodeTags, '-dof', ...dofs, response]))
     for (const g of elementForceRecorders(model)) commands.push(ops('recorder', ['Element', '-file', `${dir}/${g.file}`, '-time', '-ele', ...g.eleTags, g.response]))
     return commands
   },
-  toRecorders: (_params, model) => {
+  toRecorders: (params, model) => {
     const nodeTags = [...model.nodes.keys()].sort((a, b) => a - b)
     const eleTags = [...model.elements.keys()].sort((a, b) => a - b)
     const ndf = model.config?.ndf ?? 3
@@ -115,6 +117,7 @@ const wholeModelRecorder: AnalysisBlockDef = {
       recorders.push({ id: 'disp', targetKind: 'node', targetTags: nodeTags, responseKind: 'disp', dofs })
       recorders.push({ id: 'reaction', targetKind: 'node', targetTags: nodeTags, responseKind: 'reaction', dofs })
     }
+    if (params.dynamic === 'Yes') for (const kind of ['vel', 'accel'] as const) recorders.push({ id: kind, targetKind: 'node', targetTags: nodeTags, responseKind: kind, dofs })
     if (eleTags.length) {
       recorders.push({ id: 'eleForce', targetKind: 'element', targetTags: eleTags, responseKind: 'force' })
     }
@@ -208,8 +211,25 @@ const runPushoverAnalysis: AnalysisBlockDef = {
 const runEarthquakeAnalysis: AnalysisBlockDef = {
   id: 'run-earthquake-analysis',
   label: 'Run Earthquake Analysis',
-  description: 'Transient (Newmark) analysis stepping through a chosen ground-motion pattern.',
+  description: 'Transient (Newmark) analysis under UniformExcitation ground-motion patterns. Displacements are relative to the moving ground.',
   paramsSchema: [
+    { kind: 'idlist', name: 'patterns', label: 'Ground-motion pattern tags', defaultValue: [], description: 'Leave empty to use all UniformExcitation patterns. Directions and acceleration series are set on each pattern.' },
+    { kind: 'choice', name: 'dampingMode', label: 'Rayleigh damping', options: ['Modal periods', 'Anchor periods', 'Coefficients'], defaultValue: 'Modal periods', yields: {
+      'Modal periods': [
+        { kind: 'str', name: 'modalPeriod1', label: 'First modal period', defaultValue: 'T1', required: true },
+        { kind: 'str', name: 'modalPeriod2', label: 'Second modal period', defaultValue: 'T3', required: true },
+        { kind: 'float', name: 'dampingPercent', label: 'Damping at both anchors (%)', defaultValue: 5, required: true },
+      ],
+      'Anchor periods': [
+        { kind: 'float', name: 'period1', label: 'First anchor period (e.g. T1), s', required: true },
+        { kind: 'float', name: 'period2', label: 'Second anchor period (e.g. T3), s', required: true },
+        { kind: 'float', name: 'dampingPercent', label: 'Damping at both anchors (%)', defaultValue: 5, required: true },
+      ],
+      Coefficients: [
+        { kind: 'float', name: 'alphaM', label: 'Mass damping coefficient αM (1/s)', defaultValue: 0 },
+        { kind: 'float', name: 'betaK', label: 'Current stiffness damping coefficient βK (s)', defaultValue: 0 },
+      ],
+    }, description: 'Use modal names such as T1 and T3 to solve periods at the start of this earthquake, enter known periods, or specify coefficients directly. Uses current stiffness: C = αM M + βK K.' },
     { kind: 'float', name: 'dt', label: 'Time Step (dt)', defaultValue: 0.01, required: true },
     { kind: 'int', name: 'nSteps', label: 'Num Steps', defaultValue: 1000, required: true },
     ...CONVERGENCE_SCHEMA,
@@ -219,6 +239,10 @@ const runEarthquakeAnalysis: AnalysisBlockDef = {
     ops('numberer', ['RCM']),
     ops('system', ['BandGeneral']),
     ...convergenceOps(params),
+    ops('setTime', [0]),
+    ...(params.dampingMode === 'Modal periods'
+      ? [ops('rayleighFromModes', [rayleighDamping(params).modalAnchors?.mode1 ?? NaN, rayleighDamping(params).modalAnchors?.mode2 ?? NaN, rayleighDamping(params).modalAnchors?.ratio ?? NaN])]
+      : [ops('rayleigh', [rayleighDamping(params).alphaM, rayleighDamping(params).betaK, 0, 0])]),
     ops('integrator', ['Newmark', 0.5, 0.25]),
     ops('analysis', ['Transient']),
     ops('analyze', [Math.trunc(Number(params.nSteps) || 1000), Number(params.dt) || 0.01]),
@@ -228,8 +252,10 @@ const runEarthquakeAnalysis: AnalysisBlockDef = {
     id: 'earthquake',
     config: {
       integrator: { kind: 'newmark', gamma: 0.5, beta: 0.25 },
-      dt: Number(params.dt) || 0.01,
-      nSteps: Math.trunc(Number(params.nSteps) || 1000),
+      dt: Number(params.dt ?? 0.01),
+      nSteps: Number(params.nSteps ?? 1000),
+      patterns: blockPatternTags(params),
+      damping: { alphaM: rayleighDamping(params).alphaM, betaK: rayleighDamping(params).betaK, ...(rayleighDamping(params).modalAnchors ? { modalAnchors: rayleighDamping(params).modalAnchors } : {}) },
       ...convergenceStage(params),
     },
   }),

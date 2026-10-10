@@ -18,7 +18,7 @@ export function useCases(runId: string | null): CaseInfo[] | null {
   return useMemo(() => {
     if (!source || !modal || loaded?.source !== source) return null
     const modalCases: CaseInfo[] = modal.stages.map((m) => ({ stageIndex: m.stageIndex, stageId: m.stageId, kind: 'modal', first: -1, count: 0 }))
-    return [...loaded.cases, ...modalCases].sort((a, b) => a.stageIndex - b.stageIndex)
+    return [...new Map([...loaded.cases, ...modalCases].map((c) => [c.stageIndex, c])).values()].sort((a, b) => a.stageIndex - b.stageIndex)
   }, [source, modal, loaded])
 }
 

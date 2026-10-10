@@ -534,6 +534,22 @@
           "required": false
         }
       ]
+    },
+    "timeSeries/Path": {
+      "_why": "Path time interval, amplitude factor and start time are numeric OpenSees options, not text. Ground-motion import and preview use the same schema as export.",
+      "kind": {
+        "dt": "float",
+        "factor": "float",
+        "startTime": "float"
+      }
+    },
+    "pattern/UniformExcitation": {
+      "_why": "Uniform excitation direction is a 1-based DOF; initial velocity and amplitude factor are numeric.",
+      "kind": {
+        "dir": "int",
+        "vel0": "float",
+        "fact": "float"
+      }
     }
   }
 }

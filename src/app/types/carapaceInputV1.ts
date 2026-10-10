@@ -1,3 +1,4 @@
+import type { ModalDampingAnchors } from '@/app/lib/rayleighDamping'
 // Mirrors carapace/wasm-bridge/src/input_v1/{mod,tables,materials,sequence}.rs's serde (camelCase)
 // wire shape — what decodeInput() in carapace_wasm expects (see src/app/lib/carapace/compileInputV1.ts,
 // the only place that constructs one). One format serves 2D and 3D (`header.ndm`): the compiler targets
@@ -40,7 +41,7 @@ export interface EqualDofTable { retained: number[]; constrained: number[]; dofs
  * against it in `constrained` (sparse `(row, nodeIndex)` pairs) own `ux` to `retained[i]`'s `ux`. */
 export interface RigidDiaphragmTable { retained: number[]; constrained: [number, number][] }
 
-export type TimeSeriesSpec = { kind: 'constant' } | { kind: 'linear'; slope: number } | { kind: 'path'; times: number[]; factors: number[] }
+export type TimeSeriesSpec = { kind: 'constant' } | { kind: 'linear'; slope: number } | { kind: 'path'; times: number[]; factors: number[] } | { kind: 'boundedPath'; times: number[]; factors: number[]; useLast: boolean }
 export interface LoadPatternTable { series: TimeSeriesSpec[]; scaleFactor: number[] }
 export interface NodalLoadTable { pattern: number[]; node: number[]; dof: number[]; value: number[]; stage: number[] }
 
@@ -67,8 +68,6 @@ export type IntegratorSpec =
   | { kind: 'loadControl'; increment: number }
   | { kind: 'displacementControl'; node: number; dof: number; increment: number }
 export type AlgorithmSpec =
-  | 'linear'
-  | 'newtonRaphson'
   | { kind: 'linear' }
   | { kind: 'newton'; tangent?: 'current' | 'reuseAtStepStart' | 'initial'; lineSearch?: { kind: 'bisection' | 'regulaFalsi'; tol: number; maxIter: number; maxEta: number } }
   | { kind: 'krylovNewton'; tangent: 'current' | 'reuseAtStepStart' | 'initial'; maxDimension: number }
@@ -76,8 +75,6 @@ export type ConvergenceSpec =
   | { kind: 'normUnbalance'; tol: number; maxIter: number }
   | { kind: 'normDispIncr'; tol: number; maxIter: number }
   | { kind: 'energyIncr'; tol: number; maxIter: number }
-/** `static` and `modal` stage kinds are modeled here — `compileInputV1.ts` emits only those (see `compileStage`'s
- * "not yet supported" diagnostic for `transient`); the Rust `StageSpec` enum also has a `Transient` variant. */
 export type StageSpec =
   | {
       kind: 'static'
@@ -90,11 +87,12 @@ export type StageSpec =
     }
   | { kind: 'modal'; id: string; modes: number }
   | { kind: 'reset'; id: string }
-/** The recorder kinds `compileInputV1.ts` emits: `nodeDisp`, `reaction`, `elementForce` and `elementLoad` (the Rust
- * `RecorderSpec` enum, internally tagged on `response`, also has `nodeVel`/`nodeAccel`/`modeShape`/
- * `fiber`, which the compiler doesn't produce yet). */
+  | { kind: 'transient'; id: string; steps: number; dt: number; damping: { alphaM: number; betaK: number; modalAnchors?: ModalDampingAnchors }; groundMotions: { direction: number; series: TimeSeriesSpec; scaleFactor: number }[]; algorithm: AlgorithmSpec; convergence?: ConvergenceSpec }
+/** Scalar recorder channels stored by the browser results worker. Acceleration and velocity are relative to the ground. */
 export type RecorderSpecWire =
   | { response: 'nodeDisp'; node: number; dof: number }
+  | { response: 'nodeVel'; node: number; dof: number }
+  | { response: 'nodeAccel'; node: number; dof: number }
   | { response: 'reaction'; node: number; dof: number }
   | { response: 'elementForce'; elementKind: ElementKind; elementIndex: number; component: number }
   /** The uniform load the element carries at each sample (local axes; component 0 = wx, 1 = wy; the 2D wire row is 16 wide, the rest are continuum body/edge terms the compiler never reads). */

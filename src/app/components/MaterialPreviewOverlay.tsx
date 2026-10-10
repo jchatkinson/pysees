@@ -139,7 +139,7 @@ const HysteresisChartPanel = memo(function HysteresisChartPanel({
           <ChartTooltip content={<ChartTooltipContent />} />
           <Line type="linear" dataKey="sig" stroke={hysteresisChartConfig.sig.color} strokeWidth={1.75} dot={false} isAnimationActive={false} connectNulls />
           {leadingPoint && (
-            <ReferenceDot x={leadingPoint.eps} y={leadingPoint.sig} r={4} fill={hysteresisChartConfig.sig.color} stroke="var(--background)" strokeWidth={1.5} isFront />
+            <ReferenceDot x={leadingPoint.eps} y={leadingPoint.sig} r={4} fill={hysteresisChartConfig.sig.color} stroke="var(--background)" strokeWidth={1.5} />
           )}
         </LineChart>
       </ChartContainer>

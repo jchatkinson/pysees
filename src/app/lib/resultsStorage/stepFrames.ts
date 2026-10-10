@@ -23,6 +23,20 @@ export interface CaseInfo {
   count: number
 }
 
+/** Only actual time-history stages belong on the timeline; modal results are stored separately. */
+export function timelineCases(stage: Uint16Array, metadata: StageMetadata[]): CaseInfo[] {
+  const out: CaseInfo[] = []
+  const stages = new Map(metadata.map((s) => [s.stageIndex, s]))
+  for (let i = 0; i < stage.length; i++) {
+    const meta = stages.get(stage[i])
+    if (!meta || (meta.kind !== 'static' && meta.kind !== 'transient')) continue
+    const last = out[out.length - 1]
+    if (last && last.stageIndex === stage[i] && last.first + last.count === i) last.count++
+    else out.push({ stageIndex: stage[i], stageId: meta.stageId, kind: meta.kind, first: i, count: 1 })
+  }
+  return out
+}
+
 /** Pseudo-time and stage index of every step. */
 export interface RunTimeline {
   pseudoTime: Float64Array
@@ -37,7 +51,7 @@ export interface StepFrame {
 }
 
 function buildLayout(run: RunMetadata, recorders: RecorderMetadata[], stages: StageMetadata[]): RunLayout {
-  const columns: RunLayout['columns'] = { disp: new Map(), reaction: new Map(), force: new Map(), shell: new Map() }
+  const columns: RunLayout['columns'] = { disp: new Map(), vel: new Map(), accel: new Map(), reaction: new Map(), force: new Map(), shell: new Map() }
   for (const rec of recorders) {
     const kind = rec.kind ?? 'disp'
     const tag = Number(rec.recorderId.replace(/^[a-z]+:/, ''))
@@ -134,16 +148,7 @@ export class StepFrameSource {
   /** The run's time-history cases: each stage that produced steps, with its sample range (`first`..`first + count - 1`). */
   async cases(): Promise<CaseInfo[]> {
     const { stage } = await this.timeline()
-    const out: CaseInfo[] = []
-    for (let i = 0; i < stage.length; i++) {
-      const last = out[out.length - 1]
-      if (last && last.stageIndex === stage[i]) last.count++
-      else {
-        const meta = this.layout.stages.find((s) => s.stageIndex === stage[i])
-        out.push({ stageIndex: stage[i], stageId: meta?.stageId ?? `stage ${stage[i]}`, kind: meta?.kind ?? 'static', first: i, count: 1 })
-      }
-    }
-    return out
+    return timelineCases(stage, this.layout.stages)
   }
 
   /** Pseudo-time and stage index of every step, fetched once. */

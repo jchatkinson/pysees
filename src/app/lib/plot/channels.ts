@@ -9,13 +9,13 @@ export interface KindTargets {
 }
 export type AvailableTargets = Record<ResponseKind, KindTargets>
 
-export const KIND_LABELS: Record<ResponseKind, string> = { disp: 'Node displacement', reaction: 'Reaction', force: 'Element force' }
-export const TARGET_LABELS: Record<ResponseKind, string> = { disp: 'Node', reaction: 'Node', force: 'Element' }
+export const KIND_LABELS: Record<ResponseKind, string> = { disp: 'Node displacement', vel: 'Node velocity', accel: 'Node relative acceleration', reaction: 'Reaction', force: 'Element force' }
+export const TARGET_LABELS: Record<ResponseKind, string> = { disp: 'Node', vel: 'Node', accel: 'Node', reaction: 'Node', force: 'Element' }
 
 export function availableTargets(layout: RunLayout | null): AvailableTargets {
-  const out: AvailableTargets = { disp: { tags: [], components: [] }, reaction: { tags: [], components: [] }, force: { tags: [], components: [] } }
+  const out: AvailableTargets = { disp: { tags: [], components: [] }, vel: { tags: [], components: [] }, accel: { tags: [], components: [] }, reaction: { tags: [], components: [] }, force: { tags: [], components: [] } }
   if (!layout) return out
-  for (const kind of ['disp', 'reaction', 'force'] as const) {
+  for (const kind of ['disp', 'vel', 'accel', 'reaction', 'force'] as const) {
     out[kind].tags = [...layout.columns[kind].keys()].sort((a, b) => a - b)
     out[kind].components = [...(layout.columns[kind].values().next().value?.labels ?? [])]
   }
@@ -36,7 +36,7 @@ export function channelTerms(ch: Channel, layout: RunLayout): { column: number; 
   return terms
 }
 
-const SHORT_KIND: Record<ResponseKind, string> = { disp: 'N', reaction: 'N', force: 'E' }
+const SHORT_KIND: Record<ResponseKind, string> = { disp: 'N', vel: 'N', accel: 'N', reaction: 'N', force: 'E' }
 
 export function describeChannel(ch: Channel): string {
   if (ch.type === 'step') return 'Step'

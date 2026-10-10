@@ -2,7 +2,7 @@ import type { Model } from '@/app/types/model'
 import { elementForceRecorders } from '@/app/lib/analysisBlocks'
 import type { CarapaceRun } from '@/app/lib/commands/carapaceRunner'
 
-export type Quantity = 'disp' | 'reaction' | 'force' | 'shell'
+export type Quantity = 'disp' | 'vel' | 'accel' | 'reaction' | 'force' | 'shell'
 
 export interface Comparison {
   steps: { carapace: number; opensees: number }
@@ -17,7 +17,7 @@ export interface Comparison {
 }
 
 const table = (text: string) => text.trim().split('\n').filter(Boolean).map((l) => l.trim().split(/\s+/).map(Number))
-const zero = (): Record<Quantity, number> => ({ disp: 0, reaction: 0, force: 0, shell: 0 })
+const zero = (): Record<Quantity, number> => ({ vel: 0, accel: 0, disp: 0, reaction: 0, force: 0, shell: 0 })
 
 /**
  * Lines up Carapace's recorded columns with the files the exported OpenSeesPy script wrote, by node / element tag, and measures how far
@@ -27,6 +27,7 @@ export function compareRuns(model: Model, run: CarapaceRun, files: Record<string
   const ndf = model.config!.ndf
   const nodes = [...model.nodes.keys()].sort((a, b) => a - b)
   const disp = table(files['disp.out'] ?? '')
+  const vel = table(files['vel.out'] ?? ''), accel = table(files['accel.out'] ?? '')
   const reaction = table(files['reaction.out'] ?? '')
   // Element forces: one file per OpenSees response (see elementForceRecorders), `width` columns per element.
   const forces = elementForceRecorders(model).map((g) => {
@@ -48,7 +49,7 @@ export function compareRuns(model: Model, run: CarapaceRun, files: Record<string
         // Carapace appends the element's load components after its 6 force columns; OpenSees has no such columns.
         if (g && j < g.width) theirs = g.rows.map((r) => r[1 + g.eleTags.indexOf(plan.targetTag) * g.width + j])
       } else {
-        const rows = plan.kind === 'disp' ? disp : reaction
+        const rows = plan.kind === 'disp' ? disp : plan.kind === 'vel' ? vel : plan.kind === 'accel' ? accel : reaction
         theirs = rows.map((r) => r[1 + nodes.indexOf(plan.targetTag) * ndf + j])
       }
       if (!theirs || theirs.length !== mine.length) return
@@ -58,6 +59,6 @@ export function compareRuns(model: Model, run: CarapaceRun, files: Record<string
     })
   }
   const maxRel = zero()
-  for (const k of ['disp', 'reaction', 'force', 'shell'] as const) maxRel[k] = maxAbs[k] / Math.max(scale[k], 1e-12)
+  for (const k of ['disp', 'vel', 'accel', 'reaction', 'force', 'shell'] as const) maxRel[k] = maxAbs[k] / Math.max(scale[k], 1e-12)
   return { steps: { carapace: run.times.length, opensees: disp.length }, compared, scale, maxAbs, maxRel }
 }

@@ -10884,7 +10884,7 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
               name: "patternTag"
             },
             {
-              kind: "str",
+              kind: "int",
               name: "dir"
             },
             {
@@ -10920,7 +10920,7 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
               name: "literal"
             },
             {
-              kind: "str",
+              kind: "float",
               name: "vel0"
             },
             {
@@ -10929,7 +10929,7 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
               name: "literal"
             },
             {
-              kind: "str",
+              kind: "float",
               name: "fact"
             }
           ],
@@ -14435,7 +14435,7 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
               name: "literal"
             },
             {
-              kind: "str",
+              kind: "float",
               name: "dt"
             },
             {
@@ -14482,7 +14482,7 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
               name: "literal"
             },
             {
-              kind: "str",
+              kind: "float",
               name: "factor"
             },
             {
@@ -14491,7 +14491,7 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
               name: "literal"
             },
             {
-              kind: "str",
+              kind: "float",
               name: "startTime"
             },
             {

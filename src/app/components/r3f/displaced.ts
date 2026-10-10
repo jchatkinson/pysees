@@ -59,7 +59,9 @@ export function fillDeformedSegments(index: SceneIndex, nd: NodeDisplacements, s
       const local = (i: number, axis: number) => nd.disp[i * 3] * f[axis * 3] + nd.disp[i * 3 + 1] * f[axis * 3 + 1] + nd.disp[i * 3 + 2] * f[axis * 3 + 2]
       const [ua, va, wa, ub, vb, wb] = [local(a, 0), local(a, 1), local(a, 2), local(b, 0), local(b, 1), local(b, 2)]
       // Rotation about local z bends the member in x–y; rotation about local y bends it in x–z with the opposite sign (dw/dx = -θy).
-      const rotLocal = (i: number, axis: number) => nd.rot[i * 3] * f[axis * 3] + nd.rot[i * 3 + 1] * f[axis * 3 + 1] + nd.rot[i * 3 + 2] * f[axis * 3 + 2]
+      const rotLocal = (i: number, axis: number) => ndm3
+        ? nd.rot[i * 3] * f[axis * 3] + nd.rot[i * 3 + 1] * f[axis * 3 + 1] + nd.rot[i * 3 + 2] * f[axis * 3 + 2]
+        : nd.rot[i * 3 + 2] * f[axis * 3 + 2]
       const [tza, tzb] = cubic ? [rotLocal(a, 2), rotLocal(b, 2)] : [0, 0]
       const [tya, tyb] = cubic && ndm3 ? [rotLocal(a, 1), rotLocal(b, 1)] : [0, 0]
       for (let k = 0; k <= n; k++) {

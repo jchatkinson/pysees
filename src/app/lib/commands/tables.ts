@@ -18,8 +18,8 @@ export interface ElementSpec {
 
 export const ELEMENTS: ElementSpec[] = [
   { eleType: 'Truss', opsName: 'Truss', args: ['A', 'matTag'], flags: { '-rho': { key: 'rho' } } },
-  { eleType: 'ElasticBeamColumn', opsName: 'elasticBeamColumn', args: ['A', 'E', 'Iz', 'transfTag'], args3d: ['A', 'E', 'G', 'J', 'Iy', 'Iz', 'transfTag'], exact: true },
-  { eleType: 'DispBeamColumn', opsName: 'dispBeamColumn', args: ['transfTag', 'integrationTag'] },
+  { eleType: 'ElasticBeamColumn', opsName: 'elasticBeamColumn', args: ['A', 'E', 'Iz', 'transfTag'], args3d: ['A', 'E', 'G', 'J', 'Iy', 'Iz', 'transfTag'], exact: true, flags: { '-mass': { key: 'mass' } } },
+  { eleType: 'DispBeamColumn', opsName: 'dispBeamColumn', args: ['transfTag', 'integrationTag'], flags: { '-mass': { key: 'mass' } } },
   { eleType: 'ShellMITC4', opsName: 'ShellMITC4', nodeCount: 4, args: ['secTag'], exact: true },
   { eleType: 'ShellDKGT', opsName: 'ShellDKGT', nodeCount: 3, args: ['secTag'], exact: true },
   { eleType: 'zeroLengthSection', opsName: 'zeroLengthSection', args: ['secTag'], flags: { '-orient': { key: 'orient', vec: true } } },

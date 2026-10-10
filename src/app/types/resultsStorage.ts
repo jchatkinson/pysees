@@ -76,7 +76,7 @@ export interface RecorderMetadata {
 /** Node displacements are keyed by `String(nodeTag)`; reactions, forces and shell resultants by `reaction:<nodeTag>`,
  * `force:<elementTag>` and `shell:<elementTag>`. A shell recorder holds the element's stress resultants (Nx Ny Nxy Mx My Mxy
  * Qx Qy, OpenSees' order and sign, in the element's local axes) at its 4 Gauss points: 32 columns, point-major, labelled `Nx#1`..`Qy#4`. */
-export type RecorderKind = 'disp' | 'reaction' | 'force' | 'shell'
+export type RecorderKind = 'disp' | 'vel' | 'accel' | 'reaction' | 'force' | 'shell'
 
 // responseBlocks([runId, blockIndex]) — one row per chunk, covering every recorded node.
 export interface ResultBlock {

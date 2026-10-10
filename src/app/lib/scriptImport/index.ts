@@ -1,7 +1,7 @@
 import { buildModel } from '@/app/lib/scriptImport/build'
 import { parsePython } from '@/app/lib/scriptImport/python'
 import { parseTcl } from '@/app/lib/scriptImport/tcl'
-import type { ImportResult } from '@/app/lib/scriptImport/types'
+import type { ImportDiagnostic, ImportResult } from '@/app/lib/scriptImport/types'
 
 export type { ImportDiagnostic, ImportResult } from '@/app/lib/scriptImport/types'
 
@@ -18,6 +18,13 @@ export function detectLanguage(text: string, filename = ''): 'tcl' | 'py' {
  */
 export function importScript(text: string, filename = ''): ImportResult {
   const language = detectLanguage(text, filename)
-  const { calls, diagnostics } = language === 'tcl' ? parseTcl(text) : parsePython(text)
-  return buildModel(calls, language, diagnostics)
+  const skipped: ImportDiagnostic[] = []
+  // Exported runtime calculations are analysis only. Preserve line numbers while skipping
+  // the explicitly delimited block; model import never executes an eigensolve.
+  const modelText = text.replace(/^[ \t]*# PySees: modal damping begin\r?\n[\s\S]*?^[ \t]*# PySees: modal damping end[ \t]*\r?$/gm, (block, offset: number) => {
+    skipped.push({ severity: 'info', message: 'Modal damping calculation skipped (model import only).', line: text.slice(0, offset).split('\n').length })
+    return block.replace(/[^\r\n]/g, ' ')
+  })
+  const { calls, diagnostics } = language === 'tcl' ? parseTcl(modelText) : parsePython(modelText)
+  return buildModel(calls, language, [...skipped, ...diagnostics])
 }

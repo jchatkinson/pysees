@@ -1,4 +1,6 @@
+import { rayleighDamping } from '@/app/lib/rayleighDamping'
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { GroundMotionInput } from '@/app/components/GroundMotionInput'
 import { Button } from '@/app/components/ui/button'
 import { LoadsTable } from '@/app/components/LoadsTable'
 import { Input } from '@/app/components/ui/input'
@@ -79,6 +81,7 @@ export function CommandFormBody({
 }) {
   const [values, setValues] = useState<Record<string, unknown>>(() => initial)
   const [error, setError] = useState<string | null>(null)
+  const damping = schema.fn === 'run-earthquake-analysis' ? rayleighDamping(values) : null
   const setValue = (key: string, value: unknown) => setValues((prev) => ({ ...prev, [key]: value }))
 
   useEffect(() => {
@@ -91,6 +94,7 @@ export function CommandFormBody({
       <ScrollArea className="flex-1 min-h-0">
         <div className="p-3 grid gap-3">
           {lead?.({ values, setValue })}
+          {schema.fn === 'timeSeries' && values.type === 'Path' && <GroundMotionInput values={values} setValues={(patch) => setValues((prev) => ({ ...prev, ...patch }))} />}
           {schema.args.map((arg, idx) => (
             <SchemaFormField
               key={`arg-${arg.kind === 'flag' ? arg.flag : arg.name}-${idx}`}
@@ -109,6 +113,11 @@ export function CommandFormBody({
               ctx={ctx}
             />
           ))}
+          {damping && ['Anchor periods', 'Modal periods'].includes(String(values.dampingMode)) && (
+            <p className="text-xs text-muted-foreground" role="status">
+              {damping.error ?? (damping.modalAnchors ? `T${damping.modalAnchors.mode1} and T${damping.modalAnchors.mode2} will be solved from the model at the start of this earthquake; damping ${(damping.modalAnchors.ratio * 100).toPrecision(3)}% at both anchors.` : `ω₁ = ${damping.omega1!.toPrecision(5)} rad/s · ω₂ = ${damping.omega2!.toPrecision(5)} rad/s. αM = ${damping.alphaM.toPrecision(5)} 1/s · βK = ${damping.betaK.toPrecision(5)} s.`)}
+            </p>
+          )}
           {extra?.({ values, setValue })}
         </div>
       </ScrollArea>
@@ -137,7 +146,7 @@ export function CommandFormBody({
             size="sm"
             className={onCancel ? '' : 'flex-1'}
             onClick={() => {
-              const validation = submitValues(values)
+              const validation = damping?.error ?? submitValues(values)
               setError(validation)
               if (!validation) setValues(initial)
             }}
@@ -470,7 +479,9 @@ export function CommandForm() {
         </div>
       )
     }
-    const initial = selectedAnalysisCommand.type === 'ANALYSIS_BLOCK' ? selectedAnalysisCommand.params : selectedAnalysisCommand.values
+    const initial = selectedAnalysisCommand.type === 'ANALYSIS_BLOCK'
+      ? { ...selectedAnalysisCommand.params, ...(selectedAnalysisCommand.blockId === 'run-earthquake-analysis' && selectedAnalysisCommand.params.dampingMode === undefined ? { dampingMode: 'Coefficients' } : {}) }
+      : selectedAnalysisCommand.values
     return (
       <div className="flex flex-col h-full min-h-0 overflow-hidden">
         <div className="border-b px-3 py-2 shrink-0">
@@ -565,7 +576,7 @@ export function CommandForm() {
           previewAction={selectedAddSchema.fn === 'uniaxialMaterial' ? { onClick: () => setMaterialPreviewPanelOpen(true) } : undefined}
           submitValues={(values) => {
             const idListField = selectedAddSchema.args.find((a) => a.kind === 'idlist')
-            if (idListField) {
+            if (isModelPanel && idListField) {
               const ids = (values[idListField.name] as number[]) ?? []
               if (!ids.length) return 'Enter at least one node ID.'
               for (const id of ids) {

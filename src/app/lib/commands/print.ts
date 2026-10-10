@@ -15,6 +15,27 @@ function printCall(c: Call, lang: ScriptLanguage, depth: number): string[] {
   const pad = '    '.repeat(depth)
   const out: string[] = []
   if (c.comment) out.push(`${pad}# ${c.comment}`)
+  if (c.fn === 'rayleighFromModes') {
+    const [mode1, mode2, ratio] = c.args.map(Number)
+    if (![mode1, mode2].every((v) => Number.isInteger(v) && v > 0) || !Number.isFinite(ratio) || ratio < 0 || ratio > 1) throw new Error('Invalid modal damping anchors')
+    const count = Math.max(mode1, mode2)
+    const lines = lang === 'py' ? [
+      `# Resolve T${mode1} and T${mode2} from the current model state for Rayleigh damping.`,
+      `_pysees_damping_eigen = ops.eigen('-fullGenLapack', ${count})`,
+      `if not all(0 < value < 1e300 for value in (_pysees_damping_eigen[${mode1 - 1}], _pysees_damping_eigen[${mode2 - 1}])): raise ValueError('Requested damping modes must have finite positive eigenvalues')`,
+      `_pysees_damping_w1 = _pysees_damping_eigen[${mode1 - 1}] ** 0.5`,
+      `_pysees_damping_w2 = _pysees_damping_eigen[${mode2 - 1}] ** 0.5`,
+      `ops.rayleigh(2 * ${ratio} * _pysees_damping_w1 * _pysees_damping_w2 / (_pysees_damping_w1 + _pysees_damping_w2), 2 * ${ratio} / (_pysees_damping_w1 + _pysees_damping_w2), 0, 0)`,
+    ] : [
+      `# Resolve T${mode1} and T${mode2} from the current model state for Rayleigh damping.`,
+      `set _pysees_damping_eigen [eigen -fullGenLapack ${count}]`,
+      `if {!([lindex $_pysees_damping_eigen ${mode1 - 1}] > 0 && [lindex $_pysees_damping_eigen ${mode1 - 1}] < 1e300 && [lindex $_pysees_damping_eigen ${mode2 - 1}] > 0 && [lindex $_pysees_damping_eigen ${mode2 - 1}] < 1e300)} {error "Requested damping modes must have finite positive eigenvalues"}`,
+      `set _pysees_damping_w1 [expr {sqrt([lindex $_pysees_damping_eigen ${mode1 - 1}])}]`,
+      `set _pysees_damping_w2 [expr {sqrt([lindex $_pysees_damping_eigen ${mode2 - 1}])}]`,
+      `rayleigh [expr {2 * ${ratio} * $_pysees_damping_w1 * $_pysees_damping_w2 / ($_pysees_damping_w1 + $_pysees_damping_w2)}] [expr {2 * ${ratio} / ($_pysees_damping_w1 + $_pysees_damping_w2)}] 0 0`,
+    ]
+    return [...out, `${pad}# PySees: modal damping begin`, ...lines.map((line) => pad + line), `${pad}# PySees: modal damping end`]
+  }
   if (lang === 'py') {
     out.push(`${pad}ops.${c.fn}(${c.args.map(pyLiteral).join(', ')})`)
     for (const child of c.body ?? []) out.push(...printCall(child, lang, depth))

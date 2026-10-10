@@ -31,7 +31,11 @@ describe('ndm-aware layouts', () => {
   describe.each([2, 3])('element form args match the element table in %iD', (ndm) => {
     const choice = getSchemaForFn('element', ndm)!.args[0] as Extract<ArgDef, { kind: 'choice' }>
     it.each(ELEMENTS)('$eleType', (spec) => {
-      const form = names(choice.yields[spec.eleType]).filter((n) => n !== 'nodes' && n !== '-orient' && n !== 'orient')
+      const form = names(choice.yields[spec.eleType]).filter((n) => n !== 'nodes' && !Object.entries(spec.flags ?? {}).some(([flag, f]) => n === flag || n === f.key))
+      for (const arg of choice.yields[spec.eleType]) if (arg.kind === 'flag') {
+        expect(spec.flags?.[arg.flag], `Missing codec flag ${arg.flag}`).toBeDefined()
+        expect(names(arg.args)).toContain(spec.flags![arg.flag].key)
+      }
       expect(form).toEqual(elementArgs(spec, ndm).filter((k) => !spec.flags || !Object.values(spec.flags).some((f) => f.key === k)))
     })
   })

@@ -113,11 +113,13 @@ function elementArgsFromGenerated(): ArgDef[] {
         { kind: 'float', name: 'Iy', label: 'Moment of Inertia (Iy)', defaultValue: 1, required: true, ndm: 3 },
         { kind: 'float', name: 'Iz', label: 'Moment of Inertia (Iz)', defaultValue: 1, required: true },
         { kind: 'int', name: 'transfTag', label: 'Transformation Tag', required: true },
+        { kind: 'flag', flag: '-mass', args: [{ kind: 'float', name: 'mass', label: 'Mass per unit length' }] },
       ],
       DispBeamColumn: [
         { kind: 'vec', name: 'nodes', label: 'Node IDs', length: 2, defaultValue: [1, 2], nodeSync: true },
         { kind: 'int', name: 'transfTag', label: 'Transformation Tag', required: true },
         { kind: 'int', name: 'integrationTag', label: 'Beam Integration Tag', required: true },
+        { kind: 'flag', flag: '-mass', args: [{ kind: 'float', name: 'mass', label: 'Mass per unit length' }] },
       ],
       ShellMITC4: [
         { kind: 'vec', name: 'nodes', label: 'Node IDs (counter-clockwise, normal by the right-hand rule)', length: 4, defaultValue: [1, 2, 3, 4], nodeSync: true },

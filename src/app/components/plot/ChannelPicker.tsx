@@ -51,7 +51,7 @@ export function ChannelPicker({ value, onChange, targets, selectedNodeIds }: {
   const typeOptions: { id: TypeId; label: string; disabled?: boolean }[] = [
     { id: 'step', label: 'Step' },
     { id: 'time', label: 'Pseudo-time' },
-    ...(['disp', 'reaction', 'force'] as const).map((k) => ({ id: k, label: KIND_LABELS[k], disabled: targets[k].tags.length === 0 })),
+    ...(['disp', 'vel', 'accel', 'reaction', 'force'] as const).map((k) => ({ id: k, label: KIND_LABELS[k], disabled: targets[k].tags.length === 0 })),
   ]
 
   if (value.type !== 'response') {

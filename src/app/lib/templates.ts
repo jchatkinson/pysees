@@ -1,3 +1,5 @@
+import los000Text from '@/app/assets/groundMotions/LOS000.AT2?raw'
+import { parseGroundMotion } from '@/app/lib/groundMotion'
 import type { AnalysisCommand } from '@/app/types/analysisCommands'
 import type { ModelWrite } from '@/app/lib/modelWrite'
 import type { LoadAssignment } from '@/app/types/model'
@@ -17,6 +19,8 @@ export interface TemplateResult {
   levels?: LevelEntity[]
 }
 
+// Bundled copy of public/LOS000.AT2 so templates remain synchronous and self-contained.
+const FRAME_GROUND_MOTION = parseGroundMotion(los000Text)
 const PUSHOVER_STEPS = 100
 
 // Frame gravity loads: psf area loads over a 6 m tributary (out-of-plane bay) width, in SI (N/m).
@@ -266,14 +270,8 @@ export function frameTemplate({ stories, storyH, bays, bayW, eleType, base }: Fr
     levels.push({ id: j + 1, label: alphaLabel(j), height: storyH })
   }
 
-  // Three Plain patterns sharing one Linear series: dead + live as uniform beam loads (kN/m from an
-  // area load over a tributary width, applied as -wy in the beams' local y, i.e. downward), and an
-  // inverted-triangle lateral push on every floor node. Three stages, in order:
-  //   1. gravity: ramp dead + live (patterns 1, 2) under load control;
-  //   2. hold: freeze them at full value (`holdLoads`: loadConst in the script, held patterns in Carapace);
-  //   3. pushover: drive the roof node in +X under displacement control against the push pattern (3), which
-  //      only starts to exist here — in the exported script it is declared after the hold.
-  // The fiber frame is pushed to 3% roof drift so the response shows yielding; the elastic one to 1%.
+  // Gravity and pushover retain their existing patterns. Run the bundled earthquake after
+  // gravity, then reset and re-establish gravity so pushover is an independent case.
   const beamTags = Array.from({ length: bays * stories }, (_, k) => (bays + 1) * stories + k + 1)
   const roofNode = nodeId(bays, stories)
   // Inverted-triangle push: every node on story level j takes j kN in +X (1 kN at the first floor up to `stories` kN at the roof).
@@ -287,12 +285,19 @@ export function frameTemplate({ stories, storyH, bays, bayW, eleType, base }: Fr
     pattern(1, 'Dead Load', areaLoad(DEAD_PSF)),
     pattern(2, 'Live Load', areaLoad(LIVE_PSF)),
     pattern(3, 'Push', pushLoads),
+    { kind: 'timeSeries', entity: { id: 2, tsType: 'Path', args: { type: 'Path', tag: 2, dt: FRAME_GROUND_MOTION.dt, values: [...FRAME_GROUND_MOTION.values], factor: 9.80665, '-prependZero': true } } },
+    { kind: 'pattern', entity: { id: 4, name: 'LOS000 · X ground motion (0.1×)', patternType: 'UniformExcitation', args: { type: 'UniformExcitation', patternTag: 4, dir: 1, accelSeriesTag: 2, fact: 0.1 }, children: [] } },
   ]
   const driftRatio = eleType === 'dispBeamColumn' ? 0.03 : 0.01
   const analysisCommands: AnalysisCommand[] = [
-    { type: 'ANALYSIS_BLOCK', blockId: 'whole-model-recorder', params: { directory: 'out' } },
+    { type: 'ANALYSIS_BLOCK', blockId: 'whole-model-recorder', params: { directory: 'out', dynamic: 'Yes' } },
     eigenAnalysis(2 * stories * (bays + 1)),
     { type: 'ANALYSIS_BLOCK', blockId: 'run-gravity-analysis', params: { patterns: [1, 2], steps: 10, holdLoads: 'Yes' } },
+    { type: 'ANALYSIS_BLOCK', blockId: 'wipe-analysis', params: {} },
+    { type: 'ANALYSIS_BLOCK', blockId: 'run-earthquake-analysis', params: { patterns: [4], dt: FRAME_GROUND_MOTION.dt, nSteps: FRAME_GROUND_MOTION.values.length, dampingMode: 'Modal periods', modalPeriod1: 'T1', modalPeriod2: 'T3', dampingPercent: 5, algorithm: 'Newton', tol: 1e-6, maxIter: 50 } },
+    { type: 'ANALYSIS_BLOCK', blockId: 'reset-model', params: {} },
+    { type: 'ANALYSIS_BLOCK', blockId: 'wipe-analysis', params: {} },
+    { type: 'ANALYSIS_BLOCK', blockId: 'run-gravity-analysis', params: { patterns: [1, 2], steps: 1, holdLoads: 'Yes' } },
     { type: 'ANALYSIS_BLOCK', blockId: 'run-pushover-analysis', params: { patterns: [3], nodeTag: roofNode, dof: 1, increment: driftRatio * stories * storyH / PUSHOVER_STEPS, steps: PUSHOVER_STEPS } },
   ]
 

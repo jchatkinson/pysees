@@ -1,3 +1,4 @@
+import type { ModalDampingAnchors } from '@/app/lib/rayleighDamping'
 // Target shape for the future pysees -> Carapace compiler (see docs/pysees-carapace-handoff.md).
 // Produced from AnalysisBlockDef.toStage()/toRecorders(), never stored in AnalysisHistory directly —
 // AnalysisCommand stays the authored/procedural representation used for script export.
@@ -16,6 +17,8 @@ export interface TransientSpec {
   integrator: { kind: 'newmark'; gamma: number; beta: number }
   dt: number
   nSteps: number
+  patterns?: number[]
+  damping?: { alphaM: number; betaK: number; modalAnchors?: ModalDampingAnchors }
   algorithm: AlgorithmKind
   convergence?: ConvergenceSpec
 }

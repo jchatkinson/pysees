@@ -1,4 +1,4 @@
-export type ResponseKind = 'disp' | 'reaction' | 'force'
+export type ResponseKind = 'disp' | 'vel' | 'accel' | 'reaction' | 'force'
 
 /**
  * One axis quantity. `response` is a signed sum of recorded columns of one kind and component:

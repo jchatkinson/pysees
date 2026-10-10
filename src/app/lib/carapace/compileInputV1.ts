@@ -4,6 +4,8 @@ import type { AlgorithmKind, AnalysisStage } from '@/app/types/analysisSequence'
 import type * as W from '@/app/types/carapaceInputV1'
 import { compileAnalysisSequence, type CompileDiagnostic } from '@/app/lib/compileAnalysisSequence'
 import { orientProblem, readOrient } from '@/app/lib/orient'
+import { withLumpedBeamMass } from '@/app/lib/beamMass'
+import { pathSeries } from '@/app/lib/groundMotion'
 import { eleLoadKind } from '@/app/lib/shells'
 import { isShell } from '@/app/lib/commands/tables'
 
@@ -23,7 +25,7 @@ export interface CompileInputV1Result {
   nodeTags: number[]
 }
 
-export type RecorderPlanKind = 'disp' | 'reaction' | 'force' | 'shell'
+export type RecorderPlanKind = 'disp' | 'vel' | 'accel' | 'reaction' | 'force' | 'shell'
 export interface RecorderPlan {
   recorderId: string
   kind: RecorderPlanKind
@@ -72,7 +74,7 @@ const NO_INDEX = -1
 
 /** Compiles a pysees Model + AnalysisHistory into the CarapaceInputV1 shape decodeInput() expects.
  * Scope (matches carapace-wasm's current decoder): 2D (ndm=2/ndf=3) and 3D (ndm=3/ndf=6), Truss/ElasticBeamColumn/
- * DispBeamColumn elements (and zeroLengthSection in 2D), static and modal stages only, node displacement/reaction and element force recorders. Everything outside that is
+ * DispBeamColumn elements (and zeroLengthSection in 2D), static, modal and transient stages, node displacement/reaction and element force recorders. Everything outside that is
  * reported as a diagnostic and dropped, never guessed at — this is the full validation boundary
  * pysees-handoff.md assigns to the compiler. */
 export function compileInputV1(model: Model, analysisHistory: AnalysisHistory): CompileInputV1Result {
@@ -83,7 +85,8 @@ export function compileInputV1(model: Model, analysisHistory: AnalysisHistory): 
   }
 
   if (!model.config) return fail('Model is not initialized.')
-  const { ndm, ndf } = model.config
+  try { model = withLumpedBeamMass(model) } catch (e) { return fail(e instanceof Error ? e.message : String(e)) }
+  const { ndm, ndf } = model.config!
   if (!((ndm === 2 && ndf === 3) || (ndm === 3 && ndf === 6))) {
     return fail(`Only 2D (ndm=2, ndf=3) and 3D (ndm=3, ndf=6) models are supported by Carapace — this model is ndm=${ndm}, ndf=${ndf}.`)
   }
@@ -124,6 +127,8 @@ export function compileInputV1(model: Model, analysisHistory: AnalysisHistory): 
     for (let d = 0; d < ndf; d++) mass.push(m.values[d] ?? 0)
   }
   const nodes: W.NodeTable = { coords, fixed, massNodeIndex, mass }
+  const hasElementMass = [...model.elements.values()].some((e) => e.eleType === 'Truss' ? Number(e.args.rho) > 0 : isShell(e.eleType) && Number(model.sections.get(Number(e.args.secTag))?.args.rho) > 0)
+  if (sequence.stages.some((s) => s.kind === 'transient') && !mass.some((v) => v > 0) && !hasElementMass) return fail('Transient analysis requires positive nodal or element mass. Add mass before running the earthquake.')
   // Eigen analysis needs mass on at least as many free DOFs as modes requested (massless DOFs are condensed).
   const massiveDofs = massNodeIndex.reduce((count, idx, k) => count + Array.from({ length: ndf }, (_, d) => d).filter((d) => mass[k * ndf + d] > 0 && !(fixed[idx] & (1 << d))).length, 0)
   // A shell with density carries lumped translational mass at each of its free nodes.
@@ -282,7 +287,10 @@ export function compileInputV1(model: Model, analysisHistory: AnalysisHistory): 
   }
 
   // --- load patterns + nodal loads ---
-  const patternIds = [...model.patterns.keys()].sort((a, b) => a - b)
+  const patternIds = [...model.patterns.keys()].filter((id) => model.patterns.get(id)!.patternType === 'Plain').sort((a, b) => a - b)
+  for (const pattern of model.patterns.values()) {
+    if (pattern.patternType !== 'Plain' && pattern.patternType !== 'UniformExcitation') diagnostics.push({ severity: 'error', message: `Pattern ${pattern.id}: ${pattern.patternType} is not supported by Carapace`, commandIndex: -1 })
+  }
   const patternIndex = new Map(patternIds.map((id, i) => [id, i]))
   const series: W.TimeSeriesSpec[] = []
   const scaleFactor: number[] = []
@@ -290,7 +298,7 @@ export function compileInputV1(model: Model, analysisHistory: AnalysisHistory): 
     const pattern = model.patterns.get(id)!
     const ts = model.timeSeries.get(Number(pattern.args.tsTag))
     series.push(compileTimeSeries(ts, diagnostics))
-    scaleFactor.push(Number(pattern.args.fact) || 1)
+    scaleFactor.push(Number(pattern.args.fact ?? 1) * (ts?.tsType === 'Constant' ? Number(ts.args.factor ?? 1) : 1))
   }
   const loadPatterns: W.LoadPatternTable = { series, scaleFactor }
 
@@ -302,7 +310,7 @@ export function compileInputV1(model: Model, analysisHistory: AnalysisHistory): 
   let wireCount = 0
   for (const st of sequence.stages) {
     if (st.kind === 'static') wireOfStatic.push(wireCount)
-    if (st.kind === 'static' || st.kind === 'modal' || st.kind === 'reset') wireCount++
+    wireCount++
   }
   const firstStaticWire = wireOfStatic[0] ?? 0
   const claimedStage = new Map<number, number>()
@@ -411,7 +419,7 @@ export function compileInputV1(model: Model, analysisHistory: AnalysisHistory): 
   // --- sequence ---
   const stages: W.StageSpec[] = []
   sequence.stages.forEach((stage) => {
-    const wireStage = compileStage(stage, stages.filter((st) => st.kind === 'static').length, patternIndex, claimedStage, resolveNode, diagnostics)
+    const wireStage = compileStage(stage, stages.filter((st) => st.kind === 'static').length, patternIndex, claimedStage, resolveNode, diagnostics, model)
     if (wireStage) stages.push(wireStage)
   })
   // Every recorded node always captures its full displacement vector — no per-recorder DOF
@@ -422,16 +430,19 @@ export function compileInputV1(model: Model, analysisHistory: AnalysisHistory): 
   // only shapes Carapace's preview. Reactions get the same full-width treatment; element forces
   // record every local component (6 in 2D, 12 in 3D). Every recorder is one wire scalar per column, so the
   // plan's `columnOffset`s are just running wire-recorder indices.
-  const dofsPerNode = model.config.ndf
-  const dispLabels = dofLabels(model.config.ndm, dofsPerNode, ['dx', 'dy', 'dz', 'rx', 'ry', 'rz'])
-  const reactionLabels = dofLabels(model.config.ndm, dofsPerNode, ['Fx', 'Fy', 'Fz', 'Mx', 'My', 'Mz'])
+  const dofsPerNode = ndf
+  const dispLabels = dofLabels(ndm, dofsPerNode, ['dx', 'dy', 'dz', 'rx', 'ry', 'rz'])
+  const reactionLabels = dofLabels(ndm, dofsPerNode, ['Fx', 'Fy', 'Fz', 'Mx', 'My', 'Mz'])
   const recordedNodeTags: number[] = []
   const recordedReactionTags: number[] = []
   const recordedElementTags: number[] = []
+  const dynamicTags = { vel: new Set<number>(), accel: new Set<number>() }
   const seen = { disp: new Set<number>(), reaction: new Set<number>(), force: new Set<number>() }
   for (const rec of sequence.recorders) {
     if (rec.targetKind === 'node' && rec.responseKind === 'disp') {
       for (const tag of rec.targetTags) if (!seen.disp.has(tag)) { seen.disp.add(tag); recordedNodeTags.push(tag) }
+    } else if (rec.targetKind === 'node' && (rec.responseKind === 'vel' || rec.responseKind === 'accel')) {
+      for (const tag of rec.targetTags) dynamicTags[rec.responseKind].add(tag)
     } else if (rec.targetKind === 'node' && rec.responseKind === 'reaction') {
       for (const tag of rec.targetTags) if (!seen.reaction.has(tag)) { seen.reaction.add(tag); recordedReactionTags.push(tag) }
     } else if (rec.targetKind === 'element' && rec.responseKind === 'force') {
@@ -472,6 +483,14 @@ export function compileInputV1(model: Model, analysisHistory: AnalysisHistory): 
       for (let component = 0; component < loadLabels.length; component++) {
         recorders.push({ response: 'elementLoad', elementKind: ref.kind, elementIndex: ref.index, component })
       }
+    }
+  }
+  for (const kind of ['vel', 'accel'] as const) {
+    const labels = dofLabels(ndm, dofsPerNode, kind === 'vel' ? ['vx', 'vy', 'vz', 'vrx', 'vry', 'vrz'] : ['ax', 'ay', 'az', 'arx', 'ary', 'arz'])
+    for (const tag of dynamicTags[kind]) {
+      plan(kind, tag, labels)
+      const node = resolveNode(tag, `${kind} recorder for node ${tag}`)
+      for (let dof = 0; dof < dofsPerNode; dof++) recorders.push({ response: kind === 'vel' ? 'nodeVel' : 'nodeAccel', node, dof })
     }
   }
   // Shells also record their stress resultants at the 4 Gauss points (32 columns each), which the contour view reads.
@@ -671,10 +690,14 @@ function compileTransform(transfType: string | undefined, context: string, diagn
 
 function compileTimeSeries(ts: { tsType: string; args: Record<string, unknown> } | undefined, diagnostics: CompileDiagnostic[]): W.TimeSeriesSpec {
   if (!ts) return { kind: 'constant' }
-  const factor = Number(ts.args.factor) || 1
+  const factor = ts.args.factor === undefined || ts.args.factor === '' ? 1 : Number(ts.args.factor)
+  if (!Number.isFinite(factor)) diagnostics.push({ severity: 'error', message: 'Time-series factor must be finite.', commandIndex: -1 })
   if (ts.tsType === 'Constant') return { kind: 'constant' }
   if (ts.tsType === 'Linear') return { kind: 'linear', slope: factor }
-  diagnostics.push({ severity: 'warning', message: `Time series type "${ts.tsType}" is not yet supported by the Carapace compiler, treating as Constant`, commandIndex: -1 })
+  if (ts.tsType === 'Path') {
+    try { return { kind: 'boundedPath', ...pathSeries(ts.args), useLast: ts.args['-useLast'] === true } }
+    catch (e) { diagnostics.push({ severity: 'error', message: `Path time series: ${e instanceof Error ? e.message : String(e)}`, commandIndex: -1 }) }
+  } else diagnostics.push({ severity: 'error', message: `Time series type "${ts.tsType}" is not supported by Carapace`, commandIndex: -1 })
   return { kind: 'constant' }
 }
 
@@ -695,12 +718,34 @@ function compileStage(
   claimedStage: Map<number, number>,
   resolveNode: (id: number, context: string) => number,
   diagnostics: CompileDiagnostic[],
+  model: Model,
 ): W.StageSpec | null {
   if (stage.kind === 'modal') return { kind: 'modal', id: stage.id, modes: stage.modes }
   if (stage.kind === 'reset') return { kind: 'reset', id: stage.id }
-  if (stage.kind !== 'static') {
-    diagnostics.push({ severity: 'warning', message: `Stage "${stage.id}" (${stage.kind}) is not yet supported by the Carapace decoder and was skipped`, commandIndex: -1 })
-    return null
+  if (stage.kind === 'transient') {
+    const c = stage.config
+    const damping = c.damping ?? { alphaM: 0, betaK: 0 }
+    const error = (message: string) => diagnostics.push({ severity: 'error', message: `Stage "${stage.id}": ${message}`, commandIndex: -1 })
+    if (!Number.isFinite(c.dt) || c.dt <= 0 || !Number.isInteger(c.nSteps) || c.nSteps <= 0) error('dt must be positive and steps must be a positive integer.')
+    if (c.integrator.gamma !== 0.5 || c.integrator.beta !== 0.25) error('Carapace supports Newmark gamma=0.5, beta=0.25 only.')
+    if ([damping.alphaM, damping.betaK].some((v) => !Number.isFinite(v) || v < 0)) error('Damping coefficients must be finite and nonnegative.')
+    if (damping.modalAnchors && (![damping.modalAnchors.mode1, damping.modalAnchors.mode2].every((v) => Number.isInteger(v) && v > 0 && v <= 0xffffffff) || !Number.isFinite(damping.modalAnchors.ratio) || damping.modalAnchors.ratio < 0 || damping.modalAnchors.ratio > 1)) error('Modal damping anchors require positive mode numbers and a ratio between 0 and 1.')
+    const tags = c.patterns?.length ? c.patterns : [...model.patterns.values()].filter((p) => p.patternType === 'UniformExcitation').map((p) => p.id)
+    const groundMotions: Extract<W.StageSpec, { kind: 'transient' }>['groundMotions'] = []
+    for (const tag of new Set(tags)) {
+      const p = model.patterns.get(tag)
+      if (!p || p.patternType !== 'UniformExcitation') { error(`Pattern ${tag} must be a UniformExcitation pattern.`); continue }
+      const direction = Number(p.args.dir) - 1
+      if (!Number.isInteger(direction) || direction < 0 || direction >= model.config!.ndm) error(`Pattern ${tag}: direction must be between 1 and ${model.config!.ndm}.`)
+      if (p.args.dispSeriesTag || p.args.velSeriesTag || Number(p.args.vel0 ?? 0) !== 0 || p.children.length) error(`Pattern ${tag}: displacement/velocity input, initial velocity and child loads are unsupported.`)
+      const ts = model.timeSeries.get(Number(p.args.accelSeriesTag))
+      if (!ts) { error(`Pattern ${tag}: acceleration time series is missing.`); continue }
+      const scaleFactor = Number(p.args.fact ?? 1)
+      if (!Number.isFinite(scaleFactor)) error(`Pattern ${tag}: factor must be finite.`)
+      groundMotions.push({ direction, series: compileTimeSeries(ts, diagnostics), scaleFactor })
+    }
+    if (!groundMotions.length) error('Choose at least one UniformExcitation ground-motion pattern.')
+    return { kind: 'transient', id: stage.id, steps: c.nSteps, dt: c.dt, damping, groundMotions, algorithm: compileAlgorithm(c.algorithm), convergence: c.convergence ? { kind: c.convergence.testType === 'NormDispIncr' ? 'normDispIncr' : c.convergence.testType === 'EnergyIncr' ? 'energyIncr' : 'normUnbalance', tol: c.convergence.tol, maxIter: c.convergence.maxIter } : undefined }
   }
   const integrator: W.IntegratorSpec = stage.integrator.kind === 'load-control'
     ? { kind: 'loadControl', increment: stage.integrator.increment }

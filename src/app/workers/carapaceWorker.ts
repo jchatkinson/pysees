@@ -1,3 +1,4 @@
+import { recorderRows, type RecorderBatch } from '@/app/lib/resultsStorage/recorderRows'
 import type { CarapaceInputV1 } from '@/app/types/carapaceInputV1'
 import type { CarapaceRunResult } from '@/app/types/carapaceRun'
 import type { ModalStageResult, ResultBlock, StorageReply, StorageRequest } from '@/app/types/resultsStorage'
@@ -57,10 +58,9 @@ const cancelledRuns = new Set<string>()
 // Matches `carapace_wasm`'s `StepOutcome`/`RecorderBatch` (wasm-bridge/src/input_v1/session.rs),
 // serialized camelCase via serde-wasm-bindgen. `advance()` returns `any` at the TS boundary since
 // it crosses as a `JsValue`; this is the shape we know it actually has. `recorderBatches` is
-// ordered by `recorderIndex` ascending and, in steady state, has one entry per wire recorder
-// (every recorder samples every step) — recorderIndex `i` is therefore data column `i` of the
-// dense row.
-interface WasmRecorderBatch { recorderIndex: number; stageIndex: number; firstSample: number; samples: [number, number][] }
+// indexed by `recorderIndex`; a stage emits only the responses it supports. Recorder
+// sample counters are independent and do not represent the stored run-wide timeline.
+type WasmRecorderBatch = RecorderBatch
 interface WasmStepOutcome {
   done: boolean
   stageComplete: boolean
@@ -80,7 +80,7 @@ interface WasmStepOutcome {
  * enough prior writes have acked to bring the outstanding total back under budget. A
  * `storageError` reply is sticky — once one arrives, every later call (and the run) fails,
  * matching "storage failure is distinct from solver failure ... never mark such a run complete". */
-class StorageStream {
+export class StorageStream {
   private readonly stride: number
   private pendingRows: number[][] = []
   private pendingFirstSample = 0
@@ -91,8 +91,14 @@ class StorageStream {
   private requestCounter = 0
   private failure: string | null = null
 
-  constructor(private port: MessagePort, private runId: string, private columnCount: number) {
-    this.stride = 1 + columnCount
+  private port: MessagePort
+  private runId: string
+  private nextSample = 0
+  private recorders: CarapaceInputV1['sequence']['recorders']
+
+  constructor(port: MessagePort, runId: string, recorders: CarapaceInputV1['sequence']['recorders']) {
+    this.port = port; this.runId = runId; this.recorders = recorders
+    this.stride = 1 + recorders.length
     port.onmessage = (e: MessageEvent<StorageReply>) => this.onReply(e.data)
   }
 
@@ -107,30 +113,19 @@ class StorageStream {
     return this.pendingRows.length * this.stride * 8
   }
 
-  /** Appends one `advance()` call's worth of steps. `batches` must be ordered by `recorderIndex`
-   * ascending and cover every wire recorder — `columnCount` of them, one per scalar
-   * column — which holds whenever `stepsTaken > 0`, since every recorder samples
-   * every step. A call with the wrong count is dropped with a warning rather than corrupting the
-   * dense row layout. */
-  async add(batches: WasmRecorderBatch[], stageIndex: number): Promise<void> {
-    if (batches.length === 0) return
-    const expected = this.columnCount
-    if (batches.length !== expected) {
-      console.warn(`StorageStream: expected ${expected} recorder batches this call, got ${batches.length} — dropping`)
-      return
-    }
+  /** Accept partial recorder batches (e.g. static stages omit velocity/acceleration),
+   * keeping a contiguous timeline across stages and indexing columns by recorderIndex. */
+  async add(batches: WasmRecorderBatch[], kind: CarapaceInputV1['sequence']['stages'][number]['kind']): Promise<void> {
+    const rows = recorderRows(batches, this.recorders, kind)
+    if (!rows.length) return
+    const stageIndex = batches[0].stageIndex
     if (this.pendingRows.length > 0 && stageIndex !== this.pendingStageIndex) await this.flush()
     if (this.pendingRows.length === 0) {
-      this.pendingFirstSample = batches[0].firstSample
+      this.pendingFirstSample = this.nextSample
       this.pendingStageIndex = stageIndex
     }
-    const stepsTaken = batches[0].samples.length
-    for (let step = 0; step < stepsTaken; step++) {
-      const row = new Array<number>(this.stride)
-      row[0] = batches[0].samples[step][0]
-      for (let wireIndex = 0; wireIndex < batches.length; wireIndex++) row[1 + wireIndex] = batches[wireIndex].samples[step][1]
-      this.pendingRows.push(row)
-    }
+    this.pendingRows.push(...rows)
+    this.nextSample += rows.length
     if (this.pendingBytes() >= FLUSH_BYTE_TARGET) await this.flush()
   }
 
@@ -173,7 +168,7 @@ class StorageStream {
 async function runOne(runId: string, input: CarapaceInputV1, storagePort?: MessagePort) {
   const { decodeInput } = await loadWasm()
   const session = decodeInput(input)
-  const storageStream = storagePort ? new StorageStream(storagePort, runId, input.sequence.recorders.length) : null
+  const storageStream = storagePort ? new StorageStream(storagePort, runId, input.sequence.recorders) : null
 
   const stagesRun: string[] = []
   let error: CarapaceRunResult['error'] = null
@@ -206,7 +201,8 @@ async function runOne(runId: string, input: CarapaceInputV1, storagePort?: Messa
 
     if (storageStream) {
       try {
-        await storageStream.add(outcome.recorderBatches, outcome.recorderBatches[0]?.stageIndex ?? 0)
+        const index = outcome.recorderBatches[0]?.stageIndex
+        if (index !== undefined) await storageStream.add(outcome.recorderBatches, input.sequence.stages[index].kind)
       } catch (storageError) {
         error = { kind: 'storageFailed', detail: String(storageError) }
         break
