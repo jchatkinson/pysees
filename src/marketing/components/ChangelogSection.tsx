@@ -17,17 +17,47 @@ type ChangelogItem = {
 
 const CHANGELOG_ITEMS: ChangelogItem[] = [
   {
+    version: 'v0.5.0',
+    date: 'October 9, 2026',
+    title: '3D Models and Shells',
+    subtitle: 'Model and review 3D frames and shell structures.',
+    content: (
+      <>
+        <p>PySees now handles 3D models (Z-up) alongside 2D, including 4- and 3-node shell elements with nodal, self-weight and pressure loads.</p>
+        <p>Beam local axes follow the OpenSees vecxz rule, and loads, deformed shapes and force diagrams all use them. Shell stress resultants are drawn as contours.</p>
+      </>
+    ),
+    new: ['3D models with ShellMITC4 and ShellDKGT elements', '3D force diagrams (Vy/Vz, Mz/My, torque) in member local axes', 'Shell stress contours in the results viewport', 'Click to select elements in the scene', '3D starter template'],
+    updates: [],
+    bugs: [],
+  },
+  {
+    version: 'v0.4.0',
+    date: 'October 6, 2026',
+    title: 'Analysis in the Browser',
+    subtitle: 'Run models in the browser, view results, and move scripts in and out.',
+    content: (
+      <>
+        <p>Models now analyze directly in your browser with a built-in solver (see <Link to="/carapace" className="underline">Carapace</Link>). Runs happen in a background worker and results are stored locally, so there is no server and no local OpenSees install.</p>
+        <p>Scripts round trip: export OpenSeesPy (or import an existing script) and compare, since the solver is tested against real OpenSees on shared models.</p>
+      </>
+    ),
+    new: ['In-browser static (including pushover), eigen and transient analysis', 'Deformed shape, animation and element force diagrams', 'Plot overlay, filterable data tables and saved Report plots', 'Analysis blocks with drag-and-drop ordering and multiple load cases', 'Import OpenSeesPy and Tcl scripts into the editor', 'Fiber section preview and editor'],
+    updates: ['Retired the local agent; no local OpenSees connection is needed anymore', 'Removed recorder-file import in favor of in-browser results'],
+    bugs: [],
+  },
+  {
     version: 'v0.3.0',
     date: 'March 9, 2026',
     title: 'Live Material Previews',
-    subtitle: 'Create live previews of material definitions by streaming the data to a local opensees instance.',
+    subtitle: 'Chart the response of a uniaxial material under a load protocol.',
     content: (
       <>
-        <p>Added a dedicated Material Preview overlay for uniaxial materials. With this new preview, you can generate a simple load protocol or use your own, and chart the response of your material definition in realtime!</p>
-        <p>The preview is made possible by connecting to a local openseespy instance on the users machine. The included agent script, written in go, will create a websocket to the app and stream io to an available python and opensees instance. Note, python and openseespy must be available on the users path for this to work.</p>
+        <p>Added a dedicated Material Preview overlay for uniaxial materials. Generate a simple load protocol or use your own, and chart the response of your material definition.</p>
+        <p>The preview now runs entirely in the browser on the built-in solver, so there is nothing to install.</p>
       </>
     ),
-    new: ['Material Preview panel with local agent run to preview materials in realtime', 'Load Protocol builder: monotonic, cyclic, and custom strain lists', 'Hysteresis replay controls: Animate and scrub slider to investigate material hysteresis.', 'Local Agent: A small go script to connect to a preinstalled openseespy instance, and facilitate io between the app and openseespy.'],
+    new: ['Material Preview panel that runs in the browser', 'Load Protocol builder: monotonic, cyclic, and custom strain lists', 'Hysteresis replay controls: Animate and scrub slider to investigate material hysteresis.'],
     updates: [],
     bugs: [],
   },

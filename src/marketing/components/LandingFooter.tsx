@@ -13,7 +13,7 @@ export function LandingFooter() {
             <span className="text-xl font-semibold tracking-tight text-slate-900">PySees</span>
           </Link>
           <p className="mt-4 max-w-xs text-sm text-slate-600">
-            Modelling and Post-Processing for OpenseesPy.
+            Modelling, analysis and post-processing for OpenSeesPy.
           </p>
         </div>
 
@@ -23,6 +23,8 @@ export function LandingFooter() {
             <li><Link className="hover:text-slate-900" to="/#features">Features</Link></li>
             <li><Link className="hover:text-slate-900" to="/#changelog">Change Log</Link></li>
             <li><Link className="hover:text-slate-900" to="/studio">Studio</Link></li>
+            <li><Link className="hover:text-slate-900" to="/carapace">Carapace solver</Link></li>
+            <li><a className="hover:text-slate-900" href="https://github.com/jchatkinson/pysees" target="_blank" rel="noreferrer">GitHub</a></li>
           </ul>
         </div>
 

@@ -25,9 +25,9 @@ export function LandingPage() {
       <MarketingHeader currentPath="/" />
       <section className="mx-auto grid w-full max-w-6xl gap-10 px-4 pb-16 pt-10 md:grid-cols-2 md:px-6 md:pt-16">
         <div className="flex flex-col justify-center">
-          <p className="text-xs uppercase tracking-[0.2em] text-sky-600">OpenSeesPy visual pre/post-processor</p>
-          <h1 className="mt-3 text-4xl font-semibold leading-tight tracking-tight text-slate-900 md:text-5xl">Parametric models for OpenSeesPy.</h1>
-          <p className="mt-4 max-w-xl text-base text-slate-600">Build geometry, constraints, loads, and recorders in a history-driven GUI. Export valid Python and import recorder output for results view.</p>
+          <p className="text-xs uppercase tracking-[0.2em] text-sky-600">OpenSeesPy modeling, analysis and results</p>
+          <h1 className="mt-3 text-4xl font-semibold leading-tight tracking-tight text-slate-900 md:text-5xl">Build, analyze and review structural models.</h1>
+          <p className="mt-4 max-w-xl text-base text-slate-600">Model 2D and 3D frames, trusses and shells with OpenSees commands behind every form. Run static, eigen and transient analyses right in the browser, explore deformed shapes, force diagrams and plots, then export a valid OpenSeesPy script when you want to run it in OpenSees.</p>
           <div className="mt-7 flex flex-wrap gap-3">
             <SignedOut>
               <Button size="lg" render={<Link to="/signup">Sign up</Link>} />

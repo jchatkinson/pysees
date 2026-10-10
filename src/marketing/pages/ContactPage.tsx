@@ -20,7 +20,7 @@ export function ContactPage() {
         <div>
           <h2 className="text-4xl font-semibold tracking-tight text-slate-900">Let’s build better analysis workflows</h2>
           <p className="mt-5 text-lg leading-relaxed text-slate-600">
-            PySees focuses on practical OpenSees model authoring and postprocessing UX. If you are using it in coursework, research, or practice, we want to hear where it helps and where it still gets in your way.
+            PySees focuses on practical structural model authoring, analysis and postprocessing UX. If you are using it in coursework, research, or practice, we want to hear where it helps and where it still gets in your way.
           </p>
           <div className="mt-10 space-y-6 text-lg leading-relaxed text-slate-600">
             <div>

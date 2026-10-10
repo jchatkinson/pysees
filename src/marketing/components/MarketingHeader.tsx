@@ -27,6 +27,7 @@ export function MarketingHeader({ currentPath }: MarketingHeaderProps) {
         <nav className="hidden items-center gap-6 md:flex">
           {navItem('Features', '/#features', currentPath)}
           {navItem('Change Log', '/#changelog', currentPath)}
+          {navItem('Solver', '/carapace', currentPath)}
           {navItem('About', '/about', currentPath)}
           {navItem('Contact', '/contact', currentPath)}
         </nav>

@@ -3,6 +3,7 @@ import { AppShell } from '@/app/components/AppShell'
 import { LandingPage } from '@/marketing/pages/LandingPage'
 import { Button } from '@/app/components/ui/button'
 import { AboutPage } from '@/marketing/pages/AboutPage'
+import { CarapacePage } from '@/marketing/pages/CarapacePage'
 import { ContactPage } from '@/marketing/pages/ContactPage'
 import { TermsPage } from '@/marketing/pages/TermsPage'
 import { Link, Navigate, Route, Routes, useLocation } from 'react-router-dom'
@@ -65,6 +66,7 @@ export function App() {
       <Routes>
         <Route path="/" element={<LandingPage />} />
         <Route path="/studio" element={<StudioRoute />} />
+        <Route path="/carapace" element={<CarapacePage />} />
         <Route path="/about" element={<AboutPage />} />
         <Route path="/contact" element={<ContactPage />} />
         <Route path="/terms" element={<TermsPage />} />

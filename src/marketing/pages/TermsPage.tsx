@@ -27,7 +27,7 @@ export function TermsPage() {
           <div className="space-y-3">
             <h2 className="text-2xl font-semibold text-slate-900">1. Terms of Use</h2>
             <p>These Terms govern your use of PySees (the “Service”). By accessing or using PySees, you agree to these Terms.</p>
-            <p>PySees is a visual preprocessor/postprocessor for OpenSeesPy. PySees is an independant project and not directly affiliated with OpenSees or OpenSeesPy. It does not run OpenSees analyses in the browser. It does not replace engineering judgment.</p>
+            <p>PySees is a browser-based tool for building, analyzing and postprocessing structural models, and for exporting them to OpenSeesPy. Analyses run in your browser on the Carapace engine; PySees does not run OpenSees itself. PySees is an independent project and not directly affiliated with OpenSees or OpenSeesPy. It does not replace engineering judgment.</p>
           </div>
 
           <div className="space-y-3">

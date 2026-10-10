@@ -12,22 +12,22 @@ type FeatureGroup = {
 const FEATURE_GROUPS: FeatureGroup[] = [
   {
     eyebrow: 'OUR BEST FEATURES',
-    title: 'Build OpenSeesPy models faster without losing technical clarity',
-    description: 'PySees combines visual modeling with deterministic command history to keep workflows efficient and reproducible.',
+    title: 'Model, analyze and review in one place, with nothing to install',
+    description: 'Every form maps to an OpenSees command, and the model runs in your browser, so a change is a few clicks from new results.',
     items: [
-      { title: 'History-Driven Modeling', detail: 'Every edit is tracked as immutable commands with reliable undo/redo and replay-based state reconstruction.' },
-      { title: 'Schema-Driven Command Forms', detail: 'Command entry maps directly to OpenSees semantics, reducing invalid setup and manual argument errors.' },
-      { title: 'Python Export Pipeline', detail: 'Generate readable OpenSeesPy scripts that can be executed, inspected, and extended outside the GUI.' },
+      { title: 'In-Browser Analysis', detail: 'A built-in solver runs your model in a background worker, with no server and no local install. It is checked against OpenSees on the same models.' },
+      { title: '2D and 3D Models', detail: 'Elastic and fiber-section beam-columns, trusses and MITC4/DKGT shells, with nodal, element, self-weight and pressure loads.' },
+      { title: 'Live Material Preview', detail: 'Drive any uniaxial material through a monotonic, cyclic or custom strain protocol and watch the hysteresis, with a fiber section editor alongside.' },
     ],
   },
   {
-    eyebrow: 'ADVANCED FEATURES',
-    title: 'Scale repetitive workflows with scripting and focused postprocessing',
-    description: 'Use structured automation and lightweight results visualization to iterate on analysis models quickly.',
+    eyebrow: 'RESULTS AND INTEROP',
+    title: 'Understand the response, then take the model anywhere',
+    description: 'Results are stored in your browser and read step by step, so large analyses stay responsive.',
     items: [
-      { title: 'Script-Assisted Generation', detail: 'Use worker-based scripting to emit repeatable geometry and loading patterns as grouped commands.' },
-      { title: 'Deterministic Reproducibility', detail: 'Scene rendering, exported scripts, and model state all derive from the same command timeline.' },
-      { title: 'Results Import Loop', detail: 'Bring recorder outputs back into the app for deformed-shape and response-focused visualization workflows.' },
+      { title: 'Results Viewing', detail: 'Animated deformed shapes, shear/moment/torsion/axial diagrams in the members’ local axes, shell stress contours and step playback.' },
+      { title: 'Plots, Tables and Reports', detail: 'Chart any recorded response, filter and sort data tables, and save plots to a report that regenerates when the model re-runs.' },
+      { title: 'OpenSeesPy and Tcl Round Trip', detail: 'Export readable OpenSeesPy scripts, or import an existing OpenSeesPy or Tcl script into the editor.' },
     ],
   },
 ]
