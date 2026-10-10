@@ -1,7 +1,6 @@
 import { Button } from '@/app/components/ui/button'
 import { PiscesLogo } from '@/app/components/icons/PiscesLogo'
 import { Link } from 'react-router-dom'
-import { SignInButton, SignUpButton, SignedIn, SignedOut, UserButton } from '@clerk/clerk-react'
 
 interface MarketingHeaderProps {
   currentPath: string
@@ -32,18 +31,7 @@ export function MarketingHeader({ currentPath }: MarketingHeaderProps) {
           {navItem('Contact', '/contact', currentPath)}
         </nav>
         <div className="flex items-center gap-2">
-          <SignedOut>
-            <SignInButton mode="modal">
-              <Button variant="ghost" size="sm">Log in</Button>
-            </SignInButton>
-            <SignUpButton mode="modal">
-              <Button size="sm">Sign up</Button>
-            </SignUpButton>
-          </SignedOut>
           <Button size="sm" render={<Link to="/studio">Open Studio</Link>} />
-          <SignedIn>
-            <UserButton afterSignOutUrl="/" appearance={{ elements: { avatarBox: 'h-8 w-8' } }} />
-          </SignedIn>
         </div>
       </div>
     </header>

@@ -8,7 +8,6 @@ import hero1 from '@/marketing/assets/hero1.png'
 import hero2 from '@/marketing/assets/hero2.png'
 import hero3 from '@/marketing/assets/hero3.png'
 import { Link } from 'react-router-dom'
-import { SignedOut } from '@clerk/clerk-react'
 
 export function LandingPage() {
   const heroShots = [
@@ -29,11 +28,7 @@ export function LandingPage() {
           <h1 className="mt-3 text-4xl font-semibold leading-tight tracking-tight text-slate-900 md:text-5xl">Build, analyze and review structural models.</h1>
           <p className="mt-4 max-w-xl text-base text-slate-600">Model 2D and 3D frames, trusses and shells with OpenSees commands behind every form. Run static, eigen and transient analyses right in the browser, explore deformed shapes, force diagrams and plots, then export a valid OpenSeesPy script when you want to run it in OpenSees.</p>
           <div className="mt-7 flex flex-wrap gap-3">
-            <SignedOut>
-              <Button size="lg" render={<Link to="/signup">Sign up</Link>} />
-              <Button size="lg" variant="secondary" render={<Link to="/login">Log in</Link>} />
-            </SignedOut>
-            <Button size="lg" variant="outline" render={<Link to="/studio">Open Studio</Link>} />
+            <Button size="lg" render={<Link to="/studio">Open Studio</Link>} />
           </div>
           <div className="mt-8 flex flex-wrap gap-3">
             {heroShots.map((shot, idx) => (

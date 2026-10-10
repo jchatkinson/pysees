@@ -20,10 +20,10 @@ local OpenSees process or agent.
 ## Tech Stack
 
 Vite, React, TypeScript, Zustand (`src/app/store/useAppStore.ts`), Three.js via @react-three/fiber +
-drei, shadcn/Base UI + Tailwind v4, recharts (charts), TanStack Table, react-router, Clerk (auth gate on `/studio`).
+drei, shadcn/Base UI + Tailwind v4, recharts (charts), TanStack Table, react-router.
 Carapace wasm runs in Web Workers; results persist in IndexedDB through a storage worker.
 
-Routes: marketing pages (`src/marketing`) and the app at `/studio` (`AppShell`), behind sign-in.
+Routes: marketing pages (`src/marketing`) and the app at `/studio` (`AppShell`), accessible without an account.
 
 ---
 

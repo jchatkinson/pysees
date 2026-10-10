@@ -7,7 +7,6 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Undo2, Redo2 } from 'lucide-react'
 import { useAppStore } from '@/app/store/useAppStore'
 import { PiscesLogo } from '@/app/components/icons/PiscesLogo'
-import { UserButton } from '@clerk/clerk-react'
 import { patternColor } from '@/app/components/r3f/utils'
 import { downloadScript } from '@/app/lib/exportScript'
 import { importScript } from '@/app/lib/scriptImport'
@@ -136,9 +135,6 @@ export function TopBar() {
           />
           <TooltipContent>Redo</TooltipContent>
         </Tooltip>
-      </div>
-      <div className="ml-auto">
-        <UserButton afterSignOutUrl="/" appearance={{ elements: { avatarBox: 'h-7 w-7' } }} />
       </div>
       <input ref={fileInput} type="file" accept=".tcl,.py,.txt" className="hidden" onChange={(e) => { void pickScript(e.target.files?.[0]); e.target.value = '' }} />
       <ImportScriptDialog

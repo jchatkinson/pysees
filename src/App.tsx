@@ -7,7 +7,6 @@ import { CarapacePage } from '@/marketing/pages/CarapacePage'
 import { ContactPage } from '@/marketing/pages/ContactPage'
 import { TermsPage } from '@/marketing/pages/TermsPage'
 import { Link, Navigate, Route, Routes, useLocation } from 'react-router-dom'
-import { RedirectToSignIn, SignIn, SignUp, SignedIn, SignedOut } from '@clerk/clerk-react'
 import { useEffect } from 'react'
 
 function HashScrollHandler() {
@@ -20,31 +19,6 @@ function HashScrollHandler() {
     })
   }, [hash])
   return null
-}
-
-function StudioRoute() {
-  return (
-    <>
-      <SignedIn>
-        <AppShell />
-      </SignedIn>
-      <SignedOut>
-        <RedirectToSignIn redirectUrl="/studio" />
-      </SignedOut>
-    </>
-  )
-}
-
-function AuthPage({ mode }: { mode: 'sign-in' | 'sign-up' }) {
-  return (
-    <main className="grid min-h-screen place-items-center bg-slate-50 px-6">
-      {mode === 'sign-in' ? (
-        <SignIn routing="path" path="/login" signUpUrl="/signup" fallbackRedirectUrl="/studio" />
-      ) : (
-        <SignUp routing="path" path="/signup" signInUrl="/login" fallbackRedirectUrl="/studio" />
-      )}
-    </main>
-  )
 }
 
 function NotFound() {
@@ -65,13 +39,13 @@ export function App() {
       <HashScrollHandler />
       <Routes>
         <Route path="/" element={<LandingPage />} />
-        <Route path="/studio" element={<StudioRoute />} />
+        <Route path="/studio" element={<AppShell />} />
         <Route path="/carapace" element={<CarapacePage />} />
         <Route path="/about" element={<AboutPage />} />
         <Route path="/contact" element={<ContactPage />} />
         <Route path="/terms" element={<TermsPage />} />
-        <Route path="/signup" element={<AuthPage mode="sign-up" />} />
-        <Route path="/login" element={<AuthPage mode="sign-in" />} />
+        <Route path="/signup/*" element={<Navigate to="/studio" replace />} />
+        <Route path="/login/*" element={<Navigate to="/studio" replace />} />
         <Route path="/app" element={<Navigate to="/studio" replace />} />
         <Route path="*" element={<NotFound />} />
       </Routes>

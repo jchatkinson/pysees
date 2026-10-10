@@ -148,8 +148,7 @@ export function ChangelogSection() {
           <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-900">Changelog</h2>
           <p className="mt-3 text-sm text-slate-600">See what is shipping in PySees as modeling and results workflows evolve.</p>
           <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
-            <input type="email" placeholder="Your email" className="h-8 w-56 rounded-md border border-slate-300 bg-white px-3 text-sm" />
-            <Button size="lg" render={<Link to="/signup">Sign up</Link>} />
+            <Button size="lg" render={<Link to="/studio">Open Studio</Link>} />
           </div>
         </div>
         <div className="relative mt-12">

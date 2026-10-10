@@ -3,7 +3,7 @@ import { Separator } from '@/app/components/ui/separator'
 import { MarketingHeader } from '@/marketing/components/MarketingHeader'
 import { Link } from 'react-router-dom'
 
-const lastUpdated = 'March 9, 2026'
+const lastUpdated = 'October 10, 2026'
 
 export function TermsPage() {
   return (
@@ -31,11 +31,10 @@ export function TermsPage() {
           </div>
 
           <div className="space-y-3">
-            <h3 className="text-xl font-semibold text-slate-900">2. Eligibility and Account Use</h3>
+            <h3 className="text-xl font-semibold text-slate-900">2. Use of the Service</h3>
             <ul className="list-disc space-y-2 pl-6">
-              <li>You must provide accurate account information and keep your login credentials secure.</li>
-              <li>You are responsible for activity under your account.</li>
-              <li>By creating an account, you agree we may contact you about service operations, account security, billing (if applicable), and product updates. You can opt out of non-essential communications.</li>
+              <li>PySees does not require an account or login.</li>
+              <li>You are responsible for your use of the Service and for keeping copies of your models and scripts.</li>
               <li>You may not use the Service for unlawful activity, abuse, or attempts to compromise system security.</li>
             </ul>
           </div>
@@ -86,9 +85,9 @@ export function TermsPage() {
           <div className="space-y-3">
             <h3 className="text-xl font-semibold text-slate-900">1. Information We Collect</h3>
             <ul className="list-disc space-y-2 pl-6">
-              <li>Account data from authentication providers (for example: user ID, email, profile metadata).</li>
-              <li>Usage and diagnostic data (for example: logs, basic analytics, error reports).</li>
-              <li>Content you create in the app, such as model definitions and scripts you choose to store.</li>
+              <li>PySees has no user accounts and does not collect account identifiers, email addresses, or profile data for authentication.</li>
+              <li>Models and analyses run in your browser. Analysis results are stored locally in your browser, and model definitions and scripts are not uploaded by the app.</li>
+              <li>Hosting providers may process standard request information, such as IP addresses and browser details, when serving the website.</li>
             </ul>
           </div>
 
@@ -96,7 +95,6 @@ export function TermsPage() {
             <h3 className="text-xl font-semibold text-slate-900">2. How We Use Information</h3>
             <ul className="list-disc space-y-2 pl-6">
               <li>Provide and secure the Service.</li>
-              <li>Authenticate users and manage accounts.</li>
               <li>Diagnose issues, improve reliability, and develop features.</li>
               <li>Respond to support requests and enforce our Terms.</li>
             </ul>
@@ -104,26 +102,26 @@ export function TermsPage() {
 
           <div className="space-y-3">
             <h3 className="text-xl font-semibold text-slate-900">3. Sharing</h3>
-            <p>We do not sell personal information. We may share information with service providers that support authentication, hosting, analytics, and operations, or when required by law.</p>
+            <p>We do not sell personal information. Website hosting may involve service providers processing request information, or disclosure when required by law.</p>
           </div>
 
           <div className="space-y-3">
             <h3 className="text-xl font-semibold text-slate-900">4. Data Retention and Security</h3>
-            <p>We retain information for as long as needed to operate the Service and meet legal obligations. We use reasonable technical and organizational safeguards, but no system is completely secure.</p>
+            <p>Analysis results remain in browser storage until removed by the app or cleared through your browser settings. Keep your own copies of models and exported scripts. Hosting providers manage any request logs under their own retention and security policies.</p>
           </div>
 
           <div className="space-y-3">
             <h3 className="text-xl font-semibold text-slate-900">5. Your Choices</h3>
             <ul className="list-disc space-y-2 pl-6">
-              <li>You can request account deletion by contacting us.</li>
-              <li>You can avoid storing sensitive project data in the Service.</li>
+              <li>You can clear locally stored results through your browser’s site-data settings.</li>
+              <li>You can export scripts and keep your own project files.</li>
               <li>You can stop using the Service at any time.</li>
             </ul>
           </div>
 
           <div className="space-y-3">
             <h3 className="text-xl font-semibold text-slate-900">6. International Users</h3>
-            <p>If you access the Service from outside the region where our infrastructure is hosted, your information may be transferred and processed in that region.</p>
+            <p>Website requests may be processed wherever the hosting provider operates. Model analysis and result storage take place in your browser.</p>
           </div>
 
           <div className="space-y-3">

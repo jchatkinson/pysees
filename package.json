@@ -17,7 +17,6 @@
   },
   "dependencies": {
     "@base-ui/react": "^1.2.0",
-    "@clerk/clerk-react": "^5.46.0",
     "@dnd-kit/core": "^6.3.1",
     "@dnd-kit/sortable": "^10.0.0",
     "@dnd-kit/utilities": "^3.2.2",
@@ -59,8 +58,5 @@
     "typescript-eslint": "^8.46.4",
     "vite": "^8.2.2",
     "vitest": "^5.0.3"
-  },
-  "allowScripts": {
-    "@clerk/shared@3.47.8": true
   }
 }

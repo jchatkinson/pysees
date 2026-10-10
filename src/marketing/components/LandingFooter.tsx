@@ -1,7 +1,6 @@
 import { Button } from '@/app/components/ui/button'
 import { PiscesLogo } from '@/app/components/icons/PiscesLogo'
 import { Link } from 'react-router-dom'
-import { SignedIn, SignedOut } from '@clerk/clerk-react'
 
 export function LandingFooter() {
   return (
@@ -39,15 +38,9 @@ export function LandingFooter() {
 
         <div>
           <h3 className="text-base font-semibold text-slate-900">Ready to Start?</h3>
-          <p className="mt-4 text-sm text-slate-600">Create an account to save models and stay updated as features ship.</p>
+          <p className="mt-4 text-sm text-slate-600">Build and analyze models in your browser. No account required.</p>
           <div className="mt-5 flex flex-wrap gap-2">
-            <SignedOut>
-              <Button size="lg" render={<Link to="/signup">Sign up</Link>} />
-              <Button size="lg" variant="secondary" render={<Link to="/login">Log in</Link>} />
-            </SignedOut>
-            <SignedIn>
-              <Button size="lg" variant="outline" render={<Link to="/studio">Open Studio</Link>} />
-            </SignedIn>
+            <Button size="lg" render={<Link to="/studio">Open Studio</Link>} />
           </div>
         </div>
       </div>
