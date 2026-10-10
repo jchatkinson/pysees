@@ -33,14 +33,20 @@ const MESH_STROKE = '#475569'
 /** Skip mesh lines once cells get too small to read (px). */
 const MIN_CELL_PX = 3
 
-/** Mesh lines for a rect patch: numSubdivY columns × numSubdivZ rows, matching how OpenSees divides the patch into fibers. */
+/** Mesh lines for a rect patch: numSubdivY rows × numSubdivZ columns, matching how OpenSees divides the patch into fibers. */
 function rectMesh(a: Record<string, unknown>, project: (y: number, z: number) => [number, number]) {
   const nY = Math.max(1, Math.round(Number(a.numSubdivY)) || 1), nZ = Math.max(1, Math.round(Number(a.numSubdivZ)) || 1)
   const y1 = Number(a.y1), y2 = Number(a.y2), z1 = Number(a.z1), z2 = Number(a.z2)
-  const [xa, ya] = project(y1, z1), [xb, yb] = project(y2, z2)
   const lines: [number, number, number, number][] = []
-  if (Math.abs(xb - xa) / nY >= MIN_CELL_PX) for (let k = 1; k < nY; k++) { const x = xa + ((xb - xa) * k) / nY; lines.push([x, ya, x, yb]) }
-  if (Math.abs(yb - ya) / nZ >= MIN_CELL_PX) for (let k = 1; k < nZ; k++) { const y = ya + ((yb - ya) * k) / nZ; lines.push([xa, y, xb, y]) }
+  const [xa, ya] = project(y1, z1), [xb, yb] = project(y2, z2)
+  if (Math.abs(yb - ya) / nY >= MIN_CELL_PX) for (let k = 1; k < nY; k++) {
+    const y = y1 + ((y2 - y1) * k) / nY
+    lines.push([...project(y, z1), ...project(y, z2)])
+  }
+  if (Math.abs(xb - xa) / nZ >= MIN_CELL_PX) for (let k = 1; k < nZ; k++) {
+    const z = z1 + ((z2 - z1) * k) / nZ
+    lines.push([...project(y1, z), ...project(y2, z)])
+  }
   return lines
 }
 
@@ -90,17 +96,18 @@ export function SectionPreview({ children, hoveredIndex = null, selectedIndex = 
     ro.observe(el)
     return () => ro.disconnect()
   }, [])
-  const scale = Math.min((size.w - 2 * PAD) / (bounds.maxY - bounds.minY), (size.h - 2 * PAD) / (bounds.maxZ - bounds.minZ))
+  const scale = Math.min((size.w - 2 * PAD) / (bounds.maxZ - bounds.minZ), (size.h - 2 * PAD) / (bounds.maxY - bounds.minY))
   // Centre the section in whatever space the container gives us.
-  const offX = (size.w - (bounds.maxY - bounds.minY) * scale) / 2
-  const offY = (size.h - (bounds.maxZ - bounds.minZ) * scale) / 2
+  const offX = (size.w - (bounds.maxZ - bounds.minZ) * scale) / 2
+  const offY = (size.h - (bounds.maxY - bounds.minY) * scale) / 2
   const project = (y: number, z: number): [number, number] => [
-    offX + (y - bounds.minY) * scale,
-    size.h - offY - (z - bounds.minZ) * scale,
+    offX + (z - bounds.minZ) * scale,
+    size.h - offY - (y - bounds.minY) * scale,
   ]
 
   return (
     <div ref={box} className="border rounded-sm bg-muted/30 relative w-[42%] min-w-[260px] shrink-0 self-stretch min-h-0 overflow-hidden">
+      <span className="absolute bottom-1 left-2 text-xs text-muted-foreground">↑ y · z →</span>
       <svg width={size.w} height={size.h} className="absolute inset-0">
         {children.map((c, i) => {
           const a = c.args

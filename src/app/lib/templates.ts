@@ -1,4 +1,5 @@
 import los000Text from '@/app/assets/groundMotions/LOS000.AT2?raw'
+import los270Text from '@/app/assets/groundMotions/LOS270.AT2?raw'
 import { parseGroundMotion } from '@/app/lib/groundMotion'
 import type { AnalysisCommand } from '@/app/types/analysisCommands'
 import type { ModelWrite } from '@/app/lib/modelWrite'
@@ -19,8 +20,9 @@ export interface TemplateResult {
   levels?: LevelEntity[]
 }
 
-// Bundled copy of public/LOS000.AT2 so templates remain synchronous and self-contained.
+// Bundled copies of public/LOS000.AT2 and LOS270.AT2 keep templates synchronous and self-contained.
 const FRAME_GROUND_MOTION = parseGroundMotion(los000Text)
+const FRAME_GROUND_MOTION_Y = parseGroundMotion(los270Text)
 const PUSHOVER_STEPS = 100
 
 // Frame gravity loads: psf area loads over a 6 m tributary (out-of-plane bay) width, in SI (N/m).
@@ -363,15 +365,24 @@ export function frame3dTemplate({ stories, storyH, baysX, bayX, baysY, bayY }: F
     { kind: 'timeSeries', entity: { id: 1, tsType: 'Linear', args: { type: 'Linear', tag: 1, factor: 1 } } },
     pattern(1, 'Dead Load', [{ kind: 'eleLoad', args: { eleTags: beamTags, wx: 0, wy: 0, wz: -FRAME3D_BEAM_LOAD } }]),
     pattern(2, 'Push', pushLoads),
+    { kind: 'timeSeries', entity: { id: 2, tsType: 'Path', args: { type: 'Path', tag: 2, dt: FRAME_GROUND_MOTION.dt, values: [...FRAME_GROUND_MOTION.values], factor: 9.80665, '-prependZero': true } } },
+    { kind: 'timeSeries', entity: { id: 3, tsType: 'Path', args: { type: 'Path', tag: 3, dt: FRAME_GROUND_MOTION_Y.dt, values: [...FRAME_GROUND_MOTION_Y.values], factor: 9.80665, '-prependZero': true } } },
+    { kind: 'pattern', entity: { id: 3, name: 'LOS000 · X ground motion (0.1×)', patternType: 'UniformExcitation', args: { type: 'UniformExcitation', patternTag: 3, dir: 1, accelSeriesTag: 2, fact: 0.1 }, children: [] } },
+    { kind: 'pattern', entity: { id: 4, name: 'LOS270 · Y ground motion (0.1×)', patternType: 'UniformExcitation', args: { type: 'UniformExcitation', patternTag: 4, dir: 2, accelSeriesTag: 3, fact: 0.1 }, children: [] } },
   ]
 
   const levels: LevelEntity[] = [{ id: 1, label: 'A', height: 0 }]
   for (let j = 1; j <= stories; j++) levels.push({ id: j + 1, label: alphaLabel(j), height: storyH })
 
   const analysisCommands: AnalysisCommand[] = [
-    { type: 'ANALYSIS_BLOCK', blockId: 'whole-model-recorder', params: { directory: 'out' } },
+    { type: 'ANALYSIS_BLOCK', blockId: 'whole-model-recorder', params: { directory: 'out', dynamic: 'Yes' } },
     eigenAnalysis(3 * stories * (baysX + 1) * (baysY + 1)),
     { type: 'ANALYSIS_BLOCK', blockId: 'run-gravity-analysis', params: { patterns: [1], steps: 10, holdLoads: 'Yes' } },
+    { type: 'ANALYSIS_BLOCK', blockId: 'wipe-analysis', params: {} },
+    { type: 'ANALYSIS_BLOCK', blockId: 'run-earthquake-analysis', params: { patterns: [3, 4], dt: FRAME_GROUND_MOTION.dt, nSteps: Math.max(FRAME_GROUND_MOTION.values.length, FRAME_GROUND_MOTION_Y.values.length), dampingMode: 'Modal periods', modalPeriod1: 'T1', modalPeriod2: 'T3', dampingPercent: 5, algorithm: 'Newton', tol: 1e-6, maxIter: 50 } },
+    { type: 'ANALYSIS_BLOCK', blockId: 'reset-model', params: {} },
+    { type: 'ANALYSIS_BLOCK', blockId: 'wipe-analysis', params: {} },
+    { type: 'ANALYSIS_BLOCK', blockId: 'run-gravity-analysis', params: { patterns: [1], steps: 1, holdLoads: 'Yes' } },
     { type: 'ANALYSIS_BLOCK', blockId: 'run-pushover-analysis', params: { patterns: [2], nodeTag: nodeId(baysX, stories, 0), dof: 1, increment: 0.01 * stories * storyH / PUSHOVER_STEPS, steps: PUSHOVER_STEPS } },
   ]
 

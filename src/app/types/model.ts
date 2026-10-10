@@ -5,7 +5,7 @@ export interface MassEntity { nodeId: number; values: number[] }
 export interface MaterialEntity { id: number; kind: 'uniaxial' | 'nD'; matType: string; args: Record<string, unknown> }
 export interface FiberSectionItem { kind: 'fiber' | 'patch' | 'layer'; subType: string; args: Record<string, unknown> }
 /** Present when a Fiber section's children were last (re)generated from the Section Editor's parametric templates — lets the dialog reopen straight into the template form. Cleared once a user hand-edits a child. */
-export interface SectionTemplateMeta { kind: 'rect' | 'circle' | 'i' | 'c' | 'l' | 'tube'; params: Record<string, unknown> }
+export interface SectionTemplateMeta { kind: import('@/app/lib/sections/types').SectionTemplateKind; params: Record<string, unknown> }
 export interface SectionEntity { id: number; secType: string; args: Record<string, unknown>; children: FiberSectionItem[]; template?: SectionTemplateMeta } // children only meaningful for 'Fiber'/'NDFiber' secType
 export interface GeomTransfEntity { id: number; transfType: string; args: Record<string, unknown> }
 export interface BeamIntegrationEntity { id: number; intType: string; args: Record<string, unknown> }

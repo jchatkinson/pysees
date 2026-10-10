@@ -2,6 +2,7 @@
 import { readFileSync } from 'node:fs'
 import { parseGroundMotion } from '@/app/lib/groundMotion'
 import { describe, expect, it } from 'vitest'
+import { frame3dTemplate } from '@/app/lib/templates'
 import { modelFromWrites } from './testkit'
 import { compileInputV1 } from '@/app/lib/carapace/compileInputV1'
 import { exportScript } from '@/app/lib/exportScript'
@@ -77,6 +78,42 @@ describe('transient pipeline', () => {
     command.params.modalPeriod2 = 'T0'
     expect(compileInputV1(model, history).input).toBeNull()
   })
+  it.skipIf(!opensesAvailable)('runs both supplied horizontal components together on the 3D frame template', () => {
+    const t = frame3dTemplate({ stories: 2, storyH: 3, baysX: 2, bayX: 5, baysY: 1, bayY: 4 })
+    const model = modelFromWrites(t.ndm, t.ndf, t.writes)
+    const history: AnalysisHistory = { commands: t.analysisCommands, cursor: t.analysisCommands.length - 1 }
+    const records = ['LOS000', 'LOS270'].map((name) => parseGroundMotion(readFileSync(`public/${name}.AT2`, 'utf8')))
+    for (let i = 0; i < records.length; i++) {
+      expect(model.timeSeries.get(i + 2)?.args).toMatchObject({ dt: records[i].dt, values: records[i].values, factor: 9.80665, '-prependZero': true })
+      expect(model.patterns.get(i + 3)?.args).toMatchObject({ dir: i + 1, accelSeriesTag: i + 2, fact: 0.1 })
+    }
+    const run = runCarapace(model, history), reference = runOpenSees(exportScript(model, history))
+    expect(run.error).toBeNull(); expect(reference.failures, reference.stderr).toEqual([])
+    const earthquake = run.compile.input!.sequence.stages.find((s) => s.kind === 'transient')!
+    if (earthquake.kind !== 'transient') throw new Error('Missing earthquake')
+    expect(earthquake.dt).toBe(0.01)
+    expect(earthquake.steps).toBe(1999)
+    expect(earthquake.groundMotions.map((g) => [g.direction, g.scaleFactor])).toEqual([[0, 0.1], [1, 0.1]])
+    for (const dof of [0, 1]) {
+      const indices = run.compile.input!.sequence.recorders.flatMap((r, i) => r.response === 'nodeDisp' && r.dof === dof ? [i] : [])
+      expect(indices.some((i) => run.columns[i].slice(10, 2009).some((v) => Math.abs(v) > 1e-6))).toBe(true)
+    }
+    const comparison = compareRuns(model, run, reference.files)
+    expect(comparison.steps).toEqual({ carapace: 2110, opensees: 2110 })
+    for (const q of ['disp', 'reaction', 'force'] as const) {
+      expect(comparison.compared[q], q).toBeGreaterThan(0)
+      expect(comparison.maxRel[q], q).toBeLessThan(1e-5)
+    }
+    // Carapace emits velocity/acceleration only in transient stages; OpenSees also emits static rows.
+    const dynamicRun = { ...run, times: run.times.slice(10, 2009), columns: run.columns.map((c) => c.length === 2110 ? c.slice(10, 2009) : c) }
+    const dynamicFiles = Object.fromEntries(Object.entries(reference.files).map(([name, text]) => [name, text.trim().split('\n').slice(10, 2009).join('\n')]))
+    const dynamicComparison = compareRuns(model, dynamicRun, dynamicFiles)
+    for (const q of ['vel', 'accel'] as const) {
+      expect(dynamicComparison.compared[q], `${q}: ${JSON.stringify(dynamicComparison)}`).toBeGreaterThan(0)
+      expect(dynamicComparison.maxRel[q], q).toBeLessThan(1e-5)
+    }
+  })
+
   it('retains zero scale factors and refuses unsupported or invalid earthquake inputs', () => {
     const { model, history } = fixture(2, 0)
     expect(runCarapace(model, history).columns.flat().every((v) => v === 0)).toBe(true)
@@ -103,7 +140,7 @@ describe('transient pipeline', () => {
     const comparison = compareRuns(model, run, reference.files)
     expect(comparison.steps).toEqual({ carapace: 20, opensees: 20 })
     for (const q of ['disp', 'vel', 'accel', 'reaction', 'force'] as const) {
-      expect(comparison.compared[q]).toBeGreaterThan(0)
+      expect(comparison.compared[q], `${q}: ${JSON.stringify(comparison)}`).toBeGreaterThan(0)
       expect(comparison.maxRel[q], `${q}: ${JSON.stringify(comparison)}`).toBeLessThan(1e-5)
     }
   })
