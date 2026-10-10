@@ -9,7 +9,8 @@ import { useAppStore } from '@/app/store/useAppStore'
 import { PiscesLogo } from '@/app/components/icons/PiscesLogo'
 import { patternColor } from '@/app/components/r3f/utils'
 import { downloadScript } from '@/app/lib/exportScript'
-import { importScript } from '@/app/lib/scriptImport'
+import { readScriptFile } from '@/app/lib/project/open'
+import { downloadProject } from '@/app/lib/project/save'
 import { ImportScriptDialog, type ImportPreview } from '@/app/components/ImportScriptDialog'
 
 const MAX_IMPORT_BYTES = 5_000_000
@@ -33,14 +34,17 @@ export function TopBar() {
     setGridlinesDialogOpen,
     newModel,
     initModel,
+    loadProject,
+    projectFileName,
   } = useAppStore()
   const [newModelConfirmOpen, setNewModelConfirmOpen] = useState(false)
   const [importPreview, setImportPreview] = useState<ImportPreview | null>(null)
   const fileInput = useRef<HTMLInputElement>(null)
+  const openInput = useRef<HTMLInputElement>(null)
   const pickScript = async (file: File | undefined) => {
     if (!file) return
     if (file.size > MAX_IMPORT_BYTES) return window.alert(`${file.name} is too large to import (limit ${MAX_IMPORT_BYTES / 1e6} MB).`)
-    setImportPreview({ fileName: file.name, result: importScript(await file.text(), file.name) })
+    setImportPreview({ fileName: file.name, result: readScriptFile(await file.text(), file.name) })
   }
   const undo = activePanel === 'model' ? modelUndo : analysisUndo
   const redo = activePanel === 'model' ? modelRedo : analysisRedo
@@ -59,8 +63,9 @@ export function TopBar() {
         <DropdownMenuTrigger render={<Button variant="ghost" size="sm" className="h-8 px-2 text-xs">File</Button>} />
         <DropdownMenuContent>
           <DropdownMenuItem onClick={() => (model.config ? setNewModelConfirmOpen(true) : newModel())}>New Model</DropdownMenuItem>
+          <DropdownMenuItem onClick={() => openInput.current?.click()}>Open .py…</DropdownMenuItem>
+          <DropdownMenuItem disabled={!model.config} onClick={() => downloadProject(useAppStore.getState(), projectFileName)}>Save .py…</DropdownMenuItem>
           <DropdownMenuItem onClick={() => fileInput.current?.click()}>Import .tcl / .py…</DropdownMenuItem>
-          <DropdownMenuItem disabled={!model.config} onClick={() => downloadScript(model, analysisHistory, 'py')}>Export .py</DropdownMenuItem>
           <DropdownMenuItem disabled={!model.config} onClick={() => downloadScript(model, analysisHistory, 'tcl')}>Export .tcl</DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
@@ -136,12 +141,13 @@ export function TopBar() {
           <TooltipContent>Redo</TooltipContent>
         </Tooltip>
       </div>
+      <input ref={openInput} type="file" accept=".py,.txt" className="hidden" onChange={(e) => { void pickScript(e.target.files?.[0]); e.target.value = '' }} />
       <input ref={fileInput} type="file" accept=".tcl,.py,.txt" className="hidden" onChange={(e) => { void pickScript(e.target.files?.[0]); e.target.value = '' }} />
       <ImportScriptDialog
         preview={importPreview}
         replacing={!!model.config && (model.nodes.size > 0 || model.elements.size > 0)}
         onCancel={() => setImportPreview(null)}
-        onConfirm={(r) => { initModel(r.ndm, r.ndf, { writes: r.writes }); setImportPreview(null) }}
+        onConfirm={(r) => { if (r.project) loadProject(r.project, importPreview?.fileName); else initModel(r.ndm, r.ndf, { writes: r.writes }); setImportPreview(null) }}
       />
       <AlertDialog open={newModelConfirmOpen} onOpenChange={setNewModelConfirmOpen}>
         <AlertDialogContent>

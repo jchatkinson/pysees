@@ -312,6 +312,7 @@ export function blockAsSchema(block: AnalysisBlockDef): CommandSchema {
 
 /** Resolves an ANALYSIS_BLOCK command (or passes through anything else) into concrete commands — used by the exporter and live preview. */
 export function resolveAnalysisCommand(cmd: AnalysisCommand, model: Model): AnalysisCommand[] {
+  if (cmd.disabled) return []
   if (cmd.type === 'ANALYSIS_BLOCK') {
     const block = getAnalysisBlock(cmd.blockId)
     if (!block) return []

@@ -1,8 +1,9 @@
 /** The language-neutral form of an OpenSees command: Tcl and OpenSeesPy share one positional argument sequence. */
 export type Tok = number | string
 
-/** `body` holds a block's child commands (Tcl `pattern … { load … }`; OpenSeesPy prints them as following calls). */
-export interface Call { fn: string; args: Tok[]; body?: Call[]; comment?: string }
+/** `body` holds a block's child commands (Tcl `pattern … { load … }`; OpenSeesPy prints them as following calls).
+ * `fn: '#'` is a verbatim comment line (`args[0]`), used for `# @pysees` annotations; `before` are such lines printed ahead of the call. */
+export interface Call { fn: string; args: Tok[]; body?: Call[]; comment?: string; before?: Call[] }
 
 /** A command that cannot be represented; the importer reports it and moves on. */
 export class Skip extends Error {}

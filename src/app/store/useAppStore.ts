@@ -16,6 +16,7 @@ import { DEFAULT_RESULTS_VIEW, type ResultsView } from '@/app/types/resultsView'
 import type { SavedPlot } from '@/app/types/savedPlot'
 import { plotNameFor, restorePlot, snapshotPlot, uniqueName } from '@/app/lib/plot/savedPlots'
 import { DEFAULT_PLOT_VIEW, SERIES_COLORS, type Channel, type PlotView, type SeriesSpec } from '@/app/types/plotView'
+import { RESULTS_PREF_KEYS, PLOT_PREF_KEYS, type ProjectDocument } from '@/app/lib/project/types'
 import type { CompileDiagnostic } from '@/app/lib/compileAnalysisSequence'
 
 /** Suits both forces and displacements in most structural problems. */
@@ -160,6 +161,10 @@ interface AppStore {
   // Model actions
   initModel: (ndm: 2 | 3, ndf: number, extra?: { writes?: ModelWrite[]; analysisCommands?: AnalysisCommand[]; gridlines?: GridlineEntity[]; levels?: LevelEntity[] }) => void
   newModel: () => void
+  /** File name a saved project downloads as; an opened project keeps its own. */
+  projectFileName: string
+  /** Replaces the whole authored project in one update (model, analysis, layout, report, display preferences) and resets results, undo history and selections. */
+  loadProject: (project: ProjectDocument, fileName?: string) => void
   writeModelEntity: (write: ModelWrite) => void
   previewDeleteModelEntity: (kind: ModelDeletableKind, id: number) => string[]
   deleteModelEntity: (kind: ModelDeletableKind, id: number) => void
@@ -408,6 +413,24 @@ export const useAppStore = create<AppStore>((set, get) => {
     }
   }),
 
+  projectFileName: 'model.py',
+  loadProject: (project, fileName) => {
+    void clearAllRuns()
+    const keep = <T extends object>(from: Partial<T>, keys: readonly (keyof T)[]) => Object.fromEntries(keys.filter((k) => from[k] !== undefined).map((k) => [k, from[k]])) as Partial<T>
+    set((s) => ({
+      model: project.model, modelPast: [], modelFuture: [],
+      analysisHistory: { commands: project.analysis.commands, cursor: project.analysis.commands.length - 1 },
+      gridlines: project.gridlines, nextGridlineId: project.nextGridlineId, levels: project.levels, nextLevelId: project.nextLevelId,
+      savedPlots: project.savedPlots, nextSavedPlotId: project.nextSavedPlotId, activeSavedPlotId: project.activeSavedPlotId,
+      viewSettings: { ...s.viewSettings, ...Object.fromEntries(Object.entries(project.display.viewSettings).filter(([k]) => k in s.viewSettings)) },
+      hiddenLoadPatterns: project.display.hiddenLoadPatterns,
+      resultsView: { ...DEFAULT_RESULTS_VIEW, ...keep<ResultsView>(project.display.resultsView, RESULTS_PREF_KEYS) },
+      plotView: { ...DEFAULT_PLOT_VIEW, ...keep<PlotView>(project.display.plotView, PLOT_PREF_KEYS) },
+      selectedModelEntity: null, selectedAnalysisIndex: null, analysisInsertionIndex: null, selectedNodeIds: [], nodePickMode: 'none', pendingNodePick: null,
+      results: null, projectFileName: fileName ?? s.projectFileName,
+    }))
+  },
+
   newModel: () => {
     void clearAllRuns()
     set({
@@ -431,6 +454,7 @@ export const useAppStore = create<AppStore>((set, get) => {
       savedPlots: [],
       nextSavedPlotId: 1,
       activeSavedPlotId: null,
+      projectFileName: 'model.py',
     })
   },
 

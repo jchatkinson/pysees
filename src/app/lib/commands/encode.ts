@@ -6,6 +6,13 @@ import { CHILD_SHAPES, beamUniformOrder, childShapeKey, elementArgs, elementByTy
 import type { Call, Tok } from '@/app/lib/commands/tokens'
 import { eleLoadKind, shellNodalAreas } from '@/app/lib/shells'
 import type { Vec3 } from '@/app/lib/memberFrame'
+import { directive } from '@/app/lib/project/annotations'
+
+/** With `annotate`, the encoder also writes `# @pysees` directives (see `lib/project`). `authored` is the model as the user built it, when `model` was transformed for execution. */
+export interface EncodeAnnotation { authored: Model }
+
+/** A generated block: `header` is the authoritative authored definition; the enclosed calls are only the executable equivalent, skipped when opening. */
+const generated = (header: Record<string, unknown>, enclosed: Call[]): Call[] => [directive('generated', header, 'begin'), ...enclosed, directive('generated', undefined, 'end')]
 
 const byId = <T extends { id: number }>(m: Map<number, T>) => [...m.values()].sort((a, b) => a.id - b.id)
 
@@ -82,12 +89,30 @@ function shellNodalLoads(pattern: PatternEntity, model: Model | undefined, ndf: 
   return calls
 }
 
-export function encodePattern(pattern: PatternEntity, ctx: SchemaContext, model?: Model): Call {
+/** Whether a load is not representable in OpenSees as authored: shell pressure, and the self-weight of a `ShellDKGT`. Saved projects keep these in a generated block. */
+const isShellExpanded = (child: PatternEntity['children'][number], model?: Model) => {
+  if (child.kind !== 'eleLoad') return false
+  const kind = eleLoadKind(child.args)
+  return kind === 'pressure' || (kind === 'selfWeight' && (child.args as { eleTags: number[] }).eleTags.some((t) => model?.elements.get(t)?.eleType === 'ShellDKGT'))
+}
+
+export function encodePattern(pattern: PatternEntity, ctx: SchemaContext, model?: Model, annotate = false): Call {
   const call = schemaCall('pattern', pattern.patternType, pattern.args, ctx)
   const expanded = shellNodalLoads(pattern, model, ctx.ndf)
-  call.body = pattern.children.flatMap((child): Call[] => {
+  const authoredShell: { index: number; child: PatternEntity['children'][number] }[] = []
+  const enclosed: Call[] = []
+  call.body = pattern.children.flatMap((child, index): Call[] => {
     if (child.kind === 'eleLoad') {
       const kind = eleLoadKind(child.args)
+      if (annotate && isShellExpanded(child, model)) {
+        authoredShell.push({ index, child })
+        if (kind === 'selfWeight') {
+          const a = child.args as { eleTags: number[]; bx: number; by: number; bz: number }
+          const quads = a.eleTags.filter((tag) => model?.elements.get(tag)?.eleType !== 'ShellDKGT')
+          if (quads.length) enclosed.push({ fn: 'eleLoad', args: ['-ele', ...quads, '-type', '-selfWeight', ...[a.bx, a.by, a.bz].map((v) => 0 - v)] })
+        }
+        return []
+      }
       // Pressure is expanded to nodal loads below. OpenSees' ShellMITC4 applies -selfWeight with the opposite sign of a gravity vector;
       // a ShellDKGT's is expanded to nodal loads too (OpenSees doubles it).
       if (kind === 'pressure') return []
@@ -98,20 +123,30 @@ export function encodePattern(pattern: PatternEntity, ctx: SchemaContext, model?
       }
     }
     return [encodeChild(child, ctx)]
-  }).concat(expanded)
-  if (pattern.name) call.comment = pattern.name.replace(/[\r\n]+/g, ' ')
+  }).concat(annotate ? (authoredShell.length ? generated({ kind: 'shellLoads', patternId: pattern.id, children: authoredShell }, [...enclosed, ...expanded]) : []) : expanded)
+  if (pattern.name) {
+    if (annotate) call.before = [directive('entity', { kind: 'pattern', id: pattern.id, name: pattern.name })]
+    else call.comment = pattern.name.replace(/[\r\n]+/g, ' ')
+  }
   return call
 }
 
 /** The model as commands in a dependency-safe order, with the patterns in `deferredPatterns` left out (declared later, at the stage that claims them). */
-export function encodeModel(model: Model, deferredPatterns: ReadonlySet<number> = new Set()): Call[] {
+export function encodeModel(model: Model, deferredPatterns: ReadonlySet<number> = new Set(), annotate?: EncodeAnnotation): Call[] {
   const ctx: SchemaContext = { ndm: model.config?.ndm ?? 3, ndf: model.config?.ndf ?? 6 }
   const calls: Call[] = [{ fn: 'model', args: ['basic', '-ndm', ctx.ndm, '-ndf', ctx.ndf] }]
   for (const n of byId(model.nodes)) calls.push({ fn: 'node', args: [n.id, ...n.coords] })
-  for (const m of [...model.masses.values()].sort((a, b) => a.nodeId - b.nodeId)) calls.push({ fn: 'mass', args: [m.nodeId, ...m.values] })
+  for (const m of [...model.masses.values()].sort((a, b) => a.nodeId - b.nodeId)) {
+    const call: Call = { fn: 'mass', args: [m.nodeId, ...m.values] }
+    const authored = annotate?.authored.masses.get(m.nodeId)
+    // A mass the earthquake conversion changed (or added): the authored mass, if any, is what opening restores.
+    if (annotate && JSON.stringify(authored) !== JSON.stringify(m)) calls.push(...generated({ kind: 'beamMass', nodeId: m.nodeId, writes: authored ? [{ kind: 'mass', entity: authored }] : [] }, [call]))
+    else calls.push(call)
+  }
   for (const m of byId(model.materials)) calls.push(schemaCall(m.kind === 'nD' ? 'nDMaterial' : 'uniaxialMaterial', m.matType, m.args, ctx))
   for (const sec of byId(model.sections)) {
     const call = schemaCall('section', sec.secType, sec.args, ctx)
+    if (annotate && sec.template) call.before = [directive('entity', { kind: 'section', id: sec.id, template: sec.template })]
     if (sec.children.length) {
       call.body = sec.children.map((c) => {
         const keys = CHILD_SHAPES[childShapeKey(c.kind, c.subType)] ?? Object.keys(c.args)
@@ -131,15 +166,26 @@ export function encodeModel(model: Model, deferredPatterns: ReadonlySet<number> 
       const v = e.args[key]
       if (vec ? Array.isArray(v) && v.length : typeof v === 'number') args.push(flag, ...(vec ? (v as number[]) : [v as number]))
     }
-    calls.push({ fn: 'element', args })
+    const call: Call = { fn: 'element', args }
+    const authored = annotate?.authored.elements.get(e.id)
+    if (annotate && authored && JSON.stringify(authored) !== JSON.stringify(e)) calls.push(...generated({ kind: 'beamMass', elementId: e.id, writes: [{ kind: 'element', entity: authored }] }, [call]))
+    else calls.push(call)
   }
   for (const r of byId(model.regions)) calls.push(schemaCall('region', undefined, r.args, ctx))
-  for (const m of byId(model.misc)) calls.push(schemaCall(m.fn, undefined, m.args, ctx))
-  for (const mp of byId(model.mpConstraints)) calls.push(schemaCall(mp.kind, undefined, mp.args, ctx))
+  for (const m of byId(model.misc)) {
+    const call = schemaCall(m.fn, undefined, m.args, ctx)
+    if (annotate) calls.push(...generated({ kind: 'misc', writes: [{ kind: 'misc', entity: m }] }, [call]))
+    else calls.push(call)
+  }
+  for (const mp of byId(model.mpConstraints)) {
+    const call = schemaCall(mp.kind, undefined, mp.args, ctx)
+    if (annotate) call.before = [directive('entity', { kind: 'mpConstraint', id: mp.id })]
+    calls.push(call)
+  }
   for (const f of [...model.fixes.values()].sort((a, b) => a.nodeId - b.nodeId)) {
     calls.push({ fn: 'fix', args: [f.nodeId, ...Array.from({ length: ctx.ndf }, (_, i) => (f.dofs.includes(i + 1) ? 1 : 0))] })
   }
   for (const ts of byId(model.timeSeries)) calls.push(schemaCall('timeSeries', ts.tsType, ts.args, ctx))
-  for (const p of byId(model.patterns)) if (!deferredPatterns.has(p.id)) calls.push(encodePattern(p, ctx, model))
+  for (const p of byId(model.patterns)) if (!deferredPatterns.has(p.id)) calls.push(encodePattern(p, ctx, model, !!annotate))
   return calls
 }

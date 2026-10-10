@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/app/components/ui/dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/app/components/ui/select'
 import { Input } from '@/app/components/ui/input'
@@ -7,6 +7,8 @@ import { Button } from '@/app/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/app/components/ui/tooltip'
 import { ArrowLeft } from 'lucide-react'
 import { useAppStore } from '@/app/store/useAppStore'
+import { canImport, readScriptFile } from '@/app/lib/project/open'
+import { ImportPreviewBody, type ImportPreview } from '@/app/components/ImportScriptDialog'
 import {
   momentCurvatureTemplate,
   cantileverTemplate,
@@ -51,6 +53,15 @@ export function InitModal() {
 
 function InitDialog() {
   const initModel = useAppStore((s) => s.initModel)
+  const loadProject = useAppStore((s) => s.loadProject)
+  const fileInput = useRef<HTMLInputElement>(null)
+  const [preview, setPreview] = useState<ImportPreview | null>(null)
+  const pickFile = async (file: File | undefined) => {
+    if (!file) return
+    if (file.size > 5_000_000) return window.alert(`${file.name} is too large to open (limit 5 MB).`)
+    setPreview({ fileName: file.name, result: readScriptFile(await file.text(), file.name) })
+    select('load')
+  }
 
   const [step, setStep] = useState<1 | 2>(1)
   const [choice, setChoice] = useState<Choice | null>(null)
@@ -113,7 +124,15 @@ function InitDialog() {
     }
   }
 
-  const step2Title: Record<Exclude<Choice, 'load'>, string> = {
+  function handleLoad() {
+    const r = preview?.result
+    if (!r) return
+    if (r.project) loadProject(r.project, preview.fileName)
+    else initModel(r.ndm, r.ndf, { writes: r.writes })
+  }
+
+  const step2Title: Record<Choice, string> = {
+    load: 'Open Project',
     new: 'New Model',
     momentCurvature: 'Moment-Curvature',
     cantilever: 'Cantilever Column',
@@ -137,7 +156,7 @@ function InitDialog() {
             </DialogHeader>
             <div className="grid grid-cols-2 gap-2">
               <Card title="New" description="Start from scratch with custom ndm/ndf." onClick={() => select('new')} />
-              <Card title="Load" description="Open a previously saved project." disabled />
+              <Card title="Load" description="Open a saved project (.py)." onClick={() => fileInput.current?.click()} />
             </div>
             <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide pt-1">Templates</p>
             <div className="grid grid-cols-3 gap-2">
@@ -170,7 +189,7 @@ function InitDialog() {
           </>
         )}
 
-        {step === 2 && choice && choice !== 'load' && (
+        {step === 2 && choice && (
           <>
             <DialogHeader>
               <div className="flex items-center gap-2">
@@ -187,6 +206,13 @@ function InitDialog() {
                 <DialogTitle>{step2Title[choice]}</DialogTitle>
               </div>
             </DialogHeader>
+
+            {choice === 'load' && preview && (
+              <div className="grid gap-3 py-2">
+                <p className="text-sm font-medium">{preview.fileName}</p>
+                <ImportPreviewBody preview={preview} replacing={false} />
+              </div>
+            )}
 
             {choice === 'new' && (
               <div className="grid gap-4 py-2">
@@ -360,11 +386,14 @@ function InitDialog() {
             )}
 
             <div className="flex justify-end">
-              <Button onClick={handleCreate}>Create Model</Button>
+              {choice === 'load'
+                ? <Button disabled={!preview || !canImport(preview.result)} onClick={handleLoad}>Open</Button>
+                : <Button onClick={handleCreate}>Create Model</Button>}
             </div>
           </>
         )}
       </DialogContent>
+      <input ref={fileInput} type="file" accept=".py,.tcl,.txt" className="hidden" onChange={(e) => { void pickFile(e.target.files?.[0]); e.target.value = '' }} />
     </Dialog>
   )
 }

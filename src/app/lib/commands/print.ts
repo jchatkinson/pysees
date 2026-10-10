@@ -5,7 +5,7 @@ export type ScriptLanguage = 'py' | 'tcl'
 /** Shortest round-tripping form; both languages read JS-style exponents (`1e-7`, `2e+11`). */
 const fmtNum = (n: number) => String(n)
 
-export const pyLiteral = (v: Tok): string => (typeof v === 'string' ? `'${v.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}'` : fmtNum(v))
+export const pyLiteral = (v: Tok): string => (typeof v === 'string' ? `'${v.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/\n/g, '\\n').replace(/\r/g, '\\r')}'` : fmtNum(v))
 const tclWord = (v: Tok): string => {
   if (typeof v === 'number') return fmtNum(v)
   return v === '' || /[\s{}[\]$"\\;]/.test(v) ? `{${v}}` : v
@@ -14,6 +14,8 @@ const tclWord = (v: Tok): string => {
 function printCall(c: Call, lang: ScriptLanguage, depth: number): string[] {
   const pad = '    '.repeat(depth)
   const out: string[] = []
+  if (c.fn === '#') return [`${pad}# ${c.args[0]}`]
+  for (const b of c.before ?? []) out.push(...printCall(b, lang, depth))
   if (c.comment) out.push(`${pad}# ${c.comment}`)
   if (c.fn === 'rayleighFromModes') {
     const [mode1, mode2, ratio] = c.args.map(Number)

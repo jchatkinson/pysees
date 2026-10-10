@@ -1,6 +1,7 @@
 import type { Val } from '@/app/lib/scriptImport/expr'
 import type { ModelWrite } from '@/app/lib/modelWrite'
 import type { Model } from '@/app/types/model'
+import type { ProjectDocument } from '@/app/lib/project/types'
 
 /** One OpenSees command found in a script, with constants already substituted. */
 /** `comment` is a full-line `#` comment directly above the command (the exporter writes a pattern's name that way). */
@@ -20,4 +21,6 @@ export interface ImportResult {
   diagnostics: ImportDiagnostic[]
   /** Entity counts for the preview, e.g. `{ Nodes: 12, Elements: 11 }`. */
   counts: Record<string, number>
+  /** Set when the file is a saved PySees project: opening restores all of it, not just the model. */
+  project?: ProjectDocument
 }

@@ -10,10 +10,12 @@ import type { ImportDiagnostic, ImportResult, ParsedCall } from '@/app/lib/scrip
 
 /** Known OpenSees commands PySees has no model entity for: reported, not silently dropped. */
 const UNSUPPORTED_MODEL = new Set(['fixX', 'fixY', 'fixZ', 'frictionModel', 'block2D', 'block3D', 'mesh', 'remesh', 'DiscretizeMember', 'groundMotion', 'imposedMotion', 'parameter', 'updateParameter', 'addToParameter'])
+/** Stand-in call a saved project's parser leaves where a generated block begins. */
+export const PROJECT_HOOK = '__pysees__'
 const OPENSEES_FNS = new Set(GENERATED_COMMAND_SCHEMAS.map((s) => s.fn))
 
 /** Applies decoded writes to a growing model, validating each one and tracking the enclosing pattern / fiber section. */
-class Builder implements DecodeSink {
+export class Builder implements DecodeSink {
   model: Model
   writes: ModelWrite[] = []
   diagnostics: ImportDiagnostic[] = []
@@ -25,6 +27,8 @@ class Builder implements DecodeSink {
   private ignored = new Map<string, number[]>()
   private line = 0
   private comment: string | undefined
+  /** Called for each `# @pysees generated begin` block of a saved project (see `lib/project`); throws `Skip` for a bad block. */
+  hook?: (index: number, b: Builder) => void
 
   constructor(ndm: 2 | 3, ndf: number) {
     this.ndm = ndm
@@ -50,16 +54,18 @@ class Builder implements DecodeSink {
   run(call: ParsedCall) {
     this.line = call.line
     this.comment = call.comment
-    const fn = canonicalFn(call.fn)
-    if (!fn) return this.other(call)
+    const generated = call.fn === PROJECT_HOOK
+    const fn = generated ? undefined : canonicalFn(call.fn)
+    if (!fn && !generated) return this.other(call)
     try {
-      decodeCommand(fn, flatten(call.args), this)
+      if (generated) this.hook?.(Number(flatten(call.args)[0]), this)
+      else decodeCommand(fn!, flatten(call.args), this)
     } catch (e) {
       if (!(e instanceof Skip)) throw e
       // A failed container must not leave its children attaching to the previous one.
       if (fn === 'pattern') this.pattern = null
       if (fn === 'section') this.fiberSection = null
-      this.note('error', `${call.fn} skipped: ${e.message.replace(/\.$/, '')}.`)
+      this.note('error', `${generated ? 'generated block' : call.fn} skipped: ${e.message.replace(/\.$/, '')}.`)
     }
   }
 
@@ -79,11 +85,12 @@ class Builder implements DecodeSink {
 }
 
 /** Turns parsed commands into model writes. Anything that cannot be represented is reported, never guessed at. */
-export function buildModel(calls: ParsedCall[], language: 'tcl' | 'py', parseDiagnostics: ImportDiagnostic[]): ImportResult {
+export function buildModel(calls: ParsedCall[], language: 'tcl' | 'py', parseDiagnostics: ImportDiagnostic[], hook?: Builder['hook']): ImportResult {
   const diagnostics = [...parseDiagnostics]
   const config = readConfig(calls)
   if (!config.explicit) diagnostics.push({ severity: 'warning', message: `No "model" command found; assuming ndm=${config.ndm}, ndf=${config.ndf} from the first node.` })
   const b = new Builder(config.ndm, config.ndf)
+  b.hook = hook
   for (const call of calls) b.run(call)
   b.finish()
   diagnostics.push(...b.diagnostics)

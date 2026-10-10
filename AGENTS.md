@@ -113,6 +113,16 @@ Results live in IndexedDB (`lib/resultsStorage`), read per step for display (`us
 
 ---
 
+## Saved projects (`File > Save .py… / Open .py…`)
+
+`lib/project/`: `serializeProject` writes the OpenSeesPy script (same `scriptCalls` pipeline as `exportScript`, with `annotate`) plus `# @pysees` JSON directives; `parseProject` reads it statically and
+restores the whole authored project through the store's `loadProject`. Directives: `project` (version, ndm/ndf, id counters), `layout` (grids, levels), `report` (saved plots), `display`, `entity`
+(pattern names, section templates, constraint ids), and `begin … end` blocks: `analysis` (the authored analysis command; the lowered calls between are skipped, so metadata is authoritative for analysis, disabled commands keep an empty block)
+and `generated` (shell pressure / ShellDKGT self-weight, beam mass conversion for earthquakes, `misc`; header = authored definition, enclosed lines skipped even if hand-edited). Commands outside blocks stay authoritative.
+Analysis is saved through the cursor. Any directive or required-command error blocks opening (`project` stays unset). Files without the header go through the model-only importer. Tcl export is unannotated. Tests: `lib/project/project.test.ts`.
+
+---
+
 ## Exporting to OpenSees
 
 `lib/exportScript.ts` renders the model and analysis history to an OpenSeesPy script
