@@ -19,6 +19,7 @@ timeSeries Linear 2 -factor 1
 recorder Node -file out/disp.out -time -node 1 2 -dof 1 2 3 disp
 recorder Node -file out/reaction.out -time -node 1 2 -dof 1 2 3 reaction
 recorder Element -file out/eleForce.out -time -ele 1 force
+# Gravity
 pattern Plain 1 1 -fact 1 {
     load 2 -800000 0 0
 }
@@ -31,6 +32,7 @@ integrator LoadControl 0.1
 analysis Static
 analyze 10
 loadConst -time 0
+# Pushover
 pattern Plain 2 2 -fact 1 {
     load 2 0 0 1
 }

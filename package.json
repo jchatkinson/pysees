@@ -58,5 +58,8 @@
     "typescript-eslint": "^8.46.4",
     "vite": "^8.2.2",
     "vitest": "^5.0.3"
+  },
+  "allowScripts": {
+    "@clerk/shared@3.47.8": true
   }
 }
