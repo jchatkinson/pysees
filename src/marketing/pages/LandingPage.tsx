@@ -5,16 +5,20 @@ import { ChangelogSection } from '@/marketing/components/ChangelogSection'
 import { LandingFooter } from '@/marketing/components/LandingFooter'
 import { FeaturesSection } from '@/marketing/components/FeaturesSection'
 import hero1 from '@/marketing/assets/hero1.png'
-import hero2 from '@/marketing/assets/hero2.png'
-import hero3 from '@/marketing/assets/hero3.png'
+import heroTemplates from '@/marketing/assets/hero-templates.png'
+import heroMoment from '@/marketing/assets/hero-moment-diagram.png'
+import heroDeformed from '@/marketing/assets/hero-deformed-shape.png'
+import heroMode from '@/marketing/assets/hero-mode-shape.gif'
 import { Link } from 'react-router-dom'
 
 export function LandingPage() {
   const heroShots = [
     { src: hero1, thumbAlt: 'PySees screenshot 1' },
-    { src: hero2, thumbAlt: 'PySees screenshot 2' },
-    { src: hero3, thumbAlt: 'PySees screenshot 3' },
+    { src: heroTemplates, thumbAlt: 'PySees new-model dialog with template previews' },
     { src: '/material_preview.gif', thumbAlt: 'PySees material preview animation' },
+    { src: heroMoment, thumbAlt: 'Bending moment diagrams on a 2D frame' },
+    { src: heroDeformed, thumbAlt: 'Deformed shape of a 2D frame under pushover loading' },
+    { src: heroMode, thumbAlt: 'Animation of the first mode shape of a 2D frame' },
   ]
   const [activeShot, setActiveShot] = useState(0)
   const active = heroShots[activeShot]

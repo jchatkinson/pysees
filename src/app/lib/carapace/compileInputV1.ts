@@ -147,7 +147,12 @@ export function compileInputV1(model: Model, analysisHistory: AnalysisHistory): 
   // --- materials arena ---
   const matIds = [...model.materials.keys()].sort((a, b) => a - b)
   const matIndex = new Map(matIds.map((id, i) => [id, i]))
-  const materials: W.MaterialSpec[] = matIds.map((id) => compileMaterial(model.materials.get(id)!, diagnostics))
+  const materials: W.MaterialSpec[] = matIds.map((id) => compileMaterial(model.materials.get(id)!, diagnostics, (tag, context) => {
+    const idx = matIndex.get(tag)
+    if (idx !== undefined) return idx
+    diagnostics.push({ severity: 'error', message: `${context} references unknown material ${tag}`, commandIndex: -1 })
+    return NO_INDEX
+  }))
   const resolveMaterial = (matTag: number | undefined, context: string): number => {
     if (matTag === undefined) {
       diagnostics.push({ severity: 'error', message: `${context} has no material assigned`, commandIndex: -1 })
@@ -640,19 +645,93 @@ function compileIntegration(integration: BeamIntegrationEntity, context: string,
   return { kind: 'legendre', points }
 }
 
-export function compileMaterial(mat: MaterialEntity, diagnostics: CompileDiagnostic[]): W.MaterialSpec {
+/** Maps a referenced material tag to its index in the materials arena (composites only); reports its own diagnostic when the tag is unknown. */
+export type MaterialRef = (tag: number, context: string) => number
+
+const blank = (v: unknown) => v === undefined || v === null || v === ''
+const num = (v: unknown, fallback = 0) => (blank(v) || !Number.isFinite(Number(v)) ? fallback : Number(v))
+const list = (v: unknown): number[] => (Array.isArray(v) ? v.filter((x) => !blank(x)).map(Number) : [])
+/** A (force, deformation) pair, or `fallback` when the vec is not filled in. */
+const pair = (v: unknown, fallback?: [number, number]): [number, number] => (Array.isArray(v) && v.length >= 2 && !blank(v[0]) && !blank(v[1]) ? [Number(v[0]), Number(v[1])] : fallback ?? [0, 0])
+
+export function compileMaterial(mat: MaterialEntity, diagnostics: CompileDiagnostic[], ref?: MaterialRef): W.MaterialSpec {
   const a = mat.args
+  const error = (message: string) => diagnostics.push({ severity: 'error', message: `Material ${mat.id} (${mat.matType}): ${message}`, commandIndex: -1 })
+  const refTag = (tag: number): number => ref ? ref(tag, `Material ${mat.id} (${mat.matType})`) : (error(`cannot reference material ${tag} here`), NO_INDEX)
   switch (mat.matType) {
     case 'Elastic': return { kind: 'elastic', e: Number(a.e) || 0 }
-    case 'ElasticPP': return { kind: 'elasticPp', e: Number(a.e) || 0, eyp: Number(a.epsyP) || 0 }
+    case 'ElasticPP':
+      // Carapace yields symmetrically from zero plastic strain.
+      if (!blank(a.epsyN) && Number(a.epsyN) !== Number(a.epsyP)) error('asymmetric yield (epsyN) is not supported by Carapace')
+      if (!blank(a.eps0) && Number(a.eps0) !== 0) error('initial strain (eps0) is not supported by Carapace')
+      return { kind: 'elasticPp', e: Number(a.e) || 0, eyp: Number(a.epsyP) || 0 }
     case 'ENT': return { kind: 'ent', e: Number(a.e) || 0 }
     case 'Steel01': return { kind: 'steel01', fy: Number(a.fy) || 0, e0: Number(a.e0) || 0, b: Number(a.b) || 0, a1: Number(a.a1) || 0, a2: Number(a.a2) || 1, a3: Number(a.a3) || 0, a4: Number(a.a4) || 1 }
-    case 'Steel02': return { kind: 'steel02', fy: Number(a.fy) || 0, e0: Number(a.e0) || 0, b: Number(a.b) || 0, r0: Number(a.r0) || 15, cr1: Number(a.cr1) || 0.925, cr2: Number(a.cr2) || 0.15, a1: Number(a.a1) || 0, a2: Number(a.a2) || 1, a3: Number(a.a3) || 0, a4: Number(a.a4) || 1 }
+    case 'Steel02':
+      if (!blank(a.sigInit) && Number(a.sigInit) !== 0) error('initial stress (sigInit) is not supported by Carapace')
+      return { kind: 'steel02', fy: Number(a.fy) || 0, e0: Number(a.e0) || 0, b: Number(a.b) || 0, r0: Number(a.r0) || 15, cr1: Number(a.cr1) || 0.925, cr2: Number(a.cr2) || 0.15, a1: Number(a.a1) || 0, a2: Number(a.a2) || 1, a3: Number(a.a3) || 0, a4: Number(a.a4) || 1 }
     case 'Concrete01': return { kind: 'concrete01', fpc: Number(a.fpc) || 0, epsc0: Number(a.epsc0) || 0, fpcu: Number(a.fpcu) || 0, epscu: Number(a.epsU) || 0 }
+    case 'Concrete02': return { kind: 'concrete02', fc: num(a.fpc), epsc0: num(a.epsc0), fcu: num(a.fpcu), epscu: num(a.epsU), rat: num(a.lambda), ft: num(a.ft), ets: num(a.ets) }
+    case 'Hysteretic': {
+      const [p1f, p1d] = pair(a.p1), [p2f, p2d] = pair(a.p2), [p3f, p3d] = pair(a.p3, [p2f, p2d])
+      const [n1f, n1d] = pair(a.n1), [n2f, n2d] = pair(a.n2), [n3f, n3d] = pair(a.n3, [n2f, n2d])
+      return { kind: 'hysteretic', mom1p: p1f, rot1p: p1d, mom2p: p2f, rot2p: p2d, mom3p: p3f, rot3p: p3d, mom1n: n1f, rot1n: n1d, mom2n: n2f, rot2n: n2d, mom3n: n3f, rot3n: n3d, pinchX: num(a.pinchX), pinchY: num(a.pinchY), damfc1: num(a.damage1), damfc2: num(a.damage2), beta: num(a.beta) }
+    }
+    case 'Pinching4': {
+      const g = (p: string): [number, number, number, number] => [num(a[`${p}1`]), num(a[`${p}2`]), num(a[`${p}3`]), num(a[`${p}4`])]
+      const dmg = String(a.dmgType ?? '').replace(/['"]/g, '').trim().toLowerCase()
+      if (dmg !== 'cycle' && dmg !== 'energy') error(`dmgType must be 'cycle' or 'energy' (got "${String(a.dmgType ?? '')}")`)
+      return {
+        kind: 'pinching4',
+        stress1p: num(a.ePf1), strain1p: num(a.ePd1), stress2p: num(a.ePf2), strain2p: num(a.ePd2), stress3p: num(a.ePf3), strain3p: num(a.ePd3), stress4p: num(a.ePf4), strain4p: num(a.ePd4),
+        stress1n: num(a.eNf1), strain1n: num(a.eNd1), stress2n: num(a.eNf2), strain2n: num(a.eNd2), stress3n: num(a.eNf3), strain3n: num(a.eNd3), stress4n: num(a.eNf4), strain4n: num(a.eNd4),
+        rDispP: num(a.rDispP), rForceP: num(a.rForceP), uForceP: num(a.uForceP), rDispN: num(a.rDispN), rForceN: num(a.rForceN), uForceN: num(a.uForceN),
+        gammaKParams: g('gK'), gammaKLimit: num(a.gKLim), gammaDParams: g('gD'), gammaDLimit: num(a.gDLim), gammaFParams: g('gF'), gammaFLimit: num(a.gFLim), gammaE: num(a.gE),
+        dmgCyc: dmg === 'cycle' ? 'cycleBased' : 'energyBased',
+      }
+    }
+    case 'Parallel': {
+      const tags = list(a.matTags), factors = list(a.factorArgs)
+      if (!tags.length) error('needs at least one material tag')
+      if (factors.length && factors.length !== tags.length) error(`-factors lists ${factors.length} value(s) for ${tags.length} material(s)`)
+      return { kind: 'parallel', children: tags.map((t, i) => [refTag(t), factors.length === tags.length ? factors[i] : 1]) }
+    }
+    case 'Series': {
+      const tags = list(a.matTags)
+      if (!tags.length) error('needs at least one material tag')
+      return { kind: 'series', children: tags.map(refTag) }
+    }
+    case 'MinMax': {
+      // OpenSees' defaults are effectively unbounded.
+      if (blank(a.otherTag)) error('needs a wrapped material (otherTag)')
+      return { kind: 'minMax', inner: refTag(Number(a.otherTag)), minStrain: num(a.minStrain, -1e16), maxStrain: num(a.maxStrain, 1e16) }
+    }
     default:
       diagnostics.push({ severity: 'error', message: `Material ${mat.id} (${mat.matType}) is not yet supported by the Carapace compiler`, commandIndex: -1 })
       return { kind: 'elastic', e: 0 }
   }
+}
+
+/** Compiles `root` plus every material it references (transitively) into a self-contained arena for the material probe:
+ * `arena` holds the dependencies, and `material` (the root) refers to them by arena index. Unknown tags and cycles are diagnostics. */
+export function compileMaterialWithDependencies(root: MaterialEntity, lookup: ReadonlyMap<number, MaterialEntity>, diagnostics: CompileDiagnostic[]): { material: W.MaterialSpec; arena: W.MaterialSpec[] } {
+  const arena: W.MaterialSpec[] = []
+  const index = new Map<number, number>()
+  const active = new Set<number>([root.id])
+  const ref: MaterialRef = (tag, context) => {
+    const done = index.get(tag)
+    if (done !== undefined) return done
+    const dep = lookup.get(tag)
+    if (!dep) { diagnostics.push({ severity: 'error', message: `${context} references unknown material ${tag}`, commandIndex: -1 }); return NO_INDEX }
+    if (active.has(tag)) { diagnostics.push({ severity: 'error', message: `${context} refers back to material ${tag} (circular reference)`, commandIndex: -1 }); return NO_INDEX }
+    active.add(tag)
+    const spec = compileMaterial(dep, diagnostics, ref)
+    active.delete(tag)
+    index.set(tag, arena.length)
+    arena.push(spec)
+    return arena.length - 1
+  }
+  return { material: compileMaterial(root, diagnostics, ref), arena }
 }
 
 /** The 3D transformation a beam-column references. `vecxz` is required (the model's own validation enforces it); a missing or

@@ -17197,6 +17197,11 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
               required: true
             },
             {
+              defaultSource: "curated",
+              defaultValue: [
+                10.0,
+                0.5
+              ],
               description: "``p1=[s1p, e1p]``, stress and strain (or force & deformation) at first point of the envelope in the positive direction",
               kind: "vec",
               length: 2,
@@ -17204,6 +17209,11 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
               required: true
             },
             {
+              defaultSource: "curated",
+              defaultValue: [
+                15.0,
+                2.0
+              ],
               description: "``p2=[s2p, e2p]``, stress and strain (or force & deformation) at second point of the envelope in the positive direction",
               kind: "vec",
               length: 2,
@@ -17211,6 +17221,11 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
               required: true
             },
             {
+              defaultSource: "curated",
+              defaultValue: [
+                12.0,
+                5.0
+              ],
               description: "``p3=[s3p, e3p]``, stress and strain (or force & deformation) at third point of the envelope in the positive direction",
               kind: "vec",
               length: 2,
@@ -17218,6 +17233,11 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
               required: true
             },
             {
+              defaultSource: "curated",
+              defaultValue: [
+                -10.0,
+                -0.5
+              ],
               description: "``n1=[s1n, e1n]``, stress and strain (or force & deformation) at first point of the envelope in the negative direction",
               kind: "vec",
               length: 2,
@@ -17225,6 +17245,11 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
               required: true
             },
             {
+              defaultSource: "curated",
+              defaultValue: [
+                -15.0,
+                -2.0
+              ],
               description: "``n2=[s2n, e2n]``, stress and strain (or force & deformation) at second point of the envelope in the negative direction",
               kind: "vec",
               length: 2,
@@ -17232,6 +17257,11 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
               required: true
             },
             {
+              defaultSource: "curated",
+              defaultValue: [
+                -12.0,
+                -5.0
+              ],
               description: "``n3=[s3n, e3n]``, stress and strain (or force & deformation) at third point of the envelope in the negative direction",
               kind: "vec",
               length: 2,
@@ -17239,30 +17269,40 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
               required: true
             },
             {
+              defaultSource: "curated",
+              defaultValue: 0.8,
               description: "pinching factor for strain (or deformation) during reloading",
               kind: "float",
               name: "pinchX",
               required: true
             },
             {
+              defaultSource: "curated",
+              defaultValue: 0.5,
               description: "pinching factor for stress (or force) during reloading",
               kind: "float",
               name: "pinchY",
               required: true
             },
             {
+              defaultSource: "curated",
+              defaultValue: 0.0,
               description: "damage due to ductility: D1(mu-1)",
               kind: "float",
               name: "damage1",
               required: true
             },
             {
+              defaultSource: "curated",
+              defaultValue: 0.0,
               description: "damage due to energy: D2(Eii/Eult)",
               kind: "float",
               name: "damage2",
               required: true
             },
             {
+              defaultSource: "curated",
+              defaultValue: 0.0,
               description: "power used to determine the degraded unloading stiffness based on ductility, mu-beta (optional, default=0.0)",
               kind: "float",
               name: "beta",
@@ -17774,7 +17814,7 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
             },
             {
               description: "tag of the other material",
-              kind: "float",
+              kind: "int",
               name: "otherTag",
               required: true
             },
@@ -18175,232 +18215,310 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
               required: true
             },
             {
+              defaultSource: "curated",
+              defaultValue: 10.0,
               description: "floating point values defining force points on the positive response envelope",
               kind: "float",
               name: "ePf1",
               required: true
             },
             {
+              defaultSource: "curated",
+              defaultValue: 0.5,
               description: "floating point values defining deformation points on the positive response envelope",
               kind: "float",
               name: "ePd1",
               required: true
             },
             {
+              defaultSource: "curated",
+              defaultValue: 20.0,
               description: "floating point values defining force points on the positive response envelope",
               kind: "float",
               name: "ePf2",
               required: true
             },
             {
+              defaultSource: "curated",
+              defaultValue: 1.5,
               description: "floating point values defining deformation points on the positive response envelope",
               kind: "float",
               name: "ePd2",
               required: true
             },
             {
+              defaultSource: "curated",
+              defaultValue: 25.0,
               description: "floating point values defining force points on the positive response envelope",
               kind: "float",
               name: "ePf3",
               required: true
             },
             {
+              defaultSource: "curated",
+              defaultValue: 3.0,
               description: "floating point values defining deformation points on the positive response envelope",
               kind: "float",
               name: "ePd3",
               required: true
             },
             {
+              defaultSource: "curated",
+              defaultValue: 5.0,
               description: "floating point values defining force points on the positive response envelope",
               kind: "float",
               name: "ePf4",
               required: true
             },
             {
+              defaultSource: "curated",
+              defaultValue: 6.0,
               description: "floating point values defining deformation points on the positive response envelope",
               kind: "float",
               name: "ePd4",
               required: true
             },
             {
+              defaultSource: "curated",
+              defaultValue: -10.0,
               description: "floating point values defining force points on the negative response envelope",
               kind: "float",
               name: "eNf1",
               required: true
             },
             {
+              defaultSource: "curated",
+              defaultValue: -0.5,
               description: "floating point values defining deformation points on the negative response envelope",
               kind: "float",
               name: "eNd1",
               required: true
             },
             {
+              defaultSource: "curated",
+              defaultValue: -20.0,
               description: "floating point values defining force points on the negative response envelope",
               kind: "float",
               name: "eNf2",
               required: true
             },
             {
+              defaultSource: "curated",
+              defaultValue: -1.5,
               description: "floating point values defining deformation points on the negative response envelope",
               kind: "float",
               name: "eNd2",
               required: true
             },
             {
+              defaultSource: "curated",
+              defaultValue: -25.0,
               description: "floating point values defining force points on the negative response envelope",
               kind: "float",
               name: "eNf3",
               required: true
             },
             {
+              defaultSource: "curated",
+              defaultValue: -3.0,
               description: "floating point values defining deformation points on the negative response envelope",
               kind: "float",
               name: "eNd3",
               required: true
             },
             {
+              defaultSource: "curated",
+              defaultValue: -5.0,
               description: "floating point values defining force points on the negative response envelope",
               kind: "float",
               name: "eNf4",
               required: true
             },
             {
+              defaultSource: "curated",
+              defaultValue: -6.0,
               description: "floating point values defining deformation points on the negative response envelope",
               kind: "float",
               name: "eNd4",
               required: true
             },
             {
+              defaultSource: "curated",
+              defaultValue: 0.5,
               description: "floating point value defining the ratio of the deformation at which reloading occurs to the maximum historic deformation demand",
               kind: "float",
               name: "rDispP",
               required: true
             },
             {
-              kind: "str",
+              defaultSource: "curated",
+              defaultValue: 0.25,
+              kind: "float",
               name: "rForceP",
               required: true
             },
             {
+              defaultSource: "curated",
+              defaultValue: 0.05,
               description: "floating point value defining the ratio of strength developed upon unloading from negative load to the maximum strength developed under monotonic loading",
               kind: "float",
               name: "uForceP",
               required: true
             },
             {
+              defaultSource: "curated",
+              defaultValue: 0.5,
               description: "floating point value defining the ratio of the deformation at which reloading occurs to the minimum historic deformation demand",
               kind: "float",
               name: "rDispN",
               required: true
             },
             {
-              kind: "str",
+              defaultSource: "curated",
+              defaultValue: 0.25,
+              kind: "float",
               name: "rForceN",
               required: true
             },
             {
+              defaultSource: "curated",
+              defaultValue: 0.05,
               description: "floating point value defining the ratio of strength developed upon unloading from negative load to the minimum strength developed under monotonic loading",
               kind: "float",
               name: "uForceN",
               required: true
             },
             {
+              defaultSource: "curated",
+              defaultValue: 0.0,
               description: "floating point values controlling cyclic degradation model for unloading stiffness degradation",
               kind: "float",
               name: "gK1",
               required: true
             },
             {
+              defaultSource: "curated",
+              defaultValue: 0.0,
               description: "floating point values controlling cyclic degradation model for unloading stiffness degradation",
               kind: "float",
               name: "gK2",
               required: true
             },
             {
+              defaultSource: "curated",
+              defaultValue: 0.0,
               description: "floating point values controlling cyclic degradation model for unloading stiffness degradation",
               kind: "float",
               name: "gK3",
               required: true
             },
             {
+              defaultSource: "curated",
+              defaultValue: 0.0,
               description: "floating point values controlling cyclic degradation model for unloading stiffness degradation",
               kind: "float",
               name: "gK4",
               required: true
             },
             {
+              defaultSource: "curated",
+              defaultValue: 0.5,
               description: "floating point values controlling cyclic degradation model for unloading stiffness degradation",
               kind: "float",
               name: "gKLim",
               required: true
             },
             {
+              defaultSource: "curated",
+              defaultValue: 0.0,
               description: "floating point values controlling cyclic degradation model for reloading stiffness degradation",
               kind: "float",
               name: "gD1",
               required: true
             },
             {
+              defaultSource: "curated",
+              defaultValue: 0.0,
               description: "floating point values controlling cyclic degradation model for reloading stiffness degradation",
               kind: "float",
               name: "gD2",
               required: true
             },
             {
+              defaultSource: "curated",
+              defaultValue: 0.0,
               description: "floating point values controlling cyclic degradation model for reloading stiffness degradation",
               kind: "float",
               name: "gD3",
               required: true
             },
             {
+              defaultSource: "curated",
+              defaultValue: 0.0,
               description: "floating point values controlling cyclic degradation model for reloading stiffness degradation",
               kind: "float",
               name: "gD4",
               required: true
             },
             {
+              defaultSource: "curated",
+              defaultValue: 0.5,
               description: "floating point values controlling cyclic degradation model for reloading stiffness degradation",
               kind: "float",
               name: "gDLim",
               required: true
             },
             {
+              defaultSource: "curated",
+              defaultValue: 0.0,
               description: "floating point values controlling cyclic degradation model for strength degradation",
               kind: "float",
               name: "gF1",
               required: true
             },
             {
+              defaultSource: "curated",
+              defaultValue: 0.0,
               description: "floating point values controlling cyclic degradation model for strength degradation",
               kind: "float",
               name: "gF2",
               required: true
             },
             {
+              defaultSource: "curated",
+              defaultValue: 0.0,
               description: "floating point values controlling cyclic degradation model for strength degradation",
               kind: "float",
               name: "gF3",
               required: true
             },
             {
+              defaultSource: "curated",
+              defaultValue: 0.0,
               description: "floating point values controlling cyclic degradation model for strength degradation",
               kind: "float",
               name: "gF4",
               required: true
             },
             {
+              defaultSource: "curated",
+              defaultValue: 0.5,
               description: "floating point values controlling cyclic degradation model for strength degradation",
               kind: "float",
               name: "gFLim",
               required: true
             },
             {
+              defaultSource: "curated",
+              defaultValue: 10.0,
               description: "floating point value used to define maximum energy dissipation under cyclic loading.",
               kind: "float",
               name: "gE",
               required: true
             },
             {
+              defaultSource: "curated",
+              defaultValue: "energy",
               description: "string to indicate type of damage (option: ``'cycle'``, ``'energy'``)",
               kind: "str",
               name: "dmgType",
@@ -19452,6 +19570,8 @@ export const GENERATED_COMMAND_SCHEMAS: GeneratedCommandSchema[] = [
               required: true
             },
             {
+              defaultSource: "curated",
+              defaultValue: 0.0,
               description: "isotropic hardening parameter, increase of compression yield envelope as proportion of yield strength after a plastic strain of",
               kind: "float",
               name: "a1",

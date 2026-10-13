@@ -7,9 +7,11 @@ keywords: hysteresis cyclic monotonic protocol strain stress chart
 
 The material preview applies a prescribed strain history to a unit spring that uses the material, with the Carapace solver, and charts the result. Open it with **Preview** in the material dialog or when editing a material. It floats over the viewport at the bottom right.
 
-![The Load Protocol tab with a cyclic protocol and its strain history chart](/docs/material-preview-protocol.png)
+![Previewing a Steel02 material: the load protocol is set, then Run and Animate show its cyclic stress–strain response](/material_preview.gif)
 
 ## Load Protocol tab
+
+![The Load Protocol tab with a cyclic protocol and its strain history chart](/docs/material-preview-protocol.png)
 
 | Option | Meaning |
 |---|---|

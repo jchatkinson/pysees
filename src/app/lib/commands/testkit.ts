@@ -103,22 +103,34 @@ export function cantilever3dFixtures(): Fixture[] {
 
 /** Planar trusses with analysis, for comparing Carapace against OpenSees: one stays elastic, one yields (Steel01) under a displacement-controlled push. */
 export function trussFixtures(): Fixture[] {
-  const base = (matType: 'Elastic' | 'Steel01') => [
+  const mat = (id: number, matType: string, args: Record<string, unknown>): ModelWrite => ({ kind: 'material', entity: { id, kind: 'uniaxial', matType, args: { matTag: id, matType, ...args } } })
+  const steel = mat(1, 'Steel01', { fy: 355e6, e0: 2e11, b: 0.02 })
+  /** `materials` are written first; the trusses use the one tagged `use` (the last by default). */
+  const base = (materials: ModelWrite[], use = 1, chord = use) => [
     { kind: 'node', entity: { id: 1, coords: [0, 0] } }, { kind: 'node', entity: { id: 2, coords: [4, 0] } }, { kind: 'node', entity: { id: 3, coords: [2, 3] } },
     // A truss has no rotational stiffness, so every node's rotation is restrained.
     { kind: 'fix', entity: { nodeId: 1, dofs: [1, 2, 3] } }, { kind: 'fix', entity: { nodeId: 2, dofs: [2, 3] } }, { kind: 'fix', entity: { nodeId: 3, dofs: [3] } },
-    { kind: 'material', entity: { id: 1, kind: 'uniaxial', matType, args: matType === 'Elastic' ? { matTag: 1, matType, e: 2e11 } : { matTag: 1, matType, fy: 355e6, e0: 2e11, b: 0.02 } } },
-    { kind: 'element', entity: { id: 1, eleType: 'Truss', nodes: [1, 3], args: { A: 1e-3, matTag: 1 } } },
-    { kind: 'element', entity: { id: 2, eleType: 'Truss', nodes: [2, 3], args: { A: 1e-3, matTag: 1 } } },
-    { kind: 'element', entity: { id: 3, eleType: 'Truss', nodes: [1, 2], args: { A: 5e-4, matTag: 1 } } },
+    ...materials,
+    { kind: 'element', entity: { id: 1, eleType: 'Truss', nodes: [1, 3], args: { A: 1e-3, matTag: use } } },
+    { kind: 'element', entity: { id: 2, eleType: 'Truss', nodes: [2, 3], args: { A: 1e-3, matTag: use } } },
+    { kind: 'element', entity: { id: 3, eleType: 'Truss', nodes: [1, 2], args: { A: 5e-4, matTag: chord } } },
     { kind: 'timeSeries', entity: { id: 1, tsType: 'Linear', args: { type: 'Linear', tag: 1, factor: 1 } } },
     { kind: 'pattern', entity: { id: 1, patternType: 'Plain', args: { type: 'Plain', patternTag: 1, tsTag: 1, fact: 1 }, children: [] } },
     { kind: 'patternChild', patternId: 1, child: { kind: 'load', args: { nodeTag: 3, values: [2e4, -1e5, 0] } } },
   ] as ModelWrite[]
   const recorder = { type: 'ANALYSIS_BLOCK', blockId: 'whole-model-recorder', params: { directory: 'out' } } as const
+  /** `chord` is the material of the bottom bar (default: the same). Softening materials get an elastic one so the truss never becomes a mechanism. */
+  const pushed = (name: string, materials: ModelWrite[], use?: number, chord?: number, steps = 60): Fixture => ({ name, model: modelFromWrites(2, 3, base(materials, use, chord)), history: { commands: [recorder, { type: 'ANALYSIS_BLOCK', blockId: 'run-pushover-analysis', params: { patterns: [1], nodeTag: 3, dof: 2, increment: -0.0004, steps } }], cursor: 1 } })
   return [
-    { name: 'truss-elastic', model: modelFromWrites(2, 3, base('Elastic')), history: { commands: [recorder, { type: 'ANALYSIS_BLOCK', blockId: 'run-gravity-analysis', params: { patterns: [1], steps: 5 } }], cursor: 1 } },
-    { name: 'truss-yielding', model: modelFromWrites(2, 3, base('Steel01')), history: { commands: [recorder, { type: 'ANALYSIS_BLOCK', blockId: 'run-pushover-analysis', params: { patterns: [1], nodeTag: 3, dof: 2, increment: -0.0004, steps: 60 } }], cursor: 1 } },
+    { name: 'truss-elastic', model: modelFromWrites(2, 3, base([mat(1, 'Elastic', { e: 2e11 })])), history: { commands: [recorder, { type: 'ANALYSIS_BLOCK', blockId: 'run-gravity-analysis', params: { patterns: [1], steps: 5 } }], cursor: 1 } },
+    pushed('truss-yielding', [steel]),
+    // Every Carapace uniaxial material PySees maps beyond the first six: each runs a push that takes it past its first break point.
+    pushed('truss-concrete02', [mat(1, 'Concrete02', { fpc: -30e6, epsc0: -0.002, fpcu: -6e6, epsU: -0.006, lambda: 0.1, ft: 3e6, ets: 3e9 }), mat(2, 'Elastic', { e: 2e11 })], 1, 2, 25),
+    pushed('truss-hysteretic', [mat(1, 'Hysteretic', { p1: [2e5, 1e-3], p2: [3e5, 4e-3], p3: [2.5e5, 8e-3], n1: [-2e5, -1e-3], n2: [-3e5, -4e-3], n3: [-2.5e5, -8e-3], pinchX: 0.8, pinchY: 0.5, damage1: 0, damage2: 0, beta: 0 })]),
+    pushed('truss-pinching4', [mat(1, 'Pinching4', { ePf1: 2e5, ePd1: 1e-3, ePf2: 3e5, ePd2: 3e-3, ePf3: 3.5e5, ePd3: 6e-3, ePf4: 1e5, ePd4: 1.2e-2, eNf1: -2e5, eNd1: -1e-3, eNf2: -3e5, eNd2: -3e-3, eNf3: -3.5e5, eNd3: -6e-3, eNf4: -1e5, eNd4: -1.2e-2, rDispP: 0.5, rForceP: 0.25, uForceP: 0.05, rDispN: 0.5, rForceN: 0.25, uForceN: 0.05, gK1: 0, gK2: 0, gK3: 0, gK4: 0, gKLim: 0.5, gD1: 0, gD2: 0, gD3: 0, gD4: 0, gDLim: 0.5, gF1: 0, gF2: 0, gF3: 0, gF4: 0, gFLim: 0.5, gE: 10, dmgType: 'energy' }), mat(2, 'Elastic', { e: 2e11 })], 1, 2),
+    pushed('truss-parallel', [steel, mat(2, 'Elastic', { e: 5e10 }), mat(3, 'Parallel', { matTags: [1, 2], factorArgs: [1, 0.5] })], 3),
+    pushed('truss-series', [steel, mat(2, 'Elastic', { e: 4e11 }), mat(3, 'Series', { matTags: [1, 2] })], 3),
+    pushed('truss-minmax', [steel, mat(2, 'MinMax', { otherTag: 1, minStrain: -0.01, maxStrain: 0.01 })], 2),
   ]
 }
 

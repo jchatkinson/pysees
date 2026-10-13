@@ -620,7 +620,7 @@ export const useAppStore = create<AppStore>((set, get) => {
     const protocol = protocolOverride && protocolOverride.length ? protocolOverride : (s.materialPreview.protocol.length ? s.materialPreview.protocol : DEFAULT_STRAIN_PROTOCOL)
     set((prev) => ({ materialPreview: { ...prev.materialPreview, running: true, jobId, points: [], error: null, protocol } }))
     const material = { id: s.model.nextIds.material, kind: 'uniaxial' as const, matType: input.matType, args: input.values }
-    runCarapaceMaterialPreview(material, protocol, { isCancelled: () => activePreviewJob !== jobId }).then(
+    runCarapaceMaterialPreview(material, protocol, { isCancelled: () => activePreviewJob !== jobId }, s.model.materials).then(
       (points) => {
         if (activePreviewJob !== jobId) return
         activePreviewJob = null

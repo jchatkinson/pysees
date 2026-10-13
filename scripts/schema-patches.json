@@ -550,6 +550,19 @@
         "vel0": "float",
         "fact": "float"
       }
+    },
+    "uniaxialMaterial/Pinching4": {
+      "_why": "rForceP / rForceN are floats (the docs leave their type blank); dmgType is the string 'cycle' or 'energy'.",
+      "kind": {
+        "rForceP": "float",
+        "rForceN": "float"
+      }
+    },
+    "uniaxialMaterial/MinMax": {
+      "_why": "otherTag is a material tag, not a float.",
+      "kind": {
+        "otherTag": "int"
+      }
     }
   }
 }

@@ -686,6 +686,11 @@ export interface LoadPatternTable {
 
 export interface MaterialProbeConfig {
     material: MaterialSpec;
+    /**
+     * Materials that composite variants of `material` (`Parallel`, `Series`,
+     * `MinMax`) refer to by index. Empty for a self-contained material.
+     */
+    arena?: MaterialSpec[];
     initialStrain?: number | undefined;
 }
 

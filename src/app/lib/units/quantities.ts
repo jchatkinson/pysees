@@ -76,6 +76,7 @@ export const QTY_RULES: Record<string, Rules> = {
   'uniaxialMaterial/InitStrainMaterial': { initStrain: 'mStrain' },
   'uniaxialMaterial/InitStressMaterial': { initStress: 'mStress' },
   'uniaxialMaterial/MultiLinear': { pts: ['mStrain', 'mStress'] },
+  'uniaxialMaterial/Pinching4': { ePf1: 'mStress', ePd1: 'mStrain', ePf2: 'mStress', ePd2: 'mStrain', ePf3: 'mStress', ePd3: 'mStrain', ePf4: 'mStress', ePd4: 'mStrain', eNf1: 'mStress', eNd1: 'mStrain', eNf2: 'mStress', eNd2: 'mStrain', eNf3: 'mStress', eNd3: 'mStrain', eNf4: 'mStress', eNd4: 'mStrain' },
   'uniaxialMaterial/Hysteretic': { p1: ['mStress', 'mStrain'], p2: ['mStress', 'mStrain'], p3: ['mStress', 'mStrain'], n1: ['mStress', 'mStrain'], n2: ['mStress', 'mStrain'], n3: ['mStress', 'mStrain'] },
 }
 

@@ -157,6 +157,12 @@ def apply_patch(args: list[dict[str, Any]], patch: dict[str, Any]) -> list[dict[
       arg["length"] = patch["length"][name]
     if name in patch.get("kind", {}):
       arg["kind"] = patch["kind"][name]
+      if "defaultValue" in arg:  # a default coerced for the old kind
+        coerced = coerce_default(arg["kind"], arg["defaultValue"])
+        if coerced is None:
+          arg.pop("defaultValue"), arg.pop("defaultSource", None)
+        else:
+          arg["defaultValue"] = coerced
     if name in patch.get("word", []):
       arg["word"] = True
     out.append(arg)
@@ -270,6 +276,9 @@ def apply_uniaxial_arg_metadata(
     if default_value is not None:
       default_source = "curated"
   coerced = coerce_default(kind, default_value)
+  if coerced is None and default_source != "curated":  # a symbolic doc default (`p3=p2`) falls back to the curated one
+    coerced = coerce_default(kind, lookup_curated_default(curated_defaults, mat_type, str(arg.get("name", ""))))
+    default_source = "curated"
   if coerced is not None:
     out["defaultValue"] = coerced
     if default_source:

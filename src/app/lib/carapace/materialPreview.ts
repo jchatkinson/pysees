@@ -1,7 +1,7 @@
 import type { MaterialProbeError, WasmMaterialProbe } from '@/app/carapace/wasm/carapace_wasm.js'
 import type { MaterialEntity } from '@/app/types/model'
 import type { CompileDiagnostic } from '@/app/lib/compileAnalysisSequence'
-import { compileMaterial } from '@/app/lib/carapace/compileInputV1'
+import { compileMaterialWithDependencies } from '@/app/lib/carapace/compileInputV1'
 
 type Wasm = typeof import('@/app/carapace/wasm/carapace_wasm.js')
 
@@ -38,16 +38,16 @@ function describeProbeError(error: unknown): string {
  * event loop periodically so the page stays responsive and cancellation takes effect; a cancelled
  * run resolves with the points computed so far. Throws an Error with a
  * user-presentable message. */
-export async function runMaterialPreview(material: MaterialEntity, protocol: number[], { isCancelled }: RunMaterialPreviewOptions): Promise<MaterialPreviewPoint[]> {
+export async function runMaterialPreview(material: MaterialEntity, protocol: number[], { isCancelled }: RunMaterialPreviewOptions, materials: ReadonlyMap<number, MaterialEntity> = new Map()): Promise<MaterialPreviewPoint[]> {
   const diagnostics: CompileDiagnostic[] = []
-  const spec = compileMaterial(material, diagnostics)
+  const { material: spec, arena } = compileMaterialWithDependencies(material, materials, diagnostics)
   const failure = diagnostics.find((d) => d.severity === 'error')
   if (failure) throw new Error(failure.message)
 
   const wasm = await loadWasm()
   let probe: WasmMaterialProbe | null = null
   try {
-    probe = wasm.createMaterialProbe({ material: spec })
+    probe = wasm.createMaterialProbe({ material: spec, arena })
     const points: MaterialPreviewPoint[] = []
     let sliceStart = performance.now()
     for (const target of protocol) {

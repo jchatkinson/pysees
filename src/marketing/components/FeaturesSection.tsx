@@ -1,5 +1,5 @@
 import { CheckCircle2 } from 'lucide-react'
-import hero1 from '@/marketing/assets/hero1.png'
+import featureResults from '@/marketing/assets/feature-results.gif'
 const materialPreviewGif = '/material_preview.gif'
 
 type FeatureGroup = {
@@ -65,7 +65,7 @@ export function FeaturesSection() {
 
         <div className="mt-14 grid items-center gap-10 md:grid-cols-2">
           <div className="order-2 overflow-hidden rounded-xl border border-slate-200 bg-slate-50 p-4 md:order-1">
-            <img src={hero1} alt="PySees advanced feature preview" className="h-full w-full rounded-md object-cover object-top" />
+            <img src={featureResults} alt="Earthquake response of a 3D frame animating alongside a base shear plot" className="h-full w-full rounded-md object-cover object-top" />
           </div>
           <div className="order-1 md:order-2">
             <p className="text-xs font-semibold tracking-[0.16em] text-blue-600">{FEATURE_GROUPS[1].eyebrow}</p>

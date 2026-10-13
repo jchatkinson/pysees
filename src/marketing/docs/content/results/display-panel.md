@@ -5,6 +5,8 @@ order: 1
 keywords: case result type scale undeformed values fill display
 ---
 
+![Switching between the eigen, pushover and earthquake cases and their results in the Display Results panel](/docs/results-display.gif)
+
 After a run, the **Display Results** panel opens over the viewport. Its header has a plot button and a close button.
 
 ![The Display Results panel and a bending moment diagram on a 2D frame](/docs/results-moment-diagram.png)

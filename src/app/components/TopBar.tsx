@@ -1,10 +1,11 @@
 import { useRef, useState } from 'react'
-import { Button } from '@/app/components/ui/button'
+import { Button, buttonVariants } from '@/app/components/ui/button'
 import { Separator } from '@/app/components/ui/separator'
 import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger, DropdownMenuTrigger } from '@/app/components/ui/dropdown-menu'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/app/components/ui/tooltip'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/app/components/ui/alert-dialog'
-import { Undo2, Redo2 } from 'lucide-react'
+import { Link } from 'react-router-dom'
+import { Undo2, Redo2, House, BookOpen } from 'lucide-react'
 import { useAppStore } from '@/app/store/useAppStore'
 import { PiscesLogo } from '@/app/components/icons/PiscesLogo'
 import { patternColor } from '@/app/components/r3f/utils'
@@ -56,10 +57,10 @@ export function TopBar() {
 
   return (
     <header className="h-12 border-b flex items-center px-3 gap-3 shrink-0">
-      <div className="flex items-center gap-1.5 text-sm font-semibold select-none">
+      <Link to="/" className="flex items-center gap-1.5 text-sm font-semibold select-none" aria-label="PySees home">
         <PiscesLogo className="size-4 text-primary" aria-hidden="true" />
         PySees
-      </div>
+      </Link>
       <Separator orientation="vertical" className="self-stretch" />
       <DropdownMenu>
         <DropdownMenuTrigger render={<Button variant="ghost" size="sm" className="h-8 px-2 text-xs">File</Button>} />
@@ -143,6 +144,10 @@ export function TopBar() {
           />
           <TooltipContent>Redo</TooltipContent>
         </Tooltip>
+      </div>
+      <div className="ml-auto flex items-center gap-1">
+        <Link to="/" className={buttonVariants({ variant: 'ghost', size: 'sm', className: 'h-8 px-2 text-xs' })}><House />Home</Link>
+        <a href="/docs" target="_blank" rel="noreferrer" className={buttonVariants({ variant: 'ghost', size: 'sm', className: 'h-8 px-2 text-xs' })}><BookOpen />Docs</a>
       </div>
       <input ref={openInput} type="file" accept=".py,.txt" className="hidden" onChange={(e) => { void pickScript(e.target.files?.[0]); e.target.value = '' }} />
       <input ref={fileInput} type="file" accept=".tcl,.py,.txt" className="hidden" onChange={(e) => { void pickScript(e.target.files?.[0]); e.target.value = '' }} />

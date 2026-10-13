@@ -63,6 +63,8 @@ export type MaterialSpec =
   | { kind: 'parallel'; children: [number, number][] }
   | { kind: 'series'; children: number[] }
   | { kind: 'minMax'; inner: number; minStrain: number; maxStrain: number }
+  | { kind: 'hysteretic'; mom1p: number; rot1p: number; mom2p: number; rot2p: number; mom3p: number; rot3p: number; mom1n: number; rot1n: number; mom2n: number; rot2n: number; mom3n: number; rot3n: number; pinchX: number; pinchY: number; damfc1: number; damfc2: number; beta: number }
+  | { kind: 'pinching4'; stress1p: number; strain1p: number; stress2p: number; strain2p: number; stress3p: number; strain3p: number; stress4p: number; strain4p: number; stress1n: number; strain1n: number; stress2n: number; strain2n: number; stress3n: number; strain3n: number; stress4n: number; strain4n: number; rDispP: number; rForceP: number; uForceP: number; rDispN: number; rForceN: number; uForceN: number; gammaKParams: [number, number, number, number]; gammaKLimit: number; gammaDParams: [number, number, number, number]; gammaDLimit: number; gammaFParams: [number, number, number, number]; gammaFLimit: number; gammaE: number; dmgCyc: 'energyBased' | 'cycleBased' }
 
 export type IntegratorSpec =
   | { kind: 'loadControl'; increment: number }
