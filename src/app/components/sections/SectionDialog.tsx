@@ -11,7 +11,7 @@ import { ChildRowList } from '@/app/components/sections/ChildRowList'
 import { SectionPreview } from '@/app/components/sections/SectionPreview'
 import { sectionGeometryError } from '@/app/lib/sections/validate'
 import { defaultMaterialId } from '@/app/lib/sections/templates'
-import { singleFiber } from '@/app/lib/sections/discretize'
+import { circPatch, rectPatch, singleFiber } from '@/app/lib/sections/discretize'
 import type { SectionEntity } from '@/app/types/model'
 
 function SectionDialogBody({ editingId, onClose }: { editingId: number | null; onClose: () => void }) {
@@ -74,7 +74,7 @@ function SectionDialogBody({ editingId, onClose }: { editingId: number | null; o
                 onHoverChild={setHoveredIndex}
                 onUpdateChild={updateChild}
                 onRemoveChild={removeChild}
-                onAddFiber={() => addChild(singleFiber(defaultMaterialId(model.materials, 'steel'), 0, 0, 0.0001))}
+                onAdd={(k) => addChild(k === 'fiber' ? singleFiber(defaultMaterialId(model.materials, 'steel'), 0, 0, 0.0001) : k === 'rect' ? rectPatch(defaultMaterialId(model.materials, 'concrete'), -0.1, -0.1, 0.1, 0.1, 4, 4) : circPatch(defaultMaterialId(model.materials, 'concrete'), 0, 0, 0, 0.1, 8, 4))}
               />
             </TabsContent>
           </Tabs>

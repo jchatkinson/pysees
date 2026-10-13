@@ -8,6 +8,8 @@ import { skip } from '@/app/lib/commands/tokens'
 import { DIRECTIVES, DIRECTIVE_LINE, PROJECT_VERSION } from '@/app/lib/project/annotations'
 import type { ImportDiagnostic, ImportResult } from '@/app/lib/scriptImport/types'
 import type { ProjectDocument } from '@/app/lib/project/types'
+import { parseBaseUnits, parseUnitPrefs } from '@/app/lib/units/units'
+import { MATERIAL_USAGES, type MaterialUsage } from '@/app/lib/units/quantities'
 
 type Rec = Record<string, unknown>
 const isRec = (v: unknown): v is Rec => !!v && typeof v === 'object' && !Array.isArray(v)
@@ -119,6 +121,10 @@ export function parseProject(text: string): ImportResult {
   const h = header!.data
   if (model.config?.ndm !== h.ndm || model.config?.ndf !== h.ndf) error(`The project header says ndm=${String(h.ndm)}, ndf=${String(h.ndf)} but the model command says ndm=${model.config?.ndm}, ndf=${model.config?.ndf}.`, header!.line)
 
+  const units = parseBaseUnits(h.units)
+  if (units === null) error('The project header has invalid "units".', header!.line)
+  else if (units && model.config) model = { ...model, config: { ...model.config, units } }
+
   // Entity annotations: app-only fields, and the ids of constraints (their commands carry none).
   const constraintIds: { id: number; line: number }[] = []
   for (const { data, line } of entities) {
@@ -130,6 +136,10 @@ export function parseProject(text: string): ImportResult {
       const section = isInt(data.id) ? model.sections.get(data.id) : undefined
       if (!section || !isRec(data.template) || typeof data.template.kind !== 'string' || !isRec(data.template.params)) error(`Section annotation does not match a section (id ${String(data.id)}).`, line)
       else model = { ...model, sections: new Map(model.sections).set(section.id, { ...section, template: data.template as unknown as SectionTemplateMeta }) }
+    } else if (data.kind === 'material') {
+      const material = isInt(data.id) ? model.materials.get(data.id) : undefined
+      if (!material || material.kind !== 'uniaxial' || !(MATERIAL_USAGES as readonly unknown[]).includes(data.usage)) error(`Material annotation does not match a uniaxial material (id ${String(data.id)}).`, line)
+      else model = { ...model, materials: new Map(model.materials).set(material.id, { ...material, usage: data.usage as MaterialUsage }) }
     } else if (data.kind === 'mpConstraint') {
       if (isInt(data.id)) constraintIds.push({ id: data.id, line }); else error('Constraint annotation needs a positive integer id.', line)
     } else error(`Unknown entity annotation kind "${String(data.kind)}".`, line)
@@ -168,6 +178,7 @@ export function parseProject(text: string): ImportResult {
     activeSavedPlotId: isInt(report.activeSavedPlotId) && savedPlots.some((p) => p.id === report.activeSavedPlotId) ? report.activeSavedPlotId : null,
     display: {
       viewSettings: isRec(display.viewSettings) ? Object.fromEntries(Object.entries(display.viewSettings).filter(([, v]) => typeof v === 'boolean')) as Record<string, boolean> : {},
+      unitPrefs: parseUnitPrefs(display.unitPrefs),
       hiddenLoadPatterns: Array.isArray(display.hiddenLoadPatterns) ? display.hiddenLoadPatterns.filter(isInt) : [],
       resultsView: isRec(display.resultsView) ? display.resultsView : {}, plotView: isRec(display.plotView) ? display.plotView : {},
     },

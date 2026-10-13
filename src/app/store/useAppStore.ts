@@ -17,6 +17,7 @@ import type { SavedPlot } from '@/app/types/savedPlot'
 import { plotNameFor, restorePlot, snapshotPlot, uniqueName } from '@/app/lib/plot/savedPlots'
 import { DEFAULT_PLOT_VIEW, SERIES_COLORS, type Channel, type PlotView, type SeriesSpec } from '@/app/types/plotView'
 import { RESULTS_PREF_KEYS, PLOT_PREF_KEYS, type ProjectDocument } from '@/app/lib/project/types'
+import type { BaseUnits, Category, UnitPrefs } from '@/app/lib/units/units'
 import type { CompileDiagnostic } from '@/app/lib/compileAnalysisSequence'
 
 /** Suits both forces and displacements in most structural problems. */
@@ -159,7 +160,13 @@ interface AppStore {
   deleteSavedPlot: (id: number) => void
 
   // Model actions
-  initModel: (ndm: 2 | 3, ndf: number, extra?: { writes?: ModelWrite[]; analysisCommands?: AnalysisCommand[]; gridlines?: GridlineEntity[]; levels?: LevelEntity[] }) => void
+  /** Display unit per category (symbol); a category without one follows the displayed length / force / time. Presentation only: not part of the model or its undo history. */
+  unitPrefs: UnitPrefs
+  setUnitPref: (cat: Category, sym: string | null) => void
+  setUnitPrefs: (prefs: UnitPrefs) => void
+  /** Declares the system an unitless model's numbers are already in. Changes no value; a model that has units keeps them. */
+  assignUnits: (units: BaseUnits) => void
+  initModel: (ndm: 2 | 3, ndf: number, extra?: { units?: BaseUnits; unitPrefs?: UnitPrefs; writes?: ModelWrite[]; analysisCommands?: AnalysisCommand[]; gridlines?: GridlineEntity[]; levels?: LevelEntity[] }) => void
   newModel: () => void
   /** File name a saved project downloads as; an opened project keeps its own. */
   projectFileName: string
@@ -388,13 +395,14 @@ export const useAppStore = create<AppStore>((set, get) => {
   initModel: (ndm, ndf, extra) => set(() => {
     void clearAllRuns()
     let model = emptyModel()
-    model = { ...model, config: { ndm, ndf } }
+    model = { ...model, config: { ndm, ndf, ...(extra?.units ? { units: extra.units } : {}) } }
     for (const write of extra?.writes ?? []) model = applyModelWrite(model, write)
     const analysisCommands = extra?.analysisCommands ?? []
     const gridlines = extra?.gridlines ?? []
     const levels = extra?.levels ?? []
     return {
       model,
+      unitPrefs: extra?.unitPrefs ?? {},
       modelPast: [],
       modelFuture: [],
       analysisHistory: { commands: analysisCommands, cursor: analysisCommands.length - 1 },
@@ -413,6 +421,15 @@ export const useAppStore = create<AppStore>((set, get) => {
     }
   }),
 
+  unitPrefs: {},
+  setUnitPref: (cat, sym) => set((s) => {
+    const { [cat]: _drop, ...rest } = s.unitPrefs
+    void _drop
+    return { unitPrefs: sym ? { ...rest, [cat]: sym } : rest }
+  }),
+  setUnitPrefs: (unitPrefs) => set({ unitPrefs }),
+  assignUnits: (units) => set((s) => (s.model.config && !s.model.config.units ? { model: { ...s.model, config: { ...s.model.config, units } } } : s)),
+
   projectFileName: 'model.py',
   loadProject: (project, fileName) => {
     void clearAllRuns()
@@ -423,6 +440,7 @@ export const useAppStore = create<AppStore>((set, get) => {
       gridlines: project.gridlines, nextGridlineId: project.nextGridlineId, levels: project.levels, nextLevelId: project.nextLevelId,
       savedPlots: project.savedPlots, nextSavedPlotId: project.nextSavedPlotId, activeSavedPlotId: project.activeSavedPlotId,
       viewSettings: { ...s.viewSettings, ...Object.fromEntries(Object.entries(project.display.viewSettings).filter(([k]) => k in s.viewSettings)) },
+      unitPrefs: project.display.unitPrefs,
       hiddenLoadPatterns: project.display.hiddenLoadPatterns,
       resultsView: { ...DEFAULT_RESULTS_VIEW, ...keep<ResultsView>(project.display.resultsView, RESULTS_PREF_KEYS) },
       plotView: { ...DEFAULT_PLOT_VIEW, ...keep<PlotView>(project.display.plotView, PLOT_PREF_KEYS) },
@@ -437,6 +455,7 @@ export const useAppStore = create<AppStore>((set, get) => {
       model: emptyModel(),
       modelPast: [],
       modelFuture: [],
+      unitPrefs: {},
       analysisHistory: emptyAnalysisHistory(),
       gridlines: [],
       nextGridlineId: 1,

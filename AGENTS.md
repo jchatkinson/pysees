@@ -164,6 +164,19 @@ is global, so beams export `localForce` to match the local N/V/M PySees shows; t
 
 ---
 
+## Units
+
+Carapace and OpenSees are unitless; the **model is stored in one consistent system** (`ModelConfig.units`: a length, force and time unit, chosen at init and fixed; absent = unitless model). Display units are presentation only (`unitPrefs` in the store, saved in the `display` directive; base units in the `project` directive): values convert at the UI boundary and are never stored converted.
+
+- `lib/units/units.ts`: categories are dimensions as exponents of [L, F, T] (stress = F/L², mass = F·T²/L, ...). A category follows the displayed length/force/time ("auto", named when an alias matches exactly: kip/in² → ksi, N·s²/mm → t) until set explicitly. `makeUnitContext(base, prefs)` gives `toDisplay` / `fromDisplay` / `parse` (typed `4 ft`); `useUnits()` is the hook. Inactive (unitless) contexts convert and label nothing.
+- `lib/units/quantities.ts`: `ArgDef.qty` tags, applied from `QTY_RULES` (keyed `fn` or `fn/Type`, then arg name) by `tagQuantities` inside `getAvailableSchemas`. An untagged arg is dimensionless and shows no unit. `units.test.ts` fails if a rule names an arg that no schema has. Section fiber/patch/layer args (custom editor) are not tagged yet.
+- Per-DOF vecs use `dofForce` / `dofMass` (translational for the first ndm entries); `sp` uses `dofValue`.
+- A uniaxial material has a `usage`, `stress-strain` (default; fibers, trusses) or `force-deformation` (springs), fixed at creation (form-only key `__usage`, saved in an `entity` directive). Its args are tagged by role (`mStress`, `mStrain`, `mModulus`) that the usage resolves to units. `MaterialPicker` filters by usage and `validateSchemaResult` rejects a mismatch.
+- Field edits write back only when the text changed (no float drift), snapped to 12 significant digits.
+- Planned: export with a unit prelude and `value*unit` tokens, results/plot conversion, section editor, templates/AISC/ground-motion conversion.
+
+---
+
 ## Key Constraints
 
 - Analysis is in-browser via Carapace; no OpenSees runtime, local agent, or server compute.

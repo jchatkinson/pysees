@@ -1,8 +1,10 @@
-export interface ModelConfig { ndm: 2 | 3; ndf: number }
+/** `units`: the consistent system every number in the model is in (fixed at init). Absent: a unitless model. */
+export interface ModelConfig { ndm: 2 | 3; ndf: number; units?: import('@/app/lib/units/units').BaseUnits }
 
 export interface NodeEntity { id: number; coords: number[] }
 export interface MassEntity { nodeId: number; values: number[] }
-export interface MaterialEntity { id: number; kind: 'uniaxial' | 'nD'; matType: string; args: Record<string, unknown> }
+/** `usage` (uniaxial only): a stress-strain law or a force-deformation spring; absent means stress-strain. It decides the units of the material's stress, strain and modulus args. */
+export interface MaterialEntity { id: number; kind: 'uniaxial' | 'nD'; matType: string; args: Record<string, unknown>; usage?: import('@/app/lib/units/quantities').MaterialUsage }
 export interface FiberSectionItem { kind: 'fiber' | 'patch' | 'layer'; subType: string; args: Record<string, unknown> }
 /** Present when a Fiber section's children were last (re)generated from the Section Editor's parametric templates — lets the dialog reopen straight into the template form. Cleared once a user hand-edits a child. */
 export interface SectionTemplateMeta { kind: import('@/app/lib/sections/types').SectionTemplateKind; params: Record<string, unknown> }

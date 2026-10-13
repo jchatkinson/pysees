@@ -22,6 +22,7 @@ import type { AnalysisCommand } from '@/app/types/analysisCommands'
 import { ANALYSIS_BLOCKS, blockAsSchema } from '@/app/lib/analysisBlocks'
 import { useHotkeyRegistry } from '@/app/lib/hotkeys'
 import { CircleHelp } from 'lucide-react'
+import { MaterialUsageField } from '@/app/components/MaterialUsageField'
 
 function getModelEntity(model: Model, kind: string, id: number): unknown {
   switch (kind) {
@@ -395,7 +396,7 @@ export function CommandForm() {
               <Label className="text-xs">Name</Label>
               <Input value={String(values[NAME_KEY] ?? '')} placeholder={`Pattern ${selectedModelEntity.id}`} onChange={(e) => setValue(NAME_KEY, e.target.value)} />
             </div>
-          ) : undefined}
+          ) : schema.fn === 'uniaxialMaterial' ? ({ values, setValue }) => <MaterialUsageField values={values} setValue={setValue} locked /> : undefined}
           extra={isPattern ? () => (
             <>
               <LoadsTable patternId={selectedModelEntity.id} ndf={ctx.ndf} children={(entity as { children: LoadAssignment[] }).children} />
@@ -574,6 +575,7 @@ export function CommandForm() {
             if (selectedAddSchema.fn === 'uniaxialMaterial') setMaterialPreviewInputMaterial({ matType: String(values.matType ?? ''), values })
           }}
           previewAction={selectedAddSchema.fn === 'uniaxialMaterial' ? { onClick: () => setMaterialPreviewPanelOpen(true) } : undefined}
+          lead={selectedAddSchema.fn === 'uniaxialMaterial' ? ({ values, setValue }) => <MaterialUsageField values={values} setValue={setValue} /> : undefined}
           submitValues={(values) => {
             const idListField = selectedAddSchema.args.find((a) => a.kind === 'idlist')
             if (isModelPanel && idListField) {

@@ -1,12 +1,13 @@
-import { useRef, useState } from 'react'
+import { useRef, useState, type ReactNode } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/app/components/ui/dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/app/components/ui/select'
 import { Input } from '@/app/components/ui/input'
 import { Label } from '@/app/components/ui/label'
 import { Button } from '@/app/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/app/components/ui/tooltip'
-import { ArrowLeft } from 'lucide-react'
+import { ArrowLeft, FilePlus, FolderOpen } from 'lucide-react'
 import { useAppStore } from '@/app/store/useAppStore'
+import { UNIT_PRESETS, type BaseUnits, type UnitPrefs } from '@/app/lib/units/units'
 import { canImport, readScriptFile } from '@/app/lib/project/open'
 import { ImportPreviewBody, type ImportPreview } from '@/app/components/ImportScriptDialog'
 import {
@@ -19,28 +20,44 @@ import {
   type FrameParams,
 } from '@/app/lib/templates'
 
+/** Templates are written in N, m, s; they show stress in MPa and force in kN. */
+const TEMPLATE_UNITS: { units: BaseUnits; unitPrefs: UnitPrefs } = { units: { length: 'm', force: 'N', time: 's' }, unitPrefs: { stress: 'MPa', force: 'kN' } }
+import momentCurvatureImg from '@/app/assets/templates/momentCurvature.png'
+import cantileverImg from '@/app/assets/templates/cantilever.png'
+import frame2dImg from '@/app/assets/templates/frame2d.png'
+import frame3dImg from '@/app/assets/templates/frame3d.png'
+import plateImg from '@/app/assets/templates/plate.png'
+
+const NO_UNITS = 'none'
+
 type Choice = 'new' | 'load' | 'momentCurvature' | 'cantilever' | 'frame' | 'frame3d' | 'plate'
 
 interface CardProps {
   title: string
   description: string
+  image?: string
+  icon?: ReactNode
   onClick?: () => void
   disabled?: boolean
 }
 
-function Card({ title, description, onClick, disabled }: CardProps) {
+function Card({ title, description, image, icon, onClick, disabled }: CardProps) {
   return (
     <button
       className={[
-        'group border rounded-sm p-2 text-left w-full transition-colors',
+        'group border rounded-sm p-2 text-left w-full h-full flex transition-colors',
+        icon ? 'flex-row items-center gap-3' : 'flex-col justify-start',
         disabled ? 'opacity-50 cursor-not-allowed' : 'hover:bg-accent hover:text-accent-foreground cursor-pointer',
       ].join(' ')}
       onClick={disabled ? undefined : onClick}
       disabled={disabled}
     >
-      <div className="bg-muted rounded-sm aspect-video w-full mb-2" />
-      <p className="text-sm font-medium">{title}</p>
-      <p className="text-xs text-muted-foreground leading-snug group-hover:text-accent-foreground">{description}</p>
+      {icon && <span className="shrink-0 text-muted-foreground group-hover:text-accent-foreground [&>svg]:size-10 [&>svg]:stroke-[1.25]">{icon}</span>}
+      {image && <img src={image} alt="" className="bg-muted rounded-sm aspect-video w-full mb-2 object-cover" />}
+      <span className="min-w-0">
+        <p className="text-sm font-medium">{title}</p>
+        <p className="text-xs text-muted-foreground leading-snug group-hover:text-accent-foreground">{description}</p>
+      </span>
     </button>
   )
 }
@@ -69,6 +86,7 @@ function InitDialog() {
   // New model
   const [ndm, setNdm] = useState<2 | 3>(3)
   const [ndf, setNdf] = useState(6)
+  const [unitPreset, setUnitPreset] = useState<string>('kip-in-s')
 
   // Cantilever
   const [cantN, setCantN] = useState(10)
@@ -105,22 +123,22 @@ function InitDialog() {
 
   function handleCreate() {
     if (choice === 'new') {
-      initModel(ndm, ndf)
+      initModel(ndm, ndf, { units: UNIT_PRESETS.find((p) => p.id === unitPreset)?.units })
     } else if (choice === 'momentCurvature') {
       const t = momentCurvatureTemplate()
-      initModel(t.ndm, t.ndf, { writes: t.writes, analysisCommands: t.analysisCommands })
+      initModel(t.ndm, t.ndf, { ...TEMPLATE_UNITS, writes: t.writes, analysisCommands: t.analysisCommands })
     } else if (choice === 'cantilever') {
       const t = cantileverTemplate({ n: cantN, h: cantH, eleType: cantEle })
-      initModel(t.ndm, t.ndf, { writes: t.writes, analysisCommands: t.analysisCommands })
+      initModel(t.ndm, t.ndf, { ...TEMPLATE_UNITS, writes: t.writes, analysisCommands: t.analysisCommands })
     } else if (choice === 'frame') {
       const t = frameTemplate({ stories, storyH, bays, bayW, eleType: frameEle, base: frameBase })
-      initModel(t.ndm, t.ndf, { writes: t.writes, analysisCommands: t.analysisCommands, gridlines: t.gridlines, levels: t.levels })
+      initModel(t.ndm, t.ndf, { ...TEMPLATE_UNITS, writes: t.writes, analysisCommands: t.analysisCommands, gridlines: t.gridlines, levels: t.levels })
     } else if (choice === 'frame3d') {
       const t = frame3dTemplate({ stories: stories3, storyH: storyH3, baysX, bayX, baysY, bayY })
-      initModel(t.ndm, t.ndf, { writes: t.writes, analysisCommands: t.analysisCommands, levels: t.levels })
+      initModel(t.ndm, t.ndf, { ...TEMPLATE_UNITS, writes: t.writes, analysisCommands: t.analysisCommands, levels: t.levels })
     } else if (choice === 'plate') {
       const t = plateTemplate({ nx: plateNx, ny: plateNy, lx: plateLx, ly: plateLy, h: plateH })
-      initModel(t.ndm, t.ndf, { writes: t.writes, analysisCommands: t.analysisCommands })
+      initModel(t.ndm, t.ndf, { ...TEMPLATE_UNITS, writes: t.writes, analysisCommands: t.analysisCommands })
     }
   }
 
@@ -155,34 +173,39 @@ function InitDialog() {
               <DialogTitle>PySees</DialogTitle>
             </DialogHeader>
             <div className="grid grid-cols-2 gap-2">
-              <Card title="New" description="Start from scratch with custom ndm/ndf." onClick={() => select('new')} />
-              <Card title="Load" description="Open a saved project (.py)." onClick={() => fileInput.current?.click()} />
+              <Card title="New" description="Start from scratch with custom ndm/ndf." icon={<FilePlus />} onClick={() => select('new')} />
+              <Card title="Load" description="Open a saved project (.py)." icon={<FolderOpen />} onClick={() => fileInput.current?.click()} />
             </div>
             <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide pt-1">Templates</p>
             <div className="grid grid-cols-3 gap-2">
               <Card
                 title="Moment-Curvature"
                 description="Two-node zerolength with fiber section (300×500mm, 4 Ø20 bars)."
+                image={momentCurvatureImg}
                 onClick={() => select('momentCurvature')}
               />
               <Card
                 title="Cantilever Column"
                 description="Single column of n elements in y, fixed base."
+                image={cantileverImg}
                 onClick={() => select('cantilever')}
               />
               <Card
                 title="2D Frame"
                 description="Story-bay grid with columns and beams."
+                image={frame2dImg}
                 onClick={() => select('frame')}
               />
               <Card
                 title="3D Frame"
                 description="Story-bay grid in X and Y (Z up), elastic members, fixed base."
+                image={frame3dImg}
                 onClick={() => select('frame3d')}
               />
               <Card
                 title="Plate"
                 description="Cantilever slab of shell elements (Z up) under self-weight and pressure."
+                image={plateImg}
                 onClick={() => select('plate')}
               />
             </div>
@@ -228,6 +251,17 @@ function InitDialog() {
                       <SelectItem value="3">3D</SelectItem>
                     </SelectContent>
                   </Select>
+                </div>
+                <div className="grid gap-1.5">
+                  <Label>Units (fixed for the model)</Label>
+                  <Select value={unitPreset} onValueChange={(v) => setUnitPreset(v ?? NO_UNITS)}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {UNIT_PRESETS.map((p) => <SelectItem key={p.id} value={p.id}>{p.label}</SelectItem>)}
+                      <SelectItem value={NO_UNITS}>None (plain numbers)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-[11px] text-muted-foreground">Analysis is unitless: every value you enter must be in this one consistent system. Display units can be changed later (Edit › Units).</p>
                 </div>
                 <div className="grid gap-1.5">
                   <Label>DOFs per node (ndf)</Label>

@@ -12,6 +12,7 @@ import { downloadScript } from '@/app/lib/exportScript'
 import { readScriptFile } from '@/app/lib/project/open'
 import { downloadProject } from '@/app/lib/project/save'
 import { ImportScriptDialog, type ImportPreview } from '@/app/components/ImportScriptDialog'
+import { UnitsDialog } from '@/app/components/UnitsDialog'
 
 const MAX_IMPORT_BYTES = 5_000_000
 
@@ -38,6 +39,7 @@ export function TopBar() {
     projectFileName,
   } = useAppStore()
   const [newModelConfirmOpen, setNewModelConfirmOpen] = useState(false)
+  const [unitsOpen, setUnitsOpen] = useState(false)
   const [importPreview, setImportPreview] = useState<ImportPreview | null>(null)
   const fileInput = useRef<HTMLInputElement>(null)
   const openInput = useRef<HTMLInputElement>(null)
@@ -82,6 +84,7 @@ export function TopBar() {
           </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem onClick={() => setGridlinesDialogOpen(true)}>Grids & Levels…</DropdownMenuItem>
+          <DropdownMenuItem disabled={!model.config} onClick={() => setUnitsOpen(true)}>Units…</DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
       <DropdownMenu>
@@ -143,6 +146,7 @@ export function TopBar() {
       </div>
       <input ref={openInput} type="file" accept=".py,.txt" className="hidden" onChange={(e) => { void pickScript(e.target.files?.[0]); e.target.value = '' }} />
       <input ref={fileInput} type="file" accept=".tcl,.py,.txt" className="hidden" onChange={(e) => { void pickScript(e.target.files?.[0]); e.target.value = '' }} />
+      <UnitsDialog open={unitsOpen} onOpenChange={setUnitsOpen} />
       <ImportScriptDialog
         preview={importPreview}
         replacing={!!model.config && (model.nodes.size > 0 || model.elements.size > 0)}

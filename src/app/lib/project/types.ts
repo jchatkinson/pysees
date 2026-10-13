@@ -5,10 +5,13 @@ import type { LevelEntity } from '@/app/types/levels'
 import type { SavedPlot } from '@/app/types/savedPlot'
 import type { PlotView } from '@/app/types/plotView'
 import type { ResultsView } from '@/app/types/resultsView'
+import type { UnitPrefs } from '@/app/lib/units/units'
 
 /** Display preferences worth keeping: nothing here depends on a run (no selection, step, playback or open panels). */
 export interface ProjectDisplay {
   viewSettings: Record<string, boolean>
+  /** Display unit per category (by symbol). */
+  unitPrefs: UnitPrefs
   hiddenLoadPatterns: number[]
   resultsView: Partial<ResultsView>
   plotView: Partial<PlotView>
@@ -41,6 +44,7 @@ export interface ProjectSource {
   nextSavedPlotId: number
   activeSavedPlotId: number | null
   viewSettings: Record<string, boolean>
+  unitPrefs: UnitPrefs
   hiddenLoadPatterns: number[]
   resultsView: ResultsView
   plotView: PlotView
@@ -62,6 +66,6 @@ export function captureProject(s: ProjectSource): ProjectDocument {
     model: s.model, analysis: { commands, cursor: commands.length - 1 },
     gridlines: s.gridlines, levels: s.levels, nextGridlineId: s.nextGridlineId, nextLevelId: s.nextLevelId,
     savedPlots: s.savedPlots, nextSavedPlotId: s.nextSavedPlotId, activeSavedPlotId: s.activeSavedPlotId,
-    display: { viewSettings: { ...s.viewSettings }, hiddenLoadPatterns: [...s.hiddenLoadPatterns], resultsView, plotView: { ...pick(s.plotView, PLOT_PREF_KEYS), open: false } },
+    display: { viewSettings: { ...s.viewSettings }, unitPrefs: { ...s.unitPrefs }, hiddenLoadPatterns: [...s.hiddenLoadPatterns], resultsView, plotView: { ...pick(s.plotView, PLOT_PREF_KEYS), open: false } },
   }
 }

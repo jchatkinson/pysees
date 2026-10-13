@@ -10,6 +10,7 @@ import { encodeArgs } from '@/app/lib/commands/grammar'
 import { elementArgs, elementByType, elementNodeCount, isShell } from '@/app/lib/commands/tables'
 import { pyLiteral } from '@/app/lib/commands/print'
 import { ELE_LOAD_TYPES, eleLoadKind } from '@/app/lib/shells'
+import { tagQuantities, USAGE_KEY, type MaterialUsage } from '@/app/lib/units/quantities'
 
 export type SchemaResult =
   | { target: 'model'; write: ModelWrite }
@@ -401,7 +402,11 @@ const GENERATED_SCHEMAS: CommandSchema[] = GENERATED_COMMAND_SCHEMAS
         if (tagArgName) values = { ...values, [tagArgName]: id }
         const typeValue = resolveTypeValue(schema.fn, args, values)
 
-        if (kind === 'material') return { target: 'model', write: { kind: 'material', entity: { id, kind: schema.fn === 'nDMaterial' ? 'nD' : 'uniaxial', matType: typeValue, args: values } } }
+        if (kind === 'material') {
+          const { [USAGE_KEY]: usage, ...args } = values
+          const forceDeformation = schema.fn === 'uniaxialMaterial' && usage === 'force-deformation'
+          return { target: 'model', write: { kind: 'material', entity: { id, kind: schema.fn === 'nDMaterial' ? 'nD' : 'uniaxial', matType: typeValue, args, ...(forceDeformation ? { usage: 'force-deformation' as MaterialUsage } : {}) } } }
+        }
         if (kind === 'section') return { target: 'model', write: { kind: 'section', entity: { id, secType: typeValue, args: values, children: [] } } }
         if (kind === 'geomTransf') return { target: 'model', write: { kind: 'geomTransf', entity: { id, transfType: typeValue, args: values } } }
         if (kind === 'beamIntegration') return { target: 'model', write: { kind: 'beamIntegration', entity: { id, intType: typeValue, args: values } } }
@@ -433,14 +438,15 @@ export function getAvailableSchemas(ndm: number): CommandSchema[] {
   if (!list) {
     list = [...V1_MODEL_SCHEMAS, ...GENERATED_SCHEMAS]
       .filter((schema) => !schema.ndmFilter || schema.ndmFilter.includes(ndm))
-      .map((schema) => ({ ...schema, args: resolveArgs(schema.args, ndm), optional: resolveArgs(schema.optional, ndm) }))
+      .map((schema) => ({ ...schema, args: tagQuantities(schema.fn, resolveArgs(schema.args, ndm)), optional: tagQuantities(schema.fn, resolveArgs(schema.optional, ndm)) }))
     schemasByNdm.set(ndm, list)
   }
   return list
 }
 
+const TAGGED_PATTERN_CHILD_SCHEMAS = PATTERN_CHILD_SCHEMAS.map((schema) => ({ ...schema, args: tagQuantities(schema.fn, schema.args), optional: tagQuantities(schema.fn, schema.optional) }))
 export function getPatternChildSchemas() {
-  return PATTERN_CHILD_SCHEMAS
+  return TAGGED_PATTERN_CHILD_SCHEMAS
 }
 
 function docsUrlFromRstPath(path: string) {
@@ -647,6 +653,9 @@ export function validateSchemaResult(result: SchemaResult, model: Model, ctx: Sc
     if (eleLoadKind(write.child.args) === 'beam' ? shells > 0 : shells < tags.length) return eleLoadKind(write.child.args) === 'beam' ? 'A uniform beam load does not apply to shell elements.' : 'Shell pressure and self-weight apply to shell elements only.'
   }
   if (write.kind === 'sectionChild' && !model.sections.has(write.sectionId)) return `Section ${write.sectionId} does not exist.`
+  // Fibers, patches, layers and trusses take stress-strain laws; a force-deformation (spring) material never mixes in.
+  const usesMaterial = write.kind === 'sectionChild' ? write.child.args.matTag : write.kind === 'element' && write.entity.eleType === 'Truss' ? write.entity.args.matTag : undefined
+  if (usesMaterial !== undefined && model.materials.get(Number(usesMaterial))?.usage === 'force-deformation') return `Material ${Number(usesMaterial)} is a force-deformation (spring) material; this takes a stress–strain material.`
   return null
 }
 
@@ -686,6 +695,7 @@ export function modelEntityToValues(kind: ModelWrite['kind'], entity: unknown, c
     return { eleType: e.eleType, nodes: [...e.nodes], ...e.args, ...(e.args.orient !== undefined ? { '-orient': true } : {}) }
   }
   // Older/template-built entities may lack the schema's `type` discriminator in args; restore it so the form doesn't fall back to the schema default.
+  if (kind === 'material') { const e = entity as { args: Record<string, unknown>; usage?: MaterialUsage }; return { ...e.args, ...(e.usage ? { [USAGE_KEY]: e.usage } : {}) } }
   if (kind === 'pattern') { const e = entity as { patternType: string; args: Record<string, unknown> }; return { type: e.patternType, ...e.args } }
   if (kind === 'timeSeries') { const e = entity as { tsType: string; args: Record<string, unknown> }; return { type: e.tsType, ...e.args } }
   const e = entity as { args: Record<string, unknown> }

@@ -7,7 +7,7 @@ interface MarketingHeaderProps {
 }
 
 function navItem(label: string, href: string, currentPath: string) {
-  const active = href === currentPath
+  const active = href === currentPath || (href !== '/' && !href.includes('#') && currentPath.startsWith(href + '/'))
   return (
     <Link key={href} to={href} className={`text-sm transition-colors ${active ? 'text-slate-900' : 'text-slate-600 hover:text-slate-900'}`}>
       {label}
@@ -26,6 +26,7 @@ export function MarketingHeader({ currentPath }: MarketingHeaderProps) {
         <nav className="hidden items-center gap-6 md:flex">
           {navItem('Features', '/#features', currentPath)}
           {navItem('Change Log', '/#changelog', currentPath)}
+          {navItem('Docs', '/docs', currentPath)}
           {navItem('Solver', '/carapace', currentPath)}
           {navItem('About', '/about', currentPath)}
           {navItem('Contact', '/contact', currentPath)}

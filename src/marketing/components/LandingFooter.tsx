@@ -21,6 +21,7 @@ export function LandingFooter() {
           <ul className="mt-4 space-y-2 text-sm text-slate-600">
             <li><Link className="hover:text-slate-900" to="/#features">Features</Link></li>
             <li><Link className="hover:text-slate-900" to="/#changelog">Change Log</Link></li>
+            <li><Link className="hover:text-slate-900" to="/docs">Documentation</Link></li>
             <li><Link className="hover:text-slate-900" to="/studio">Studio</Link></li>
             <li><Link className="hover:text-slate-900" to="/carapace">Carapace solver</Link></li>
             <li><a className="hover:text-slate-900" href="https://github.com/jchatkinson/pysees" target="_blank" rel="noreferrer">GitHub</a></li>

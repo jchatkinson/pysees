@@ -2,13 +2,16 @@ import { useMemo } from 'react'
 import { Plus } from 'lucide-react'
 import { Select, SelectContent, SelectGroup, SelectItem, SelectSeparator, SelectTrigger, SelectValue } from '@/app/components/ui/select'
 import { useAppStore } from '@/app/store/useAppStore'
+import type { MaterialUsage } from '@/app/lib/units/quantities'
 
 const NEW_MATERIAL = '__new__'
 
 /** A material picker sourced live from the model, with a trailing "New material" affordance that opens MaterialDialog. Since both read/write the same store, a material created mid-flow shows up here immediately. */
-export function MaterialPicker({ id, kind = 'uniaxial', value, onChange, disabled, className }: {
+export function MaterialPicker({ id, kind = 'uniaxial', usage = 'stress-strain', value, onChange, disabled, className }: {
   id?: string
   kind?: 'uniaxial' | 'nD'
+  /** Uniaxial materials are listed by how they are used; fibers and trusses take stress-strain, springs force-deformation. */
+  usage?: MaterialUsage
   value: number | null
   onChange: (matId: number) => void
   disabled?: boolean
@@ -17,7 +20,7 @@ export function MaterialPicker({ id, kind = 'uniaxial', value, onChange, disable
   // Select the stable Map reference and derive the filtered/sorted array in the component body — a selector that
   // returns a fresh array on every call breaks useSyncExternalStore's snapshot stability and infinite-loops.
   const materialsMap = useAppStore((s) => s.model.materials)
-  const materials = useMemo(() => [...materialsMap.values()].filter((m) => m.kind === kind).sort((a, b) => a.id - b.id), [materialsMap, kind])
+  const materials = useMemo(() => [...materialsMap.values()].filter((m) => m.kind === kind && (kind === 'nD' || (m.usage ?? 'stress-strain') === usage)).sort((a, b) => a.id - b.id), [materialsMap, kind, usage])
   const setMaterialDialogOpen = useAppStore((s) => s.setMaterialDialogOpen)
 
   return (

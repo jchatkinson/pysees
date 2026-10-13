@@ -12,7 +12,7 @@ import { readScriptFile } from '@/app/lib/project/open'
 
 const docOf = (f: { model: Fixture['model']; history: AnalysisHistory }, extra: Partial<Parameters<typeof captureProject>[0]> = {}): ProjectDocument => captureProject({
   model: f.model, analysisHistory: f.history, gridlines: [], levels: [], nextGridlineId: 1, nextLevelId: 1, savedPlots: [], nextSavedPlotId: 1, activeSavedPlotId: null,
-  viewSettings: { showGrid: true }, hiddenLoadPatterns: [], resultsView: DEFAULT_RESULTS_VIEW, plotView: DEFAULT_PLOT_VIEW, ...extra,
+  viewSettings: { showGrid: true }, unitPrefs: {}, hiddenLoadPatterns: [], resultsView: DEFAULT_RESULTS_VIEW, plotView: DEFAULT_PLOT_VIEW, ...extra,
 })
 
 /** Complete persistent state, comparable regardless of map insertion order. */
@@ -65,7 +65,7 @@ describe('save then open restores the authored project', () => {
     const doc = docOf({ model: f.model, history }, {
       gridlines: [{ id: 3, label: 'A', start: [0, 0], end: [0, 5] }], levels: [{ id: 2, label: 'L1', height: 3 }], nextGridlineId: 9, nextLevelId: 4,
       savedPlots: [{ kind: 'plot', id: 2, name: 'Drift', config: { series: [], sharedX: true, x: { type: 'step' }, showStageTicks: true, showStepMarker: false } }], nextSavedPlotId: 5, activeSavedPlotId: 2,
-      hiddenLoadPatterns: [1], viewSettings: { showGrid: false },
+      hiddenLoadPatterns: [1], viewSettings: { showGrid: false }, unitPrefs: {},
     })
     const { project } = roundTrip(doc)
     expect(state(project)).toEqual(state(doc))
@@ -89,6 +89,32 @@ describe('save then open restores the authored project', () => {
     const f = shellPressureFixture()
     const text = serializeProject(docOf(f)).replace(/\n/g, '\r\n')
     expect(state(parseProject(text).project!)).toEqual(state(docOf(f)))
+  })
+})
+
+describe('units', () => {
+  it('saves and restores the base units, display units and a spring material', () => {
+    const f = earthquakeFixture()
+    f.model = { ...f.model, config: { ...f.model.config!, units: { length: 'in', force: 'kip', time: 's' } } }
+    f.model.materials.set(4, { id: 4, kind: 'uniaxial', matType: 'Elastic', args: { type: 'Elastic', matTag: 4, e: 120 }, usage: 'force-deformation' })
+    f.model.materials.set(5, { id: 5, kind: 'uniaxial', matType: 'Elastic', args: { type: 'Elastic', matTag: 5, e: 29000 } })
+    f.model.nextIds.material = 6
+    const doc = docOf(f, { unitPrefs: { length: 'ft', stress: 'MPa' } })
+    const { project, text } = roundTrip(doc)
+    expect(project.model.config?.units).toEqual({ length: 'in', force: 'kip', time: 's' })
+    expect(project.display.unitPrefs).toEqual({ length: 'ft', stress: 'MPa' })
+    expect(project.model.materials.get(4)?.usage).toBe('force-deformation')
+    expect(project.model.materials.get(5)?.usage).toBeUndefined()
+    expect(serializeProject(parseProject(text).project!)).toBe(text)
+  })
+
+  it('a project without units opens unitless, and a bad units value blocks opening', () => {
+    const f = earthquakeFixture()
+    expect(roundTrip(docOf(f)).project.model.config?.units).toBeUndefined()
+    const bad = serializeProject(docOf(f)).replace('"ndm":2', '"ndm":2,"units":{"force":"stone","length":"in","time":"s"}')
+    const result = parseProject(bad)
+    expect(result.project).toBeUndefined()
+    expect(result.diagnostics.some((d) => d.severity === 'error' && /units/.test(d.message))).toBe(true)
   })
 })
 

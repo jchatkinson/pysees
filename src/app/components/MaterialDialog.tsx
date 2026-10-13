@@ -3,6 +3,7 @@ import { useAppStore } from '@/app/store/useAppStore'
 import { getSchemaForFn, initialValues, validateSchemaResult } from '@/app/lib/commandSchemas'
 import type { SchemaResult } from '@/app/lib/commandSchemas'
 import { CommandFormBody } from '@/app/components/CommandForm'
+import { MaterialUsageField } from '@/app/components/MaterialUsageField'
 
 /** A focused "create a material" modal, openable mid-flow from anywhere (e.g. the Section Editor's material pickers) without disturbing whatever dialog opened it — it only ever writes a new material to the store and closes itself. */
 export function MaterialDialog() {
@@ -30,6 +31,7 @@ export function MaterialDialog() {
           schema={schema}
           ctx={ctx}
           actionLabel="Create"
+          lead={({ values, setValue }) => <MaterialUsageField values={values} setValue={setValue} />}
           initial={initialValues(schema, ctx, model)}
           onCancel={() => setOpen(false)}
           onValuesChange={(values) => setMaterialPreviewInputMaterial({ matType: String(values.matType ?? ''), values })}

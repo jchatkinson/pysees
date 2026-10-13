@@ -6,6 +6,7 @@ import { AboutPage } from '@/marketing/pages/AboutPage'
 import { CarapacePage } from '@/marketing/pages/CarapacePage'
 import { ContactPage } from '@/marketing/pages/ContactPage'
 import { TermsPage } from '@/marketing/pages/TermsPage'
+import { DocsPage } from '@/marketing/docs/DocsPage'
 import { Link, Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { useEffect } from 'react'
 
@@ -40,6 +41,8 @@ export function App() {
       <Routes>
         <Route path="/" element={<LandingPage />} />
         <Route path="/studio" element={<AppShell />} />
+        <Route path="/docs" element={<DocsPage />} />
+        <Route path="/docs/:category/:slug" element={<DocsPage />} />
         <Route path="/carapace" element={<CarapacePage />} />
         <Route path="/about" element={<AboutPage />} />
         <Route path="/contact" element={<ContactPage />} />

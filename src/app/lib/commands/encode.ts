@@ -143,7 +143,11 @@ export function encodeModel(model: Model, deferredPatterns: ReadonlySet<number> 
     if (annotate && JSON.stringify(authored) !== JSON.stringify(m)) calls.push(...generated({ kind: 'beamMass', nodeId: m.nodeId, writes: authored ? [{ kind: 'mass', entity: authored }] : [] }, [call]))
     else calls.push(call)
   }
-  for (const m of byId(model.materials)) calls.push(schemaCall(m.kind === 'nD' ? 'nDMaterial' : 'uniaxialMaterial', m.matType, m.args, ctx))
+  for (const m of byId(model.materials)) {
+    const call = schemaCall(m.kind === 'nD' ? 'nDMaterial' : 'uniaxialMaterial', m.matType, m.args, ctx)
+    if (annotate && m.usage) call.before = [directive('entity', { kind: 'material', id: m.id, usage: m.usage })]
+    calls.push(call)
+  }
   for (const sec of byId(model.sections)) {
     const call = schemaCall('section', sec.secType, sec.args, ctx)
     if (annotate && sec.template) call.before = [directive('entity', { kind: 'section', id: sec.id, template: sec.template })]

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Input } from '@/app/components/ui/input'
+import { InputGroup, InputGroupAddon, InputGroupInput, InputGroupText } from '@/app/components/ui/input-group'
 import { Label } from '@/app/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/app/components/ui/select'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/app/components/ui/tooltip'
@@ -7,6 +8,9 @@ import type { ArgDef, SchemaContext } from '@/app/types/schema'
 import { resolveArgLen } from '@/app/lib/commandSchemas'
 import { useAppStore } from '@/app/store/useAppStore'
 import { CircleHelp } from 'lucide-react'
+import { useUnits } from '@/app/lib/units/useUnits'
+import { formatQuantity, snapQuantity, type Category, type UnitContext } from '@/app/lib/units/units'
+import { resolveQty, USAGE_KEY, type MaterialUsage } from '@/app/lib/units/quantities'
 
 interface SchemaFormFieldProps {
   arg: ArgDef
@@ -35,56 +39,76 @@ function normalizeCommittedNumber(n: number, kind: 'int' | 'float') {
   return kind === 'int' ? Math.trunc(n) : n
 }
 
-function NumberInput({
+export function NumberInput({
   value,
   kind,
   onCommit,
   disabled,
   onFocus,
+  cat,
+  units,
+  suffix = true,
+  className,
 }: {
   value: unknown
   kind: 'int' | 'float'
   onCommit: (value: number) => void
   disabled?: boolean
   onFocus?: () => void
+  /** Quantity of the value (stored in base units). With active units the field shows and accepts the display unit, and a typed unit (`4 ft`) converts. */
+  cat?: Category | null
+  units?: UnitContext
+  /** Show the unit inside the field; off where the caller labels units itself (vec cells). */
+  suffix?: boolean
+  className?: string
 }) {
+  const scaled = Boolean(units?.active && cat && kind === 'float')
+  const show = (v: number) => (scaled ? formatQuantity(units!.toDisplay(cat, v)) : String(v))
+  const read = (text: string) => (scaled ? units!.parse(cat, text) : parseCommittedNumber(text))
+  const commit = (n: number) => (scaled ? snapQuantity(n) : normalizeCommittedNumber(n, kind))
   const committed = num(value)
-  const [draft, setDraft] = useState(String(committed))
+  const [draft, setDraft] = useState(show(committed))
   const [focused, setFocused] = useState(false)
 
   const [prevCommitted, setPrevCommitted] = useState(committed)
   if (committed !== prevCommitted) {
     setPrevCommitted(committed)
-    if (!focused) setDraft(String(committed))
+    if (!focused) setDraft(show(committed))
   }
 
+  const sym = scaled && suffix ? units!.symbol(cat) : ''
+  const props = {
+    value: draft,
+    onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
+      const text = e.target.value
+      setDraft(text)
+      const parsed = read(text)
+      if (parsed !== null) onCommit(commit(parsed))
+    },
+    onFocus: () => {
+      setFocused(true)
+      onFocus?.()
+    },
+    onBlur: (e: React.FocusEvent<HTMLInputElement>) => {
+      setFocused(false)
+      const text = e.target.value
+      // Untouched text keeps the stored value exactly, so opening and leaving a field never changes a number by float noise.
+      if (text === show(committed)) return setDraft(text)
+      const parsed = read(text)
+      if (parsed === null) return setDraft(show(committed))
+      const normalized = commit(parsed)
+      onCommit(normalized)
+      setDraft(show(normalized))
+    },
+    disabled,
+    className,
+  }
+  if (!sym) return <Input type={scaled ? 'text' : 'number'} inputMode={scaled ? 'decimal' : undefined} {...props} />
   return (
-    <Input
-      type="number"
-      value={draft}
-      onChange={(e) => {
-        const text = e.target.value
-        setDraft(text)
-        const parsed = parseCommittedNumber(text)
-        if (parsed !== null) onCommit(normalizeCommittedNumber(parsed, kind))
-      }}
-      onFocus={() => {
-        setFocused(true)
-        onFocus?.()
-      }}
-      onBlur={(e) => {
-        setFocused(false)
-        const parsed = parseCommittedNumber(e.target.value)
-        if (parsed === null) {
-          setDraft(String(committed))
-          return
-        }
-        const normalized = normalizeCommittedNumber(parsed, kind)
-        onCommit(normalized)
-        setDraft(String(normalized))
-      }}
-      disabled={disabled}
-    />
+    <InputGroup>
+      <InputGroupInput type="text" inputMode="decimal" {...props} />
+      <InputGroupAddon align="inline-end"><InputGroupText>{sym}</InputGroupText></InputGroupAddon>
+    </InputGroup>
   )
 }
 
@@ -140,10 +164,11 @@ function seedDefaults(arg: ArgDef, values: Record<string, unknown>, setValue: (k
   if (arg.kind === 'idlist' && values[arg.name] === undefined) setValue(arg.name, arg.defaultValue ?? [])
 }
 
-function FieldLabel({ text, description }: { text: string; description?: string }) {
+function FieldLabel({ text, description, unit }: { text: string; description?: string; unit?: string }) {
   return (
     <Label className="text-xs flex items-center gap-1.5">
       <span>{text}</span>
+      {unit && <span className="text-muted-foreground font-normal">({unit})</span>}
       {description && (
         <Tooltip>
           <TooltipTrigger
@@ -247,11 +272,15 @@ function VecField({
   const rawVec = values[arg.name]
   const arr = useMemo(() => (Array.isArray(rawVec) ? (rawVec as unknown[]) : []), [rawVec])
   const label = arg.label ?? arg.name
+  const units = useUnits()
+  const qctx = { ndm: ctx.ndm, usage: values[USAGE_KEY] as MaterialUsage | undefined }
+  const catAt = (i: number) => resolveQty(arg.qty, qctx, i)
+  const symAt = (i: number) => units.symbol(catAt(i))
 
   const [nextSlot, setNextSlot] = useState(0)
   const activeRef = useRef(false)
   const [active, setActive] = useState(false)
-  const formattedVec = arr.map((v) => String(num(v))).join(', ')
+  const formattedVec = arr.map((v, i) => formatQuantity(units.toDisplay(catAt(i), num(v)))).join(', ')
   const [dynamicOverride, setDynamicOverride] = useState<string | null>(null)
   const dynamicRaw = dynamicOverride ?? formattedVec
 
@@ -269,7 +298,7 @@ function VecField({
   if (len === 'dynamic') {
     return (
       <div className="grid gap-1.5">
-        <FieldLabel text={label} description={arg.description} />
+        <FieldLabel text={label} description={arg.description} unit={[...new Set(arr.map((_, i) => symAt(i)).filter(Boolean))].join(', ') || undefined} />
         <Input
           type="text"
           value={dynamicRaw}
@@ -277,12 +306,12 @@ function VecField({
             const text = e.target.value
             setDynamicOverride(text)
             const parsed = tryParseDynamicFloatList(text)
-            if (parsed) setValue(arg.name, parsed)
+            if (parsed) setValue(arg.name, parsed.map((v, i) => snapQuantity(units.fromDisplay(catAt(i), v))))
           }}
           onFocus={() => setDynamicOverride(dynamicRaw)}
           onBlur={() => {
             const parsed = tryParseDynamicFloatList(dynamicRaw)
-            if (parsed) setValue(arg.name, parsed)
+            if (parsed) setValue(arg.name, parsed.map((v, i) => snapQuantity(units.fromDisplay(catAt(i), v))))
             setDynamicOverride(null)
           }}
           placeholder="e.g. 1, 2, 3"
@@ -293,10 +322,12 @@ function VecField({
   }
 
   const fixed = arr.length ? arr : Array.from({ length: len }, () => 0)
+  const syms = Array.from({ length: len }, (_, i) => symAt(i))
+  const uniform = new Set(syms).size === 1 ? syms[0] : ''
 
   return (
     <div className="grid gap-1.5">
-      <FieldLabel text={label} description={arg.description} />
+      <FieldLabel text={label} description={arg.description} unit={uniform || undefined} />
       <div
         className="grid gap-1"
         style={{ gridTemplateColumns: `repeat(${Math.min(len, 6)}, minmax(0,1fr))` }}
@@ -313,6 +344,9 @@ function VecField({
             key={`${arg.name}-${idx}`}
             value={fixed[idx]}
             kind="float"
+            cat={catAt(idx)}
+            units={units}
+            suffix={false}
             onCommit={(value) => {
               const next = [...fixed]
               next[idx] = value
@@ -330,6 +364,11 @@ function VecField({
           />
         ))}
       </div>
+      {!uniform && syms.some(Boolean) && (
+        <div className="grid gap-1 -mt-0.5" style={{ gridTemplateColumns: `repeat(${Math.min(len, 6)}, minmax(0,1fr))` }}>
+          {syms.map((sym, i) => <span key={i} className="text-[10px] text-muted-foreground text-center truncate">{sym}</span>)}
+        </div>
+      )}
       {arg.nodeSync && active && (
         <p className="text-[10px] text-muted-foreground">
           Click nodes in viewport to fill sequentially
@@ -342,6 +381,7 @@ function VecField({
 // ─── main field dispatcher ────────────────────────────────────────────────────
 
 export function SchemaFormField({ arg, values, setValue, ctx, disabled }: SchemaFormFieldProps) {
+  const units = useUnits()
   if (arg.kind === 'idlist') {
     return <IdListField arg={arg} values={values} setValue={setValue} disabled={disabled} />
   }
@@ -356,7 +396,10 @@ export function SchemaFormField({ arg, values, setValue, ctx, disabled }: Schema
         {arg.kind === 'str' ? (
           <Input type="text" value={String(values[key] ?? '')} onChange={(e) => setValue(key, e.target.value)} disabled={disabled} />
         ) : (
-          <NumberInput value={values[key]} kind={arg.kind} onCommit={(value) => setValue(key, value)} disabled={disabled} />
+          <NumberInput
+            value={values[key]} kind={arg.kind} onCommit={(value) => setValue(key, value)} disabled={disabled} units={units}
+            cat={arg.kind === 'float' ? resolveQty(arg.qty, { ndm: ctx.ndm, usage: values[USAGE_KEY] as MaterialUsage | undefined, dof: Number(values.dof) }) : null}
+          />
         )}
       </div>
     )
