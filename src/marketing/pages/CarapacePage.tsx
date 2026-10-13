@@ -15,11 +15,11 @@ const COVERAGE = [
 
 export function CarapacePage() {
   return (
-    <main className="min-h-screen bg-white">
+    <main id="main" tabIndex={-1} className="outline-none min-h-screen bg-white">
       <MarketingHeader currentPath="/carapace" />
       <section className="mx-auto max-w-4xl px-4 pt-14 text-center md:px-6 md:pt-18">
-        <img src={crab} alt="Carapace crab mascot" className="mx-auto mb-6 h-40 w-auto md:h-52" />
-        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-sky-600">The PySees solver</p>
+        <img src={crab} alt="Carapace crab mascot" width={558} height={416} fetchPriority="high" className="mx-auto mb-6 h-40 w-auto md:h-52" />
+        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-sky-700">The PySees solver</p>
         <h1 className="mt-3 text-5xl font-semibold tracking-tight text-slate-900 md:text-6xl">Carapace</h1>
         <p className="mx-auto mt-4 max-w-3xl text-lg text-slate-600">
           An open-source finite-element engine written in Rust and compiled to WebAssembly. It is what lets PySees run your model in the browser, with no server and no local OpenSees install.

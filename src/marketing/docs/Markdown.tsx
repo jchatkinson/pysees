@@ -35,7 +35,7 @@ const heading = (Tag: 'h1' | 'h2' | 'h3' | 'h4', cls: string) => ({ children, id
 )
 
 const components: Components = {
-  h1: heading('h1', 'mb-4 text-3xl font-semibold tracking-tight text-slate-900'),
+  h1: heading('h2', 'mb-4 text-3xl font-semibold tracking-tight text-slate-900'),
   h2: heading('h2', 'mt-10 mb-3 border-b border-slate-200 pb-2 text-xl font-semibold tracking-tight text-slate-900'),
   h3: heading('h3', 'mt-6 mb-2 text-base font-semibold text-slate-900'),
   h4: heading('h4', 'mt-4 mb-1 text-sm font-semibold text-slate-900'),
@@ -48,7 +48,7 @@ const components: Components = {
   table: ({ children }) => <div className="my-4 overflow-x-auto"><table className="w-full border-collapse text-sm">{children}</table></div>,
   th: ({ children }) => <th className="border border-slate-200 bg-slate-50 px-3 py-2 text-left font-semibold text-slate-900">{children}</th>,
   td: ({ children }) => <td className="border border-slate-200 px-3 py-2 align-top text-slate-700">{children}</td>,
-  img: ({ src, alt }) => <img src={src} alt={alt} className="my-4 max-w-full rounded-lg border border-slate-200" loading="lazy" />,
+  img: ({ src, alt }) => <img src={src} alt={alt} className="my-4 max-w-full rounded-lg border border-slate-200" loading="lazy" decoding="async" />,
   hr: () => <hr className="my-8 border-slate-200" />,
   kbd: ({ children }) => <kbd className="rounded border border-slate-300 bg-slate-50 px-1.5 py-0.5 font-mono text-xs">{children}</kbd>,
   blockquote: ({ children }) => {

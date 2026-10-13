@@ -1,14 +1,12 @@
 import { TooltipProvider } from '@/app/components/ui/tooltip'
-import { AppShell } from '@/app/components/AppShell'
-import { LandingPage } from '@/marketing/pages/LandingPage'
 import { Button } from '@/app/components/ui/button'
-import { AboutPage } from '@/marketing/pages/AboutPage'
-import { CarapacePage } from '@/marketing/pages/CarapacePage'
-import { ContactPage } from '@/marketing/pages/ContactPage'
-import { TermsPage } from '@/marketing/pages/TermsPage'
-import { DocsPage } from '@/marketing/docs/DocsPage'
+import { marketingRoutes } from '@/marketing/routes'
+import { Seo } from '@/marketing/Seo'
 import { Link, Navigate, Route, Routes, useLocation } from 'react-router-dom'
-import { useEffect } from 'react'
+import { lazy, Suspense, useEffect } from 'react'
+
+// The studio (three.js, charts, workers) is its own chunk so marketing pages stay light.
+const AppShell = lazy(() => import('@/app/components/AppShell').then(m => ({ default: m.AppShell })))
 
 function HashScrollHandler() {
   const { hash } = useLocation()
@@ -16,7 +14,11 @@ function HashScrollHandler() {
     if (!hash) return
     const id = hash.replace('#', '')
     requestAnimationFrame(() => {
-      document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      const el = document.getElementById(id)
+      if (!el) return
+      el.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' })
+      if (!el.hasAttribute('tabindex') && !/^(a|button|input|select|textarea)$/i.test(el.tagName)) el.setAttribute('tabindex', '-1')
+      el.focus({ preventScroll: true })
     })
   }, [hash])
   return null
@@ -37,16 +39,11 @@ function NotFound() {
 export function App() {
   return (
     <TooltipProvider>
+      <Seo />
       <HashScrollHandler />
       <Routes>
-        <Route path="/" element={<LandingPage />} />
-        <Route path="/studio" element={<AppShell />} />
-        <Route path="/docs" element={<DocsPage />} />
-        <Route path="/docs/:category/:slug" element={<DocsPage />} />
-        <Route path="/carapace" element={<CarapacePage />} />
-        <Route path="/about" element={<AboutPage />} />
-        <Route path="/contact" element={<ContactPage />} />
-        <Route path="/terms" element={<TermsPage />} />
+        {marketingRoutes}
+        <Route path="/studio" element={<Suspense fallback={<div role="status" className="grid min-h-screen place-items-center text-sm text-slate-500">Loading studio…</div>}><AppShell /></Suspense>} />
         <Route path="/signup/*" element={<Navigate to="/studio" replace />} />
         <Route path="/login/*" element={<Navigate to="/studio" replace />} />
         <Route path="/app" element={<Navigate to="/studio" replace />} />

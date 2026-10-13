@@ -1,11 +1,11 @@
 import { Link } from 'react-router-dom'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/app/components/ui/tabs'
 import { MarketingHeader } from '@/marketing/components/MarketingHeader'
-import about1 from '@/marketing/assets/about1.png'
+import about1 from '@/marketing/assets/about1.webp'
 
 export function AboutPage() {
   return (
-    <main className="min-h-screen bg-white">
+    <main id="main" tabIndex={-1} className="outline-none min-h-screen bg-white">
       <MarketingHeader currentPath="/about" />
 
       <section className="mx-auto max-w-4xl px-4 pt-14 text-center md:px-6 md:pt-18">
@@ -49,7 +49,7 @@ export function AboutPage() {
         </div>
 
         <div className="relative">
-          <img src={about1} alt="PySees about visual" className="h-full max-h-[500px] w-full rounded-3xl object-cover" />
+          <img src={about1} alt="" width={1024} height={1024} loading="lazy" decoding="async" className="h-full max-h-[500px] w-full rounded-3xl object-cover" />
         </div>
       </section>
     </main>

@@ -6,7 +6,7 @@ import { MarketingHeader } from '@/marketing/components/MarketingHeader'
 
 export function ContactPage() {
   return (
-    <main className="min-h-screen bg-white">
+    <main id="main" tabIndex={-1} className="outline-none min-h-screen bg-white">
       <MarketingHeader currentPath="/contact" />
 
       <section className="mx-auto max-w-4xl px-4 pt-14 text-center md:px-6 md:pt-18">

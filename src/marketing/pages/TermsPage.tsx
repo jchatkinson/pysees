@@ -7,7 +7,7 @@ const lastUpdated = 'October 10, 2026'
 
 export function TermsPage() {
   return (
-    <main className="min-h-screen bg-white">
+    <main id="main" tabIndex={-1} className="outline-none min-h-screen bg-white">
       <MarketingHeader currentPath="/terms" />
 
       <section className="mx-auto max-w-4xl px-4 pb-16 pt-14 md:px-6 md:pt-18">

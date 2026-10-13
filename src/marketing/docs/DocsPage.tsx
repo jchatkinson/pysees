@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { Link, Navigate, NavLink, useParams } from 'react-router-dom'
 import { ChevronLeft, ChevronRight, Menu, X } from 'lucide-react'
 import { MarketingHeader } from '@/marketing/components/MarketingHeader'
@@ -9,7 +9,7 @@ import { FLAT, TREE, categoryTitle, findPage } from './content'
 
 function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
   return (
-    <nav className="space-y-6 text-sm">
+    <nav aria-label="Documentation" className="space-y-6 text-sm">
       {TREE.map(c => (
         <div key={c.id}>
           <h3 className="mb-2 text-xs font-semibold uppercase tracking-[0.15em] text-slate-500">{c.title}</h3>
@@ -29,18 +29,17 @@ function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
 export function DocsPage() {
   const { category, slug } = useParams()
   const page = findPage(category, slug)
-  useEffect(() => { if (page) document.title = `${page.title} – PySees Docs` }, [page])
   const [menu, setMenu] = useState(false)
   if (!category && FLAT[0]) return <Navigate to={FLAT[0].path} replace />
   const i = page ? FLAT.indexOf(page) : -1
   const prev = FLAT[i - 1], next = FLAT[i + 1]
 
   return (
-    <main className="min-h-screen bg-white">
+    <main id="main" tabIndex={-1} className="outline-none min-h-screen bg-white">
       <MarketingHeader currentPath="/docs" />
       <div className="mx-auto w-full max-w-6xl px-4 md:px-6">
         <div className="flex items-center gap-2 border-b py-3 md:hidden">
-          <button type="button" aria-label="Toggle docs menu" onClick={() => setMenu(m => !m)} className="grid h-9 w-9 place-items-center rounded-md border">{menu ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}</button>
+          <button type="button" aria-label="Toggle docs menu" aria-expanded={menu} onClick={() => setMenu(m => !m)} className="grid h-9 w-9 place-items-center rounded-md border">{menu ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}</button>
           <DocsSearch />
         </div>
         {menu && <div className="max-h-[70vh] overflow-y-auto border-b py-4 md:hidden"><Sidebar onNavigate={() => setMenu(false)} /></div>}
@@ -51,7 +50,7 @@ export function DocsPage() {
           </aside>
           {page ? (
             <article className="min-w-0">
-              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-sky-600">{categoryTitle(page.category)}</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-sky-700">{categoryTitle(page.category)}</p>
               <h1 className="mt-1 text-3xl font-semibold tracking-tight text-slate-900">{page.title}</h1>
               {page.description && <p className="mt-2 text-lg text-slate-600">{page.description}</p>}
               <Markdown>{page.body}</Markdown>
@@ -67,7 +66,7 @@ export function DocsPage() {
             <aside className="sticky top-20 hidden max-h-[calc(100vh-6rem)] self-start overflow-y-auto text-sm lg:block">
               {page.headings.length > 0 && (
                 <>
-                  <h3 className="mb-2 text-xs font-semibold uppercase tracking-[0.15em] text-slate-500">On this page</h3>
+                  <h2 className="mb-2 text-xs font-semibold uppercase tracking-[0.15em] text-slate-500">On this page</h2>
                   <ul className="space-y-1">
                     {page.headings.map(h => <li key={h.id} className={h.level === 3 ? 'pl-3' : ''}><a href={`#${h.id}`} className="text-slate-600 hover:text-slate-900">{h.text}</a></li>)}
                   </ul>

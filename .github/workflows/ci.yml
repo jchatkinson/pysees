@@ -1,0 +1,15 @@
+name: CI
+on: [push, pull_request]
+jobs:
+  site:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - run: npm ci
+      - run: npm run lint
+      # Marketing/SEO tests only: the OpenSees comparison tests need the Python venv.
+      - run: npx vitest run src/marketing
+      # Typechecks, builds the app, SSR-builds and prerenders every marketing page (fails if a page has no <h1>).
+      - run: npm run build

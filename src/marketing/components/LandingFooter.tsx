@@ -17,7 +17,7 @@ export function LandingFooter() {
         </div>
 
         <div>
-          <h3 className="text-base font-semibold text-slate-900">Product</h3>
+          <h2 className="text-base font-semibold text-slate-900">Product</h2>
           <ul className="mt-4 space-y-2 text-sm text-slate-600">
             <li><Link className="hover:text-slate-900" to="/#features">Features</Link></li>
             <li><Link className="hover:text-slate-900" to="/#changelog">Change Log</Link></li>
@@ -29,7 +29,7 @@ export function LandingFooter() {
         </div>
 
         <div>
-          <h3 className="text-base font-semibold text-slate-900">Company</h3>
+          <h2 className="text-base font-semibold text-slate-900">Company</h2>
           <ul className="mt-4 space-y-2 text-sm text-slate-600">
             <li><Link className="hover:text-slate-900" to="/about">About</Link></li>
             <li><Link className="hover:text-slate-900" to="/contact">Contact</Link></li>
@@ -38,7 +38,7 @@ export function LandingFooter() {
         </div>
 
         <div>
-          <h3 className="text-base font-semibold text-slate-900">Ready to Start?</h3>
+          <h2 className="text-base font-semibold text-slate-900">Ready to Start?</h2>
           <p className="mt-4 text-sm text-slate-600">Build and analyze models in your browser. No account required.</p>
           <div className="mt-5 flex flex-wrap gap-2">
             <Button size="lg" render={<Link to="/studio">Open Studio</Link>} />
