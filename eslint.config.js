@@ -20,4 +20,9 @@ export default defineConfig([
       globals: globals.browser,
     },
   },
+  {
+    // shadcn files export variant helpers (buttonVariants, ...) alongside components; keep them as generated.
+    files: ['src/app/components/ui/**'],
+    rules: { 'react-refresh/only-export-components': 'off' },
+  },
 ])
