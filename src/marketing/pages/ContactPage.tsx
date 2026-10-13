@@ -1,8 +1,7 @@
 import { Button } from '@/app/components/ui/button'
-import { Input } from '@/app/components/ui/input'
-import { Label } from '@/app/components/ui/label'
-import { Textarea } from '@/app/components/ui/textarea'
 import { MarketingHeader } from '@/marketing/components/MarketingHeader'
+
+const ISSUES = 'https://github.com/jchatkinson/pysees/issues'
 
 export function ContactPage() {
   return (
@@ -12,7 +11,7 @@ export function ContactPage() {
       <section className="mx-auto max-w-4xl px-4 pt-14 text-center md:px-6 md:pt-18">
         <h1 className="text-5xl font-semibold tracking-tight text-slate-900 md:text-6xl">Contact Us</h1>
         <p className="mx-auto mt-4 max-w-3xl text-lg text-slate-600">
-          Questions, feedback, or feature requests for PySees? Send a message and we will follow up.
+          Questions, feedback, or feature requests for PySees? Open an issue on GitHub and we will follow up there.
         </p>
       </section>
 
@@ -38,27 +37,17 @@ export function ContactPage() {
           </div>
         </div>
 
-        <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm md:p-7">
-          <form className="space-y-5">
-            <div className="space-y-2">
-              <Label className="text-sm text-slate-700" htmlFor="contact-name">Name</Label>
-              <Input id="contact-name" placeholder="Your name" className="h-10 bg-white text-sm md:text-sm" />
-            </div>
-            <div className="space-y-2">
-              <Label className="text-sm text-slate-700" htmlFor="contact-email">Email</Label>
-              <Input id="contact-email" type="email" placeholder="you@example.com" className="h-10 bg-white text-sm md:text-sm" />
-            </div>
-            <div className="space-y-2">
-              <Label className="text-sm text-slate-700" htmlFor="contact-topic">Topic</Label>
-              <Input id="contact-topic" placeholder="Feature request, bug report, question..." className="h-10 bg-white text-sm md:text-sm" />
-            </div>
-            <div className="space-y-2">
-              <Label className="text-sm text-slate-700" htmlFor="contact-message">Message</Label>
-              <Textarea id="contact-message" placeholder="Write your message..." className="min-h-36 resize-y bg-white text-sm md:text-sm" />
-            </div>
-            <Button type="button" size="lg" className="w-full">Send Message</Button>
-            <p className="text-xs text-slate-500">Form wiring is pending. This is a visual scaffold only.</p>
-          </form>
+        <div className="flex flex-col justify-center rounded-3xl border border-slate-200 bg-white p-6 shadow-sm md:p-7">
+          <svg viewBox="0 0 16 16" aria-hidden="true" className="mx-auto size-20 fill-slate-900"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z" /></svg>
+          <h3 className="mt-5 text-center text-2xl font-semibold text-slate-900">Open an issue on GitHub</h3>
+          <p className="mt-3 text-base leading-relaxed text-slate-600">
+            Questions, bug reports, and feature requests all live in the PySees issue tracker. Search existing issues first, then open a new one if yours is not there.
+          </p>
+          <div className="mt-6 flex flex-col gap-3">
+            <Button size="lg" className="w-full" render={<a href={`${ISSUES}/new`} target="_blank" rel="noopener noreferrer" />}>New issue</Button>
+            <Button size="lg" variant="outline" className="w-full" render={<a href={ISSUES} target="_blank" rel="noopener noreferrer" />}>Browse existing issues</Button>
+          </div>
+          <p className="mt-4 text-xs text-slate-500">A free GitHub account is required. For bugs, include the steps to reproduce and, if possible, the saved .py project.</p>
         </div>
       </section>
     </main>
