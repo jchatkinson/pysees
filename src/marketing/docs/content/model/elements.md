@@ -2,7 +2,7 @@
 title: Elements
 description: The element types you can add, with their arguments in 2D and 3D.
 order: 7
-keywords: truss elasticBeamColumn dispBeamColumn shell MITC4 DKGT zeroLengthSection
+keywords: truss elasticBeamColumn dispBeamColumn shell MITC4 DKGT zeroLength zeroLengthSection friction
 ---
 
 Elements are in the **Elements** group. Click an element in the viewport or its row to edit it. The form changes with the model dimension.
@@ -14,9 +14,18 @@ Elements are in the **Elements** group. Click an element in the viewport or its 
 | `dispBeamColumn` | 2 | transformation, beam integration, optional `-mass` (uses a fiber section) | 2D, 3D |
 | `ShellMITC4` | 4 | section | 3D |
 | `ShellDKGT` | 3 | section | 3D |
+| `zeroLength` | 2 | `-mat` tags and `-dir` directions, optional `-orient` | 2D (skipped with a warning in 3D) |
 | `zeroLengthSection` | 2 | section, optional `-orient` | 2D (skipped with a warning in 3D) |
 
 Other OpenSees element names exist in the generated schemas but are not available in the element form.
+
+## Zero-length springs
+
+A `zeroLength` element joins two nodes, usually coincident, with an independent material in each listed direction: `-mat 1 2 -dir 1 2` puts material 1 on ux and material 2 on uy (3 is rz; in 3D 4-6 are the rotations). Directions without a material are free. `-orient` rotates the element's local axes. Use *force-deformation* materials (set when a uniaxial material is created) so the material's stress is the spring force and its strain the relative displacement.
+
+The node order matters for one-sided materials: the relative displacement is node J minus node I, so with `ENT` (compression-only) put the supporting node first and the node that presses on it second.
+
+Tick **Coulomb friction** in the element form to couple a shear direction to the compression in another: the normal direction takes the material (such as `ENT`), the shear direction takes none, and the shear force slides once it exceeds `mu` times the compression. Friction is a Carapace feature; OpenSees has no equivalent in a `zeroLength`, so an exported script writes the element without it and adds a warning comment. A saved project keeps it.
 
 ## Shells
 

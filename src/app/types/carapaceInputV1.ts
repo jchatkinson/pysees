@@ -24,6 +24,10 @@ export interface FiberBeamColumn2dTable { nodeI: number[]; nodeJ: number[]; fibe
 /** Sparse OpenSees `-orient` row; rows without one use the global axes. 2D: `x = [x1, x2, 0]` and no `yp`; 3D adds `yp`. */
 export interface OrientRow { row: number; x: [number, number, number]; yp?: [number, number, number] }
 /** A `ZeroLength` driven by a coupled `FiberSection` (axial + moment) instead of independent per-DOF materials. `materials` is a sparse spring for the one DOF (`uy`) the section has no resultant for. */
+/** Coulomb friction on one `zeroLengths` row: shear DOF `shearDofs[0]` slides against the current force in `normalDof` (compression negative; capacity `mu * max(-N, 0)`), sticking with stiffness `k0` and sliding with tangent `b * k0`. 0-based DOFs. `normalDof` needs its own material on the row; the shear DOF must not. */
+export interface FrictionRow { row: number; normalDof: number; shearDofs: number[]; mu: number; k0: number; b: number }
+/** Independent per-DOF materials between two nodes (`materials` is sparse `[row, dof, materialIndex]`, 0-based DOFs), optionally with friction coupling and local axes. */
+export interface ZeroLengthTable { nodeI: number[]; nodeJ: number[]; materials: [number, number, number][]; friction?: FrictionRow[]; orient?: OrientRow[] }
 export interface ZeroLengthSectionTable { nodeI: number[]; nodeJ: number[]; fiberSection: number[]; materials: [number, number, number][]; orient?: OrientRow[] }
 /** `z` is empty in 2D and parallel to `y` in 3D. */
 /** ETABS-style stiffness modifiers on a shell section; each omitted factor is 1 and each must be finite and positive.
@@ -117,6 +121,7 @@ export interface CarapaceInputV1 {
   dispBeamColumns2d: FiberBeamColumn2dTable
   elasticBeamColumns3d?: ElasticBeamColumn3dTable
   dispBeamColumns3d?: FiberBeamColumn3dTable
+  zeroLengths?: ZeroLengthTable
   zeroLengthSections: ZeroLengthSectionTable
   shellSections?: ShellSectionSpec[]
   shell3s?: Shell3Table

@@ -16,6 +16,8 @@ import {
   frameTemplate,
   frame3dTemplate,
   plateTemplate,
+  precastWallTemplate,
+  PRECAST_WALL_DEFAULTS,
   type CantileverParams,
   type FrameParams,
 } from '@/app/lib/templates'
@@ -27,10 +29,11 @@ import cantileverImg from '@/app/assets/templates/cantilever.png'
 import frame2dImg from '@/app/assets/templates/frame2d.png'
 import frame3dImg from '@/app/assets/templates/frame3d.png'
 import plateImg from '@/app/assets/templates/plate.png'
+import precastWallImg from '@/app/assets/templates/precastWall.png'
 
 const NO_UNITS = 'none'
 
-type Choice = 'new' | 'load' | 'momentCurvature' | 'cantilever' | 'frame' | 'frame3d' | 'plate'
+type Choice = 'new' | 'load' | 'momentCurvature' | 'cantilever' | 'frame' | 'frame3d' | 'plate' | 'precastWall'
 
 interface CardProps {
   title: string
@@ -116,6 +119,19 @@ function InitDialog() {
   const [plateLy, setPlateLy] = useState(2.0)
   const [plateH, setPlateH] = useState(0.2)
 
+  // Precast wall (the form shows kN and kN/mm; the template takes N and N/m)
+  const [wallPanels, setWallPanels] = useState(PRECAST_WALL_DEFAULTS.panels)
+  const [wallWidth, setWallWidth] = useState(PRECAST_WALL_DEFAULTS.panelWidth)
+  const [wallHeight, setWallHeight] = useState(PRECAST_WALL_DEFAULTS.panelHeight)
+  const [wallThickness, setWallThickness] = useState(PRECAST_WALL_DEFAULTS.thickness)
+  const [wallStories, setWallStories] = useState(PRECAST_WALL_DEFAULTS.storyHeights.map((h) => Number(h.toFixed(3))).join(', '))
+  const [wallConnectors, setWallConnectors] = useState(PRECAST_WALL_DEFAULTS.connectorsPerJoint)
+  const [wallKv, setWallKv] = useState(PRECAST_WALL_DEFAULTS.Kv / 1e6) // kN/mm
+  const [wallFy, setWallFy] = useState(PRECAST_WALL_DEFAULTS.Fy / 1e3) // kN
+  const [wallB, setWallB] = useState(PRECAST_WALL_DEFAULTS.b)
+  const [wallFriction, setWallFriction] = useState(PRECAST_WALL_DEFAULTS.friction)
+  const [wallMu, setWallMu] = useState(PRECAST_WALL_DEFAULTS.mu)
+
   function select(c: Choice) {
     setChoice(c)
     setStep(2)
@@ -139,6 +155,13 @@ function InitDialog() {
     } else if (choice === 'plate') {
       const t = plateTemplate({ nx: plateNx, ny: plateNy, lx: plateLx, ly: plateLy, h: plateH })
       initModel(t.ndm, t.ndf, { ...TEMPLATE_UNITS, writes: t.writes, analysisCommands: t.analysisCommands })
+    } else if (choice === 'precastWall') {
+      const storyHeights = wallStories.split(/[\s,;]+/).map(Number).filter((h) => Number.isFinite(h) && h > 0)
+      const t = precastWallTemplate({
+        panels: wallPanels, panelWidth: wallWidth, panelHeight: wallHeight, thickness: wallThickness, ...(storyHeights.length ? { storyHeights } : {}),
+        connectorsPerJoint: wallConnectors, Kv: wallKv * 1e6, Fy: wallFy * 1e3, b: wallB, friction: wallFriction, mu: wallMu,
+      })
+      initModel(t.ndm, t.ndf, { ...TEMPLATE_UNITS, writes: t.writes, analysisCommands: t.analysisCommands, levels: t.levels })
     }
   }
 
@@ -157,6 +180,7 @@ function InitDialog() {
     frame: '2D Frame',
     frame3d: '3D Frame',
     plate: 'Plate',
+    precastWall: 'Precast Wall',
   }
 
   return (
@@ -207,6 +231,12 @@ function InitDialog() {
                 description="Cantilever slab of shell elements (Z up) under self-weight and pressure."
                 image={plateImg}
                 onClick={() => select('plate')}
+              />
+              <Card
+                title="Precast Wall"
+                description="Panels joined by vertical connectors, on a bearing, dowel and friction base."
+                image={precastWallImg}
+                onClick={() => select('precastWall')}
               />
             </div>
           </>
@@ -416,6 +446,63 @@ function InitDialog() {
                   </div>
                 </div>
                 <p className="text-xs text-muted-foreground">3D model (ndm=3, ndf=6), Z up, clamped along x = 0. Four-node MITC4 shells.</p>
+              </div>
+            )}
+
+            {choice === 'precastWall' && (
+              <div className="grid gap-4 py-2">
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="grid gap-1.5">
+                    <Label>Panels</Label>
+                    <Input type="number" value={wallPanels} min={1} onChange={(e) => setWallPanels(Math.max(1, Math.trunc(Number(e.target.value))))} />
+                  </div>
+                  <div className="grid gap-1.5">
+                    <Label>Panel width (m)</Label>
+                    <Input type="number" value={wallWidth} min={0.5} step={0.1} onChange={(e) => setWallWidth(Math.max(0.5, Number(e.target.value)))} />
+                  </div>
+                  <div className="grid gap-1.5">
+                    <Label>Panel height (m)</Label>
+                    <Input type="number" value={wallHeight} min={2} step={0.5} onChange={(e) => setWallHeight(Math.max(2, Number(e.target.value)))} />
+                  </div>
+                  <div className="grid gap-1.5">
+                    <Label>Thickness (m)</Label>
+                    <Input type="number" value={wallThickness} min={0.05} step={0.01} onChange={(e) => setWallThickness(Math.max(0.05, Number(e.target.value)))} />
+                  </div>
+                  <div className="grid gap-1.5 col-span-2">
+                    <Label>Story heights (m), bottom up</Label>
+                    <Input value={wallStories} onChange={(e) => setWallStories(e.target.value)} placeholder="4.27, 3.66, 3.66" />
+                  </div>
+                  <div className="grid gap-1.5">
+                    <Label>Connectors per joint</Label>
+                    <Input type="number" value={wallConnectors} min={1} onChange={(e) => setWallConnectors(Math.max(1, Math.trunc(Number(e.target.value))))} />
+                  </div>
+                  <div className="grid gap-1.5">
+                    <Label>Connector Kv (kN/mm)</Label>
+                    <Input type="number" value={wallKv} min={0.001} step={10} onChange={(e) => setWallKv(Math.max(0.001, Number(e.target.value)))} />
+                  </div>
+                  <div className="grid gap-1.5">
+                    <Label>Connector Fy (kN)</Label>
+                    <Input type="number" value={wallFy} min={1} step={10} onChange={(e) => setWallFy(Math.max(1, Number(e.target.value)))} />
+                  </div>
+                  <div className="grid gap-1.5">
+                    <Label>Post-yield ratio</Label>
+                    <Input type="number" value={wallB} min={0} max={1} step={0.001} onChange={(e) => setWallB(Math.min(1, Math.max(0, Number(e.target.value))))} />
+                  </div>
+                </div>
+                <div className="grid grid-cols-3 gap-3 items-end">
+                  <label className="flex items-center gap-2 text-sm col-span-2">
+                    <input type="checkbox" checked={wallFriction} onChange={(e) => setWallFriction(e.target.checked)} />
+                    Base shear by friction on the bearings
+                  </label>
+                  <div className="grid gap-1.5">
+                    <Label>Friction coefficient</Label>
+                    <Input type="number" value={wallMu} min={0} step={0.05} disabled={!wallFriction} onChange={(e) => setWallMu(Math.max(0, Number(e.target.value)))} />
+                  </div>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  2D model (ndm=2, ndf=3), the paper's four-panel benchmark. Panels are fiber beam columns, joined by Steel02 shear connectors and standing on compression-only bearings, Steel02 dowels and a stabilizing shear spring. Other values (concrete and steel strengths, bars, bearings, dowels, gravity, lateral pattern) take the paper's values and are editable in the model.
+                  Friction runs in Carapace only; an exported script carries it as a warning, so turn it off for a model that runs the same in OpenSees.
+                </p>
               </div>
             )}
 

@@ -22,6 +22,8 @@ export const ELEMENTS: ElementSpec[] = [
   { eleType: 'DispBeamColumn', opsName: 'dispBeamColumn', args: ['transfTag', 'integrationTag'], flags: { '-mass': { key: 'mass' } } },
   { eleType: 'ShellMITC4', opsName: 'ShellMITC4', nodeCount: 4, args: ['secTag'], exact: true },
   { eleType: 'ShellDKGT', opsName: 'ShellDKGT', nodeCount: 3, args: ['secTag'], exact: true },
+  // Per-direction materials: `-mat` tags pair with `-dir` DOFs (1-based). Friction is PySees-only (`args.friction`) and is not written to the script.
+  { eleType: 'zeroLength', opsName: 'zeroLength', args: [], flags: { '-mat': { key: 'mat', vec: true }, '-dir': { key: 'dir', vec: true }, '-orient': { key: 'orient', vec: true } } },
   { eleType: 'zeroLengthSection', opsName: 'zeroLengthSection', args: ['secTag'], flags: { '-orient': { key: 'orient', vec: true } } },
 ]
 /** Number of nodes an element type connects. */

@@ -179,6 +179,7 @@ export function compileInputV1(model: Model, analysisHistory: AnalysisHistory): 
   const dispBeamColumns: W.FiberBeamColumn2dTable = { nodeI: [], nodeJ: [], fiberSection: [], integration: [], corotational: [], density: [] }
   const elasticBeamColumns3d: W.ElasticBeamColumn3dTable = { nodeI: [], nodeJ: [], e: [], g: [], a: [], j: [], iy: [], iz: [], transform: [], density: [] }
   const dispBeamColumns3d: W.FiberBeamColumn3dTable = { nodeI: [], nodeJ: [], g: [], j: [], vecXz: [], fiberSection: [], integration: [], density: [] }
+  const zeroLengths: W.ZeroLengthTable = { nodeI: [], nodeJ: [], materials: [], friction: [], orient: [] }
   const zeroLengthSections: W.ZeroLengthSectionTable = { nodeI: [], nodeJ: [], fiberSection: [], materials: [], orient: [] }
   const shell3s: W.Shell3Table = { nodeIds: [], section: [] }
   const shell4s: W.Shell4Table = { nodeIds: [], section: [] }
@@ -277,6 +278,37 @@ export function compileInputV1(model: Model, analysisHistory: AnalysisHistory): 
       dispBeamColumns.corotational.push(false)
       dispBeamColumns.density.push(0)
       elementRefs.set(ele.id, { kind: 'dispBeamColumn2d', index: dispBeamColumns.nodeI.length - 1 })
+    } else if (ele.eleType === 'zeroLength') {
+      const ctx = `ZeroLength ${ele.id}`
+      if (ndm !== 2) {
+        diagnostics.push({ severity: 'warning', message: `Element ${ele.id} (zeroLength) is not yet supported in 3D models by the Carapace compiler and was skipped`, commandIndex: -1 })
+        continue
+      }
+      const row = zeroLengths.nodeI.length
+      zeroLengths.nodeI.push(resolveNode(ele.nodes[0], ctx))
+      zeroLengths.nodeJ.push(resolveNode(ele.nodes[1], ctx))
+      const mats = Array.isArray(ele.args.mat) ? ele.args.mat.map(Number) : []
+      const dirs = Array.isArray(ele.args.dir) ? ele.args.dir.map(Number) : []
+      if (mats.length !== dirs.length) diagnostics.push({ severity: 'error', message: `${ctx}: ${mats.length} material(s) for ${dirs.length} direction(s); -mat and -dir must pair up`, commandIndex: -1 })
+      const seenDirs = new Set<number>()
+      mats.forEach((tag, i) => {
+        const dir = dirs[i]
+        if (!Number.isInteger(dir) || dir < 1 || dir > 3) { diagnostics.push({ severity: 'error', message: `${ctx}: direction ${String(dirs[i])} is not 1, 2 or 3 in a 2D model`, commandIndex: -1 }); return }
+        if (seenDirs.has(dir)) diagnostics.push({ severity: 'error', message: `${ctx}: direction ${dir} has more than one material`, commandIndex: -1 })
+        seenDirs.add(dir)
+        zeroLengths.materials.push([row, dir - 1, resolveMaterial(tag, ctx)])
+      })
+      const orient = readOrient(ele.args.orient)
+      const problem = ele.args.orient === undefined ? null : orientProblem(ele.args.orient, 2)
+      if (problem) diagnostics.push({ severity: 'error', message: `${ctx}: ${problem}`, commandIndex: -1 })
+      else if (orient) zeroLengths.orient!.push({ row, x: [orient[0], orient[1], orient[2]] })
+      const friction = readZeroLengthFriction(ele.args.friction, ctx, diagnostics)
+      if (friction) {
+        if (!seenDirs.has(friction.normalDir)) diagnostics.push({ severity: 'error', message: `${ctx}: friction needs a material on its normal direction ${friction.normalDir}`, commandIndex: -1 })
+        if (seenDirs.has(friction.shearDir)) diagnostics.push({ severity: 'error', message: `${ctx}: friction carries direction ${friction.shearDir}, so it cannot also have a material`, commandIndex: -1 })
+        zeroLengths.friction!.push({ row, normalDof: friction.normalDir - 1, shearDofs: [friction.shearDir - 1], mu: friction.mu, k0: friction.k0, b: friction.b })
+      }
+      elementRefs.set(ele.id, { kind: 'zeroLength', index: row })
     } else if (ele.eleType === 'zeroLengthSection') {
       const secIdx = resolveSection(Number(ele.args.secTag), `ZeroLengthSection ${ele.id}`)
       zeroLengthSections.nodeI.push(resolveNode(ele.nodes[0], `ZeroLengthSection ${ele.id}`))
@@ -522,6 +554,7 @@ export function compileInputV1(model: Model, analysisHistory: AnalysisHistory): 
     elasticBeamColumns2d: elasticBeamColumns,
     dispBeamColumns2d: dispBeamColumns,
     ...(ndm === 3 ? { elasticBeamColumns3d, dispBeamColumns3d, shellSections, shell3s, shell4s } : {}),
+    ...(zeroLengths.nodeI.length ? { zeroLengths } : {}),
     zeroLengthSections,
     loadPatterns,
     nodalLoads,
@@ -529,6 +562,19 @@ export function compileInputV1(model: Model, analysisHistory: AnalysisHistory): 
     sequence: { stages, recorders },
   }
   return { input, diagnostics, recordedNodeTags, dofsPerNode, recorderPlans, nodeTags: nodeIds }
+}
+
+/** The PySees-only Coulomb friction of a `zeroLength`: `{ normalDir, shearDir, mu, k0, b }` (1-based directions), or `undefined` when the element has none. */
+function readZeroLengthFriction(raw: unknown, ctx: string, diagnostics: CompileDiagnostic[]): { normalDir: number; shearDir: number; mu: number; k0: number; b: number } | undefined {
+  if (raw === undefined || raw === null) return undefined
+  const f = raw as Record<string, unknown>
+  const normalDir = Number(f.normalDir), shearDir = Number(f.shearDir), mu = Number(f.mu), k0 = Number(f.k0), b = f.b === undefined ? 0 : Number(f.b)
+  const dirOk = (d: number) => Number.isInteger(d) && d >= 1 && d <= 3
+  if (typeof raw !== 'object' || !dirOk(normalDir) || !dirOk(shearDir) || normalDir === shearDir || !(mu >= 0) || !Number.isFinite(mu) || !(k0 > 0) || !Number.isFinite(k0) || !(b >= 0 && b <= 1)) {
+    diagnostics.push({ severity: 'error', message: `${ctx}: friction needs distinct normalDir and shearDir (1-3), mu >= 0, k0 > 0 and 0 <= b <= 1`, commandIndex: -1 })
+    return undefined
+  }
+  return { normalDir, shearDir, mu, k0, b }
 }
 
 /** Reads the PySees-only `modifiers` object of a shell section: `undefined` when there is none, `null` (after an error diagnostic) when a factor is not a positive finite number. */
@@ -624,6 +670,19 @@ function compileFiberSections(
         compileRectPatch(child.args, secTag, ndm === 3 ? z : null, resolveMaterial, y, area, material)
       } else {
         diagnostics.push({ severity: 'warning', message: `Section ${secTag}: fiber item "${child.kind}/${child.subType}" is not yet supported by the Carapace compiler and was skipped`, commandIndex: -1 })
+      }
+    }
+    // OpenSees' FiberSection2d/3d measure fiber coordinates from the area-weighted centroid of all the section's fibers (steel and concrete alike),
+    // not from the origin they were written against; Carapace takes y (and z) from the element axis. Moving the origin there keeps the two
+    // engines agreeing for sections that are not symmetric about it (a symmetric one has its centroid at the origin already).
+    const start = sectionOffsets[sectionOffsets.length - 1]
+    const total = area.slice(start).reduce((a, b) => a + b, 0)
+    if (total > 0) {
+      const yBar = area.slice(start).reduce((q, a, i) => q + a * y[start + i], 0) / total
+      for (let i = start; i < y.length; i++) y[i] -= yBar
+      if (ndm === 3) {
+        const zBar = area.slice(start).reduce((q, a, i) => q + a * z[start + i], 0) / total
+        for (let i = start; i < z.length; i++) z[i] -= zBar
       }
     }
     sectionOffsets.push(y.length)

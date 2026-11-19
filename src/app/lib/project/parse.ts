@@ -141,6 +141,10 @@ export function parseProject(text: string): ImportResult {
         const args = hasModifiers ? { ...section.args, modifiers: data.modifiers } : section.args
         model = { ...model, sections: new Map(model.sections).set(section.id, { ...section, args, ...(hasTemplate ? { template: data.template as unknown as SectionTemplateMeta } : {}) }) }
       }
+    } else if (data.kind === 'element') {
+      const element = isInt(data.id) ? model.elements.get(data.id) : undefined
+      if (!element || element.eleType !== 'zeroLength' || !isRec(data.friction)) error(`Element annotation does not match a zeroLength element (id ${String(data.id)}).`, line)
+      else model = { ...model, elements: new Map(model.elements).set(element.id, { ...element, args: { ...element.args, friction: data.friction } }) }
     } else if (data.kind === 'material') {
       const material = isInt(data.id) ? model.materials.get(data.id) : undefined
       if (!material || material.kind !== 'uniaxial' || !(MATERIAL_USAGES as readonly unknown[]).includes(data.usage)) error(`Material annotation does not match a uniaxial material (id ${String(data.id)}).`, line)

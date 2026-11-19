@@ -436,3 +436,5 @@ export function plateTemplate({ nx, ny, lx, ly, h }: PlateParams): TemplateResul
   ]
   return { ndm: 3, ndf: 6, writes: [...writes, ...loadWrites], analysisCommands }
 }
+
+export { precastWallTemplate, PRECAST_WALL_DEFAULTS, type PrecastWallParams } from '@/app/lib/precastWall'

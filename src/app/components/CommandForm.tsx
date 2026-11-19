@@ -24,6 +24,7 @@ import { useHotkeyRegistry } from '@/app/lib/hotkeys'
 import { CircleHelp } from 'lucide-react'
 import { MaterialUsageField } from '@/app/components/MaterialUsageField'
 import { ShellModifiersField } from '@/app/components/ShellModifiersField'
+import { ZeroLengthFrictionField } from '@/app/components/ZeroLengthFrictionField'
 
 function getModelEntity(model: Model, kind: string, id: number): unknown {
   switch (kind) {
@@ -398,7 +399,7 @@ export function CommandForm() {
               <Input value={String(values[NAME_KEY] ?? '')} placeholder={`Pattern ${selectedModelEntity.id}`} onChange={(e) => setValue(NAME_KEY, e.target.value)} />
             </div>
           ) : schema.fn === 'uniaxialMaterial' ? ({ values, setValue }) => <MaterialUsageField values={values} setValue={setValue} locked /> : undefined}
-          extra={schema.fn === 'section' && (entity as { secType?: string } | null)?.secType === 'ElasticMembranePlateSection' ? ({ values, setValue }) => <ShellModifiersField values={values} setValue={setValue} /> : isPattern ? () => (
+          extra={schema.fn === 'section' && (entity as { secType?: string } | null)?.secType === 'ElasticMembranePlateSection' ? ({ values, setValue }) => <ShellModifiersField values={values} setValue={setValue} /> : schema.fn === 'element' && (entity as { eleType?: string } | null)?.eleType === 'zeroLength' ? ({ values, setValue }) => <ZeroLengthFrictionField values={values} setValue={setValue} /> : isPattern ? () => (
             <>
               <LoadsTable patternId={selectedModelEntity.id} ndf={ctx.ndf} children={(entity as { children: LoadAssignment[] }).children} />
               <ChildrenEditor
@@ -577,7 +578,7 @@ export function CommandForm() {
           }}
           previewAction={selectedAddSchema.fn === 'uniaxialMaterial' ? { onClick: () => setMaterialPreviewPanelOpen(true) } : undefined}
           lead={selectedAddSchema.fn === 'uniaxialMaterial' ? ({ values, setValue }) => <MaterialUsageField values={values} setValue={setValue} /> : undefined}
-          extra={selectedAddSchema.fn === 'section' ? ({ values, setValue }) => values.type === 'ElasticMembranePlateSection' ? <ShellModifiersField values={values} setValue={setValue} /> : null : undefined}
+          extra={selectedAddSchema.fn === 'section' ? ({ values, setValue }) => values.type === 'ElasticMembranePlateSection' ? <ShellModifiersField values={values} setValue={setValue} /> : null : selectedAddSchema.fn === 'element' ? ({ values, setValue }) => values.eleType === 'zeroLength' ? <ZeroLengthFrictionField values={values} setValue={setValue} /> : null : undefined}
           submitValues={(values) => {
             const idListField = selectedAddSchema.args.find((a) => a.kind === 'idlist')
             if (isModelPanel && idListField) {

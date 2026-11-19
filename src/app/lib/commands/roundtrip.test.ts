@@ -5,12 +5,15 @@ import { ALL_FIXTURES, plain } from '@/app/lib/commands/testkit'
 
 const fixtures = ALL_FIXTURES()
 
+/** A material's `usage` (stress-strain or force-deformation) is an app-only field a script cannot carry; a project file keeps it. */
+const scriptView = (m: ReturnType<typeof plain>) => ({ ...m, materials: m.materials.map(({ usage: _usage, ...rest }) => { void _usage; return rest }) })
+
 describe.each(['py', 'tcl'] as const)('export .%s then import', (lang) => {
   it.each(fixtures)('$name rebuilds the same model', ({ model, history }) => {
     const script = exportScript(model, history, lang)
     const result = importScript(script, `model.${lang}`)
     expect(result.diagnostics.filter((d) => d.severity !== 'info')).toEqual([])
-    expect(plain(result.model)).toEqual(plain(model))
+    expect(scriptView(plain(result.model))).toEqual(scriptView(plain(model)))
   })
 })
 

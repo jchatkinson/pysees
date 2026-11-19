@@ -99,7 +99,7 @@ function massArgs(): ArgDef[] {
 
 function elementArgsFromGenerated(): ArgDef[] {
   return [
-    { kind: 'choice', name: 'eleType', label: 'Element Type', options: ['Truss', 'ElasticBeamColumn', 'DispBeamColumn', 'ShellMITC4', 'ShellDKGT', 'zeroLengthSection'], defaultValue: 'Truss', yields: {
+    { kind: 'choice', name: 'eleType', label: 'Element Type', options: ['Truss', 'ElasticBeamColumn', 'DispBeamColumn', 'ShellMITC4', 'ShellDKGT', 'zeroLength', 'zeroLengthSection'], defaultValue: 'Truss', yields: {
       Truss: [
         { kind: 'vec', name: 'nodes', label: 'Node IDs', length: 2, defaultValue: [1, 2], nodeSync: true },
         { kind: 'float', name: 'A', label: 'Area (A)', defaultValue: 1, required: true },
@@ -129,6 +129,14 @@ function elementArgsFromGenerated(): ArgDef[] {
       ShellDKGT: [
         { kind: 'vec', name: 'nodes', label: 'Node IDs (counter-clockwise, normal by the right-hand rule)', length: 3, defaultValue: [1, 2, 3], nodeSync: true },
         { kind: 'int', name: 'secTag', label: 'Section Tag', required: true, description: 'An ElasticMembranePlateSection. Shells need a 3D model.' },
+      ],
+      zeroLength: [
+        { kind: 'vec', name: 'nodes', label: 'Node IDs', length: 2, defaultValue: [1, 2], nodeSync: true },
+        { kind: 'vec', name: 'mat', label: 'Material tags (-mat)', length: 'dynamic', defaultValue: [1] },
+        { kind: 'vec', name: 'dir', label: 'Directions (-dir): 1 ux, 2 uy, 3 rz (3D: 4 rx, 5 ry, 6 rz)', length: 'dynamic', defaultValue: [1] },
+        { kind: 'flag', flag: '-orient', label: 'Custom local axes (-orient)', defaultValue: false, description: 'OpenSees -orient. 2D: x1 x2 x3 (local x; local y is x turned 90° counter-clockwise). 3D: x1 x2 x3 yp1 yp2 yp3. Without this, local axes are the global axes.', args: [
+          { kind: 'vec', name: 'orient', label: '2D: x1 x2 x3 — 3D: x1 x2 x3 yp1 yp2 yp3', length: 'dynamic', defaultValue: [1, 0, 0] },
+        ] },
       ],
       zeroLengthSection: [
         { kind: 'vec', name: 'nodes', label: 'Node IDs', length: 2, defaultValue: [1, 2], nodeSync: true },
@@ -196,6 +204,12 @@ const V1_MODEL_SCHEMAS: CommandSchema[] = [
       // The arg layout (which args, in which order, per ndm) is the one script import / export uses.
       const args: Record<string, unknown> = Object.fromEntries((spec ? elementArgs(spec, model.config?.ndm ?? 2) : []).map((k) => [k, INT_ARGS.has(k) ? Math.trunc(num(values[k])) : num(values[k], k === 'A' ? 1 : 0)]))
       if (values['-orient']) args.orient = nums(values.orient)
+      if (eleType === 'zeroLength') {
+        args.mat = ints(values.mat)
+        args.dir = ints(values.dir)
+        // PySees-only Coulomb friction (not an OpenSees argument): the form edits it, and an edit must not drop it.
+        if (values.friction !== undefined && values.friction !== null) args.friction = values.friction
+      }
       return {
         target: 'model',
         write: { kind: 'element', entity: { id: existingId ?? model.nextIds.element, eleType, nodes: ints(values.nodes), args } },
@@ -639,6 +653,17 @@ export function validateSchemaResult(result: SchemaResult, model: Model, ctx: Sc
     if (write.entity.eleType === 'zeroLengthSection' && write.entity.args.orient !== undefined) {
       const problem = orientProblem(write.entity.args.orient, ctx.ndm)
       if (problem) return problem
+    }
+    if (write.entity.eleType === 'zeroLength') {
+      const mats = Array.isArray(write.entity.args.mat) ? write.entity.args.mat.map(Number) : []
+      const dirs = Array.isArray(write.entity.args.dir) ? write.entity.args.dir.map(Number) : []
+      if (mats.length === 0) return 'A zeroLength element needs at least one material (-mat) and direction (-dir).'
+      if (mats.length !== dirs.length) return `${mats.length} material(s) for ${dirs.length} direction(s): -mat and -dir must pair up.`
+      const missing = mats.find((tag) => !model.materials.has(tag))
+      if (missing !== undefined) return `Material ${missing} does not exist.`
+      const bad = dirs.find((d) => !Number.isInteger(d) || d < 1 || d > ctx.ndf)
+      if (bad !== undefined) return `Direction ${bad} is not between 1 and ${ctx.ndf}.`
+      if (new Set(dirs).size !== dirs.length) return 'Each direction can have only one material.'
     }
     if (write.entity.eleType === 'DispBeamColumn' && !model.beamIntegrations.has(Number(write.entity.args.integrationTag))) return 'Beam integration does not exist.'
   }

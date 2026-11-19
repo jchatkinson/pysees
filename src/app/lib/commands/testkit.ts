@@ -2,7 +2,7 @@ import { emptyModel, type Model } from '@/app/types/model'
 import type { AnalysisHistory } from '@/app/types/analysisCommands'
 import type { ModelWrite } from '@/app/lib/modelWrite'
 import { applyModelWrite } from '@/app/lib/modelWrite'
-import { cantileverTemplate, frameTemplate, frame3dTemplate, momentCurvatureTemplate, plateTemplate, type TemplateResult } from '@/app/lib/templates'
+import { cantileverTemplate, frameTemplate, frame3dTemplate, momentCurvatureTemplate, plateTemplate, precastWallTemplate, type TemplateResult } from '@/app/lib/templates'
 
 export function modelFromWrites(ndm: 2 | 3, ndf: number, writes: ModelWrite[]): Model {
   let m: Model = { ...emptyModel(), config: { ndm, ndf } }
@@ -15,6 +15,9 @@ export interface Fixture { name: string; model: Model; history: AnalysisHistory;
 
 const fromTemplate = (name: string, t: TemplateResult): Fixture => ({ name, model: modelFromWrites(t.ndm, t.ndf, t.writes), history: { commands: t.analysisCommands, cursor: t.analysisCommands.length - 1 } })
 
+/** The same fixture with every solver stage's convergence tolerance set to `tol`. */
+const withTolerance = (f: Fixture, tol: number): Fixture => ({ ...f, history: { ...f.history, commands: f.history.commands.map((c) => (c.type === 'ANALYSIS_BLOCK' && (c.blockId === 'run-gravity-analysis' || c.blockId === 'run-pushover-analysis') ? { ...c, params: { ...c.params, tol, maxIter: 100 } } : c)) } })
+
 /** The app's own starter models: the realistic baseline every export / import / round-trip test runs over. */
 export const TEMPLATE_FIXTURES: Fixture[] = [
   fromTemplate('moment-curvature', momentCurvatureTemplate()),
@@ -23,6 +26,9 @@ export const TEMPLATE_FIXTURES: Fixture[] = [
   fromTemplate('frame-elastic', frameTemplate({ stories: 2, storyH: 3.5, bays: 2, bayW: 6, eleType: 'elasticBeamColumn', base: 'fixed' })),
   fromTemplate('frame-disp-pinned', frameTemplate({ stories: 1, storyH: 3.5, bays: 1, bayW: 6, eleType: 'dispBeamColumn', base: 'pinned' })),
   fromTemplate('frame3d-elastic', frame3dTemplate({ stories: 2, storyH: 3, baysX: 2, bayX: 5, baysY: 1, bayY: 4 })),
+  // Without friction, which OpenSees cannot represent in a zeroLength, so the exported script runs the same model.
+  // The stiff arms and the yielding connectors make element forces sensitive to where each engine's Newton iteration stops, so both run to a tight tolerance.
+  withTolerance(fromTemplate('precast-wall', precastWallTemplate({ panels: 2, panelHeight: 6, connectorsPerJoint: 3, bearingSpacing: 0.6, storyHeights: [3, 3], lateralWeights: [0.4, 0.6], spliceHeight: 0.6, friction: false })), 1e-10),
 ]
 
 /** A model with the entities no template covers (trusses, element loads, 3D transformation, masses, constraints, inline-numbered series). */

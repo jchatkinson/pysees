@@ -190,6 +190,13 @@ export function encodeModel(model: Model, deferredPatterns: ReadonlySet<number> 
       if (vec ? Array.isArray(v) && v.length : typeof v === 'number') args.push(flag, ...(vec ? (v as number[]) : [v as number]))
     }
     const call: Call = { fn: 'element', args }
+    // Coulomb friction is a Carapace feature (shear that slides against the normal force on the same element); OpenSees' zeroLength has none.
+    if (e.eleType === 'zeroLength' && e.args.friction !== undefined && e.args.friction !== null) {
+      if (annotate) {
+        call.comment = 'Friction is kept in the project annotation; OpenSees would read this element without it.'
+        call.before = [directive('entity', { kind: 'element', id: e.id, friction: e.args.friction })]
+      } else call.comment = 'WARNING: this element has Coulomb friction, which OpenSees cannot represent here; it is written without it.'
+    }
     const authored = annotate?.authored.elements.get(e.id)
     if (annotate && authored && JSON.stringify(authored) !== JSON.stringify(e)) calls.push(...generated({ kind: 'beamMass', elementId: e.id, writes: [{ kind: 'element', entity: authored }] }, [call]))
     else calls.push(call)
