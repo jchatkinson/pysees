@@ -23,6 +23,7 @@ import { ANALYSIS_BLOCKS, blockAsSchema } from '@/app/lib/analysisBlocks'
 import { useHotkeyRegistry } from '@/app/lib/hotkeys'
 import { CircleHelp } from 'lucide-react'
 import { MaterialUsageField } from '@/app/components/MaterialUsageField'
+import { ShellModifiersField } from '@/app/components/ShellModifiersField'
 
 function getModelEntity(model: Model, kind: string, id: number): unknown {
   switch (kind) {
@@ -397,7 +398,7 @@ export function CommandForm() {
               <Input value={String(values[NAME_KEY] ?? '')} placeholder={`Pattern ${selectedModelEntity.id}`} onChange={(e) => setValue(NAME_KEY, e.target.value)} />
             </div>
           ) : schema.fn === 'uniaxialMaterial' ? ({ values, setValue }) => <MaterialUsageField values={values} setValue={setValue} locked /> : undefined}
-          extra={isPattern ? () => (
+          extra={schema.fn === 'section' && (entity as { secType?: string } | null)?.secType === 'ElasticMembranePlateSection' ? ({ values, setValue }) => <ShellModifiersField values={values} setValue={setValue} /> : isPattern ? () => (
             <>
               <LoadsTable patternId={selectedModelEntity.id} ndf={ctx.ndf} children={(entity as { children: LoadAssignment[] }).children} />
               <ChildrenEditor
@@ -576,6 +577,7 @@ export function CommandForm() {
           }}
           previewAction={selectedAddSchema.fn === 'uniaxialMaterial' ? { onClick: () => setMaterialPreviewPanelOpen(true) } : undefined}
           lead={selectedAddSchema.fn === 'uniaxialMaterial' ? ({ values, setValue }) => <MaterialUsageField values={values} setValue={setValue} /> : undefined}
+          extra={selectedAddSchema.fn === 'section' ? ({ values, setValue }) => values.type === 'ElasticMembranePlateSection' ? <ShellModifiersField values={values} setValue={setValue} /> : null : undefined}
           submitValues={(values) => {
             const idListField = selectedAddSchema.args.find((a) => a.kind === 'idlist')
             if (isModelPanel && idListField) {

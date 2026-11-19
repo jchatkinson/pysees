@@ -45,6 +45,239 @@ export class WasmMaterialProbe {
 if (Symbol.dispose) WasmMaterialProbe.prototype[Symbol.dispose] = WasmMaterialProbe.prototype.free;
 
 /**
+ * Opaque handle to a fiber-section probe (`section_probe`). Evaluation is stateless: nothing here commits
+ * material history, so the same strain state always returns the same resultants.
+ */
+export class WasmSectionProbe {
+    static __wrap(ptr) {
+        const obj = Object.create(WasmSectionProbe.prototype);
+        obj.__wbg_ptr = ptr;
+        WasmSectionProbeFinalization.register(obj, obj.__wbg_ptr, obj);
+        return obj;
+    }
+    __destroy_into_raw() {
+        const ptr = this.__wbg_ptr;
+        this.__wbg_ptr = 0;
+        WasmSectionProbeFinalization.unregister(this);
+        return ptr;
+    }
+    free() {
+        const ptr = this.__destroy_into_raw();
+        wasm.__wbg_wasmsectionprobe_free(ptr, 0);
+    }
+    /**
+     * Maximum compressive and tensile axial force over uniform strain in `[-maxStrain, maxStrain]`.
+     * @param {number} max_strain
+     * @returns {AxialExtremes}
+     */
+    axialExtremes(max_strain) {
+        const ret = wasm.wasmsectionprobe_axialExtremes(this.__wbg_ptr, max_strain);
+        if (ret[2]) {
+            throw takeFromExternrefTable0(ret[1]);
+        }
+        return takeFromExternrefTable0(ret[0]);
+    }
+    /**
+     * `buildGrid` that also returns the `sampleStates` rows of the same states, from one sweep over the fibers.
+     * @param {Float64Array} angles
+     * @param {Float64Array} profiles
+     * @param {Factoring | null} [factoring]
+     * @returns {Float64Array}
+     */
+    buildGridSampled(angles, profiles, factoring) {
+        const ptr0 = passArrayF64ToWasm0(angles, wasm.__wbindgen_malloc);
+        const len0 = WASM_VECTOR_LEN;
+        const ptr1 = passArrayF64ToWasm0(profiles, wasm.__wbindgen_malloc);
+        const len1 = WASM_VECTOR_LEN;
+        const ret = wasm.wasmsectionprobe_buildGridSampled(this.__wbg_ptr, ptr0, len0, ptr1, len1, isLikeNone(factoring) ? 0 : addToExternrefTable0(factoring));
+        if (ret[3]) {
+            throw takeFromExternrefTable0(ret[2]);
+        }
+        var v3 = getArrayF64FromWasm0(ret[0], ret[1]).slice();
+        wasm.__wbindgen_free(ret[0], ret[1] * 8, 8);
+        return v3;
+    }
+    /**
+     * Samples the PMM boundary for `solveIsolines`; returns the number of sampled states.
+     * @param {Float64Array} angles
+     * @param {Float64Array} profiles
+     * @param {Factoring | null} [factoring]
+     * @returns {number}
+     */
+    buildGrid(angles, profiles, factoring) {
+        const ptr0 = passArrayF64ToWasm0(angles, wasm.__wbindgen_malloc);
+        const len0 = WASM_VECTOR_LEN;
+        const ptr1 = passArrayF64ToWasm0(profiles, wasm.__wbindgen_malloc);
+        const len1 = WASM_VECTOR_LEN;
+        const ret = wasm.wasmsectionprobe_buildGrid(this.__wbg_ptr, ptr0, len0, ptr1, len1, isLikeNone(factoring) ? 0 : addToExternrefTable0(factoring));
+        if (ret[2]) {
+            throw takeFromExternrefTable0(ret[1]);
+        }
+        return ret[0] >>> 0;
+    }
+    /**
+     * `(eps0, kz, ky)` triples in, `(n, mz, my)` triples out; with `withGroups` each state also returns the
+     * per-group `(n, mz, my)` after the total.
+     * @param {Float64Array} states
+     * @param {boolean} with_groups
+     * @returns {Float64Array}
+     */
+    evaluateBatch(states, with_groups) {
+        const ptr0 = passArrayF64ToWasm0(states, wasm.__wbindgen_malloc);
+        const len0 = WASM_VECTOR_LEN;
+        const ret = wasm.wasmsectionprobe_evaluateBatch(this.__wbg_ptr, ptr0, len0, with_groups);
+        var v2 = getArrayF64FromWasm0(ret[0], ret[1]).slice();
+        wasm.__wbindgen_free(ret[0], ret[1] * 8, 8);
+        return v2;
+    }
+    /**
+     * `{ n, mz, my, m2, m3 }` at `(eps0, kz, ky)`; strain is `eps0 - y kz + z ky`.
+     * @param {number} eps0
+     * @param {number} kz
+     * @param {number} ky
+     * @returns {SectionResponse}
+     */
+    evaluate(eps0, kz, ky) {
+        const ret = wasm.wasmsectionprobe_evaluate(this.__wbg_ptr, eps0, kz, ky);
+        if (ret[2]) {
+            throw takeFromExternrefTable0(ret[1]);
+        }
+        return takeFromExternrefTable0(ret[0]);
+    }
+    /**
+     * @returns {number}
+     */
+    fiberCount() {
+        const ret = wasm.wasmsectionprobe_fiberCount(this.__wbg_ptr);
+        return ret >>> 0;
+    }
+    /**
+     * `[strain, stress]` for every fiber, flattened.
+     * @param {number} eps0
+     * @param {number} kz
+     * @param {number} ky
+     * @returns {Float64Array}
+     */
+    fiberResponses(eps0, kz, ky) {
+        const ret = wasm.wasmsectionprobe_fiberResponses(this.__wbg_ptr, eps0, kz, ky);
+        var v1 = getArrayF64FromWasm0(ret[0], ret[1]).slice();
+        wasm.__wbindgen_free(ret[0], ret[1] * 8, 8);
+        return v1;
+    }
+    /**
+     * `[min, max]` axial force over the sampled grid, or empty before `buildGrid`.
+     * @param {boolean} factored
+     * @returns {Float64Array}
+     */
+    gridAxialRange(factored) {
+        const ret = wasm.wasmsectionprobe_gridAxialRange(this.__wbg_ptr, factored);
+        var v1 = getArrayF64FromWasm0(ret[0], ret[1]).slice();
+        wasm.__wbindgen_free(ret[0], ret[1] * 8, 8);
+        return v1;
+    }
+    /**
+     * @returns {number}
+     */
+    groupCount() {
+        const ret = wasm.wasmsectionprobe_groupCount(this.__wbg_ptr);
+        return ret >>> 0;
+    }
+    /**
+     * Stress of probe material `index` at each strain.
+     * @param {number} index
+     * @param {Float64Array} strains
+     * @returns {Float64Array}
+     */
+    materialStress(index, strains) {
+        const ptr0 = passArrayF64ToWasm0(strains, wasm.__wbindgen_malloc);
+        const len0 = WASM_VECTOR_LEN;
+        const ret = wasm.wasmsectionprobe_materialStress(this.__wbg_ptr, index, ptr0, len0);
+        var v2 = getArrayF64FromWasm0(ret[0], ret[1]).slice();
+        wasm.__wbindgen_free(ret[0], ret[1] * 8, 8);
+        return v2;
+    }
+    /**
+     * @param {MomentCurvatureRequest} request
+     * @returns {MomentCurvatureResult}
+     */
+    momentCurvature(request) {
+        const ret = wasm.wasmsectionprobe_momentCurvature(this.__wbg_ptr, request);
+        if (ret[2]) {
+            throw takeFromExternrefTable0(ret[1]);
+        }
+        return takeFromExternrefTable0(ret[0]);
+    }
+    /**
+     * `(eps0, kz, ky)` for every (angle, profile) pair, angles outermost; `profiles` is `(et, eb)` pairs.
+     * @param {Float64Array} angles
+     * @param {Float64Array} profiles
+     * @returns {Float64Array}
+     */
+    profileStates(angles, profiles) {
+        const ptr0 = passArrayF64ToWasm0(angles, wasm.__wbindgen_malloc);
+        const len0 = WASM_VECTOR_LEN;
+        const ptr1 = passArrayF64ToWasm0(profiles, wasm.__wbindgen_malloc);
+        const len1 = WASM_VECTOR_LEN;
+        const ret = wasm.wasmsectionprobe_profileStates(this.__wbg_ptr, ptr0, len0, ptr1, len1);
+        if (ret[3]) {
+            throw takeFromExternrefTable0(ret[2]);
+        }
+        var v3 = getArrayF64FromWasm0(ret[0], ret[1]).slice();
+        wasm.__wbindgen_free(ret[0], ret[1] * 8, 8);
+        return v3;
+    }
+    /**
+     * Every (angle, profile) state, angles outermost, as rows of `STATE_STRIDE` (11) numbers: nominal
+     * `n, m2, m3`, factored `n, m2, m3`, `phi`, `epsT`, `c` (NaN where undefined), and the profile's `et, eb`.
+     * @param {Float64Array} angles
+     * @param {Float64Array} profiles
+     * @param {Factoring | null} [factoring]
+     * @returns {Float64Array}
+     */
+    sampleStates(angles, profiles, factoring) {
+        const ptr0 = passArrayF64ToWasm0(angles, wasm.__wbindgen_malloc);
+        const len0 = WASM_VECTOR_LEN;
+        const ptr1 = passArrayF64ToWasm0(profiles, wasm.__wbindgen_malloc);
+        const len1 = WASM_VECTOR_LEN;
+        const ret = wasm.wasmsectionprobe_sampleStates(this.__wbg_ptr, ptr0, len0, ptr1, len1, isLikeNone(factoring) ? 0 : addToExternrefTable0(factoring));
+        if (ret[3]) {
+            throw takeFromExternrefTable0(ret[2]);
+        }
+        var v3 = getArrayF64FromWasm0(ret[0], ret[1]).slice();
+        wasm.__wbindgen_free(ret[0], ret[1] * 8, 8);
+        return v3;
+    }
+    /**
+     * @param {IsolineRequest} request
+     * @returns {IsolineResult}
+     */
+    solveIsolines(request) {
+        const ret = wasm.wasmsectionprobe_solveIsolines(this.__wbg_ptr, request);
+        if (ret[2]) {
+            throw takeFromExternrefTable0(ret[1]);
+        }
+        return takeFromExternrefTable0(ret[0]);
+    }
+    /**
+     * The state of strain profile `(et, eb)` whose moment lies along `alpha`, or null if none does. The point's
+     * indices are zero.
+     * @param {number} et
+     * @param {number} eb
+     * @param {number} alpha
+     * @param {Factoring | null} [factoring]
+     * @returns {IsolinePoint | undefined}
+     */
+    solveProfile(et, eb, alpha, factoring) {
+        const ret = wasm.wasmsectionprobe_solveProfile(this.__wbg_ptr, et, eb, alpha, isLikeNone(factoring) ? 0 : addToExternrefTable0(factoring));
+        if (ret[2]) {
+            throw takeFromExternrefTable0(ret[1]);
+        }
+        return takeFromExternrefTable0(ret[0]);
+    }
+}
+if (Symbol.dispose) WasmSectionProbe.prototype[Symbol.dispose] = WasmSectionProbe.prototype.free;
+
+/**
  * Opaque handle to a decoded, steppable analysis session — the `Session`
  * enum itself can't cross the boundary directly, since `wasm_bindgen`
  * requires an exported type to be a plain struct.
@@ -68,11 +301,13 @@ export class WasmSession {
     }
     /**
      * See `input_v1::Session::advance`. Returns a `{ done, stageComplete, stepsTaken,
-     * loadFactor, error, recorderBatches }` object — `recorderBatches` holds only the samples
+     * loadFactor, error, recorderBatches, bulkBatches, ... }` object. `recorderBatches` holds only the samples
      * this call produced (results-storage-indexeddb.md's `recorderBatch`, one entry per
      * recorder that recorded this call), not the whole run's history. There is no separate
      * "samples so far" accessor: a caller that needs the full history accumulates these
-     * batches itself, same as the planned results-storage worker will.
+     * batches itself, same as the planned results-storage worker will. `bulkBatches` carry their
+     * `progress` and `values` as `Float64Array`s, each on its own buffer, so a worker can
+     * transfer them to the main thread without a copy.
      * @param {number} step_budget
      * @returns {StepOutcome}
      */
@@ -111,6 +346,19 @@ export class WasmSession {
         }
         return takeFromExternrefTable0(ret[0]);
     }
+    /**
+     * What decoding resolved: the embedded-bar segment table and each bar group's TCM/POM
+     * routing and crack spacing (`{ embeddedBars: EmbeddedBarGroup[] }`). Available right after
+     * `decodeInput`; empty when the model has no `embeddedBars`.
+     * @returns {ModelOutput}
+     */
+    modelOutput() {
+        const ret = wasm.wasmsession_modelOutput(this.__wbg_ptr);
+        if (ret[2]) {
+            throw takeFromExternrefTable0(ret[1]);
+        }
+        return takeFromExternrefTable0(ret[0]);
+    }
 }
 if (Symbol.dispose) WasmSession.prototype[Symbol.dispose] = WasmSession.prototype.free;
 
@@ -124,6 +372,18 @@ export function createMaterialProbe(config) {
         throw takeFromExternrefTable0(ret[1]);
     }
     return WasmMaterialProbe.__wrap(ret[0]);
+}
+
+/**
+ * @param {SectionProbeConfig} config
+ * @returns {WasmSectionProbe}
+ */
+export function createSectionProbe(config) {
+    const ret = wasm.createSectionProbe(config);
+    if (ret[2]) {
+        throw takeFromExternrefTable0(ret[1]);
+    }
+    return WasmSectionProbe.__wrap(ret[0]);
 }
 
 /**
@@ -319,6 +579,10 @@ function __wbg_get_imports() {
             const ret = new Array();
             return ret;
         },
+        __wbg_new_from_slice_3b4c7f1456059f80: function(arg0, arg1) {
+            const ret = new Float64Array(getArrayF64FromWasm0(arg0, arg1));
+            return ret;
+        },
         __wbg_next_95053e306b1c3aed: function(arg0) {
             const ret = arg0.next;
             return ret;
@@ -330,12 +594,20 @@ function __wbg_get_imports() {
         __wbg_prototypesetcall_ae9f5e7459250748: function(arg0, arg1, arg2) {
             Uint8Array.prototype.set.call(getArrayU8FromWasm0(arg0, arg1), arg2);
         },
+        __wbg_push_bfdf956ba476f65b: function(arg0, arg1) {
+            const ret = arg0.push(arg1);
+            return ret;
+        },
         __wbg_set_13d25b81ab403f5e: function(arg0, arg1, arg2) {
             arg0[arg1 >>> 0] = arg2;
         },
         __wbg_set_6be42768c690e380: function(arg0, arg1, arg2) {
             arg0[arg1] = arg2;
         },
+        __wbg_set_a377297433dfea63: function() { return handleError(function (arg0, arg1, arg2) {
+            const ret = Reflect.set(arg0, arg1, arg2);
+            return ret;
+        }, arguments); },
         __wbg_value_c227f843d21da141: function(arg0) {
             const ret = arg0.value;
             return ret;
@@ -379,6 +651,9 @@ function __wbg_get_imports() {
 const WasmMaterialProbeFinalization = (typeof FinalizationRegistry === 'undefined')
     ? { register: () => {}, unregister: () => {} }
     : new FinalizationRegistry(ptr => wasm.__wbg_wasmmaterialprobe_free(ptr, 1));
+const WasmSectionProbeFinalization = (typeof FinalizationRegistry === 'undefined')
+    ? { register: () => {}, unregister: () => {} }
+    : new FinalizationRegistry(ptr => wasm.__wbg_wasmsectionprobe_free(ptr, 1));
 const WasmSessionFinalization = (typeof FinalizationRegistry === 'undefined')
     ? { register: () => {}, unregister: () => {} }
     : new FinalizationRegistry(ptr => wasm.__wbg_wasmsession_free(ptr, 1));
@@ -454,6 +729,11 @@ function debugString(val) {
     return className;
 }
 
+function getArrayF64FromWasm0(ptr, len) {
+    ptr = ptr >>> 0;
+    return getFloat64ArrayMemory0().subarray(ptr / 8, ptr / 8 + len);
+}
+
 function getArrayU8FromWasm0(ptr, len) {
     ptr = ptr >>> 0;
     return getUint8ArrayMemory0().subarray(ptr / 1, ptr / 1 + len);
@@ -465,6 +745,14 @@ function getDataViewMemory0() {
         cachedDataViewMemory0 = new DataView(wasm.memory.buffer);
     }
     return cachedDataViewMemory0;
+}
+
+let cachedFloat64ArrayMemory0 = null;
+function getFloat64ArrayMemory0() {
+    if (cachedFloat64ArrayMemory0 === null || cachedFloat64ArrayMemory0.byteLength === 0) {
+        cachedFloat64ArrayMemory0 = new Float64Array(wasm.memory.buffer);
+    }
+    return cachedFloat64ArrayMemory0;
 }
 
 function getStringFromWasm0(ptr, len) {
@@ -490,6 +778,13 @@ function handleError(f, args) {
 
 function isLikeNone(x) {
     return x === undefined || x === null;
+}
+
+function passArrayF64ToWasm0(arg, malloc) {
+    const ptr = malloc(arg.length * 8, 8) >>> 0;
+    getFloat64ArrayMemory0().set(arg, ptr / 8);
+    WASM_VECTOR_LEN = arg.length;
+    return ptr;
 }
 
 function passStringToWasm0(arg, malloc, realloc) {
@@ -570,6 +865,7 @@ function __wbg_finalize_init(instance, module) {
     wasm = instance.exports;
     wasmModule = module;
     cachedDataViewMemory0 = null;
+    cachedFloat64ArrayMemory0 = null;
     cachedUint8ArrayMemory0 = null;
     wasm.__wbindgen_start();
     return wasm;

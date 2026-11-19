@@ -7,6 +7,18 @@ import type { Call, Tok } from '@/app/lib/commands/tokens'
 import { eleLoadKind, shellNodalAreas } from '@/app/lib/shells'
 import type { Vec3 } from '@/app/lib/memberFrame'
 import { directive } from '@/app/lib/project/annotations'
+import { readShellModifiers, sectionNeedsShear, shellModifiersExport, type ShellModifiers } from '@/app/lib/shellModifiers'
+
+/** `E' = E f` and `Ep_modifier = m / f` for modifiers OpenSees can represent; otherwise the reason it cannot. */
+function foldShellModifiers(args: Record<string, unknown>, modifiers: ShellModifiers, needsShear: boolean): { args: Record<string, unknown>; reason?: undefined } | { args?: undefined; reason: string } {
+  const ep = args.epModifier === undefined || args.epModifier === '' ? 1 : Number(args.epModifier)
+  if (ep !== 1) return { reason: 'it also sets a plate modifier' }
+  const result = shellModifiersExport(modifiers, needsShear)
+  if (!result.exact) return { reason: result.reason }
+  const { modifiers: _drop, ...rest } = args
+  void _drop
+  return { args: { ...rest, eMod: Number(args.eMod) * result.factor, ...(result.epModifier !== 1 ? { epModifier: result.epModifier } : {}) } }
+}
 
 /** With `annotate`, the encoder also writes `# @pysees` directives (see `lib/project`). `authored` is the model as the user built it, when `model` was transformed for execution. */
 export interface EncodeAnnotation { authored: Model }
@@ -149,8 +161,15 @@ export function encodeModel(model: Model, deferredPatterns: ReadonlySet<number> 
     calls.push(call)
   }
   for (const sec of byId(model.sections)) {
-    const call = schemaCall('section', sec.secType, sec.args, ctx)
-    if (annotate && sec.template) call.before = [directive('entity', { kind: 'section', id: sec.id, template: sec.template })]
+    const modifiers = sec.secType === 'ElasticMembranePlateSection' ? readShellModifiers(sec.args) : undefined
+    const folded = modifiers ? foldShellModifiers(sec.args, modifiers, sectionNeedsShear(model, sec.id)) : null
+    // A project file keeps the authored section and the modifiers in its directive; a plain script folds them into E and Ep_modifier when OpenSees can represent them.
+    const call = schemaCall('section', sec.secType, annotate || !folded?.args ? sec.args : folded.args, ctx)
+    if (modifiers) {
+      if (annotate) call.comment = 'Stiffness modifiers are kept in the project annotation; OpenSees would read this section unmodified.'
+      else call.comment = folded?.args ? 'Stiffness modifiers written as E and Ep_modifier.' : `WARNING: this section has stiffness modifiers that OpenSees cannot represent (${folded?.reason}); it is written unmodified.`
+    }
+    if (annotate && (sec.template || modifiers)) call.before = [directive('entity', { kind: 'section', id: sec.id, ...(sec.template ? { template: sec.template } : {}), ...(modifiers ? { modifiers } : {}) })]
     if (sec.children.length) {
       call.body = sec.children.map((c) => {
         const keys = CHILD_SHAPES[childShapeKey(c.kind, c.subType)] ?? Object.keys(c.args)

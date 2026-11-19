@@ -134,8 +134,13 @@ export function parseProject(text: string): ImportResult {
       else model = { ...model, patterns: new Map(model.patterns).set(pattern.id, { ...pattern, name: data.name }) }
     } else if (data.kind === 'section') {
       const section = isInt(data.id) ? model.sections.get(data.id) : undefined
-      if (!section || !isRec(data.template) || typeof data.template.kind !== 'string' || !isRec(data.template.params)) error(`Section annotation does not match a section (id ${String(data.id)}).`, line)
-      else model = { ...model, sections: new Map(model.sections).set(section.id, { ...section, template: data.template as unknown as SectionTemplateMeta }) }
+      const hasTemplate = data.template !== undefined
+      const hasModifiers = data.modifiers !== undefined
+      if (!section || (!hasTemplate && !hasModifiers) || (hasTemplate && (!isRec(data.template) || typeof data.template.kind !== 'string' || !isRec(data.template.params))) || (hasModifiers && !isRec(data.modifiers))) error(`Section annotation does not match a section (id ${String(data.id)}).`, line)
+      else {
+        const args = hasModifiers ? { ...section.args, modifiers: data.modifiers } : section.args
+        model = { ...model, sections: new Map(model.sections).set(section.id, { ...section, args, ...(hasTemplate ? { template: data.template as unknown as SectionTemplateMeta } : {}) }) }
+      }
     } else if (data.kind === 'material') {
       const material = isInt(data.id) ? model.materials.get(data.id) : undefined
       if (!material || material.kind !== 'uniaxial' || !(MATERIAL_USAGES as readonly unknown[]).includes(data.usage)) error(`Material annotation does not match a uniaxial material (id ${String(data.id)}).`, line)

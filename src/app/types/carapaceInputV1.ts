@@ -26,8 +26,12 @@ export interface OrientRow { row: number; x: [number, number, number]; yp?: [num
 /** A `ZeroLength` driven by a coupled `FiberSection` (axial + moment) instead of independent per-DOF materials. `materials` is a sparse spring for the one DOF (`uy`) the section has no resultant for. */
 export interface ZeroLengthSectionTable { nodeI: number[]; nodeJ: number[]; fiberSection: number[]; materials: [number, number, number][]; orient?: OrientRow[] }
 /** `z` is empty in 2D and parallel to `y` in 3D. */
+/** ETABS-style stiffness modifiers on a shell section; each omitted factor is 1 and each must be finite and positive.
+ * `f11 f22 f12` scale the membrane terms, `m11 m22 m12` the bending terms and `v13 v23` the transverse shear (no effect on `shell3s`).
+ * OpenSees has no equivalent: results match only when all `f` equal `f`, all `m` equal `m` and `v13 = v23 = m` (export `E*f`, `Ep_modifier = m/f`). */
+export interface ShellModifiersSpec { f11?: number; f22?: number; f12?: number; m11?: number; m22?: number; m12?: number; v13?: number; v23?: number }
 /** Shell section arena entry (3D). Strain and resultants follow OpenSees' ElasticMembranePlateSection. */
-export type ShellSectionSpec = { kind: 'elasticMembranePlate'; e: number; nu: number; h: number; rho: number }
+export type ShellSectionSpec = { kind: 'elasticMembranePlate'; e: number; nu: number; h: number; rho: number; modifiers?: ShellModifiersSpec }
 /** 3-node DKT/Allman shells (ShellDKGT): `nodeIds` has stride 3, `section` indexes `shellSections`. */
 export interface Shell3Table { nodeIds: number[]; section: number[] }
 /** 4-node MITC4 shells: `nodeIds` has stride 4 (the node order fixes the normal), `section` indexes `shellSections`. */

@@ -2,6 +2,7 @@ import type { Model, MaterialEntity, BeamIntegrationEntity } from '@/app/types/m
 import type { AnalysisHistory } from '@/app/types/analysisCommands'
 import type { AlgorithmKind, AnalysisStage } from '@/app/types/analysisSequence'
 import type * as W from '@/app/types/carapaceInputV1'
+import { SHELL_MODIFIER_KEYS } from '@/app/lib/shellModifiers'
 import { compileAnalysisSequence, type CompileDiagnostic } from '@/app/lib/compileAnalysisSequence'
 import { orientProblem, readOrient } from '@/app/lib/orient'
 import { withLumpedBeamMass } from '@/app/lib/beamMass'
@@ -530,6 +531,27 @@ export function compileInputV1(model: Model, analysisHistory: AnalysisHistory): 
   return { input, diagnostics, recordedNodeTags, dofsPerNode, recorderPlans, nodeTags: nodeIds }
 }
 
+/** Reads the PySees-only `modifiers` object of a shell section: `undefined` when there is none, `null` (after an error diagnostic) when a factor is not a positive finite number. */
+function compileShellModifiers(tag: number, raw: unknown, diagnostics: CompileDiagnostic[]): W.ShellModifiersSpec | undefined | null {
+  if (raw === undefined || raw === null || raw === '') return undefined
+  if (typeof raw !== 'object') {
+    diagnostics.push({ severity: 'error', message: `Section ${tag} (ElasticMembranePlateSection) has stiffness modifiers that are not an object`, commandIndex: -1 })
+    return null
+  }
+  const out: W.ShellModifiersSpec = {}
+  for (const key of SHELL_MODIFIER_KEYS) {
+    const value = (raw as Record<string, unknown>)[key]
+    if (value === undefined || value === '') continue
+    const factor = Number(value)
+    if (!Number.isFinite(factor) || factor <= 0) {
+      diagnostics.push({ severity: 'error', message: `Section ${tag} (ElasticMembranePlateSection) stiffness modifier ${key} must be a positive number, got ${String(value)}`, commandIndex: -1 })
+      return null
+    }
+    out[key] = factor
+  }
+  return Object.keys(out).length > 0 ? out : undefined
+}
+
 /** Compiles the `ElasticMembranePlateSection` sections (the shells' arena); `shellSectionIndex` maps a section tag to its arena row. */
 function compileShellSections(model: Model, diagnostics: CompileDiagnostic[]): { shellSections: W.ShellSectionSpec[]; shellSectionIndex: Map<number, number> } {
   const shellSections: W.ShellSectionSpec[] = []
@@ -538,12 +560,23 @@ function compileShellSections(model: Model, diagnostics: CompileDiagnostic[]): {
     if (section.secType !== 'ElasticMembranePlateSection') continue
     const a = section.args
     const ep = a.epModifier === undefined || a.epModifier === '' ? 1 : Number(a.epModifier)
-    if (ep !== 1) {
-      diagnostics.push({ severity: 'error', message: `Section ${tag} (ElasticMembranePlateSection) sets a plate modifier of ${ep}, which Carapace does not support`, commandIndex: -1 })
+    if (!Number.isFinite(ep) || ep <= 0) {
+      diagnostics.push({ severity: 'error', message: `Section ${tag} (ElasticMembranePlateSection) has a plate modifier of ${String(a.epModifier)}, which must be a positive number`, commandIndex: -1 })
       continue
     }
+    let modifiers = compileShellModifiers(tag, a.modifiers, diagnostics)
+    if (modifiers === null) continue
+    if (ep !== 1) {
+      // OpenSees' Ep_modifier scales bending and transverse shear and leaves the membrane alone, which is m11 = m22 = m12 = v13 = v23 = ep.
+      // Giving both it and explicit modifiers is ambiguous, so it is an error rather than a guess.
+      if (modifiers) {
+        diagnostics.push({ severity: 'error', message: `Section ${tag} (ElasticMembranePlateSection) sets both a plate modifier (${ep}) and stiffness modifiers; use one or the other`, commandIndex: -1 })
+        continue
+      }
+      modifiers = { m11: ep, m22: ep, m12: ep, v13: ep, v23: ep }
+    }
     shellSectionIndex.set(tag, shellSections.length)
-    shellSections.push({ kind: 'elasticMembranePlate', e: Number(a.eMod), nu: Number(a.nu), h: Number(a.h), rho: Number(a.rho) || 0 })
+    shellSections.push({ kind: 'elasticMembranePlate', e: Number(a.eMod), nu: Number(a.nu), h: Number(a.h), rho: Number(a.rho) || 0, ...(modifiers ? { modifiers } : {}) })
   }
   return { shellSections, shellSectionIndex }
 }
