@@ -232,6 +232,12 @@ export interface AppStore {
   /** Orthographic projection for the 3D view. */
   orthographic: boolean
   setOrthographic: (on: boolean) => void
+  /** Label families switched on but not drawn because the view holds too many (set by the viewport, shown next to the view name). */
+  hiddenLabels: string[]
+  setHiddenLabels: (names: string[]) => void
+  /** Range (force per area) of the shell load contour the viewport is drawing, for its legend; null when none is drawn. */
+  shellLoadRange: { min: number; max: number } | null
+  setShellLoadRange: (range: { min: number; max: number } | null) => void
   importResults: (files: { name: string; data: string }[]) => void
   runMaterialPreview: (protocolOverride?: number[]) => void
   setMaterialPreviewPanelOpen: (open: boolean) => void
@@ -410,11 +416,12 @@ export const useAppStore = create<AppStore>((set, get) => {
   viewSettings: {
     showNodeIds: false,
     showElementIds: false,
-    showNodes: true,
+    // Nodes and loads start hidden: on a real model they bury the members (the View tab turns them on).
+    showNodes: false,
     showElements: true,
     showSupports: true,
-    showNodalLoads: true,
-    showElementLoads: true,
+    showNodalLoads: false,
+    showElementLoads: false,
     showLoadValues: false,
     showGrid: true,
     showGridlines: true,
@@ -698,6 +705,10 @@ export const useAppStore = create<AppStore>((set, get) => {
   setToolInput: (toolInput) => set({ toolInput }),
   setSupportPreset: (supportPreset) => set({ supportPreset }),
   setOrthographic: (orthographic) => set({ orthographic }),
+  hiddenLabels: [],
+  shellLoadRange: null,
+  setShellLoadRange: (shellLoadRange) => set({ shellLoadRange }),
+  setHiddenLabels: (hiddenLabels) => set((s) => (s.hiddenLabels.join() === hiddenLabels.join() ? s : { hiddenLabels })),
   requestViewportAction: (kind) => set((s) => ({ viewportAction: { kind, token: (s.viewportAction?.token ?? 0) + 1 } })),
 
   importResults: (files) => set({ results: { files } }),

@@ -1,3 +1,6 @@
+import { useUnits } from '@/app/lib/units/useUnits'
+import { RAMP_CSS } from '@/app/lib/shellContour'
+import { areaLoadText, areaLoadUnit } from '@/app/components/r3f/utils'
 import { useRef, useState } from 'react'
 import { Canvas } from '@react-three/fiber'
 import { useAppStore } from '@/app/store/useAppStore'
@@ -17,10 +20,27 @@ function ViewLabel() {
   const mode = useAppStore(currentView)
   const levels = useAppStore((s) => s.levels)
   const gridlines = useAppStore((s) => s.gridlines)
+  const hiddenLabels = useAppStore((s) => s.hiddenLabels)
   return (
     <span className="absolute left-2 top-2 z-30 pointer-events-none rounded-sm border bg-background/90 px-1.5 py-0.5 text-[11px] font-medium">
       {viewLabel(mode, levels, gridlines, (v) => String(Number(v.toPrecision(6))))}
+      {hiddenLabels.length > 0 && <span className="ml-1.5 font-normal text-muted-foreground">· {hiddenLabels.join(', ')} hidden: too many in this view (try a plan or elevation)</span>}
     </span>
+  )
+}
+
+/** Colour key of the shell load contour (total area load of the visible patterns). */
+function ShellLoadLegend() {
+  const range = useAppStore((s) => s.shellLoadRange)
+  const units = useUnits()
+  if (!range) return null
+  const fmt = (v: number) => areaLoadText(units, v, false)
+  return (
+    <div className="absolute left-2 bottom-2 z-30 pointer-events-none w-44 rounded-sm border bg-background/90 px-2 py-1 text-[10px]">
+      <div className="mb-1 font-medium">Shell load{units.active ? ` (${areaLoadUnit(units)})` : ''}</div>
+      <div className="h-2 w-full rounded-sm" style={{ background: RAMP_CSS }} />
+      <div className="mt-0.5 flex justify-between text-muted-foreground"><span>{fmt(range.min)}</span><span>hover a shell</span><span>{fmt(range.max)}</span></div>
+    </div>
   )
 }
 
@@ -88,6 +108,8 @@ export function Viewport() {
           raycaster={{ params: { Line2: { threshold: 6 } } } as never}
           camera={ndm === 3 ? { position: [10, -12, 8], up: [0, 0, 1], fov: 45, near: 0.1, far: 2000 } : { position: [8, 8, 10], fov: 45, near: 0.1, far: 2000 }}
           gl={{ antialias: true }}
+          // Drawn only when something changes (camera, model, results, selection): an idle view of a large model costs nothing.
+          frameloop="demand"
         >
           <ViewportScene ref={sceneRef} />
         </Canvas>
@@ -111,6 +133,7 @@ export function Viewport() {
 
       {hasConfig && <ViewLabel />}
       {hasConfig && <DrawOptions />}
+      {hasConfig && <ShellLoadLegend />}
       {!hasConfig && (
         <div className="absolute inset-0 grid place-items-center pointer-events-none">
           <span className="rounded-sm border bg-background/90 px-2 py-1 text-xs text-muted-foreground">

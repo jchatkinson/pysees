@@ -6,6 +6,7 @@ import type { Mesh } from 'three'
 import { useAppStore } from '@/app/store/useAppStore'
 import { isDiagramType } from '@/app/types/resultsView'
 import { BufferLines } from './BufferLines'
+import { LABEL_LIMIT } from './utils'
 import type { DiagramLabel, DisplayBuffers } from './displayBuffers'
 
 const OUTLINE_COLOR = 0x334155
@@ -47,7 +48,7 @@ function DiagramLabels({ buffers }: { buffers: DisplayBuffers }) {
   useFrame(() => { if (shown.version !== buffers.diagramVersion) setShown({ version: buffers.diagramVersion, labels: buffers.diagramActive ? buffers.diagramLabels : [] }) })
   return (
     <>
-      {shown.labels.filter((l) => Math.abs(l.value) > 1e-9).map((l, i) => (
+      {shown.labels.length <= LABEL_LIMIT && shown.labels.filter((l) => Math.abs(l.value) > 1e-9).map((l, i) => (
         <Html key={i} position={l.position} center style={LABEL_STYLE} zIndexRange={[10, 10]}>{fmt(l.value)}</Html>
       ))}
     </>

@@ -1,13 +1,17 @@
-import { useMemo, useRef } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { Html, Line } from '@react-three/drei'
 import type { Group } from 'three'
-import { Vector3 } from 'three'
-import type { ElementEntity, GeomTransfEntity, NodeEntity, PatternEntity } from '@/app/types/model'
+import { BufferAttribute, BufferGeometry, Color, DoubleSide, DynamicDrawUsage, Quaternion, Vector3 } from 'three'
+import type { ElementEntity, GeomTransfEntity, NodeEntity, PatternEntity, SectionEntity } from '@/app/types/model'
+import { alongTotal, loadDirection, shellAreaLoads, type ShellAreaLoad } from '@/app/lib/shellLoads'
+import { rampColor } from '@/app/lib/shellContour'
+import { useUnits } from '@/app/lib/units/useUnits'
+import { useAppStore } from '@/app/store/useAppStore'
 import { memberFrame } from '@/app/lib/memberFrame'
-import { eleLoadKind, shellFrame } from '@/app/lib/shells'
+import { eleLoadKind } from '@/app/lib/shells'
 import { isShell } from '@/app/lib/commands/tables'
-import { formatLoadValue, patternColor, toVec3 } from './utils'
+import { areaLoadText, batchesLoads, formatLoadValue, patternColor, toVec3 } from './utils'
 import { ScreenSize } from './ScreenSize'
 import { worldUnitsPerPixel } from './screenScale'
 
@@ -71,6 +75,101 @@ function NodalLoadGlyph({ coords, values, color, showValues, ndm, label }: { coo
         </Html>
       )}
     </ScreenSize>
+  )
+}
+
+
+interface Arrow { at: number[]; dir: number[]; color: string }
+
+
+
+const tmpAnchor = new Vector3()
+
+/** Screen-sized arrows as one line-segment mesh: the same shape as `NodalLoadGlyph`, rescaled on the CPU when the camera moves. */
+function ArrowBatch({ arrows }: { arrows: Arrow[] }) {
+  const { geometry, anchors, shape } = useMemo(() => {
+    const n = arrows.length, anchors = new Float32Array(n * 3), shape = new Float32Array(n * 18), colors = new Float32Array(n * 18), color = new Color()
+    arrows.forEach((a, i) => {
+      const dir = new Vector3(a.dir[0] ?? 0, a.dir[1] ?? 0, a.dir[2] ?? 0).normalize()
+      const tip = dir.clone().multiplyScalar(ARROW_LENGTH), side = dir.clone().multiplyScalar(ARROW_HEAD_LENGTH)
+      const right = new Vector3().crossVectors(side, Math.abs(dir.z) > 0.9 ? new Vector3(0, 1, 0) : new Vector3(0, 0, 1)).normalize().multiplyScalar(ARROW_HEAD_WIDTH)
+      ;[new Vector3(), tip, tip, tip.clone().sub(side).add(right), tip, tip.clone().sub(side).sub(right)].forEach((v, k) => v.toArray(shape, i * 18 + k * 3))
+      color.set(a.color)
+      for (let k = 0; k < 6; k++) color.toArray(colors, i * 18 + k * 3)
+      anchors.set(toVec3(a.at), i * 3)
+    })
+    const geometry = new BufferGeometry()
+    geometry.setAttribute('position', new BufferAttribute(new Float32Array(n * 18), 3).setUsage(DynamicDrawUsage))
+    geometry.setAttribute('color', new BufferAttribute(colors, 3))
+    return { geometry, anchors, shape }
+  }, [arrows])
+  useEffect(() => () => geometry.dispose(), [geometry])
+  const last = useRef({ pos: new Vector3(), quat: new Quaternion(), proj: 0, zoom: 0, height: 0, geometry: null as BufferGeometry | null })
+  useFrame(({ camera, size }) => {
+    const l = last.current, proj = camera.projectionMatrix.elements[5]
+    if (l.geometry === geometry && l.proj === proj && l.zoom === camera.zoom && l.height === size.height && l.pos.equals(camera.position) && l.quat.equals(camera.quaternion)) return
+    const position = geometry.getAttribute('position') as BufferAttribute, out = position.array as Float32Array
+    for (let i = 0; i < anchors.length / 3; i++) {
+      const s = worldUnitsPerPixel(camera, tmpAnchor.fromArray(anchors, i * 3), size.height)
+      for (let k = 0; k < 18; k++) out[i * 18 + k] = anchors[i * 3 + (k % 3)] + shape[i * 18 + k] * s
+    }
+    position.needsUpdate = true
+    Object.assign(l, { proj, zoom: camera.zoom, height: size.height, geometry })
+    l.pos.copy(camera.position); l.quat.copy(camera.quaternion)
+  })
+  return <lineSegments geometry={geometry} frustumCulled={false}><lineBasicMaterial vertexColors /></lineSegments>
+}
+
+const TOOLTIP_STYLE: React.CSSProperties = {
+  fontSize: 11, lineHeight: '15px', whiteSpace: 'pre', color: '#0f172a', background: 'rgba(255,255,255,0.95)', border: '1px solid #cbd5e1',
+  borderRadius: 3, padding: '3px 6px', pointerEvents: 'none', userSelect: 'none', transform: 'translate(10px, -50%)',
+}
+
+/** Loaded shells filled by the magnitude of their total area load (one colour per shell); hovering one shows its parts. */
+function ShellLoadContour({ loads, patterns, nodeMap, elementMap }: { loads: Map<number, ShellAreaLoad>; patterns: PatternEntity[]; nodeMap: Map<number, NodeEntity>; elementMap: Map<number, ElementEntity> }) {
+  const setRange = useAppStore((s) => s.setShellLoadRange)
+  const units = useUnits()
+  const [hover, setHover] = useState<{ tag: number; point: [number, number, number] } | null>(null)
+  const { geometry, owner, range } = useMemo(() => {
+    let min = Infinity, max = -Infinity
+    for (const q of loads.values()) { min = Math.min(min, q.magnitude); max = Math.max(max, q.magnitude) }
+    const position: number[] = [], color: number[] = [], owner: number[] = []
+    for (const [tag, q] of loads) {
+      const xyz = elementMap.get(tag)!.nodes.map((n) => toVec3(nodeMap.get(n)?.coords ?? []))
+      const rgb = rampColor(max - min > 1e-12 * Math.max(1, max) ? (q.magnitude - min) / (max - min) : 0.5)
+      for (let k = 1; k + 1 < xyz.length; k++) {
+        for (const p of [xyz[0], xyz[k], xyz[k + 1]]) { position.push(...p); color.push(...rgb) }
+        owner.push(tag)
+      }
+    }
+    const geometry = new BufferGeometry()
+    geometry.setAttribute('position', new BufferAttribute(Float32Array.from(position), 3))
+    geometry.setAttribute('color', new BufferAttribute(Float32Array.from(color), 3))
+    geometry.computeBoundingSphere()
+    return { geometry, owner, range: { min, max } }
+  }, [loads, nodeMap, elementMap])
+  useEffect(() => () => geometry.dispose(), [geometry])
+  useEffect(() => { setRange(range); return () => setRange(null) }, [range, setRange])
+
+  const fmt = (v: number) => areaLoadText(units, v)
+  const name = (id: number) => patterns.find((p) => p.id === id)?.name ?? `Pattern ${id}`
+  const q = hover && loads.get(hover.tag)
+  return (
+    <>
+      <mesh
+        geometry={geometry}
+        renderOrder={1}
+        onPointerMove={(e) => { if (e.faceIndex != null) setHover({ tag: owner[e.faceIndex], point: e.point.toArray() as [number, number, number] }) }}
+        onPointerOut={() => setHover(null)}
+      >
+        <meshBasicMaterial vertexColors side={DoubleSide} transparent opacity={0.85} depthWrite={false} polygonOffset polygonOffsetFactor={-1} polygonOffsetUnits={-1} />
+      </mesh>
+      {q && hover && (
+        <Html position={hover.point} style={TOOLTIP_STYLE} zIndexRange={[20, 20]}>
+          {[`Shell ${hover.tag}: ${fmt(q.magnitude)} ${loadDirection(q)}`, ...q.parts.map((p) => `${name(p.patternId)} · ${p.kind === 'pressure' ? 'pressure' : 'self-weight'} ${fmt(alongTotal(p, q))}`)].join('\n')}
+        </Html>
+      )}
+    </>
   )
 }
 
@@ -152,6 +251,7 @@ export function LoadsLayer({
   nodeMap,
   elementMap,
   geomTransfs,
+  sections,
   ndm,
   hiddenPatterns,
   showNodal,
@@ -162,14 +262,15 @@ export function LoadsLayer({
   nodeMap: Map<number, NodeEntity>
   elementMap: Map<number, ElementEntity>
   geomTransfs: Map<number, GeomTransfEntity>
+  sections: Map<number, SectionEntity>
   ndm: number
   hiddenPatterns: number[]
   showNodal: boolean
   showElement: boolean
   showValues: boolean
 }) {
-  const ids = patterns.map((p) => p.id).sort((x, y) => x - y)
-  const visible = patterns.filter((p) => !hiddenPatterns.includes(p.id))
+  const ids = useMemo(() => patterns.map((p) => p.id).sort((x, y) => x - y), [patterns])
+  const visible = useMemo(() => patterns.filter((p) => !hiddenPatterns.includes(p.id)), [patterns, hiddenPatterns])
 
   const elementLoads = showElement ? visible.flatMap((p) => p.children.flatMap((c) => {
     if (c.kind !== 'eleLoad' || eleLoadKind(c.args) !== 'beam') return []
@@ -210,38 +311,20 @@ export function LoadsLayer({
   }
   const maxUnit = Number.isFinite(minLen) && stacked > 0 ? (MAX_STACK_FRACTION * minLen) / stacked : Infinity
 
-  // Shell pressure and self-weight: arrows at the centroid and near each corner, along the shell's normal (pressure) or the body acceleration.
-  const shellLoads = showElement ? visible.flatMap((p) => p.children.flatMap((c, idx) => {
-    if (c.kind !== 'eleLoad') return []
-    const kind = eleLoadKind(c.args)
-    if (kind === 'beam') return []
-    const a = c.args as { eleTags?: number[]; pressure?: number; bx?: number; by?: number; bz?: number }
-    return (a.eleTags ?? []).flatMap((tag) => {
-      const ele = elementMap.get(tag)
-      const xyz = ele && isShell(ele.eleType) ? ele.nodes.map((n) => nodeMap.get(n)?.coords) : []
-      if (!ele || xyz.length < 3 || xyz.some((q) => !q)) return []
-      const pts = xyz.map((q) => toVec3(q!))
-      const frame = shellFrame(pts)
-      if (!frame) return []
-      const sign = Math.sign(Number(a.pressure) || 0)
-      const dir = kind === 'pressure' ? frame.e3.map((v) => v * sign) : [Number(a.bx) || 0, Number(a.by) || 0, Number(a.bz) || 0]
-      if (Math.hypot(...dir) < 1e-12) return []
-      const centroid = [0, 1, 2].map((k) => pts.reduce((sum, q) => sum + q[k], 0) / pts.length)
-      const label = kind === 'pressure' ? `p: ${formatLoadValue(Number(a.pressure))}` : `b: ${[a.bx, a.by, a.bz].map((v) => formatLoadValue(Number(v) || 0)).join(', ')}`
-      const anchors = kind === 'pressure' ? [centroid, ...pts.map((q) => q.map((v, k) => v + 0.5 * (centroid[k] - v)))] : [centroid]
-      return anchors.map((at, i) => ({ key: `shell-${p.id}-${idx}-${tag}-${i}`, at, dir, label: i === 0 ? label : undefined, color: patternColor(ids, p.id) }))
-    })
-  })) : []
+  const nodalLoads = useMemo(() => showNodal ? visible.flatMap((p) => p.children.flatMap((c, idx) => {
+    if (c.kind !== 'load') return []
+    const args = c.args as { nodeTag: number; values: number[] }
+    const node = nodeMap.get(args.nodeTag)
+    return node ? [{ key: `load-${p.id}-${idx}`, at: node.coords, values: args.values, dir: args.values.slice(0, 3), color: patternColor(ids, p.id) }] : []
+  })) : [], [visible, ids, nodeMap, showNodal])
+  const batched = useMemo(() => batchesLoads(nodalLoads.length) ? nodalLoads.filter((a) => Math.hypot(...a.dir) > 1e-9) : null, [nodalLoads])
+  // Shell pressure and self-weight: the shells coloured by their total area load.
+  const shellLoads = useMemo(() => (showElement ? shellAreaLoads(visible, [], elementMap, nodeMap, sections) : new Map<number, ShellAreaLoad>()), [visible, elementMap, nodeMap, sections, showElement])
 
   return (
     <>
-      {shellLoads.map((l) => <NodalLoadGlyph key={l.key} coords={l.at} values={l.dir} color={l.color} showValues={showValues && l.label !== undefined} ndm={3} label={l.label} />)}
-      {showNodal && visible.flatMap((p) => p.children.map((c, idx) => ({ p, c, idx })).filter(({ c }) => c.kind === 'load')).map(({ p, c, idx }) => {
-        const args = c.args as { nodeTag: number; values: number[] }
-        const node = nodeMap.get(args.nodeTag)
-        if (!node) return null
-        return <NodalLoadGlyph key={`load-${p.id}-${idx}`} coords={node.coords} values={args.values} color={patternColor(ids, p.id)} showValues={showValues} ndm={ndm} />
-      })}
+      {shellLoads.size > 0 && <ShellLoadContour loads={shellLoads} patterns={patterns} nodeMap={nodeMap} elementMap={elementMap} />}
+      {batched ? <ArrowBatch arrows={batched} /> : nodalLoads.map((l) => <NodalLoadGlyph key={l.key} coords={l.at} values={l.values} color={l.color} showValues={showValues} ndm={ndm} />)}
       {elementLoads.map((l, i) => <ElementLoadGlyph key={`${l.key}-${i}`} a={l.a} b={l.b} w={l.w} ratio={ratioFor(l)} offsetRatio={offsetByPattern.get(l.pid) ?? 0} refPoint={refPoint} maxUnit={maxUnit} color={l.color} label={showValues ? l.label : undefined} />)}
     </>
   )

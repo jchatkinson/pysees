@@ -49,9 +49,10 @@ export function ShellSurfaces({ index, buffers }: { index: SceneIndex; buffers: 
   // The selected shells are their own mesh over the same vertex data, so they follow the displaced positions too.
   const selectedGeometry = useMemo(() => {
     const triangles: number[] = []
+    const rowOf = new Map(index.elementIds.map((id, e) => [id, e]))
     for (const id of selectedIds) {
-      const row = index.elementIds.indexOf(id)
-      if (row < 0 || index.elementKind[row] !== 'shell') continue
+      const row = rowOf.get(id)
+      if (row === undefined || index.elementKind[row] !== 'shell') continue
       const rows = index.elementNodes[row]
       for (let k = 1; k + 1 < rows.length; k++) triangles.push(rows[0], rows[k], rows[k + 1])
     }

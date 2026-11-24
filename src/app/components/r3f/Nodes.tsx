@@ -1,17 +1,20 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { useFrame } from '@react-three/fiber'
+import { useFrame, useThree } from '@react-three/fiber'
 import { Html } from '@react-three/drei'
-import { Color, DynamicDrawUsage, Matrix4, Quaternion, Sphere, Vector3 } from 'three'
-import type { InstancedMesh } from 'three'
+import { BufferAttribute, BufferGeometry, Color, ShaderMaterial, Vector3 } from 'three'
+import type { Intersection, Points, Raycaster } from 'three'
 import { useAppStore } from '@/app/store/useAppStore'
-import { worldUnitsPerPixel } from './screenScale'
 import type { DisplayBuffers, NodeLabel } from './displayBuffers'
 import type { SceneIndex } from './sceneIndex'
+import { LABEL_LIMIT } from './utils'
 
-/** Node marker radius in screen pixels. */
-const NODE_RADIUS_PX = 6
+/** Node marker (a small ✕) size in screen pixels, and when selected. */
+const NODE_PX = 7
+const NODE_SELECTED_PX = 11
+/** How close (screen pixels) a click must land to pick a node. */
+export const NODE_HIT_RADIUS_PX = 8
 
-const COLOR_DEFAULT = new Color('#111827')
+const COLOR_DEFAULT = new Color('#334155')
 const COLOR_SELECTED = new Color('#2563eb')
 
 const LABEL_STYLE: React.CSSProperties = {
@@ -28,11 +31,33 @@ const LABEL_STYLE: React.CSSProperties = {
   transform: 'translate(4px, -16px)',
 }
 
-const tmpMatrix = new Matrix4()
-const tmpPos = new Vector3()
+// A ✕ in each point sprite: the two diagonals of the point's square, about 1.5 px wide at any size.
+const VERTEX = `
+attribute float size;
+attribute vec3 color;
+varying vec3 vColor;
+varying float vSize;
+uniform float pixelRatio;
+void main() {
+  vColor = color;
+  vSize = size * pixelRatio;
+  gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+  gl_PointSize = vSize;
+}`
+const FRAGMENT = `
+varying vec3 vColor;
+varying float vSize;
+void main() {
+  vec2 p = gl_PointCoord - 0.5;
+  if (min(abs(p.x - p.y), abs(p.x + p.y)) * vSize > 1.1) discard;
+  gl_FragColor = vec4(vColor, 1.0);
+}`
 
-/** All nodes as one InstancedMesh; each instance is rescaled so the marker stays NODE_RADIUS_PX on screen. */
-function NodeInstances({
+const tmpPos = new Vector3()
+const tmpNdc = new Vector3()
+
+/** All nodes as one `Points` draw: a fixed-size ✕ drawn by the GPU, so nothing is rescaled per frame. Picking is by screen distance. */
+function NodePoints({
   index,
   buffers,
   selected,
@@ -44,68 +69,74 @@ function NodeInstances({
   onToggle: (id: number, additive: boolean) => void
 }) {
   const count = index.nodeIds.length
-  const ref = useRef<InstancedMesh>(null)
-  const last = useRef({ pos: new Vector3(), quat: new Quaternion(), proj: 0, zoom: 0, height: 0, version: -1, dirty: true })
+  const { gl, invalidate } = useThree()
+  const geometry = useMemo(() => {
+    const g = new BufferGeometry()
+    g.setAttribute('position', new BufferAttribute(new Float32Array(count * 3), 3))
+    g.setAttribute('color', new BufferAttribute(new Float32Array(count * 3), 3))
+    g.setAttribute('size', new BufferAttribute(new Float32Array(count), 1))
+    return g
+  }, [count])
+  const material = useMemo(() => new ShaderMaterial({ vertexShader: VERTEX, fragmentShader: FRAGMENT, uniforms: { pixelRatio: { value: 1 } } }), [])
+  useEffect(() => () => geometry.dispose(), [geometry])
+  useEffect(() => () => material.dispose(), [material])
 
   useEffect(() => {
-    const mesh = ref.current
-    if (!mesh) return
-    mesh.instanceMatrix.setUsage(DynamicDrawUsage)
-    // Instances are rescaled/moved every frame, so the cached bounding sphere (used by the
-    // raycaster) would go stale; use a generously large one around the model instead.
-    const center = new Vector3()
-    for (let i = 0; i < count; i++) center.add(tmpPos.fromArray(index.nodeCoords, i * 3))
-    if (count) center.divideScalar(count)
-    let radius = 0
-    for (let i = 0; i < count; i++) radius = Math.max(radius, center.distanceTo(tmpPos.fromArray(index.nodeCoords, i * 3)))
-    mesh.boundingSphere = new Sphere(center, radius * 4 + 1000)
-    mesh.frustumCulled = false
-    last.current.dirty = true
-  }, [index, count])
-
-  useEffect(() => {
-    const mesh = ref.current
-    if (!mesh) return
-    for (let i = 0; i < count; i++) mesh.setColorAt(i, selected.has(index.nodeIds[i]) ? COLOR_SELECTED : COLOR_DEFAULT)
-    if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true
-  }, [index, count, selected])
-
-  useFrame(({ camera, size }) => {
-    const mesh = ref.current
-    if (!mesh) return
-    const l = last.current
-    const proj = camera.projectionMatrix.elements[5]
-    if (!l.dirty && l.version === buffers.version && l.proj === proj && l.zoom === camera.zoom && l.height === size.height
-      && l.pos.equals(camera.position) && l.quat.equals(camera.quaternion)) return
+    const colors = geometry.getAttribute('color') as BufferAttribute, sizes = geometry.getAttribute('size') as BufferAttribute
     for (let i = 0; i < count; i++) {
-      tmpPos.fromArray(buffers.nodePositions, i * 3)
-      const s = worldUnitsPerPixel(camera, tmpPos, size.height) * NODE_RADIUS_PX
-      mesh.setMatrixAt(i, tmpMatrix.makeScale(s, s, s).setPosition(tmpPos))
+      const on = selected.has(index.nodeIds[i])
+      ;(on ? COLOR_SELECTED : COLOR_DEFAULT).toArray(colors.array, i * 3)
+      sizes.array[i] = on ? NODE_SELECTED_PX : NODE_PX
     }
-    mesh.instanceMatrix.needsUpdate = true
-    l.pos.copy(camera.position)
-    l.quat.copy(camera.quaternion)
-    l.proj = proj
-    l.zoom = camera.zoom
-    l.height = size.height
-    l.version = buffers.version
-    l.dirty = false
+    colors.needsUpdate = true; sizes.needsUpdate = true
+    invalidate()
+  }, [geometry, index, count, selected, invalidate])
+
+  const seen = useRef(-1)
+  useFrame(() => {
+    material.uniforms.pixelRatio.value = gl.getPixelRatio()
+    if (seen.current === buffers.version) return
+    const position = geometry.getAttribute('position') as BufferAttribute
+    ;(position.array as Float32Array).set(buffers.nodePositions)
+    position.needsUpdate = true
+    geometry.computeBoundingSphere()
+    seen.current = buffers.version
   })
+  useEffect(() => { seen.current = -1 }, [geometry])
+
+  // Screen-space picking: the nearest node within NODE_HIT_RADIUS_PX of the pointer (`Points`' own raycast works in world units).
+  const raycast = useMemo(() => function (this: Points, raycaster: Raycaster, intersects: Intersection[]) {
+    const camera = raycaster.camera
+    if (!camera) return
+    const { width, height } = gl.domElement.getBoundingClientRect()
+    const pointer = tmpNdc.copy(raycaster.ray.origin).add(raycaster.ray.direction).project(camera)
+    const px = (pointer.x + 1) * 0.5 * width, py = (1 - pointer.y) * 0.5 * height
+    let best = -1, bestDist = NODE_HIT_RADIUS_PX
+    const positions = buffers.nodePositions
+    for (let i = 0; i < count; i++) {
+      const v = tmpPos.fromArray(positions, i * 3).project(camera)
+      if (v.z > 1) continue
+      const d = Math.hypot((v.x + 1) * 0.5 * width - px, (1 - v.y) * 0.5 * height - py)
+      if (d < bestDist) { bestDist = d; best = i }
+    }
+    if (best < 0) return
+    const point = new Vector3().fromArray(positions, best * 3)
+    // Slightly in front of its true distance, so a node wins over the member it sits on.
+    intersects.push({ distance: raycaster.ray.origin.distanceTo(point) * 0.999, point, index: best, object: this })
+  }, [gl, buffers, count])
 
   return (
-    <instancedMesh
-      key={count}
-      ref={ref}
-      args={[undefined, undefined, count]}
+    <points
+      geometry={geometry}
+      material={material}
+      raycast={raycast}
+      frustumCulled={false}
       onClick={(e) => {
         e.stopPropagation()
-        if (e.instanceId === undefined) return
-        onToggle(index.nodeIds[e.instanceId], e.nativeEvent.shiftKey || e.nativeEvent.ctrlKey || e.nativeEvent.metaKey)
+        if (e.index === undefined) return
+        onToggle(index.nodeIds[e.index], e.nativeEvent.shiftKey || e.nativeEvent.ctrlKey || e.nativeEvent.metaKey)
       }}
-    >
-      <sphereGeometry args={[1, 20, 20]} />
-      <meshStandardMaterial />
-    </instancedMesh>
+    />
   )
 }
 
@@ -170,9 +201,9 @@ export function NodesLayer({
 
   return (
     <>
-      {showNodes && index.nodeIds.length > 0 && <NodeInstances index={index} buffers={buffers} selected={selected} onToggle={handleToggle} />}
-      {showNodeIds && <NodeLabels index={index} />}
-      {showDisplacements && <NodeValueLabels buffers={buffers} />}
+      {showNodes && index.nodeIds.length > 0 && <NodePoints index={index} buffers={buffers} selected={selected} onToggle={handleToggle} />}
+      {showNodeIds && index.nodeIds.length <= LABEL_LIMIT && <NodeLabels index={index} />}
+      {showDisplacements && index.nodeIds.length <= LABEL_LIMIT && <NodeValueLabels buffers={buffers} />}
     </>
   )
 }

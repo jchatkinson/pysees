@@ -7,6 +7,7 @@ import { BufferLines } from './BufferLines'
 import type { DisplayBuffers } from './displayBuffers'
 import { fillSegmentPositions, type SceneIndex } from './sceneIndex'
 import { ShellSurfaces } from './Shells'
+import { LABEL_LIMIT } from './utils'
 
 const ELEMENT_COLOR = 0x4b5563
 const ELEMENT_LINE_WIDTH_PX = 2
@@ -70,9 +71,10 @@ function SelectedElements({ index }: { index: SceneIndex }) {
   const points = useMemo(() => {
     const out: [number, number, number][] = []
     const at = (r: number): [number, number, number] => [index.nodeCoords[r * 3], index.nodeCoords[r * 3 + 1], index.nodeCoords[r * 3 + 2]]
+    const rowOf = new Map(index.elementIds.map((id, e) => [id, e]))
     for (const id of ids) {
-      const e = index.elementIds.indexOf(id)
-      if (e < 0) continue
+      const e = rowOf.get(id)
+      if (e === undefined) continue
       const rows = index.elementNodes[e]
       const shell = index.elementKind[e] === 'shell'
       for (let k = 0; k < (shell ? rows.length : rows.length - 1); k++) out.push(at(rows[k]), at(rows[(k + 1) % rows.length]))
@@ -123,7 +125,7 @@ export function ElementsLayer({
       {showElements && hasSegments && (!extruded || deformedMode) && (!deformedMode || showUndeformed) && <ElementLines index={index} ghost={deformedMode} />}
       {deformedMode && hasSegments && <BufferLines positions={buffers.deformedSegments} color={DEFORMED_COLOR} widthPx={ELEMENT_LINE_WIDTH_PX} isActive={() => buffers.active} getVersion={() => buffers.version} />}
       {showElements && !deformedMode && !extruded && <SelectedElements index={index} />}
-      {showElementIds && <ElementLabels index={index} />}
+      {showElementIds && index.elementIds.length <= LABEL_LIMIT && <ElementLabels index={index} />}
     </>
   )
 }

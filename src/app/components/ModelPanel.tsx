@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { ChevronRight, ChevronsDownUp, ChevronsUpDown } from 'lucide-react'
 import { ScrollArea } from '@/app/components/ui/scroll-area'
 import { Button } from '@/app/components/ui/button'
@@ -10,6 +10,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/app/componen
 import { StudBuildingForm } from '@/app/components/StudBuildingForm'
 
 interface Row { kind: ModelDeletableKind; id: number; summary: string }
+
+/** Rows rendered per group before "Show more": a large model has tens of thousands. */
+const ROW_PAGE = 300
 
 function rowsFor(model: Model): { label: string; rows: Row[] }[] {
   const groups: { label: string; rows: Row[] }[] = []
@@ -79,7 +82,8 @@ export function ModelPanel() {
   const canUndo = useAppStore((s) => s.modelPast.length > 0)
   const canRedo = useAppStore((s) => s.modelFuture.length > 0)
 
-  const groups = rowsFor(model)
+  const groups = useMemo(() => rowsFor(model), [model])
+  const [limits, setLimits] = useState<Record<string, number>>({})
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
   const toggle = (label: string) => setCollapsed((prev) => {
     const next = new Set(prev)
@@ -92,8 +96,12 @@ export function ModelPanel() {
   const [seenSelection, setSeenSelection] = useState(selectedModelEntity)
   if (seenSelection !== selectedModelEntity) {
     setSeenSelection(selectedModelEntity)
-    const label = selectedModelEntity && groups.find((g) => g.rows.some((r) => r.kind === selectedModelEntity.kind && r.id === selectedModelEntity.id))?.label
+    const group = selectedModelEntity && groups.find((g) => g.rows.some((r) => r.kind === selectedModelEntity.kind && r.id === selectedModelEntity.id))
+    const label = group?.label
     if (label && collapsed.has(label)) setCollapsed((prev) => { const next = new Set(prev); next.delete(label); return next })
+    // Render far enough down the group to reach the selected row.
+    const at = group ? group.rows.findIndex((r) => r.kind === selectedModelEntity!.kind && r.id === selectedModelEntity!.id) : -1
+    if (label && at >= (limits[label] ?? ROW_PAGE)) setLimits((prev) => ({ ...prev, [label]: Math.ceil((at + 1) / ROW_PAGE) * ROW_PAGE }))
   }
   useEffect(() => {
     if (!selectedModelEntity) return
@@ -140,7 +148,7 @@ export function ModelPanel() {
                     <span>{group.label}</span>
                     <span className="ml-auto tabular-nums opacity-50">{group.rows.length}</span>
                   </button>
-                  {!isCollapsed && group.rows.map((row) => {
+                  {!isCollapsed && group.rows.slice(0, limits[group.label] ?? ROW_PAGE).map((row) => {
                     const isSelected = selectedModelEntity?.kind === row.kind && selectedModelEntity.id === row.id
                     return (
                       <button
@@ -156,6 +164,11 @@ export function ModelPanel() {
                       </button>
                     )
                   })}
+                  {!isCollapsed && group.rows.length > (limits[group.label] ?? ROW_PAGE) && (
+                    <button className="block w-full text-left px-1.5 py-px pl-3 text-[10px] text-muted-foreground hover:text-foreground" onClick={() => setLimits((prev) => ({ ...prev, [group.label]: (prev[group.label] ?? ROW_PAGE) + ROW_PAGE }))}>
+                      Show {Math.min(ROW_PAGE, group.rows.length - (limits[group.label] ?? ROW_PAGE))} more of {(group.rows.length - (limits[group.label] ?? ROW_PAGE)).toLocaleString()}
+                    </button>
+                  )}
                 </div>
               )
             })}

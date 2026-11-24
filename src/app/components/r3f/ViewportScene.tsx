@@ -11,6 +11,7 @@ import { ElementsLayer } from './Elements'
 import { SupportsLayer } from './Supports'
 import { ZeroLengthsLayer } from './ZeroLengths'
 import { LoadsLayer } from './Loads'
+import { batchesLoads, LABEL_LIMIT, loadGlyphCount } from './utils'
 import { GridlinesLayer } from './Gridlines'
 import { LevelsLayer } from './Levels'
 import { levelElevations } from '@/app/lib/levels'
@@ -61,7 +62,7 @@ export const ViewportScene = forwardRef<ViewportSceneRef, object>(function Viewp
   const clearSceneSelection = useAppStore((s) => s.clearSceneSelection)
 
   const controlsRef = useRef<OrbitControlsImpl | null>(null)
-  const { camera, size } = useThree()
+  const { camera, size, invalidate } = useThree()
 
   const ndm = model.config?.ndm === 2 ? 2 : 3
   const viewModeRaw = useAppStore((s) => s.viewMode)
@@ -73,6 +74,22 @@ export const ViewportScene = forwardRef<ViewportSceneRef, object>(function Viewp
   const elements = slice?.elements ?? model.elements
   const sceneIndex = useMemo(() => buildSceneIndex(nodes, elements, model.geomTransfs, ndm), [nodes, elements, model.geomTransfs, ndm])
   const displayBuffers = useMemo(() => new DisplayBuffers(sceneIndex), [sceneIndex])
+  useEffect(() => { displayBuffers.onChange = invalidate; return () => { displayBuffers.onChange = null } }, [displayBuffers, invalidate])
+  const patterns = useMemo(() => [...model.patterns.values()], [model.patterns])
+  // Labels the view settings ask for but this view has too many of (each is an HTML element), named next to the view.
+  const resultValues = useAppStore((s) => s.resultsView.showValues && s.resultsView.runId !== null && s.resultsView.type !== 'none')
+  const setHiddenLabels = useAppStore((s) => s.setHiddenLabels)
+  const loadCount = useMemo(() => (viewSettings.showLoadValues ? loadGlyphCount(patterns, hiddenLoadPatterns, viewSettings.showNodalLoads) : 0), [patterns, hiddenLoadPatterns, viewSettings])
+  useEffect(() => {
+    const many = (n: number) => n > LABEL_LIMIT
+    setHiddenLabels([
+      ...(viewSettings.showNodeIds && many(sceneIndex.nodeIds.length) ? ['node IDs'] : []),
+      ...(viewSettings.showElementIds && many(sceneIndex.elementIds.length) ? ['element IDs'] : []),
+      ...(resultValues && (many(sceneIndex.nodeIds.length) || many(sceneIndex.elementIds.length)) ? ['result values'] : []),
+      ...(!showingResults && batchesLoads(loadCount) ? ['load values'] : []),
+    ])
+  }, [sceneIndex, viewSettings, resultValues, showingResults, loadCount, setHiddenLabels])
+  useEffect(() => () => setHiddenLabels([]), [setHiddenLabels])
   const fixes = useMemo(() => [...model.fixes.values()].filter((f) => nodes.has(f.nodeId)).sort((a, b) => a.nodeId - b.nodeId), [model.fixes, nodes])
   const isOrtho = mode.kind !== '3d' || orthographic
   const view = useMemo(() => viewCamera(mode, gridlines, ndm), [mode, gridlines, ndm])
@@ -237,6 +254,9 @@ export const ViewportScene = forwardRef<ViewportSceneRef, object>(function Viewp
     fit()
   }, [camera, viewportAction, fit])
 
+  // The canvas renders on demand: the effects above move the camera directly, so ask for a frame after every render (declared last, it runs after them).
+  useEffect(() => { invalidate() })
+
   return (
     <>
       <SceneHelpers showGrid={viewSettings.showGrid} ndm={model.config?.ndm ?? 3} />
@@ -270,7 +290,8 @@ export const ViewportScene = forwardRef<ViewportSceneRef, object>(function Viewp
       <NodesLayer
         index={sceneIndex}
         buffers={displayBuffers}
-        showNodes={viewSettings.showNodes}
+        // Hidden nodes still appear while a form waits for one to be picked.
+        showNodes={viewSettings.showNodes || nodePickMode !== 'none'}
         showNodeIds={viewSettings.showNodeIds}
       />
       {viewSettings.showElements && (
@@ -282,10 +303,11 @@ export const ViewportScene = forwardRef<ViewportSceneRef, object>(function Viewp
         <SupportsLayer fixes={fixes} nodeMap={nodes} />
       )}
       {!showingResults && <LoadsLayer
-        patterns={[...model.patterns.values()]}
+        patterns={patterns}
         nodeMap={nodes}
         elementMap={elements}
         geomTransfs={model.geomTransfs}
+        sections={model.sections}
         ndm={model.config?.ndm ?? 3}
         hiddenPatterns={hiddenLoadPatterns}
         showNodal={viewSettings.showNodalLoads}

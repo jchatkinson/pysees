@@ -4,9 +4,11 @@ import { shellFrame } from '@/app/lib/shells'
 import { isShell } from '@/app/lib/commands/tables'
 import { toVec3 } from './utils'
 
-/** Line segments each element span is split into. Fixed so the line buffer layout never changes
- * between undeformed and displaced display — only the positions are rewritten. */
+/** Line segments each beam or truss span is split into (its displaced shape and diagrams are curved). Fixed so the line buffer
+ * layout never changes between undeformed and displaced display — only the positions are rewritten. */
 export const SEGMENTS_PER_SPAN = 8
+/** Segments per span of an element kind: shell edges and the rest stay straight when displaced, so one each. */
+export const segmentsFor = (kind: ElementKind) => (kind === 'beam' || kind === 'truss' ? SEGMENTS_PER_SPAN : 1)
 
 /**
  * Stable, array-backed view of the model for the GPU buffers. Node row `i` / element row `j` are
@@ -30,7 +32,9 @@ export interface SceneIndex {
   /** Per element, 9 floats: local x, y, z axes (global components) of its first span (a shell's e1, e2, e3); zeros for a zero-length element. */
   elementFrames: Float32Array
   segmentsPerSpan: number
-  /** Per element: first segment index in the line buffer; `elementSegmentStart[elementIds.length]` is the total. */
+  /** Per element: the spans it draws. A shell skips an edge an earlier element (a beam on it, or the neighbouring shell) already draws. */
+  elementSpans: number[][]
+  /** Per element: first segment index in the line buffer (`segmentsFor` its kind per span); `elementSegmentStart[elementIds.length]` is the total. */
   elementSegmentStart: Uint32Array
   segmentCount: number
 }
@@ -57,6 +61,9 @@ export function buildSceneIndex(
   const elementKind: ElementKind[] = []
   const frames: number[] = []
   const starts: number[] = []
+  const spans: number[][] = []
+  const drawn = new Set<number>()
+  const edge = (a: number, b: number) => Math.min(a, b) * nodeIds.length + Math.max(a, b)
   let segmentCount = 0
   for (const el of [...elements.values()].sort((a, b) => a.id - b.id)) {
     const rows = el.nodes.map((id) => nodeIndex.get(id)).filter((r): r is number => r !== undefined)
@@ -69,11 +76,19 @@ export function buildSceneIndex(
     const frame = shell ? { x: shell.e1, y: shell.e2, z: shell.e3 } : kind === 'shell' ? null : memberFrame(nodeCoords.subarray(rows[0] * 3, rows[0] * 3 + 3), nodeCoords.subarray(rows[1] * 3, rows[1] * 3 + 3), ndm, geomTransfs.get(Number(el.args.transfTag))?.args.vecxz)
     frames.push(...(frame ? [...frame.x, ...frame.y, ...frame.z] : [0, 0, 0, 0, 0, 0, 0, 0, 0]))
     starts.push(segmentCount)
-    segmentCount += spanCount(kind, rows.length) * SEGMENTS_PER_SPAN
+    const mine: number[] = []
+    for (let span = 0; span < spanCount(kind, rows.length); span++) {
+      const key = edge(...spanEnds(rows, span))
+      if (kind === 'shell' && drawn.has(key)) continue
+      drawn.add(key)
+      mine.push(span)
+    }
+    spans.push(mine)
+    segmentCount += mine.length * segmentsFor(kind)
   }
   starts.push(segmentCount)
 
-  return { ndm, nodeIds, nodeIndex, nodeCoords, elementIds, elementNodes, elementKind, elementFrames: Float32Array.from(frames), segmentsPerSpan: SEGMENTS_PER_SPAN, elementSegmentStart: Uint32Array.from(starts), segmentCount }
+  return { ndm, nodeIds, nodeIndex, nodeCoords, elementIds, elementNodes, elementKind, elementFrames: Float32Array.from(frames), elementSpans: spans, segmentsPerSpan: SEGMENTS_PER_SPAN, elementSegmentStart: Uint32Array.from(starts), segmentCount }
 }
 
 /**
@@ -84,13 +99,14 @@ export function buildSceneIndex(
 export function fillSegmentPositions(index: SceneIndex, nodePositions: Float32Array, out: Float32Array): void {
   let o = 0
   index.elementNodes.forEach((rows, e) => {
-    for (let span = 0; span < spanCount(index.elementKind[e], rows.length); span++) {
+    for (const span of index.elementSpans[e]) {
       const [ra, rb] = spanEnds(rows, span)
       const a = ra * 3
       const b = rb * 3
-      for (let s = 0; s < SEGMENTS_PER_SPAN; s++) {
-        const t0 = s / SEGMENTS_PER_SPAN
-        const t1 = (s + 1) / SEGMENTS_PER_SPAN
+      const n = segmentsFor(index.elementKind[e])
+      for (let s = 0; s < n; s++) {
+        const t0 = s / n
+        const t1 = (s + 1) / n
         for (let k = 0; k < 3; k++) {
           const pa = nodePositions[a + k]
           const d = nodePositions[b + k] - pa

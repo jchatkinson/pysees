@@ -1,6 +1,6 @@
 import type { RunLayout } from '@/app/lib/resultsStorage/stepFrames'
 import type { NodeLabel } from './displayBuffers'
-import { spanCount, spanEnds, type SceneIndex } from './sceneIndex'
+import { segmentsFor, spanEnds, type SceneIndex } from './sceneIndex'
 
 /** Per-node displacement read from a step row. `rot` holds `[rx, ry, rz]` per node (a 2D model only has rz), NaN where not recorded. */
 export interface NodeDisplacements {
@@ -43,14 +43,14 @@ export function displaceNodes(index: SceneIndex, nd: NodeDisplacements, scale: n
  * the member's local frame: bending in x–y from rz, and in 3D x–z from ry); every other span interpolates the end displacements linearly.
  */
 export function fillDeformedSegments(index: SceneIndex, nd: NodeDisplacements, scale: number, out: Float32Array): void {
-  const n = index.segmentsPerSpan
-  const station = new Float32Array((n + 1) * 3)
+  const station = new Float32Array((index.segmentsPerSpan + 1) * 3)
   const c = index.nodeCoords
   const ndm3 = index.ndm === 3
   let o = 0
   index.elementNodes.forEach((rows, e) => {
     const f = index.elementFrames.subarray(e * 9, e * 9 + 9)
-    for (let span = 0; span < spanCount(index.elementKind[e], rows.length); span++) {
+    const n = segmentsFor(index.elementKind[e])
+    for (const span of index.elementSpans[e]) {
       const [a, b] = spanEnds(rows, span)
       const len = Math.hypot(c[b * 3] - c[a * 3], c[b * 3 + 1] - c[a * 3 + 1], c[b * 3 + 2] - c[a * 3 + 2])
       const rotOk = (i: number) => !Number.isNaN(nd.rot[i * 3 + 2]) && (!ndm3 || !Number.isNaN(nd.rot[i * 3 + 1]))

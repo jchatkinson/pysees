@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef } from 'react'
-import type { ThreeEvent } from '@react-three/fiber'
+import { useThree, type ThreeEvent } from '@react-three/fiber'
 import { BufferAttribute, BufferGeometry, Color, DoubleSide, ExtrudeGeometry, InstancedMesh, Matrix4, MeshStandardMaterial, Path, Shape } from 'three'
 import { useAppStore } from '@/app/store/useAppStore'
 import type { ElementEntity, Model } from '@/app/types/model'
@@ -33,12 +33,14 @@ function MemberGroup({ group, material, selected, onPick }: { group: Group; mate
     return m
   }, [group, material])
   const ref = useRef<InstancedMesh>(null)
+  const invalidate = useThree((s) => s.invalidate)
   useEffect(() => {
     const m = ref.current
     if (!m) return
     group.ids.forEach((id, i) => m.setColorAt(i, selected.has(id) ? SELECTED : group.nominal ? NOMINAL : REAL))
     if (m.instanceColor) m.instanceColor.needsUpdate = true
-  }, [mesh, group, selected])
+    invalidate()
+  }, [mesh, group, selected, invalidate])
   useEffect(() => () => mesh.dispose(), [mesh])
   const onClick = (e: ThreeEvent<MouseEvent>) => {
     if (e.instanceId == null) return
