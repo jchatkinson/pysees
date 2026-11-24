@@ -107,6 +107,51 @@ export function cantilever3dFixtures(): Fixture[] {
   ]
 }
 
+/** Elastic frames held together by every multi-point constraint kind, for comparing Carapace against OpenSees (`constraints Transformation`).
+ * 2D: two cantilever columns tied by `equalDOF` in X, an eccentric load point on a `rigidLink beam`, and a third column whose top sways with the
+ * first one's vertical displacement (`equalDOF_Mixed`, retained dof 2 → constrained dof 1). 3D (Z-up): four columns under a `rigidDiaphragm`
+ * (perpDirn 3) with a torque on its master, and two outrigger columns joined by `rigidLink bar`, with a loaded point on a `rigidLink beam` from
+ * the second. No retained node is itself constrained, and no link retains a fixed dof: OpenSees' Transformation handler resolves neither
+ * (chains give wrong answers, and a fixed retained dof breaks the link from the second load step on), while Carapace handles both. */
+export function constraintFixtures(): Fixture[] {
+  const history: AnalysisHistory = { commands: [{ type: 'ANALYSIS_BLOCK', blockId: 'whole-model-recorder', params: { directory: 'out' } }, { type: 'ANALYSIS_BLOCK', blockId: 'run-gravity-analysis', params: { patterns: [1], steps: 2 } }], cursor: 1 }
+  const node = (id: number, coords: number[]): ModelWrite => ({ kind: 'node', entity: { id, coords } })
+  const fix = (nodeId: number, dofs: number[]): ModelWrite => ({ kind: 'fix', entity: { nodeId, dofs } })
+  const mp = (id: number, kind: 'equalDOF' | 'equalDOF_Mixed' | 'rigidDiaphragm' | 'rigidLink', args: Record<string, unknown>): ModelWrite => ({ kind: 'mpConstraint', entity: { id, kind, args } })
+  const pattern = (loads: [number, number[]][]): ModelWrite[] => [
+    { kind: 'timeSeries', entity: { id: 1, tsType: 'Linear', args: { type: 'Linear', tag: 1, factor: 1 } } },
+    { kind: 'pattern', entity: { id: 1, patternType: 'Plain', args: { type: 'Plain', patternTag: 1, tsTag: 1, fact: 1 }, children: [] } },
+    ...loads.map(([nodeTag, values]): ModelWrite => ({ kind: 'patternChild', patternId: 1, child: { kind: 'load', args: { nodeTag, values } } })),
+  ]
+  const ele2 = (id: number, nodes: number[]): ModelWrite => ({ kind: 'element', entity: { id, eleType: 'ElasticBeamColumn', nodes, args: { A: 0.01, E: 2e11, Iz: 1e-4 * id, transfTag: 1 } } })
+  const twoD = modelFromWrites(2, 3, [
+    node(1, [0, 0]), node(2, [0, 3]), node(3, [4, 0]), node(4, [4, 3]), node(5, [0.5, 3.5]), node(6, [8, 0]), node(7, [8, 3]),
+    fix(1, [1, 2, 3]), fix(3, [1, 2, 3]), fix(6, [1, 2, 3]),
+    { kind: 'geomTransf', entity: { id: 1, transfType: 'Linear', args: { type: 'Linear', transfTag: 1 } } },
+    ele2(1, [1, 2]), ele2(2, [3, 4]), ele2(3, [6, 7]),
+    mp(1, 'equalDOF', { rNodeTag: 2, cNodeTag: 4, dofs: [1] }),
+    mp(2, 'rigidLink', { type: 'beam', rNodeTag: 2, cNodeTag: 5 }),
+    mp(3, 'equalDOF_Mixed', { rNodeTag: 2, cNodeTag: 7, numDOF: 1, rcdofs: [2, 1] }),
+    ...pattern([[5, [2e4, -5e5, 1e3]], [4, [0, -1e5, 0]]]),
+  ])
+  const ele3 = (id: number, nodes: number[]): ModelWrite => ({ kind: 'element', entity: { id, eleType: 'ElasticBeamColumn', nodes, args: { A: 0.01, E: 2e11, G: 8e10, J: 2e-4, Iy: 1e-4, Iz: 1.5e-4 * (1 + id / 10), transfTag: 1 } } })
+  const corners = [[0, 0], [4, 0], [4, 3], [0, 3]]
+  const threeD = modelFromWrites(3, 6, [
+    ...corners.flatMap(([x, y], i) => [node(i + 1, [x, y, 0]), node(i + 5, [x, y, 3]), fix(i + 1, [1, 2, 3, 4, 5, 6])]),
+    node(9, [2.5, 1, 3]), fix(9, [3, 4, 5]),
+    node(10, [7, 0, 0]), node(11, [7, 0, 3]), fix(10, [1, 2, 3, 4, 5, 6]),
+    node(13, [10, 0, 0]), node(14, [10, 0, 3]), fix(13, [1, 2, 3, 4, 5, 6]),
+    node(12, [11, 1, 4]),
+    { kind: 'geomTransf', entity: { id: 1, transfType: 'Linear', args: { type: 'Linear', transfTag: 1, vecxz: [1, 0, 0] } } },
+    ...corners.map((_c, i) => ele3(i + 1, [i + 1, i + 5])), ele3(5, [10, 11]), ele3(6, [13, 14]),
+    mp(1, 'rigidDiaphragm', { perpDirn: 3, rNodeTag: 9, cNodeTags: [5, 6, 7, 8] }),
+    mp(2, 'rigidLink', { type: 'bar', rNodeTag: 14, cNodeTag: 11 }),
+    mp(3, 'rigidLink', { type: 'beam', rNodeTag: 14, cNodeTag: 12 }),
+    ...pattern([[9, [3e4, 1e4, 0, 0, 0, 2e4]], [12, [0, 5e3, -2e4, 1e3, 0, 0]], [7, [0, 0, -1e5, 0, 0, 0]]]),
+  ])
+  return [{ name: 'constraints-2d', model: twoD, history }, { name: 'constraints-3d', model: threeD, history }]
+}
+
 /** Planar trusses with analysis, for comparing Carapace against OpenSees: one stays elastic, one yields (Steel01) under a displacement-controlled push. */
 export function trussFixtures(): Fixture[] {
   const mat = (id: number, matType: string, args: Record<string, unknown>): ModelWrite => ({ kind: 'material', entity: { id, kind: 'uniaxial', matType, args: { matTag: id, matType, ...args } } })

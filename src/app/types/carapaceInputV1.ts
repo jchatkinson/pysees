@@ -45,9 +45,16 @@ export interface FiberTable { sectionOffsets: number[]; y: number[]; z?: number[
 /** Identity multi-point constraints (`core::Domain::equal_dof`): row `i` ties `constrained[i]`'s
  * dofs listed in `dofs` (sparse `(row, dof)` pairs) exactly to the same dofs of `retained[i]`. */
 export interface EqualDofTable { retained: number[]; constrained: number[]; dofs: [number, number][] }
-/** 2D rigid diaphragm (`core::Domain::rigid_diaphragm`): row `i` ties every node listed
- * against it in `constrained` (sparse `(row, nodeIndex)` pairs) own `ux` to `retained[i]`'s `ux`. */
-export interface RigidDiaphragmTable { retained: number[]; constrained: [number, number][] }
+/** Rigid diaphragm: row `i` ties every node listed against it in `constrained` (sparse `(row, nodeIndex)` pairs) to `retained[i]`. In 2D
+ * only `ux`; in 3D the two translations in the plane normal to `normal[i]` (with the lever arm of the retained node's rotation about it).
+ * `normal` is 3D only (default Y). The constrained nodes' rotation about the normal is not tied; add an `equalDofs` row for that. */
+export interface RigidDiaphragmTable { retained: number[]; normal?: Axis3Spec[]; constrained: [number, number][] }
+export type Axis3Spec = 'x' | 'y' | 'z'
+/** Rigid links (`core::Domain::rigid_link`): `slave[i]` moves with `master[i]` as a rigid body (small rotations, lever arm from the coordinates). */
+export interface RigidLinkTable { master: number[]; slave: number[] }
+/** General linear constraints: row `i` sets `u[slaveNode[i], slaveDof[i]] = sum termCoeff * u[termNode, termDof]` over the terms
+ * `termOffsets[i]..termOffsets[i + 1]`. `termOffsets` has rows + 1 entries. Node indices and 0-based dofs. */
+export interface LinearConstraintTable { slaveNode: number[]; slaveDof: number[]; termOffsets: number[]; termNode: number[]; termDof: number[]; termCoeff: number[] }
 
 export type TimeSeriesSpec = { kind: 'constant' } | { kind: 'linear'; slope: number } | { kind: 'path'; times: number[]; factors: number[] } | { kind: 'boundedPath'; times: number[]; factors: number[]; useLast: boolean }
 export interface LoadPatternTable { series: TimeSeriesSpec[]; scaleFactor: number[] }
@@ -152,6 +159,10 @@ export interface CarapaceInputV1 {
   dispBeamColumns3d?: FiberBeamColumn3dTable
   zeroLengths?: ZeroLengthTable
   zeroLengthSections?: ZeroLengthSectionTable
+  equalDofs?: EqualDofTable
+  rigidDiaphragms?: RigidDiaphragmTable
+  rigidLinks?: RigidLinkTable
+  linearConstraints?: LinearConstraintTable
   shellSections?: ShellSectionSpec[]
   shell3s?: Shell3Table
   shell4s?: Shell4Table

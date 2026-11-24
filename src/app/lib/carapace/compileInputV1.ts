@@ -343,6 +343,8 @@ export function compileInputV1(model: Model, analysisHistory: AnalysisHistory): 
     }
   }
 
+  const constraintTables = compileConstraints(model, ndm, ndf, resolveNode, diagnostics)
+
   // --- load patterns + nodal loads ---
   const patternIds = [...model.patterns.keys()].filter((id) => model.patterns.get(id)!.patternType === 'Plain').sort((a, b) => a - b)
   for (const pattern of model.patterns.values()) {
@@ -575,12 +577,83 @@ export function compileInputV1(model: Model, analysisHistory: AnalysisHistory): 
     ...(ndm === 3 ? { elasticBeamColumns3d, dispBeamColumns3d, shellSections, shell3s, shell4s } : {}),
     ...(zeroLengths.nodeI.length ? { zeroLengths } : {}),
     zeroLengthSections,
+    ...constraintTables,
     loadPatterns,
     nodalLoads,
     elementLoads,
     sequence: { stages, recorders },
   }
   return { input, diagnostics, recordedNodeTags, dofsPerNode, recorderPlans, nodeTags: nodeIds }
+}
+
+/** Positive integers from a scalar or list arg (`dofs`, `cNodeTags`), or `null` when any entry is not one. */
+function intList(raw: unknown): number[] | null {
+  const list = (Array.isArray(raw) ? raw : raw === undefined || raw === '' ? [] : [raw]).map(Number)
+  return list.every((v) => Number.isInteger(v) && v > 0) ? list : null
+}
+
+/**
+ * Lowers the model's multi-point constraints to Carapace's constraint tables, with OpenSees' meaning (dofs 1-based in the model,
+ * 0-based on the wire). `equalDOF` → `equalDofs`; `equalDOF_Mixed` (`rcdofs` = retained/constrained dof pairs) → `linearConstraints`;
+ * `rigidLink beam` → `rigidLinks`; `rigidLink bar` (translations only) → `equalDofs`; 3D `rigidDiaphragm perpDirn` → `rigidDiaphragms`
+ * with that normal, plus an `equalDofs` row tying each constrained node's rotation about the normal, which OpenSees also ties.
+ * OpenSees only has the diaphragm in 3D, so a 2D one is an error rather than Carapace's 2D (`ux`-only) variant.
+ */
+function compileConstraints(model: Model, ndm: number, ndf: number, resolveNode: (id: number, context: string) => number, diagnostics: CompileDiagnostic[]): Partial<W.CarapaceInputV1> {
+  const equalDofs: W.EqualDofTable = { retained: [], constrained: [], dofs: [] }
+  const diaphragms: W.RigidDiaphragmTable = { retained: [], normal: [], constrained: [] }
+  const links: W.RigidLinkTable = { master: [], slave: [] }
+  const linear: W.LinearConstraintTable = { slaveNode: [], slaveDof: [], termOffsets: [0], termNode: [], termDof: [], termCoeff: [] }
+  const tie = (r: number, c: number, dofs: number[]) => {
+    equalDofs.retained.push(r); equalDofs.constrained.push(c)
+    for (const d of dofs) equalDofs.dofs.push([equalDofs.retained.length - 1, d - 1])
+  }
+  for (const mp of [...model.mpConstraints.values()].sort((a, b) => a.id - b.id)) {
+    const ctx = `Constraint ${mp.id} (${mp.kind})`
+    const error = (message: string) => diagnostics.push({ severity: 'error', message: `${ctx}: ${message}`, commandIndex: -1 })
+    const a = mp.args
+    const r = resolveNode(Number(a.rNodeTag), ctx)
+    const badDofs = (dofs: number[] | null, max: number): dofs is null => !dofs || !dofs.length || dofs.some((d) => d > max)
+    if (mp.kind === 'equalDOF') {
+      const dofs = intList(a.dofs)
+      if (badDofs(dofs, ndf)) { error(`dofs must list one or more of 1-${ndf}`); continue }
+      tie(r, resolveNode(Number(a.cNodeTag), ctx), dofs)
+    } else if (mp.kind === 'equalDOF_Mixed') {
+      const pairs = intList(a.rcdofs)
+      if (badDofs(pairs, ndf) || pairs.length % 2 || (a.numDOF !== undefined && a.numDOF !== '' && Number(a.numDOF) * 2 !== pairs.length)) { error(`rcdofs must be numDOF pairs of retained and constrained dofs (1-${ndf})`); continue }
+      const c = resolveNode(Number(a.cNodeTag), ctx)
+      for (let i = 0; i < pairs.length; i += 2) {
+        linear.slaveNode.push(c); linear.slaveDof.push(pairs[i + 1] - 1)
+        linear.termNode.push(r); linear.termDof.push(pairs[i] - 1); linear.termCoeff.push(1)
+        linear.termOffsets.push(linear.termNode.length)
+      }
+    } else if (mp.kind === 'rigidLink') {
+      const type = String(a.type ?? '').toLowerCase()
+      const c = resolveNode(Number(a.cNodeTag), ctx)
+      if (type === 'beam') { links.master.push(r); links.slave.push(c) }
+      else if (type === 'bar') tie(r, c, Array.from({ length: ndm }, (_, i) => i + 1))
+      else error(`type must be beam or bar, got "${String(a.type ?? '')}"`)
+    } else if (mp.kind === 'rigidDiaphragm') {
+      const perp = Number(a.perpDirn)
+      const nodes = intList(a.cNodeTags)
+      if (ndm !== 3) { error('OpenSees rigid diaphragms are 3D only; use equalDOF in a 2D model'); continue }
+      if (![1, 2, 3].includes(perp)) { error(`perpDirn must be 1, 2 or 3, got ${String(a.perpDirn)}`); continue }
+      if (!nodes?.length) { error('cNodeTags must list one or more nodes'); continue }
+      const row = diaphragms.retained.push(r) - 1
+      diaphragms.normal!.push((['x', 'y', 'z'] as const)[perp - 1])
+      for (const id of nodes) {
+        const c = resolveNode(id, ctx)
+        diaphragms.constrained.push([row, c])
+        tie(r, c, [3 + perp])
+      }
+    } else error('is not supported by the Carapace compiler')
+  }
+  return {
+    ...(equalDofs.retained.length ? { equalDofs } : {}),
+    ...(diaphragms.retained.length ? { rigidDiaphragms: diaphragms } : {}),
+    ...(links.master.length ? { rigidLinks: links } : {}),
+    ...(linear.slaveNode.length ? { linearConstraints: linear } : {}),
+  }
 }
 
 /** The PySees-only Coulomb friction of a `zeroLength`: `{ normalDir, shearDir, mu, k0, b }` (1-based directions), or `undefined` when the element has none. */
