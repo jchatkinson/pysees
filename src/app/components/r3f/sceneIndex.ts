@@ -88,7 +88,18 @@ export function buildSceneIndex(
   }
   starts.push(segmentCount)
 
-  return { ndm, nodeIds, nodeIndex, nodeCoords, elementIds, elementNodes, elementKind, elementFrames: Float32Array.from(frames), elementSpans: spans, segmentsPerSpan: SEGMENTS_PER_SPAN, elementSegmentStart: Uint32Array.from(starts), segmentCount }
+  return hideFromDevTools({ ndm, nodeIds, nodeIndex, nodeCoords, elementIds, elementNodes, elementKind, elementFrames: Float32Array.from(frames), elementSpans: spans, segmentsPerSpan: SEGMENTS_PER_SPAN, elementSegmentStart: Uint32Array.from(starts), segmentCount })
+}
+
+/**
+ * Makes every own field of `target` non-enumerable (they read, write and type the same). React's development build logs a deep
+ * diff of every changed prop for the browser's Performance panel, expanding arrays and typed arrays entry by entry: on a large
+ * model the scene index and display buffers became millions of log rows and each view switch took ~10 s. Production builds
+ * don't log at all.
+ */
+export function hideFromDevTools<T extends object>(target: T): T {
+  for (const key of Object.keys(target)) Object.defineProperty(target, key, { enumerable: false })
+  return target
 }
 
 /**

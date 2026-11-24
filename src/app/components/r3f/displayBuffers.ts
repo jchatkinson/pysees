@@ -1,4 +1,4 @@
-import type { SceneIndex } from './sceneIndex'
+import { hideFromDevTools, type SceneIndex } from './sceneIndex'
 
 export interface NodeLabel {
   position: [number, number, number]
@@ -61,6 +61,7 @@ export class DisplayBuffers {
     this.diagramFillColor = new Float32Array(index.segmentCount * 18)
     // One outline segment per fill segment, plus two closing ties per element.
     this.diagramLines = new Float32Array((index.segmentCount + 2 * index.elementIds.length) * 6)
+    hideFromDevTools(this)
   }
 
   /** Call after writing `nodePositions` / `deformedSegments` (and `contourColors` when `contour`). */
