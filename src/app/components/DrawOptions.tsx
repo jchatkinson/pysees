@@ -80,6 +80,8 @@ export function DrawOptions() {
   const preset = useAppStore((s) => s.supportPreset)
   const setPreset = useAppStore((s) => s.setSupportPreset)
   const [creating, setCreating] = useState(false)
+  const toolInput = useAppStore((s) => s.toolInput)
+  const allStories = useAppStore((s) => s.drawAllStories && s.viewMode.kind === 'plan')
   const props = useMemo(() => deriveProperties(model).filter((p) => p.kind === 'frame'), [model])
   const items = useMemo(() => {
     const list = props.map((p) => ({ value: p.key, label: `${p.name} (${p.elementIds.length})` }))
@@ -99,6 +101,9 @@ export function DrawOptions() {
     <div className="absolute left-2 top-9 z-30 w-64 rounded-sm border bg-background/95 p-2 text-xs shadow" data-hotkeys-ignore="true">
       <div className="font-medium">{TITLES[tool]}</div>
       <p className="mb-1.5 text-[11px] leading-snug text-muted-foreground">{HINTS[tool]}</p>
+      {tool === 'frame' && <p className="mb-1.5 text-[11px] leading-snug text-muted-foreground">After the first point, type a length and press Enter to place the next point towards the cursor.</p>}
+      {toolInput && <div className="mb-1.5 rounded-sm bg-muted px-1.5 py-0.5 font-mono">Length: {toolInput}<span className="animate-pulse">▌</span></div>}
+      {allStories && tool !== 'support' && <div className="mb-1.5 text-[11px] font-medium text-primary">Drawing on all stories</div>}
       {tool === 'support' ? (
         <Select items={[{ value: 'fixed', label: 'Fixed' }, { value: 'pinned', label: 'Pinned' }, { value: 'roller', label: 'Roller (vertical)' }]} value={preset} onValueChange={(v) => v && setPreset(v as typeof preset)}>
           <SelectTrigger size="sm" className="h-7 w-full text-xs"><SelectValue /></SelectTrigger>

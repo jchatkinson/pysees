@@ -186,6 +186,10 @@ export interface AppStore {
   /** Replaces the whole authored project in one update (model, analysis, layout, report, display preferences) and resets results, undo history and selections. */
   loadProject: (project: ProjectDocument, fileName?: string) => void
   writeModelEntity: (write: ModelWrite) => void
+  /** Replace the model with `edit(model)` as one undo step (for edits that are not plain writes, e.g. several deletes). */
+  editModel: (edit: (model: Model) => Model) => void
+  /** Delete the selected elements and nodes (with what references them) as one undo step. */
+  deleteSelection: () => void
   /** Apply several writes as one edit (one undo step). */
   writeModelEntities: (writes: ModelWrite[]) => void
   previewDeleteModelEntity: (kind: ModelDeletableKind, id: number) => string[]
@@ -216,6 +220,12 @@ export interface AppStore {
   drawTemplate: DrawTemplate | null
   setDrawTemplate: (t: DrawTemplate | null) => void
   supportPreset: 'fixed' | 'pinned' | 'roller'
+  /** In a plan, draw tools place the same members on every story (ETABS "All Stories") instead of only the shown one. */
+  drawAllStories: boolean
+  setDrawAllStories: (on: boolean) => void
+  /** A length being typed while drawing a frame chain (Enter places the next point that far towards the cursor). */
+  toolInput: string
+  setToolInput: (text: string) => void
   setSupportPreset: (p: 'fixed' | 'pinned' | 'roller') => void
   /** Orthographic projection for the 3D view. */
   orthographic: boolean
@@ -539,6 +549,15 @@ export const useAppStore = create<AppStore>((set, get) => {
     modelPast: pushModelPast(s.modelPast, s.model),
     modelFuture: [],
   })),
+  editModel: (edit) => set((s) => { const model = edit(s.model); return model === s.model ? s : { model, modelPast: pushModelPast(s.modelPast, s.model), modelFuture: [] } }),
+  deleteSelection: () => set((s) => {
+    if (s.selectedNodeIds.length + s.selectedElementIds.length === 0) return s
+    let model = s.model
+    for (const id of s.selectedElementIds) if (model.elements.has(id)) model = deleteEntity(model, 'element', id)
+    for (const id of s.selectedNodeIds) if (model.nodes.has(id)) model = deleteEntity(model, 'node', id)
+    const kind = s.selectedModelEntity?.kind
+    return { model, modelPast: pushModelPast(s.modelPast, s.model), modelFuture: [], selectedNodeIds: [], selectedElementIds: [], ...(kind === 'node' || kind === 'element' ? { selectedModelEntity: null } : {}) }
+  }),
   writeModelEntities: (writes) => set((s) => (writes.length === 0 ? s : {
     model: writes.reduce(applyModelWrite, s.model),
     modelPast: pushModelPast(s.modelPast, s.model),
@@ -670,6 +689,10 @@ export const useAppStore = create<AppStore>((set, get) => {
   drawTemplate: null,
   setDrawTemplate: (drawTemplate) => set({ drawTemplate }),
   supportPreset: 'fixed',
+  drawAllStories: false,
+  setDrawAllStories: (drawAllStories) => set({ drawAllStories }),
+  toolInput: '',
+  setToolInput: (toolInput) => set({ toolInput }),
   setSupportPreset: (supportPreset) => set({ supportPreset }),
   setOrthographic: (orthographic) => set({ orthographic }),
   requestViewportAction: (kind) => set((s) => ({ viewportAction: { kind, token: (s.viewportAction?.token ?? 0) + 1 } })),

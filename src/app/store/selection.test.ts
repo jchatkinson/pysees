@@ -78,3 +78,18 @@ describe('scene selection', () => {
     expect(st().selectedElementIds).toEqual([2])
   })
 })
+
+describe('deleteSelection', () => {
+  beforeEach(() => st().writeModelEntities([node(1, 0), node(2, 1), node(3, 2), truss(1, 1, 2), truss(2, 2, 3)]))
+  it('deletes elements and nodes (taking their members) as one undo step', () => {
+    st().setSceneSelection({ nodes: [3], elements: [1] })
+    const past = st().modelPast.length
+    st().deleteSelection()
+    expect([...st().model.elements.keys()]).toEqual([])
+    expect([...st().model.nodes.keys()]).toEqual([1, 2])
+    expect(st().modelPast.length).toBe(past + 1)
+    expect(st().selectedElementIds).toEqual([])
+    st().modelUndo()
+    expect(st().model.elements.size).toBe(2)
+  })
+})

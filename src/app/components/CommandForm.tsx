@@ -21,6 +21,7 @@ import type { LoadAssignment, Model } from '@/app/types/model'
 import type { AnalysisCommand } from '@/app/types/analysisCommands'
 import { ANALYSIS_BLOCKS, blockAsSchema } from '@/app/lib/analysisBlocks'
 import { useHotkeyRegistry } from '@/app/lib/hotkeys'
+import { SelectionPanel } from '@/app/components/SelectionPanel'
 import { CircleHelp } from 'lucide-react'
 import { MaterialUsageField } from '@/app/components/MaterialUsageField'
 import { ShellModifiersField } from '@/app/components/ShellModifiersField'
@@ -264,6 +265,10 @@ export function CommandForm() {
   const model = useAppStore((s) => s.model)
   const analysisHistory = useAppStore((s) => s.analysisHistory)
   const selectedModelEntity = useAppStore((s) => s.selectedModelEntity)
+  const selectedNodeIds = useAppStore((s) => s.selectedNodeIds)
+  const selectedElementIds = useAppStore((s) => s.selectedElementIds)
+  const nodePickMode = useAppStore((s) => s.nodePickMode)
+  const clearSceneSelection = useAppStore((s) => s.clearSceneSelection)
   const setSelectedModelEntity = useAppStore((s) => s.setSelectedModelEntity)
   const selectedAnalysisIndex = useAppStore((s) => s.selectedAnalysisIndex)
   const setSelectedAnalysisIndex = useAppStore((s) => s.setSelectedAnalysisIndex)
@@ -310,6 +315,7 @@ export function CommandForm() {
         if (deleteDialogOpen) { setDeleteDialogOpen(false); setPendingModelDelete(null); setPendingAnalysisDeleteIndex(null); return }
         setSelectedModelEntity(null)
         setSelectedAnalysisIndex(null)
+        clearSceneSelection()
       },
     },
   ])
@@ -324,6 +330,9 @@ export function CommandForm() {
       </div>
     )
   }
+
+  // ── MODEL PANEL: several objects selected in the scene ────────────────────
+  if (isModelPanel && !selectedModelEntity && nodePickMode === 'none' && selectedNodeIds.length + selectedElementIds.length > 1) return <SelectionPanel />
 
   // ── MODEL PANEL: editing an existing entity ───────────────────────────────
   if (isModelPanel && selectedModelEntity) {

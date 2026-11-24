@@ -2,7 +2,7 @@ import type { LucideIcon } from 'lucide-react'
 import {
   Undo2, Redo2, SquareDashedMousePointer, SquareDashed, Grid3x3, Ruler, ZoomIn, ZoomOut, Maximize2, CircleDot, Minus, Anchor, ArrowDown, ArrowDownToLine, Hash, Tag, Tags,
   Grid2x2, Layers, Rows3, Box, LayoutGrid, Building2, Square, ChevronUp, ChevronDown, Ghost, CircleOff, Spline, MoveHorizontal, Activity, RotateCw, Waves, Palette,
-  BarChart3, ChartLine, Sigma, MousePointer2, PenLine, GripHorizontal, Columns2,
+  BarChart3, ChartLine, Sigma, Trash2, Layers3, MousePointer2, PenLine, GripHorizontal, Columns2,
 } from 'lucide-react'
 import { useAppStore, type AppStore } from '@/app/store/useAppStore'
 import { stepView, validViewMode } from '@/app/lib/editor/viewCamera'
@@ -71,6 +71,7 @@ export const COMMANDS = {
   undo: { id: 'undo', label: 'Undo', icon: Undo2, hotkey: ['mod+z'], enabled: (s) => (modelUndoable(s) ? s.modelPast.length > 0 : s.analysisHistory.cursor > -1), run: (s) => (modelUndoable(s) ? s.modelUndo() : s.analysisUndo()) },
   redo: { id: 'redo', label: 'Redo', icon: Redo2, hotkey: ['mod+y', 'mod+shift+z'], enabled: (s) => (modelUndoable(s) ? s.modelFuture.length > 0 : s.analysisHistory.cursor < s.analysisHistory.commands.length - 1), run: (s) => (modelUndoable(s) ? s.modelRedo() : s.analysisRedo()) },
   selectAll: { id: 'selectAll', label: 'Select all', icon: SquareDashedMousePointer, tip: 'Select every node and element', hotkey: ['mod+a'], enabled: (s) => hasModel(s) && s.nodePickMode === 'none', run: (s) => s.selectAll() },
+  deleteSelection: { id: 'deleteSelection', label: 'Delete', icon: Trash2, tip: 'Delete the selected nodes and elements', hotkey: ['delete'], enabled: (s) => s.activePanel === 'model' && s.activeTool === 'select' && s.nodePickMode === 'none' && s.selectedNodeIds.length + s.selectedElementIds.length > 0, run: (s) => s.deleteSelection() },
   clearSelection: { id: 'clearSelection', label: 'Clear', icon: SquareDashed, tip: 'Clear the selection', enabled: (s) => s.selectedNodeIds.length + s.selectedElementIds.length > 0, run: (s) => s.clearSceneSelection() },
   gridsLevels: { id: 'gridsLevels', label: 'Grids & levels', icon: Grid3x3, tip: 'Edit grid lines and story levels', run: (s) => s.setGridlinesDialogOpen(true) },
   units: { id: 'units', label: 'Units', icon: Ruler, tip: 'Model and display units', enabled: hasModel, run: (s) => s.setUnitsDialogOpen(true) },
@@ -79,6 +80,7 @@ export const COMMANDS = {
   toolFrame: tool('frame', 'Frame', PenLine, 'Draw members point to point; right-click or Esc ends the chain, Shift locks to an axis'),
   toolBeam: tool('quickBeam', 'Beams', GripHorizontal, 'Quick beams: click a grid bay (plan or elevation)', (s) => quickOk(s, 'quickBeam')),
   toolColumn: tool('quickColumn', 'Columns', Columns2, 'Quick columns: click a grid intersection (plan) or a bay (elevation)', (s) => quickOk(s, 'quickColumn')),
+  drawAllStories: { id: 'drawAllStories', label: 'All stories', icon: Layers3, tip: 'Draw on every story at once (plan views)', visible: only3d, isActive: (s) => s.drawAllStories, run: (s) => s.setDrawAllStories(!s.drawAllStories) },
   toolSupport: tool('support', 'Support', Anchor, 'Assign a support to the clicked node'),
   view3d: { id: 'view3d', label: '3D', icon: Box, tip: '3D view', isActive: (s) => currentView(s).kind === '3d', run: (s) => s.setViewMode({ kind: '3d' }) },
   viewPlan: {
@@ -137,9 +139,9 @@ export const RIBBON_TABS: RibbonTabDef[] = [
   { id: 'file', label: 'File', groups: [{ label: 'Project', custom: 'file' }] },
   { id: 'model', label: 'Model', groups: [
     { label: 'Edit', commands: ['undo', 'redo'] },
-    { label: 'Draw', commands: ['toolSelect', 'toolFrame', 'toolBeam', 'toolColumn', 'toolSupport'] },
+    { label: 'Draw', commands: ['toolSelect', 'toolFrame', 'toolBeam', 'toolColumn', 'toolSupport', 'drawAllStories'] },
     { label: 'View', commands: ['view3d', 'viewPlan', 'viewElevation'], custom: 'stories' },
-    { label: 'Select', commands: ['selectAll', 'clearSelection'] },
+    { label: 'Select', commands: ['selectAll', 'clearSelection', 'deleteSelection'] },
     { label: 'Define', commands: ['gridsLevels', 'units'] },
   ] },
   { id: 'view', label: 'View', groups: [

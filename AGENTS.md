@@ -115,7 +115,7 @@ pickable and results draw on the slice. A plan shows the story above as dashed g
 Drawing (`activeTool` in the store; `components/r3f/ToolLayer.tsx`, `components/DrawOptions.tsx`, `lib/editor/draw.ts`, `snap.ts`,
 `properties.ts`): tools emit ordinary `ModelWrite`s through `DrawBatch` (merges coincident nodes, reuses a `geomTransf` with a matching
 `vecxz`) and commit one undo step via `writeModelEntities`. Frame properties are derived from the elements (element type + args minus
-`transfTag`), never stored. While a tool is active, scene clicks don't change the selection.
+`transfTag`), never stored. While a tool is active, scene clicks don't change the selection. A selection of several objects shows `SelectionPanel` (reassign property, supports, delete) in place of the command form.
 
 Results live in IndexedDB (`lib/resultsStorage`), read per step for display (`useResultsSource`,
 `stepFrames`); 2D models render in the XY plane.

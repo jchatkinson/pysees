@@ -83,3 +83,25 @@ describe('snapping and bays', () => {
     expect(cols[0].stops).toEqual([0, 3, 6])
   })
 })
+
+describe('storyMap and reassign', async () => {
+  const { storyMap } = await import('./draw')
+  it('maps level points and column feet between stories of different heights', () => {
+    const lv = [{ id: 1, label: 'L1', height: 4 }, { id: 2, label: 'L2', height: 3 }, { id: 3, label: 'L3', height: 3 }]
+    const m = storyMap(lv, 1, 2) // drawn on L2 (z = 7), copied to L3 (z = 10)
+    expect(m([1, 2, 7])).toEqual([1, 2, 10])
+    expect(m([1, 2, 4])).toEqual([1, 2, 7]) // the foot of an L2 column goes to the foot of an L3 column
+    expect(storyMap(lv, 1, 0)([0, 0, 4])).toEqual([0, 0, 0])
+  })
+
+  it('reassigns a member, keeping its transform when the type still uses one', () => {
+    const b = new DrawBatch(model3d())
+    const id = b.member(elastic, [0, 0, 0], [6, 0, 0])!
+    const transf = b.model.elements.get(id)!.args.transfTag
+    b.reassign(id, { ...elastic, args: { ...elastic.args, A: 0.5 } })
+    expect(b.model.elements.get(id)!.args).toMatchObject({ A: 0.5, transfTag: transf })
+    b.reassign(id, { eleType: 'Truss', args: { A: 1, matTag: 1 } })
+    expect(b.model.elements.get(id)!.eleType).toBe('Truss')
+    expect(b.model.elements.get(id)!.args.transfTag).toBeUndefined()
+  })
+})

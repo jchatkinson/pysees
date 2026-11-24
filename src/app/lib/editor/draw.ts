@@ -3,6 +3,8 @@ import type { ModelWrite } from '@/app/lib/modelWrite'
 import { applyModelWrite } from '@/app/lib/modelWrite'
 import { isShell } from '@/app/lib/commands/tables'
 import type { DrawTemplate } from './properties'
+import type { LevelEntity } from '@/app/types/levels'
+import { levelElevations } from '@/app/lib/levels'
 
 export type P3 = [number, number, number]
 
@@ -80,6 +82,22 @@ export class DrawBatch {
     return id
   }
 
+  /** Give an existing two-node element a new property, with a transform for its direction when the new type needs one. */
+  reassign(elementId: number, template: DrawTemplate, transfType = 'Linear'): boolean {
+    const e = this.model.elements.get(elementId)
+    if (!e || e.nodes.length !== 2) return false
+    const a = this.model.nodes.get(e.nodes[0]), b = this.model.nodes.get(e.nodes[1])
+    if (!a || !b) return false
+    const args = { ...template.args }
+    if (needsTransform(template.eleType)) {
+      const old = Number(e.args.transfTag)
+      args.transfTag = this.model.geomTransfs.has(old) && this.model.geomTransfs.get(old)!.transfType === transfType ? old
+        : this.transform([b.coords[0] - a.coords[0], (b.coords[1] ?? 0) - (a.coords[1] ?? 0), (b.coords[2] ?? 0) - (a.coords[2] ?? 0)], transfType)
+    }
+    this.write({ kind: 'element', entity: { ...e, eleType: template.eleType, args } })
+    return true
+  }
+
   support(nodeId: number, dofs: number[]) { this.write({ kind: 'fix', entity: { nodeId, dofs } }) }
 }
 
@@ -104,3 +122,13 @@ export function supportDofs(preset: 'fixed' | 'pinned' | 'roller', ndm: 2 | 3, n
 }
 
 export const coordsOf = (n: NodeEntity): P3 => [n.coords[0] ?? 0, n.coords[1] ?? 0, n.coords[2] ?? 0]
+
+/**
+ * Map a point drawn on plan level `i` to level `j`: points at level i go to level j, points at the level below i (a column's foot) go to
+ * the level below j, anything else shifts by the difference between the two levels. Stories of different heights stay consistent.
+ */
+export function storyMap(levels: LevelEntity[], i: number, j: number): (p: P3) => P3 {
+  const z = [0, ...levelElevations(levels)] // z[k + 1] is level k; z[0] is the base
+  const top = z[i + 1], below = z[i], tol = 1e-9 * Math.max(1, Math.abs(top))
+  return ([x, y, zz]) => [x, y, Math.abs(zz - top) <= tol ? z[j + 1] : Math.abs(zz - below) <= tol ? z[j] : zz + z[j + 1] - top]
+}

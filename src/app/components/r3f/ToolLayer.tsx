@@ -5,7 +5,9 @@ import { Plane, Raycaster, Vector2, Vector3 } from 'three'
 import { useAppStore } from '@/app/store/useAppStore'
 import type { ElementEntity, NodeEntity } from '@/app/types/model'
 import { planElevation, gridSlab, type ViewMode } from '@/app/lib/editor/viewSlice'
-import { DrawBatch, supportDofs, transfTypeFor, type P3 } from '@/app/lib/editor/draw'
+import { DrawBatch, storyMap, supportDofs, transfTypeFor, type P3 } from '@/app/lib/editor/draw'
+import { useUnits } from '@/app/lib/units/useUnits'
+import { shouldIgnoreHotkeys } from '@/app/lib/hotkeys'
 import { templateKey, templateOf } from '@/app/lib/editor/properties'
 import { bayAt, bayLines, gridPoints, inGridSlab, pickSnap, snapPoints, workElevations, type Screen, type SnapPoint } from '@/app/lib/editor/snap'
 import { levelElevations } from '@/app/lib/levels'
@@ -14,6 +16,12 @@ import { ScreenSize } from './ScreenSize'
 const SNAP_PX = 12
 const PREVIEW = '#2563eb'
 const SNAP_COLOR: Record<SnapPoint['kind'], string> = { node: '#16a34a', grid: '#2563eb', mid: '#d97706' }
+
+/** Round a point on the work plane to `step`, only along global axes lying in the plane (a skewed elevation keeps its x/y). */
+function roundToIncrement(p: P3, normal: Vector3, step: number): P3 {
+  const n = [normal.x, normal.y, normal.z]
+  return p.map((v, i) => (Math.abs(n[i]) < 1e-9 && n.filter((c) => Math.abs(c) > 1e-9).length === 1 ? Math.round(v / step) * step : v)).map((v) => Number(v.toPrecision(12))) as P3
+}
 
 /** The plane a view draws on: the plan's level, the elevation grid's vertical plane, the XY plane in 2D, else ground (z = 0). */
 function workPlane(mode: ViewMode, ndm: 2 | 3, levels: ReturnType<typeof useAppStore.getState>['levels'], grids: ReturnType<typeof useAppStore.getState>['gridlines']): Plane {
@@ -43,17 +51,28 @@ export function ToolLayer({ mode, nodes, elements, ndm }: { mode: ViewMode; node
   const [hover, setHover] = useState<{ point: P3 | null; snap: SnapPoint | null; bay: [P3, P3] | null }>({ point: null, snap: null, bay: null })
   const [start, setStart] = useState<P3 | null>(null)
   const shift = useRef(false)
+  const last = useRef<P3 | null>(null)
+  const units = useUnits()
 
   const plane = useMemo(() => workPlane(mode, ndm, levels, grids), [mode, ndm, levels, grids])
   const snaps = useMemo(() => {
     const keep = (p: P3) => (mode.kind === 'elevation' && mode.gridId !== null ? inGridSlab(grids, mode.gridId, p, 1e-6) : true)
     return snapPoints(nodes, elements, gridPoints(grids, workElevations(mode, levels), ndm, keep))
   }, [nodes, elements, grids, levels, mode, ndm])
+  // Free (unsnapped) points land on a drawing increment: 1/100 of the model's order of magnitude (0.1 for a 10 m model).
+  const increment = useMemo(() => {
+    let extent = 0
+    for (const n of nodes.values()) for (const c of n.coords) extent = Math.max(extent, Math.abs(c))
+    for (const g of grids) for (const c of [...g.start, ...g.end]) extent = Math.max(extent, Math.abs(c))
+    return 10 ** (Math.floor(Math.log10(Math.max(extent, 1))) - 2)
+  }, [nodes, grids])
   const beamLines = useMemo(() => bayLines('beam', mode, grids, levels, ndm), [mode, grids, levels, ndm])
   const columnLines = useMemo(() => bayLines('column', mode, grids, levels, ndm), [mode, grids, levels, ndm])
 
   const [seenTool, setSeenTool] = useState(tool)
   if (seenTool !== tool) { setSeenTool(tool); setStart(null); setHover({ point: null, snap: null, bay: null }) }
+  // A typed length belongs to the chain it was typed for.
+  useEffect(() => { useAppStore.getState().setToolInput('') }, [start, tool])
 
   useEffect(() => {
     if (tool === 'select') return
@@ -68,7 +87,7 @@ export function ToolLayer({ mode, nodes, elements, ndm }: { mode: ViewMode; node
       const ray = new Raycaster()
       ray.setFromCamera(new Vector2((cursor.x / r.width) * 2 - 1, -(cursor.y / r.height) * 2 + 1), camera)
       const hit = ray.ray.intersectPlane(plane, new Vector3())
-      const onPlane: P3 | null = hit ? [hit.x, hit.y, hit.z] : null
+      const onPlane: P3 | null = hit ? roundToIncrement([hit.x, hit.y, hit.z], plane.normal, increment) : null
       const s = useAppStore.getState()
       if (tool === 'quickBeam' || (tool === 'quickColumn' && mode.kind !== 'plan')) {
         return { point: null, snap: null, bay: onPlane ? bayAt(tool === 'quickBeam' ? beamLines : columnLines, onPlane, project, cursor, SNAP_PX) : null }
@@ -90,10 +109,13 @@ export function ToolLayer({ mode, nodes, elements, ndm }: { mode: ViewMode; node
       }
       return { point, snap, bay: null }
     }
-    const commit = (fill: (b: DrawBatch) => void) => {
+    // With "all stories" in a plan, the same geometry is drawn on every story, mapped level to level.
+    const commit = (fill: (b: DrawBatch, at: (p: P3) => P3) => void, perStory = true) => {
       const s = useAppStore.getState()
       const b = new DrawBatch(s.model)
-      fill(b)
+      const all = perStory && s.drawAllStories && mode.kind === 'plan' && mode.level >= 0
+      const targets = all ? s.levels.map((_, j) => j) : [mode.kind === 'plan' ? mode.level : -1]
+      for (const j of targets) fill(b, mode.kind === 'plan' && mode.level >= 0 ? storyMap(s.levels, mode.level, j) : (p) => p)
       if (b.writes.length) s.writeModelEntities(b.writes)
     }
     const transfType = () => {
@@ -101,43 +123,65 @@ export function ToolLayer({ mode, nodes, elements, ndm }: { mode: ViewMode; node
       const key = template ? templateKey(template) : ''
       return transfTypeFor(s.model, [...s.model.elements.values()].filter((e) => templateKey(templateOf(e)) === key))
     }
-    const onMove = (e: PointerEvent) => { shift.current = e.shiftKey; setHover(read(e)) }
+    const onMove = (e: PointerEvent) => { shift.current = e.shiftKey; const h = read(e); last.current = h.point; setHover(h) }
     const onClick = (e: MouseEvent) => {
       if (e.button !== 0) return
       const h = read(e)
       if (tool === 'support') {
-        if (h.snap?.nodeId !== undefined) { const id = h.snap.nodeId; commit((b) => b.support(id, supportDofs(preset, ndm, useAppStore.getState().model.config?.ndf ?? 6))) }
+        if (h.snap?.nodeId !== undefined) { const id = h.snap.nodeId; commit((b) => b.support(id, supportDofs(preset, ndm, useAppStore.getState().model.config?.ndf ?? 6)), false) }
         return
       }
       if (!template) return
-      if (tool === 'quickBeam' || tool === 'quickColumn') { const bay = h.bay; if (bay) commit((b) => { b.member(template, bay[0], bay[1], transfType()) }); return }
+      if (tool === 'quickBeam' || tool === 'quickColumn') { const bay = h.bay; if (bay) commit((b, at) => { b.member(template, at(bay[0]), at(bay[1]), transfType()) }); return }
       if (!h.point) return
-      if (start) { const a = start, p = h.point; commit((b) => { b.member(template, a, p, transfType()) }) }
-      setStart(h.point)
+      place(h.point)
+    }
+    const place = (p: P3) => {
+      if (start && template) { const a = start; commit((b, at) => { b.member(template, at(a), at(p), transfType()) }) }
+      setStart(p)
     }
     const onContext = (e: MouseEvent) => { if (start) { e.preventDefault(); setStart(null) } }
+    // Typing after the first point of a chain enters a length (`6`, `6 ft`); Enter places the next point that far towards the cursor.
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Shift') shift.current = e.type === 'keydown'
-      if (e.type !== 'keydown' || (e.key !== 'Escape' && e.key !== 'Enter')) return
+      if (e.type !== 'keydown' || shouldIgnoreHotkeys(e.target)) return
+      const s = useAppStore.getState()
+      const typing = tool === 'frame' && start && !e.ctrlKey && !e.metaKey && !e.altKey
+      const consume = () => { e.preventDefault(); e.stopImmediatePropagation() }
+      if (typing && /^[0-9.,'"a-zA-Z ]$/.test(e.key) && (s.toolInput !== '' || /[0-9.]/.test(e.key))) { consume(); s.setToolInput(s.toolInput + e.key); return }
+      if (typing && e.key === 'Backspace' && s.toolInput) { consume(); s.setToolInput(s.toolInput.slice(0, -1)); return }
+      if (e.key === 'Enter' && typing && s.toolInput) {
+        consume()
+        const len = units.parse('length', s.toolInput)
+        s.setToolInput('')
+        const to = last.current
+        if (len === null || !start) return
+        const d = to ? [to[0] - start[0], to[1] - start[1], to[2] - start[2]] : [1, 0, 0]
+        const n = Math.hypot(d[0], d[1], d[2]) || 1
+        place([start[0] + (d[0] / n) * len, start[1] + (d[1] / n) * len, start[2] + (d[2] / n) * len])
+        return
+      }
+      if (e.key !== 'Escape' && e.key !== 'Enter') return
+      if (s.toolInput) { consume(); s.setToolInput(''); return }
       if (start) setStart(null)
-      else if (e.key === 'Escape') useAppStore.getState().setActiveTool('select')
+      else if (e.key === 'Escape') s.setActiveTool('select')
     }
     const onLeave = () => setHover({ point: null, snap: null, bay: null })
     el.addEventListener('pointermove', onMove)
     el.addEventListener('click', onClick)
     el.addEventListener('contextmenu', onContext)
     el.addEventListener('pointerleave', onLeave)
-    window.addEventListener('keydown', onKey)
+    window.addEventListener('keydown', onKey, true)
     window.addEventListener('keyup', onKey)
     return () => {
       el.removeEventListener('pointermove', onMove)
       el.removeEventListener('click', onClick)
       el.removeEventListener('contextmenu', onContext)
       el.removeEventListener('pointerleave', onLeave)
-      window.removeEventListener('keydown', onKey)
+      window.removeEventListener('keydown', onKey, true)
       window.removeEventListener('keyup', onKey)
     }
-  }, [tool, template, preset, camera, gl, size, plane, snaps, beamLines, columnLines, mode, ndm, start])
+  }, [tool, template, preset, camera, gl, size, plane, snaps, beamLines, columnLines, mode, ndm, start, units, increment])
 
   if (tool === 'select') return null
   const noRaycast = () => null

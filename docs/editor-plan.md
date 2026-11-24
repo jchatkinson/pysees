@@ -170,8 +170,10 @@ like any other.
    window/crossing on elements; `ribbonCommands.ts` + `Ribbon` shell with the existing View-menu toggles and zoom/fit moved in.
 2. **Views** (done except reactions; slices filter the model instead of using GPU clipping planes): ortho plan/elevation cameras, story/grid stepping, cutting planes with pick filtering, ghosting. Results ribbon tab
    (Show / Case / Labels) over the existing `resultsView`, plus reactions display.
-3. **Drawing** (in progress: done are the tool framework, snapping, node merging, derived properties, frame / quick beams / quick columns / supports; still to do are the multi-selection properties pane, one/similar/all stories, typed lengths): tool framework, snapping, node merging, derived frame properties, draw frame / quick beams / quick columns /
-   braces / supports; properties pane for multi-selection; one/similar/all stories.
+3. **Drawing** (done): tool framework, snapping (node → grid → midpoint, free points on a drawing increment), node merging, derived
+   properties, frame / quick beams / quick columns / supports, typed lengths, all-stories drawing in plans, and the multi-selection pane
+   (by property, reassign property, supports, delete). "Similar stories" needs a per-level similarity flag and is deferred; window-drag
+   for quick beams/columns is not done.
 4. **Extruded view**: instanced section sweeps for beams/columns/trusses, shell thickness, fiber detail in properties pane.
 5. **Edit & assign**: move/copy/replicate/mirror/divide/merge, assign loads/supports/diaphragms, shell drawing + meshing, select-by lists.
 6. **Stud walls as elements** (section 5).
