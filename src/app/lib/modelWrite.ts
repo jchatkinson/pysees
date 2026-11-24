@@ -59,46 +59,66 @@ export function entityExists(model: Model, write: ModelWrite): boolean {
   return (mapFor(model, write.kind) as Map<number, unknown>).has(keyFor(write))
 }
 
-/** Applies a ModelWrite immutably, returning a new Model. Structural-shares unrelated maps. */
-export function applyModelWrite(model: Model, write: ModelWrite): Model {
-  if (write.kind === 'building') return { ...model, building: write.entity }
-  if (write.kind === 'sectionChild') {
-    const existing = model.sections.get(write.sectionId)
-    if (!existing) return model
-    const children = [...existing.children]
-    if (write.childIndex !== undefined) children[write.childIndex] = write.child
-    else children.push(write.child)
-    const sections = new Map(model.sections)
-    sections.set(write.sectionId, { ...existing, children })
-    return { ...model, sections }
+/**
+ * Applies writes to a model without touching it: each map (and pattern or section) a write changes is copied the first time, then
+ * changed in place, so a long run of writes costs one copy per map instead of one per write. `model` is the result so far and later
+ * writes keep changing it; take it once you are done.
+ */
+export class ModelDraft {
+  model: Model
+  private owned = new Set<unknown>()
+  constructor(model: Model) { this.model = { ...model, nextIds: { ...model.nextIds } } }
+
+  private own<K extends keyof Model>(key: K): Model[K] {
+    const v = this.model[key]
+    if (this.owned.has(v)) return v
+    const copy = new Map(v as Map<unknown, unknown>) as Model[K]
+    this.owned.add(copy)
+    this.model[key] = copy
+    return copy
   }
-  if (write.kind === 'patternChild') {
-    const existing = model.patterns.get(write.patternId)
-    if (!existing) return model
-    const children = [...existing.children]
-    if (write.childIndex !== undefined) children[write.childIndex] = write.child
-    else children.push(write.child)
-    const patterns = new Map(model.patterns)
-    patterns.set(write.patternId, { ...existing, children })
-    return { ...model, patterns }
+
+  /** The parent's own copy (children included), or undefined when it does not exist. */
+  private parent<E extends { children: unknown[] }>(key: 'sections' | 'patterns', id: number): E | undefined {
+    const existing = this.model[key].get(id) as E | undefined
+    if (!existing || this.owned.has(existing)) return existing
+    const copy = { ...existing, children: [...existing.children] }
+    this.owned.add(copy);
+    (this.own(key) as Map<number, unknown>).set(id, copy)
+    return copy
   }
-  const map = mapFor(model, write.kind)
-  const next = new Map(map as Map<number, unknown>)
-  let entity: unknown = write.entity
-  if (write.kind === 'pattern') {
-    // Re-saving a pattern from its form rebuilds the entity without its loads or alias; carry them over.
-    const prev = model.patterns.get(write.entity.id)
-    if (prev) entity = { ...write.entity, children: write.entity.children.length ? write.entity.children : prev.children }
+
+  apply(write: ModelWrite): this {
+    if (write.kind === 'building') { this.model.building = write.entity; return this }
+    if (write.kind === 'sectionChild' || write.kind === 'patternChild') {
+      const parent = this.parent<{ children: unknown[] }>(write.kind === 'sectionChild' ? 'sections' : 'patterns', write.kind === 'sectionChild' ? write.sectionId : write.patternId)
+      if (parent) { if (write.childIndex !== undefined) parent.children[write.childIndex] = write.child; else parent.children.push(write.child) }
+      return this
+    }
+    let entity: unknown = write.entity
+    if (write.kind === 'pattern') {
+      // Re-saving a pattern from its form rebuilds the entity without its loads or alias; carry them over.
+      const prev = this.model.patterns.get(write.entity.id)
+      if (prev) entity = { ...write.entity, children: write.entity.children.length ? write.entity.children : prev.children }
+    }
+    const id = keyFor(write);
+    (this.own(mapKeyFor(write.kind)) as Map<number, unknown>).set(id, entity)
+    const idKind = write.kind as ModelEntityKind
+    if (idKind in this.model.nextIds && id >= this.model.nextIds[idKind]) this.model.nextIds[idKind] = id + 1
+    return this
   }
-  next.set(keyFor(write), entity)
-  const nextIds = { ...model.nextIds }
-  const idKind = write.kind as ModelEntityKind
-  if (idKind in nextIds) {
-    const id = keyFor(write)
-    if (id >= nextIds[idKind]) nextIds[idKind] = id + 1
-  }
-  return { ...model, [mapKeyFor(write.kind)]: next, nextIds }
 }
+
+/** Applies writes immutably, returning a new Model. Structural-shares unrelated maps. */
+export function applyModelWrites(model: Model, writes: readonly ModelWrite[]): Model {
+  if (!writes.length) return model
+  const draft = new ModelDraft(model)
+  for (const w of writes) draft.apply(w)
+  return draft.model
+}
+
+/** Applies a ModelWrite immutably, returning a new Model. Structural-shares unrelated maps. */
+export const applyModelWrite = (model: Model, write: ModelWrite): Model => applyModelWrites(model, [write])
 
 function mapKeyFor(kind: ModelDeletableKind): keyof Model {
   switch (kind) {

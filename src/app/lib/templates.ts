@@ -438,3 +438,59 @@ export function plateTemplate({ nx, ny, lx, ly, h }: PlateParams): TemplateResul
 }
 
 export { precastWallTemplate, PRECAST_WALL_DEFAULTS, type PrecastWallParams } from '@/app/lib/precastWall'
+
+// ---------------------------------------------------------------------------
+// Tower
+// ndm=3, ndf=6: a concrete flat-slab tower. Columns at every grid intersection, drop beams on every gridline and a ShellMITC4 slab meshed
+// `mesh`×`mesh` per bay at every level. Beams are split at the slab mesh so they share its nodes. Sized to stress the app and Carapace.
+// ---------------------------------------------------------------------------
+export interface TowerParams { stories: number; storyH: number; baysX: number; bayX: number; baysY: number; bayY: number; mesh: number }
+
+const TOWER_COLUMN = { A: 0.36, E: 30e9, G: 12.5e9, J: 1.8e-2, Iy: 1.08e-2, Iz: 1.08e-2 } // 600×600
+const TOWER_BEAM = { A: 0.28, E: 30e9, G: 12.5e9, J: 7.5e-3, Iy: 3.7e-3, Iz: 1.14e-2 } // 400 wide × 700 deep, strong axis vertical
+const TOWER_SDL = -3.5e3 // superimposed dead + partitions, Pa
+
+export function towerTemplate({ stories, storyH, baysX, bayX, baysY, bayY, mesh }: TowerParams): TemplateResult {
+  const writes: ModelWrite[] = []
+  const nx = baysX * mesh, ny = baysY * mesh
+  const perLevel = (nx + 1) * (ny + 1)
+  const nodeId = (i: number, k: number, j: number) => j * perLevel + k * (nx + 1) + i + 1 // mesh indices; level 0 holds only column bases
+  const onGrid = (i: number, k: number) => i % mesh === 0 && k % mesh === 0
+  for (let j = 0; j <= stories; j++) for (let k = 0; k <= ny; k++) for (let i = 0; i <= nx; i++) {
+    if (j === 0 && !onGrid(i, k)) continue
+    writes.push({ kind: 'node', entity: { id: nodeId(i, k, j), coords: [(i * bayX) / mesh, (k * bayY) / mesh, j * storyH] } })
+  }
+  for (let k = 0; k <= ny; k += mesh) for (let i = 0; i <= nx; i += mesh) writes.push({ kind: 'fix', entity: { nodeId: nodeId(i, k, 0), dofs: [1, 2, 3, 4, 5, 6] } })
+  writes.push(
+    { kind: 'geomTransf', entity: { id: 1, transfType: 'Linear', args: { type: 'Linear', transfTag: 1, vecxz: [1, 0, 0] } } },
+    { kind: 'geomTransf', entity: { id: 2, transfType: 'Linear', args: { type: 'Linear', transfTag: 2, vecxz: [0, 0, 1] } } },
+    { kind: 'section', entity: { id: 1, secType: 'ElasticMembranePlateSection', args: { type: 'ElasticMembranePlateSection', secTag: 1, eMod: PLATE_E, nu: PLATE_NU, h: 0.2, rho: PLATE_DENSITY }, children: [] } },
+  )
+  let eleId = 1
+  for (let k = 0; k <= ny; k += mesh) for (let i = 0; i <= nx; i += mesh) for (let j = 0; j < stories; j++) {
+    writes.push({ kind: 'element', entity: { id: eleId++, eleType: 'ElasticBeamColumn', nodes: [nodeId(i, k, j), nodeId(i, k, j + 1)], args: { ...TOWER_COLUMN, transfTag: 1 } } })
+  }
+  for (let j = 1; j <= stories; j++) {
+    for (let k = 0; k <= ny; k += mesh) for (let i = 0; i < nx; i++) writes.push({ kind: 'element', entity: { id: eleId++, eleType: 'ElasticBeamColumn', nodes: [nodeId(i, k, j), nodeId(i + 1, k, j)], args: { ...TOWER_BEAM, transfTag: 2 } } })
+    for (let i = 0; i <= nx; i += mesh) for (let k = 0; k < ny; k++) writes.push({ kind: 'element', entity: { id: eleId++, eleType: 'ElasticBeamColumn', nodes: [nodeId(i, k, j), nodeId(i, k + 1, j)], args: { ...TOWER_BEAM, transfTag: 2 } } })
+  }
+  const shellTags: number[] = []
+  for (let j = 1; j <= stories; j++) for (let k = 0; k < ny; k++) for (let i = 0; i < nx; i++) {
+    shellTags.push(eleId)
+    writes.push({ kind: 'element', entity: { id: eleId++, eleType: 'ShellMITC4', nodes: [nodeId(i, k, j), nodeId(i + 1, k, j), nodeId(i + 1, k + 1, j), nodeId(i, k + 1, j)], args: { secTag: 1 } } })
+  }
+  const pattern = (id: number, name: string, children: LoadAssignment[]): ModelWrite =>
+    ({ kind: 'pattern', entity: { id, name, patternType: 'Plain', args: { type: 'Plain', patternTag: id, tsTag: 1, fact: 1 }, children } })
+  writes.push(
+    { kind: 'timeSeries', entity: { id: 1, tsType: 'Linear', args: { type: 'Linear', tag: 1, factor: 1 } } },
+    pattern(1, 'Dead', [{ kind: 'eleLoad', args: { eleTags: shellTags, loadType: 'Shell self-weight', bx: 0, by: 0, bz: -GRAVITY } }, { kind: 'eleLoad', args: { eleTags: shellTags, loadType: 'Shell pressure', pressure: TOWER_SDL } }]),
+  )
+  const levels: LevelEntity[] = [{ id: 1, label: 'A', height: 0 }]
+  for (let j = 1; j <= stories; j++) levels.push({ id: j + 1, label: alphaLabel(j), height: storyH })
+  const analysisCommands: AnalysisCommand[] = [
+    { type: 'ANALYSIS_BLOCK', blockId: 'whole-model-recorder', params: { directory: 'out' } },
+    { type: 'ANALYSIS_BLOCK', blockId: 'run-eigen-analysis', params: { modes: 6 } },
+    { type: 'ANALYSIS_BLOCK', blockId: 'run-gravity-analysis', params: { patterns: [1], steps: 2 } },
+  ]
+  return { ndm: 3, ndf: 6, writes, analysisCommands, levels }
+}

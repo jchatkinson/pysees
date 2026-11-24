@@ -1,6 +1,6 @@
 import type { ElementEntity, Model, NodeEntity } from '@/app/types/model'
 import type { ModelWrite } from '@/app/lib/modelWrite'
-import { applyModelWrite } from '@/app/lib/modelWrite'
+import { ModelDraft } from '@/app/lib/modelWrite'
 import { isShell } from '@/app/lib/commands/tables'
 import type { DrawTemplate } from './properties'
 import type { LevelEntity } from '@/app/types/levels'
@@ -23,9 +23,10 @@ export class DrawBatch {
   model: Model
   readonly writes: ModelWrite[] = []
   private readonly tol: number
-  constructor(model: Model) { this.model = model; this.tol = mergeTolerance(model) }
+  private readonly draft: ModelDraft
+  constructor(model: Model) { this.model = model; this.draft = new ModelDraft(model); this.tol = mergeTolerance(model) }
 
-  private write(w: ModelWrite) { this.writes.push(w); this.model = applyModelWrite(this.model, w) }
+  private write(w: ModelWrite) { this.writes.push(w); this.model = this.draft.apply(w).model }
 
   /** The node at `p` (within tolerance), or a new one. Coordinates are trimmed to the model's dimension. */
   node(p: P3): number {

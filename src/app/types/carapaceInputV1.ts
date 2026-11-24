@@ -105,7 +105,7 @@ export type StageSpec =
   | { kind: 'modal'; id: string; modes: number }
   | { kind: 'reset'; id: string }
   | { kind: 'transient'; id: string; steps: number; dt: number; damping: { alphaM: number; betaK: number; modalAnchors?: ModalDampingAnchors }; groundMotions: { direction: number; series: TimeSeriesSpec; scaleFactor: number }[]; algorithm: AlgorithmSpec; convergence?: ConvergenceSpec }
-/** Scalar recorder channels stored by the browser results worker. Acceleration and velocity are relative to the ground. */
+/** Recorder channels stored by the browser results worker. Acceleration and velocity are relative to the ground. */
 export type RecorderSpecWire =
   | { response: 'buildingWallPier'; storey: number; wall: string; pier: number; quantity: StudWallQuantity }
   /** A named wall's total base reaction in its local axes: shear, axial (up positive: the gravity takedown is positive) and moment about the wall centre. */
@@ -120,6 +120,10 @@ export type RecorderSpecWire =
   | { response: 'elementLoad'; elementKind: ElementKind; elementIndex: number; component: number }
   /** One shell resultant (`component` 0..8: Nx Ny Nxy Mx My Mxy Qx Qy, OpenSees' order and sign) at Gauss point `point` (0..4). */
   | { response: 'gaussPoint'; elementKind: ElementKind; elementIndex: number; point: number; quantity: 'stress' | 'strain'; component: number }
+  /** A whole node or element table (or the `rows` of it, in that order) per step, as one flat Float64Array: row, then Gauss point, then component. */
+  | { response: 'bulk'; table: 'nodes' | 'elements'; quantity: BulkQuantity; elementKind?: ElementKind; rows?: number[] }
+/** `nodes`: displacement, reaction, velocity, acceleration (ndf each). `elements`: endForce (the elementForce components), load (wx, wy(, wz)), stress / strain (shell resultants per Gauss point). */
+export type BulkQuantity = 'displacement' | 'reaction' | 'velocity' | 'acceleration' | 'endForce' | 'load' | 'stress' | 'strain'
 export interface SequenceSpec { stages: StageSpec[]; recorders: RecorderSpecWire[] }
 
 export interface BuildingSpec { storeys: StoreySpec[]; foundationAnchorage: AnchorageSpec; diaphragm: DiaphragmKind; combination?: [number, number, number, number, number, number, number, number] }

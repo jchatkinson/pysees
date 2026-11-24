@@ -1,4 +1,4 @@
-import { recorderRows, type RecorderBatch } from '@/app/lib/resultsStorage/recorderRows'
+import { recorderRows, type RecorderOutput, type RowLayout } from '@/app/lib/resultsStorage/recorderRows'
 import type { CarapaceInputV1 } from '@/app/types/carapaceInputV1'
 import type { CarapaceRunResult } from '@/app/types/carapaceRun'
 import type { ModalStageResult, ResultBlock, StorageReply, StorageRequest } from '@/app/types/resultsStorage'
@@ -8,12 +8,10 @@ import type { ModalStageResult, ResultBlock, StorageReply, StorageRequest } from
  * is this run's dedicated side of a `MessageChannel` to the results-storage worker (see
  * carapace/docs/results-storage-indexeddb.md's "Use a MessageChannel between the two workers") —
  * the main thread creates the channel, keeps the other port for its own beginRun/finishRun calls,
- * and transfers this one when starting the run. Every wire recorder in `input.sequence.recorders`
- * is one scalar column of the dense results-storage row, in wire order (compileInputV1 lays out
- * displacements, then reactions, then element forces), so the recorder count is all this worker
- * needs to build the rows — see resultsStorage.ts's header comment. */
+ * and transfers this one when starting the run. `layout` (compileInputV1's `rowLayout`) says which
+ * columns of the dense results-storage row each wire recorder's values fill. */
 type InMsg =
-  | { type: 'run'; runId: string; input: CarapaceInputV1; storagePort?: MessagePort }
+  | { type: 'run'; runId: string; input: CarapaceInputV1; layout: RowLayout; storagePort?: MessagePort }
   | { type: 'cancel'; runId: string }
 
 type OutMsg =
@@ -55,19 +53,13 @@ function yieldToEventLoop() {
 
 const cancelledRuns = new Set<string>()
 
-// Matches `carapace_wasm`'s `StepOutcome`/`RecorderBatch` (wasm-bridge/src/input_v1/session.rs),
-// serialized camelCase via serde-wasm-bindgen. `advance()` returns `any` at the TS boundary since
-// it crosses as a `JsValue`; this is the shape we know it actually has. `recorderBatches` is
-// indexed by `recorderIndex`; a stage emits only the responses it supports. Recorder
-// sample counters are independent and do not represent the stored run-wide timeline.
-type WasmRecorderBatch = RecorderBatch
-interface WasmStepOutcome {
+// The part of `carapace_wasm`'s `StepOutcome` this worker reads. `advance()` returns `any` at the TS boundary.
+interface WasmStepOutcome extends RecorderOutput {
   done: boolean
   stageComplete: boolean
   stepsTaken: number
   loadFactor: number
   error: CarapaceRunResult['error']
-  recorderBatches: WasmRecorderBatch[]
 }
 
 /** Buffers `advance()` calls into dense, run-wide chunks — one row per step, every recorded
@@ -82,7 +74,8 @@ interface WasmStepOutcome {
  * matching "storage failure is distinct from solver failure ... never mark such a run complete". */
 export class StorageStream {
   private readonly stride: number
-  private pendingRows: number[][] = []
+  private pending: Float64Array[] = []
+  private pendingCount = 0
   private pendingFirstSample = 0
   private pendingStageIndex = 0
   private blockIndexCounter = 0
@@ -94,11 +87,12 @@ export class StorageStream {
   private port: MessagePort
   private runId: string
   private nextSample = 0
-  private recorders: CarapaceInputV1['sequence']['recorders']
+  private layout: RowLayout
+  private stages: CarapaceInputV1['sequence']['stages']
 
-  constructor(port: MessagePort, runId: string, recorders: CarapaceInputV1['sequence']['recorders']) {
-    this.port = port; this.runId = runId; this.recorders = recorders
-    this.stride = 1 + recorders.length
+  constructor(port: MessagePort, runId: string, layout: RowLayout, stages: CarapaceInputV1['sequence']['stages']) {
+    this.port = port; this.runId = runId; this.layout = layout; this.stages = stages
+    this.stride = 1 + layout.width
     port.onmessage = (e: MessageEvent<StorageReply>) => this.onReply(e.data)
   }
 
@@ -109,24 +103,19 @@ export class StorageStream {
     if (entry) { this.inFlightBytes -= entry.bytes; entry.resolve() }
   }
 
-  private pendingBytes(): number {
-    return this.pendingRows.length * this.stride * 8
-  }
-
-  /** Accept partial recorder batches (e.g. static stages omit velocity/acceleration),
-   * keeping a contiguous timeline across stages and indexing columns by recorderIndex. */
-  async add(batches: WasmRecorderBatch[], kind: CarapaceInputV1['sequence']['stages'][number]['kind']): Promise<void> {
-    const rows = recorderRows(batches, this.recorders, kind)
-    if (!rows.length) return
-    const stageIndex = batches[0].stageIndex
-    if (this.pendingRows.length > 0 && stageIndex !== this.pendingStageIndex) await this.flush()
-    if (this.pendingRows.length === 0) {
+  /** Adds one `advance()` call's steps, keeping a contiguous timeline across stages. */
+  async add(out: RecorderOutput): Promise<void> {
+    const rows = recorderRows(out, this.layout, this.stages)
+    if (!rows?.count) return
+    if (this.pendingCount > 0 && rows.stageIndex !== this.pendingStageIndex) await this.flush()
+    if (this.pendingCount === 0) {
       this.pendingFirstSample = this.nextSample
-      this.pendingStageIndex = stageIndex
+      this.pendingStageIndex = rows.stageIndex
     }
-    this.pendingRows.push(...rows)
-    this.nextSample += rows.length
-    if (this.pendingBytes() >= FLUSH_BYTE_TARGET) await this.flush()
+    this.pending.push(rows.data)
+    this.pendingCount += rows.count
+    this.nextSample += rows.count
+    if (this.pendingCount * this.stride * 8 >= FLUSH_BYTE_TARGET) await this.flush()
   }
 
   /** Persists finished modal stages (not part of the step timeline). Waits for the ack. */
@@ -141,17 +130,22 @@ export class StorageStream {
   }
 
   async flush(): Promise<void> {
-    if (this.pendingRows.length === 0) return
+    if (this.pendingCount === 0) return
     if (this.failure) throw new Error(this.failure)
 
-    const rows = this.pendingRows
+    const chunks = this.pending, sampleCount = this.pendingCount
     const firstSample = this.pendingFirstSample
     const stageIndex = this.pendingStageIndex
-    this.pendingRows = []
+    this.pending = []
+    this.pendingCount = 0
 
-    const data = new Float64Array(rows.length * this.stride)
-    rows.forEach((row, i) => data.set(row, i * this.stride))
-    const block: ResultBlock = { blockIndex: this.blockIndexCounter++, firstSample, sampleCount: rows.length, stageIndex, data: data.buffer }
+    let data = chunks[0]
+    if (chunks.length > 1) {
+      data = new Float64Array(sampleCount * this.stride)
+      let at = 0
+      for (const c of chunks) { data.set(c, at); at += c.length }
+    }
+    const block: ResultBlock = { blockIndex: this.blockIndexCounter++, firstSample, sampleCount, stageIndex, data: data.buffer as ArrayBuffer }
     const bytes = data.buffer.byteLength
 
     const requestId = `storage-${this.runId}-${this.requestCounter++}`
@@ -165,10 +159,10 @@ export class StorageStream {
   }
 }
 
-async function runOne(runId: string, input: CarapaceInputV1, storagePort?: MessagePort) {
+async function runOne(runId: string, input: CarapaceInputV1, layout: RowLayout, storagePort?: MessagePort) {
   const { decodeInput } = await loadWasm()
   const session = decodeInput(input)
-  const storageStream = storagePort ? new StorageStream(storagePort, runId, input.sequence.recorders) : null
+  const storageStream = storagePort ? new StorageStream(storagePort, runId, layout, input.sequence.stages) : null
 
   const stagesRun: string[] = []
   let error: CarapaceRunResult['error'] = null
@@ -201,8 +195,7 @@ async function runOne(runId: string, input: CarapaceInputV1, storagePort?: Messa
 
     if (storageStream) {
       try {
-        const index = outcome.recorderBatches[0]?.stageIndex
-        if (index !== undefined) await storageStream.add(outcome.recorderBatches, input.sequence.stages[index].kind)
+        await storageStream.add(outcome)
       } catch (storageError) {
         error = { kind: 'storageFailed', detail: String(storageError) }
         break
@@ -229,7 +222,7 @@ ctx.onmessage = (e) => {
   const msg = e.data
   if (msg.type === 'run') {
     ctx.postMessage({ type: 'accepted', runId: msg.runId })
-    runOne(msg.runId, msg.input, msg.storagePort).catch((error) => ctx.postMessage({ type: 'error', runId: msg.runId, error: String(error) }))
+    runOne(msg.runId, msg.input, msg.layout, msg.storagePort).catch((error) => ctx.postMessage({ type: 'error', runId: msg.runId, error: String(error) }))
   } else if (msg.type === 'cancel') {
     cancelledRuns.add(msg.runId)
   }

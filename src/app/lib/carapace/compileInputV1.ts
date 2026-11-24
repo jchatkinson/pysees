@@ -10,6 +10,7 @@ import { pathSeries } from '@/app/lib/groundMotion'
 import { eleLoadKind } from '@/app/lib/shells'
 import { isShell } from '@/app/lib/commands/tables'
 import { buildingRecorders } from '@/app/lib/studBuilding'
+import { rowLayout, type RowLayout } from '@/app/lib/resultsStorage/recorderRows'
 
 export interface CompileInputV1Result {
   input: W.CarapaceInputV1 | null
@@ -19,12 +20,14 @@ export interface CompileInputV1Result {
   recordedNodeTags: number[]
   /** The model's ndf — every recorded node's fixed component width in that dense layout. */
   dofsPerNode: number
-  /** Every stored recorder, in wire-recorder (= results-column) order: node displacements first,
-   * then support reactions, then element forces. Each one owns `componentLayout.length`
-   * consecutive columns starting at `columnOffset` (after the leading pseudo-time column). */
+  /** Every stored target, in column order: node displacements first, then support reactions, element forces, velocities,
+   * accelerations and shell resultants. Each one owns `componentLayout.length` consecutive columns starting at `columnOffset`
+   * (after the leading pseudo-time column). */
   recorderPlans: RecorderPlan[]
   /** Every model node tag in node-table order (ascending) — the node order of a modal stage's mode shapes. */
   nodeTags: number[]
+  /** Where each wire recorder's values land in the stored row (see `RowLayout`). */
+  rowLayout: RowLayout
 }
 
 export type RecorderPlanKind = 'disp' | 'vel' | 'accel' | 'reaction' | 'force' | 'shell' | 'building'
@@ -83,7 +86,7 @@ export function compileInputV1(model: Model, analysisHistory: AnalysisHistory): 
   const diagnostics: CompileDiagnostic[] = []
   const fail = (message: string): CompileInputV1Result => {
     diagnostics.push({ severity: 'error', message, commandIndex: -1 })
-    return { input: null, diagnostics, recordedNodeTags: [], dofsPerNode: 0, recorderPlans: [], nodeTags: [] }
+    return { input: null, diagnostics, recordedNodeTags: [], dofsPerNode: 0, recorderPlans: [], nodeTags: [], rowLayout: rowLayout(0, []) }
   }
 
   if (!model.config) return fail('Model is not initialized.')
@@ -103,7 +106,7 @@ export function compileInputV1(model: Model, analysisHistory: AnalysisHistory): 
       building: model.building.spec,
       sequence: { stages: [{ kind: 'static', id: 'building', steps: model.building.steps, integrator: { kind: 'loadControl', increment: 1 / model.building.steps }, algorithm: { kind: 'newton', tangent: 'current' }, convergence: { kind: 'normDispIncr', tol: 1e-7, maxIter: 100 }, holdPatternsAfter: [] }], recorders },
     }
-    return { input, diagnostics, recordedNodeTags: [], dofsPerNode: 0, recorderPlans, nodeTags: [] }
+    return { input, diagnostics, recordedNodeTags: [], dofsPerNode: 0, recorderPlans, nodeTags: [], rowLayout: rowLayout(recorders.length, recorders.map((_, i) => [i])) }
   }
   try { model = withLumpedBeamMass(model) } catch (e) { return fail(e instanceof Error ? e.message : String(e)) }
   const { ndm, ndf } = model.config!
@@ -510,61 +513,59 @@ export function compileInputV1(model: Model, analysisHistory: AnalysisHistory): 
       diagnostics.push({ severity: 'warning', message: `Recorder "${rec.id}" (${rec.targetKind}/${rec.responseKind}) is not yet supported by Carapace — only node displacement/reaction and element force recorders are — and was skipped`, commandIndex: -1 })
     }
   }
+  // One bulk recorder per node quantity and per element table (Carapace returns each as a flat Float64Array per step); `columns`
+  // scatters its values into the stored row, where every plan's columns stay contiguous. The stored layout is what an OpenSees
+  // recorder file holds: one row per step, a column group per node or element.
   const recorders: W.RecorderSpecWire[] = []
   const recorderPlans: RecorderPlan[] = []
+  const columns: number[][] = []
+  let width = 0
   const plan = (kind: RecorderPlanKind, targetTag: number, componentLayout: string[]) => {
-    recorderPlans.push({ recorderId: recorderIdFor(kind, targetTag), kind, targetTag, columnOffset: recorders.length, componentLayout })
+    recorderPlans.push({ recorderId: recorderIdFor(kind, targetTag), kind, targetTag, columnOffset: width, componentLayout })
+    width += componentLayout.length
+    return width - componentLayout.length
   }
-  for (const tag of recordedNodeTags) {
-    plan('disp', tag, dispLabels)
-    const node = resolveNode(tag, `Recorder for node ${tag}`)
-    for (let dof = 0; dof < dofsPerNode; dof++) recorders.push({ response: 'nodeDisp', node, dof })
+  /** A bulk recorder over `rows` whose row `k` fills `perRow` columns from `at[k]`. */
+  const bulk = (spec: Omit<Extract<W.RecorderSpecWire, { response: 'bulk' }>, 'response'>, at: number[], perRow: number) => {
+    if (!at.length) return
+    recorders.push({ response: 'bulk', ...spec })
+    columns.push(at.flatMap((c) => Array.from({ length: perRow }, (_, j) => c + j)))
   }
-  for (const tag of recordedReactionTags) {
-    // Only supported nodes (an sp/fix constraint) carry a reaction; elsewhere it is just a free DOF's residual.
-    if (!model.fixes.get(tag)?.dofs.length) continue
-    plan('reaction', tag, reactionLabels)
-    const node = resolveNode(tag, `Reaction recorder for node ${tag}`)
-    for (let dof = 0; dof < dofsPerNode; dof++) recorders.push({ response: 'reaction', node, dof })
-  }
-  for (const tag of recordedElementTags) {
-    const ref = elementRefs.get(tag)
-    // An element the compiler skipped already produced its own "not yet supported" warning.
-    if (!ref) continue
-    // A loaded element also records the load it carries, in the same column group, right after its end forces.
-    const loaded = loadedElementTags.has(tag) && ref.kind !== 'shell3' && ref.kind !== 'shell4'
-    const labels = forceLabels(ref.kind)
-    plan('force', tag, loaded ? [...labels, ...loadLabels] : labels)
-    for (let component = 0; component < labels.length; component++) {
-      recorders.push({ response: 'elementForce', elementKind: ref.kind, elementIndex: ref.index, component })
-    }
-    if (loaded) {
-      for (let component = 0; component < loadLabels.length; component++) {
-        recorders.push({ response: 'elementLoad', elementKind: ref.kind, elementIndex: ref.index, component })
-      }
-    }
+  const nodeBulk = (quantity: W.BulkQuantity, kind: RecorderPlanKind, tags: number[], labels: string[]) =>
+    bulk({ table: 'nodes', quantity, rows: tags.map((tag) => resolveNode(tag, `${kind} recorder for node ${tag}`)) }, tags.map((tag) => plan(kind, tag, labels)), dofsPerNode)
+  nodeBulk('displacement', 'disp', recordedNodeTags, dispLabels)
+  // Only supported nodes (an sp/fix constraint) carry a reaction; elsewhere it is just a free DOF's residual.
+  nodeBulk('reaction', 'reaction', recordedReactionTags.filter((tag) => model.fixes.get(tag)?.dofs.length), reactionLabels)
+  // Per element table: rows and first columns of the end forces, of the loads (loaded frame elements, right after their end forces) and of shell resultants.
+  const groups = new Map<W.ElementKind, Record<'force' | 'load' | 'shell', { rows: number[]; at: number[] }>>()
+  const group = (kind: W.ElementKind) => groups.get(kind) ?? groups.set(kind, { force: { rows: [], at: [] }, load: { rows: [], at: [] }, shell: { rows: [], at: [] } }).get(kind)!
+  // An element the compiler skipped already produced its own "not yet supported" warning.
+  const recordedRefs = recordedElementTags.flatMap((tag) => { const ref = elementRefs.get(tag); return ref ? [{ tag, ...ref }] : [] })
+  for (const { tag, kind, index } of recordedRefs) {
+    const loaded = loadedElementTags.has(tag) && kind !== 'shell3' && kind !== 'shell4'
+    const labels = forceLabels(kind)
+    const at = plan('force', tag, loaded ? [...labels, ...loadLabels] : labels)
+    const g = group(kind)
+    g.force.rows.push(index); g.force.at.push(at)
+    if (loaded) { g.load.rows.push(index); g.load.at.push(at + labels.length) }
   }
   for (const kind of ['vel', 'accel'] as const) {
     const labels = dofLabels(ndm, dofsPerNode, kind === 'vel' ? ['vx', 'vy', 'vz', 'vrx', 'vry', 'vrz'] : ['ax', 'ay', 'az', 'arx', 'ary', 'arz'])
-    for (const tag of dynamicTags[kind]) {
-      plan(kind, tag, labels)
-      const node = resolveNode(tag, `${kind} recorder for node ${tag}`)
-      for (let dof = 0; dof < dofsPerNode; dof++) recorders.push({ response: kind === 'vel' ? 'nodeVel' : 'nodeAccel', node, dof })
-    }
+    nodeBulk(kind === 'vel' ? 'velocity' : 'acceleration', kind, [...dynamicTags[kind]], labels)
   }
   // Shells also record their stress resultants at the 4 Gauss points (32 columns each), which the contour view reads.
-  for (const tag of recordedElementTags) {
-    const ref = elementRefs.get(tag)
-    if (ref?.kind !== 'shell3' && ref?.kind !== 'shell4') continue
-    plan('shell', tag, SHELL_RESULTANT_LABELS)
-    for (let point = 0; point < SHELL_GAUSS_POINTS; point++) {
-      for (let component = 0; component < SHELL_RESULTANTS.length; component++) {
-        recorders.push({ response: 'gaussPoint', elementKind: ref.kind, elementIndex: ref.index, point, quantity: 'stress', component })
-      }
-    }
+  for (const { tag, kind, index } of recordedRefs) {
+    if (kind !== 'shell3' && kind !== 'shell4') continue
+    const g = group(kind)
+    g.shell.rows.push(index); g.shell.at.push(plan('shell', tag, SHELL_RESULTANT_LABELS))
+  }
+  for (const [elementKind, g] of groups) {
+    bulk({ table: 'elements', elementKind, quantity: 'endForce', rows: g.force.rows }, g.force.at, forceLabels(elementKind).length)
+    bulk({ table: 'elements', elementKind, quantity: 'load', rows: g.load.rows }, g.load.at, loadLabels.length)
+    bulk({ table: 'elements', elementKind, quantity: 'stress', rows: g.shell.rows }, g.shell.at, SHELL_RESULTANT_LABELS.length)
   }
 
-  if (diagnostics.some((d) => d.severity === 'error')) return { input: null, diagnostics, recordedNodeTags: [], dofsPerNode: 0, recorderPlans: [], nodeTags: [] }
+  if (diagnostics.some((d) => d.severity === 'error')) return { input: null, diagnostics, recordedNodeTags: [], dofsPerNode: 0, recorderPlans: [], nodeTags: [], rowLayout: rowLayout(0, []) }
 
   const input: W.CarapaceInputV1 = {
     header: { schemaVersion: 1, ndm, engineVersion: 'pysees-dev', recordInitial: true },
@@ -583,7 +584,7 @@ export function compileInputV1(model: Model, analysisHistory: AnalysisHistory): 
     elementLoads,
     sequence: { stages, recorders },
   }
-  return { input, diagnostics, recordedNodeTags, dofsPerNode, recorderPlans, nodeTags: nodeIds }
+  return { input, diagnostics, recordedNodeTags, dofsPerNode, recorderPlans, nodeTags: nodeIds, rowLayout: rowLayout(width, columns) }
 }
 
 /** Positive integers from a scalar or list arg (`dofs`, `cNodeTags`), or `null` when any entry is not one. */

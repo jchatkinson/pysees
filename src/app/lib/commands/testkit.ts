@@ -1,13 +1,11 @@
 import { emptyModel, type Model } from '@/app/types/model'
 import type { AnalysisHistory } from '@/app/types/analysisCommands'
 import type { ModelWrite } from '@/app/lib/modelWrite'
-import { applyModelWrite } from '@/app/lib/modelWrite'
+import { applyModelWrites } from '@/app/lib/modelWrite'
 import { cantileverTemplate, frameTemplate, frame3dTemplate, momentCurvatureTemplate, plateTemplate, precastWallTemplate, type TemplateResult } from '@/app/lib/templates'
 
 export function modelFromWrites(ndm: 2 | 3, ndf: number, writes: ModelWrite[]): Model {
-  let m: Model = { ...emptyModel(), config: { ndm, ndf } }
-  for (const w of writes) m = applyModelWrite(m, w)
-  return m
+  return applyModelWrites({ ...emptyModel(), config: { ndm, ndf } }, writes)
 }
 
 /** `skip` names the quantities the OpenSees comparison leaves out, where the engines legitimately report different things. */

@@ -57,9 +57,15 @@ AnalysisHistory      ─┼─► compileInputV1 ─► Carapace wasm worker ─
   (`types/carapaceInputV1.ts`, mirrors Rust `input_v1` in `../carapace/wasm-bridge`), returning
   diagnostics for anything unsupported. It also emits the native `building` table for stud-wall building models. Material/section arg names are the **schema** names (lowercase,
   e.g. `fy`, `e0`, `epsU`), not OpenSees doc capitalisation.
+- Recorders compile to Carapace **bulk** recorders: one per node quantity (displacement, reaction, velocity, acceleration) and per element
+  table (end forces, beam loads, shell resultants), each with the `rows` it records; each returns one flat `Float64Array` per step.
+  `rowLayout` maps every value onto the stored row, which keeps OpenSees' recorder layout (one row per step, a column group per node or
+  element, `recorderPlans`). Only stud-wall building recorders are still scalar. `lib/resultsStorage/recorderRows.ts` builds the rows
+  for the worker and the test runner alike.
 - `workers/carapaceWorker.ts` decodes the input, advances in chunks (cooperative cancel), and streams
-  recorder batches to `workers/resultsStorageWorker.ts` over a `MessageChannel`. Client side:
+  step rows to `workers/resultsStorageWorker.ts` over a `MessageChannel`. Client side:
   `lib/carapace/carapaceWorkerClient.ts`. Store state: `carapaceRun`.
+- Large-model timings: `PERF=1 npx vitest run src/app/lib/perf` (`towerTemplate`, a 20-story flat-slab tower; `TOWER=stories,baysX,baysY,mesh`, `DUMP=file.json` for the native CLI).
 - Rebuild the bundled wasm after Carapace changes: `scripts/build-carapace.sh` (needs the `../carapace` checkout,
   `wasm-bindgen`).
 - Material Preview (`MaterialPreviewOverlay`, `lib/carapace/materialPreview.ts`) drives Carapace's

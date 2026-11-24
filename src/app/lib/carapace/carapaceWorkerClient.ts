@@ -1,3 +1,4 @@
+import type { RowLayout } from '@/app/lib/resultsStorage/recorderRows'
 import type { CarapaceInputV1 } from '@/app/types/carapaceInputV1'
 import type { CarapaceRunProgress, CarapaceRunResult } from '@/app/types/carapaceRun'
 import type { RecorderMetadata, RunMetadata, StageMetadata } from '@/app/types/resultsStorage'
@@ -60,14 +61,15 @@ function recorderMetadataFor(runId: string, recorderPlans: RecorderPlan[]): Reco
  * IndexedDB row before the analysis worker starts, hands the analysis worker a direct
  * `MessagePort` to the storage worker for `writeBlocks` traffic, and finalizes the run's stored
  * status once the analysis worker settles. `recordedNodeTags`/`dofsPerNode` come straight from
- * compileInputV1's result; `recorderPlans` lays out every stored channel (displacements, then
- * reactions, then element forces) as consecutive columns of the dense results-storage row. */
+ * compileInputV1's result; `recorderPlans` lays out every stored channel as consecutive columns of the
+ * dense results-storage row, and `rowLayout` maps each wire recorder's values onto them. */
 export function runCarapaceOnWorker(
   runId: string,
   input: CarapaceInputV1,
   recordedNodeTags: number[],
   dofsPerNode: number,
   recorderPlans: RecorderPlan[],
+  rowLayout: RowLayout,
   nodeTags: number[],
   options: RunCarapaceOnWorkerOptions = {},
 ): { promise: Promise<CarapaceRunResult>; cancel: () => void } {
@@ -79,7 +81,7 @@ export function runCarapaceOnWorker(
     // model-hash provenance yet to tell an old run apart from the current one).
     await resultsStorage.clearAllRuns()
     await resultsStorage.beginRun(
-      runMetadataFor(runId, input, nodeCount, dofsPerNode, input.sequence.recorders.length, nodeTags),
+      runMetadataFor(runId, input, nodeCount, dofsPerNode, rowLayout.width, nodeTags),
       stageMetadataFor(runId, input),
       recorderMetadataFor(runId, recorderPlans),
     )
@@ -111,7 +113,7 @@ export function runCarapaceOnWorker(
       }
       const cleanup = () => w.removeEventListener('message', onMessage)
       w.addEventListener('message', onMessage)
-      w.postMessage({ type: 'run', runId, input, storagePort: channel.port2 }, [channel.port2])
+      w.postMessage({ type: 'run', runId, input, layout: rowLayout, storagePort: channel.port2 }, [channel.port2])
     }).catch(async (error: unknown) => {
       const cancelled = error instanceof Error && error.message === 'cancelled'
       await resultsStorage.finishRun(runId, cancelled ? 'cancelled' : 'failed', cancelled ? undefined : String(error))
