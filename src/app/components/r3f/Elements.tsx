@@ -105,21 +105,24 @@ export function ElementsLayer({
   buffers,
   showElements,
   showElementIds,
+  extruded = false,
 }: {
   index: SceneIndex
   buffers: DisplayBuffers
   showElements: boolean
   showElementIds: boolean
+  /** The extruded view draws the undeformed members and shells itself; lines and surfaces stay for displaced shapes. */
+  extruded?: boolean
 }) {
   const deformedMode = useAppStore((s) => (s.resultsView.type === 'deformed' || s.resultsView.type === 'mode' || (s.resultsView.type === 'contour' && s.resultsView.contourDeformed)) && s.resultsView.runId !== null)
   const showUndeformed = useAppStore((s) => s.resultsView.showUndeformed)
   const hasSegments = index.segmentCount > 0
   return (
     <>
-      {showElements && <ShellSurfaces index={index} buffers={buffers} />}
-      {showElements && hasSegments && (!deformedMode || showUndeformed) && <ElementLines index={index} ghost={deformedMode} />}
+      {showElements && (!extruded || deformedMode) && <ShellSurfaces index={index} buffers={buffers} />}
+      {showElements && hasSegments && (!extruded || deformedMode) && (!deformedMode || showUndeformed) && <ElementLines index={index} ghost={deformedMode} />}
       {deformedMode && hasSegments && <BufferLines positions={buffers.deformedSegments} color={DEFORMED_COLOR} widthPx={ELEMENT_LINE_WIDTH_PX} isActive={() => buffers.active} getVersion={() => buffers.version} />}
-      {showElements && !deformedMode && <SelectedElements index={index} />}
+      {showElements && !deformedMode && !extruded && <SelectedElements index={index} />}
       {showElementIds && <ElementLabels index={index} />}
     </>
   )

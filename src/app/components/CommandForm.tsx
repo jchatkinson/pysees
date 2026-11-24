@@ -22,6 +22,8 @@ import type { AnalysisCommand } from '@/app/types/analysisCommands'
 import { ANALYSIS_BLOCKS, blockAsSchema } from '@/app/lib/analysisBlocks'
 import { useHotkeyRegistry } from '@/app/lib/hotkeys'
 import { SelectionPanel } from '@/app/components/SelectionPanel'
+import { MemberSectionCard } from '@/app/components/MemberSectionCard'
+import type { ElementEntity } from '@/app/types/model'
 import { CircleHelp } from 'lucide-react'
 import { MaterialUsageField } from '@/app/components/MaterialUsageField'
 import { ShellModifiersField } from '@/app/components/ShellModifiersField'
@@ -389,6 +391,7 @@ export function CommandForm() {
           </div>
           <code className="mt-1.5 block overflow-x-auto whitespace-nowrap rounded bg-muted px-2 py-1 text-[11px] font-mono text-foreground/80">{previewLine}</code>
         </div>
+        {selectedModelEntity.kind === 'element' && <MemberSectionCard element={entity as ElementEntity} />}
         <CommandFormBody
           key={`model-edit-${selectedModelEntity.kind}-${selectedModelEntity.id}`}
           schema={schema}

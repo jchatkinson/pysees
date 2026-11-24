@@ -174,7 +174,9 @@ like any other.
    properties, frame / quick beams / quick columns / supports, typed lengths, all-stories drawing in plans, and the multi-selection pane
    (by property, reassign property, supports, delete). "Similar stories" needs a per-level similarity flag and is deferred; window-drag
    for quick beams/columns is not done.
-4. **Extruded view**: instanced section sweeps for beams/columns/trusses, shell thickness, fiber detail in properties pane.
+4. **Extruded view** (done): instanced section sweeps for beams/columns/trusses (one `InstancedMesh` per distinct outline), shell slabs at
+   their thickness, fiber detail (section preview) in the properties pane. Nominal √A squares for elastic members can dwarf real sections
+   when a model uses very stiff elastic links (the precast-wall template's rigid arms); revisit if that's a problem.
 5. **Edit & assign**: move/copy/replicate/mirror/divide/merge, assign loads/supports/diaphragms, shell drawing + meshing, select-by lists.
 6. **Stud walls as elements** (section 5).
 7. **Polish**: section box in 3D, extruded deformed shape, command palette, end releases.

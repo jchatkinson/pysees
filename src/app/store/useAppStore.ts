@@ -140,6 +140,8 @@ export interface AppStore {
     showLevels: boolean
     /** Plan views also draw the story above as dashed, unpickable ghosts. */
     showStoryAbove: boolean
+    /** Draw members at their section shape and shells at their thickness (`ExtrudedLayer`). */
+    extruded: boolean
   }
   /** Pattern tags whose loads are hidden in the viewport; a pattern is shown unless listed, so new patterns appear by default. */
   hiddenLoadPatterns: number[]
@@ -418,6 +420,7 @@ export const useAppStore = create<AppStore>((set, get) => {
     showGridlines: true,
     showLevels: true,
     showStoryAbove: true,
+    extruded: false,
   },
   hiddenLoadPatterns: [],
   toggleLoadPatternVisible: (id) => set((s) => ({ hiddenLoadPatterns: s.hiddenLoadPatterns.includes(id) ? s.hiddenLoadPatterns.filter((x) => x !== id) : [...s.hiddenLoadPatterns, id] })),

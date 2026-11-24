@@ -2,7 +2,7 @@ import type { LucideIcon } from 'lucide-react'
 import {
   Undo2, Redo2, SquareDashedMousePointer, SquareDashed, Grid3x3, Ruler, ZoomIn, ZoomOut, Maximize2, CircleDot, Minus, Anchor, ArrowDown, ArrowDownToLine, Hash, Tag, Tags,
   Grid2x2, Layers, Rows3, Box, LayoutGrid, Building2, Square, ChevronUp, ChevronDown, Ghost, CircleOff, Spline, MoveHorizontal, Activity, RotateCw, Waves, Palette,
-  BarChart3, ChartLine, Sigma, Trash2, Layers3, MousePointer2, PenLine, GripHorizontal, Columns2,
+  BarChart3, ChartLine, Sigma, Trash2, Layers3, Cuboid, MousePointer2, PenLine, GripHorizontal, Columns2,
 } from 'lucide-react'
 import { useAppStore, type AppStore } from '@/app/store/useAppStore'
 import { stepView, validViewMode } from '@/app/lib/editor/viewCamera'
@@ -101,6 +101,7 @@ export const COMMANDS = {
   zoomIn: { id: 'zoomIn', label: 'Zoom in', icon: ZoomIn, run: (s) => s.requestViewportAction('zoomIn') },
   zoomOut: { id: 'zoomOut', label: 'Zoom out', icon: ZoomOut, run: (s) => s.requestViewportAction('zoomOut') },
   fit: { id: 'fit', label: 'Fit', icon: Maximize2, tip: 'Zoom to fit the view', hotkey: ['f'], run: (s) => s.requestViewportAction('fit') },
+  showExtruded: viewToggle('extruded', 'Extrude', Cuboid, 'Extruded view: members at their section shape, shells at their thickness'),
   showNodes: viewToggle('showNodes', 'Nodes', CircleDot),
   showElements: viewToggle('showElements', 'Elements', Minus),
   showSupports: viewToggle('showSupports', 'Supports', Anchor),
@@ -140,7 +141,7 @@ export const RIBBON_TABS: RibbonTabDef[] = [
   { id: 'model', label: 'Model', groups: [
     { label: 'Edit', commands: ['undo', 'redo'] },
     { label: 'Draw', commands: ['toolSelect', 'toolFrame', 'toolBeam', 'toolColumn', 'toolSupport', 'drawAllStories'] },
-    { label: 'View', commands: ['view3d', 'viewPlan', 'viewElevation'], custom: 'stories' },
+    { label: 'View', commands: ['view3d', 'viewPlan', 'viewElevation', 'showExtruded'], custom: 'stories' },
     { label: 'Select', commands: ['selectAll', 'clearSelection', 'deleteSelection'] },
     { label: 'Define', commands: ['gridsLevels', 'units'] },
   ] },
@@ -148,7 +149,7 @@ export const RIBBON_TABS: RibbonTabDef[] = [
     { label: 'View', commands: ['view3d', 'viewPlan', 'viewElevation', 'orthographic'] },
     { label: 'Stories', custom: 'stories' },
     { label: 'Zoom', commands: ['zoomIn', 'zoomOut', 'fit'] },
-    { label: 'Show', commands: ['showNodes', 'showElements', 'showSupports'] },
+    { label: 'Show', commands: ['showExtruded', 'showNodes', 'showElements', 'showSupports'] },
     { label: 'Loads', commands: ['showNodalLoads', 'showElementLoads', 'showLoadValues'], custom: 'loadPatterns' },
     { label: 'Labels', commands: ['showNodeIds', 'showElementIds'] },
     { label: 'Reference', commands: ['showGrid', 'showGridlines', 'showLevels'] },

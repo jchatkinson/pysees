@@ -112,6 +112,10 @@ Views (`viewMode` in the store, `lib/editor/viewSlice.ts` / `viewCamera.ts`): 3D
 (orthographic, pan/zoom only). A plan or elevation filters the model before the scene index is built, so hidden objects are neither drawn nor
 pickable and results draw on the slice. A plan shows the story above as dashed ghosts (`GhostElements`).
 
+Extruded view (`viewSettings.extruded`, `components/r3f/Extruded.tsx`, `lib/editor/memberShape.ts`): members swept at their section outline
+(fiber sections, via `sectionOutline`) or a nominal square of area A (elastic members, elastic sections, trusses), one `InstancedMesh` per
+outline, oriented by the scene index's member frames; shells as slabs of thickness `h`. Displaced results stay as lines.
+
 Drawing (`activeTool` in the store; `components/r3f/ToolLayer.tsx`, `components/DrawOptions.tsx`, `lib/editor/draw.ts`, `snap.ts`,
 `properties.ts`): tools emit ordinary `ModelWrite`s through `DrawBatch` (merges coincident nodes, reuses a `geomTransf` with a matching
 `vecxz`) and commit one undo step via `writeModelEntities`. Frame properties are derived from the elements (element type + args minus

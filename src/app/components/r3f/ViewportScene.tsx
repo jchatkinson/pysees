@@ -25,6 +25,7 @@ import { validViewMode, viewCamera } from '@/app/lib/editor/viewCamera'
 import { GhostElements } from './GhostElements'
 import { ReactionsLayer } from './Reactions'
 import { ToolLayer } from './ToolLayer'
+import { ExtrudedLayer } from './Extruded'
 
 const NODE_HIT_RADIUS_PX = 12
 
@@ -53,6 +54,9 @@ export const ViewportScene = forwardRef<ViewportSceneRef, object>(function Viewp
   // Results are drawn on the structure, so applied loads would just clutter them (same condition ResultsDriver draws under).
   const showingResults = useAppStore((s) => s.resultsView.type !== 'none' && s.resultsView.runId !== null)
   const setSceneSelection = useAppStore((s) => s.setSceneSelection)
+  const extruded = viewSettings.extruded && viewSettings.showElements
+  // Displaced shapes stay as lines; the extruded members are the undeformed model.
+  const deformedShown = useAppStore((s) => (s.resultsView.type === 'deformed' || s.resultsView.type === 'mode' || (s.resultsView.type === 'contour' && s.resultsView.contourDeformed)) && s.resultsView.runId !== null)
   const showReactions = useAppStore((s) => s.resultsView.showReactions && s.resultsView.runId !== null && !s.model.building)
   const clearSceneSelection = useAppStore((s) => s.clearSceneSelection)
 
@@ -260,7 +264,9 @@ export const ViewportScene = forwardRef<ViewportSceneRef, object>(function Viewp
         buffers={displayBuffers}
         showElements={viewSettings.showElements}
         showElementIds={viewSettings.showElementIds}
+        extruded={extruded}
       />
+      {extruded && !deformedShown && <ExtrudedLayer index={sceneIndex} elements={elements} />}
       <NodesLayer
         index={sceneIndex}
         buffers={displayBuffers}
