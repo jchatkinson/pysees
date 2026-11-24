@@ -10,6 +10,7 @@ import { Viewport } from '@/app/components/Viewport'
 import { InitModal } from '@/app/components/InitModal'
 import { GridlinesDialog } from '@/app/components/GridlinesDialog'
 import { UnitsDialog } from '@/app/components/UnitsDialog'
+import { EditDialog } from '@/app/components/EditDialog'
 import { MaterialDialog } from '@/app/components/MaterialDialog'
 import { SectionDialog } from '@/app/components/sections/SectionDialog'
 import { Button } from '@/app/components/ui/button'
@@ -72,6 +73,7 @@ export function AppShell() {
       <InitModal />
       <GridlinesDialog />
       <ConnectedUnitsDialog />
+      <EditDialog />
       <MaterialDialog />
       <SectionDialog />
       <Ribbon />

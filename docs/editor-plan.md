@@ -177,7 +177,10 @@ like any other.
 4. **Extruded view** (done): instanced section sweeps for beams/columns/trusses (one `InstancedMesh` per distinct outline), shell slabs at
    their thickness, fiber detail (section preview) in the properties pane. Nominal √A squares for elastic members can dwarf real sections
    when a model uses very stiff elastic links (the precast-wall template's rigid arms); revisit if that's a problem.
-5. **Edit & assign**: move/copy/replicate/mirror/divide/merge, assign loads/supports/diaphragms, shell drawing + meshing, select-by lists.
+5. **Edit & assign** (done except diaphragms): Edit tab with move, copy/replicate, mirror, divide (element loads follow the parts) and
+   merge coincident nodes; nodal and uniform member loads assigned to a Plain pattern; shell tool (plan cells / elevation panels meshed
+   into divisions, new elastic plate sections). Rigid diaphragms wait on Carapace: its compiler ignores every mpConstraint today
+   (flagged separately). Select-by lists beyond the selection pane's "by property" are not done.
 6. **Stud walls as elements** (section 5).
 7. **Polish**: section box in 3D, extruded deformed shape, command palette, end releases.
 8. **Performance audit** (after the plan is otherwise complete). The canvas crashes too easily (WebGL context lost, the "sad face"),

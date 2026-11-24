@@ -119,7 +119,7 @@ outline, oriented by the scene index's member frames; shells as slabs of thickne
 Drawing (`activeTool` in the store; `components/r3f/ToolLayer.tsx`, `components/DrawOptions.tsx`, `lib/editor/draw.ts`, `snap.ts`,
 `properties.ts`): tools emit ordinary `ModelWrite`s through `DrawBatch` (merges coincident nodes, reuses a `geomTransf` with a matching
 `vecxz`) and commit one undo step via `writeModelEntities`. Frame properties are derived from the elements (element type + args minus
-`transfTag`), never stored. While a tool is active, scene clicks don't change the selection. A selection of several objects shows `SelectionPanel` (reassign property, supports, delete) in place of the command form.
+`transfTag`), never stored. While a tool is active, scene clicks don't change the selection. Edit operations (`lib/editor/edit.ts`: move, copy/replicate, mirror, divide, merge, load writes) run from the Edit tab through `EditDialog` and commit one undo step via `editModel` / `writeModelEntities`; the shell tool meshes grid cells (`cellAt`, `meshQuad` in `snap.ts`). A selection of several objects shows `SelectionPanel` (reassign property, supports, delete) in place of the command form.
 
 Results live in IndexedDB (`lib/resultsStorage`), read per step for display (`useResultsSource`,
 `stepFrames`); 2D models render in the XY plane.

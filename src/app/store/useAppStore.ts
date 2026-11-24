@@ -22,7 +22,8 @@ import type { CompileDiagnostic } from '@/app/lib/compileAnalysisSequence'
 import type { ViewMode } from '@/app/lib/editor/viewSlice'
 import type { DrawTemplate } from '@/app/lib/editor/properties'
 
-export type ToolId = 'select' | 'frame' | 'quickBeam' | 'quickColumn' | 'support'
+export type EditDialogKind = 'move' | 'copy' | 'mirror' | 'divide' | 'nodalLoad' | 'memberLoad'
+export type ToolId = 'select' | 'frame' | 'quickBeam' | 'quickColumn' | 'shell' | 'support'
 
 /** Suits both forces and displacements in most structural problems. */
 export const DEFAULT_ZERO_TOLERANCE = 1e-6
@@ -60,6 +61,12 @@ export interface AppStore {
   nextLevelId: number
   gridlinesDialogOpen: boolean
   unitsDialogOpen: boolean
+  /** The open edit / assign dialog (`EditDialog`), if any. */
+  editDialog: EditDialogKind | null
+  setEditDialog: (kind: EditDialogKind | null) => void
+  /** A short message for the status bar (result of the last edit). */
+  status: string
+  setStatus: (text: string) => void
   setUnitsDialogOpen: (open: boolean) => void
   setGridlinesDialogOpen: (open: boolean) => void
   materialDialogOpen: boolean
@@ -222,6 +229,11 @@ export interface AppStore {
   drawTemplate: DrawTemplate | null
   setDrawTemplate: (t: DrawTemplate | null) => void
   supportPreset: 'fixed' | 'pinned' | 'roller'
+  /** What the shell tool places (a shell element type and its section), and how many divisions each side of a cell is meshed into. */
+  shellTemplate: DrawTemplate | null
+  shellDivisions: number
+  setShellTemplate: (t: DrawTemplate | null) => void
+  setShellDivisions: (n: number) => void
   /** In a plan, draw tools place the same members on every story (ETABS "All Stories") instead of only the shown one. */
   drawAllStories: boolean
   setDrawAllStories: (on: boolean) => void
@@ -480,7 +492,7 @@ export const useAppStore = create<AppStore>((set, get) => {
       nextGridlineId: gridlines.reduce((max, g) => Math.max(max, g.id + 1), 1),
       levels,
       nextLevelId: levels.reduce((max, l) => Math.max(max, l.id + 1), 1),
-      selectedModelEntity: null, selectedNodeIds: [], selectedElementIds: [], viewMode: { kind: '3d' }, activeTool: 'select', drawTemplate: null,
+      selectedModelEntity: null, selectedNodeIds: [], selectedElementIds: [], viewMode: { kind: '3d' }, activeTool: 'select', drawTemplate: null, shellTemplate: null,
       selectedAnalysisIndex: null,
       analysisInsertionIndex: null,
       resultsView: DEFAULT_RESULTS_VIEW,
@@ -514,7 +526,7 @@ export const useAppStore = create<AppStore>((set, get) => {
       hiddenLoadPatterns: project.display.hiddenLoadPatterns,
       resultsView: { ...DEFAULT_RESULTS_VIEW, ...keep<ResultsView>(project.display.resultsView, RESULTS_PREF_KEYS) },
       plotView: { ...DEFAULT_PLOT_VIEW, ...keep<PlotView>(project.display.plotView, PLOT_PREF_KEYS) },
-      selectedModelEntity: null, selectedAnalysisIndex: null, analysisInsertionIndex: null, selectedNodeIds: [], selectedElementIds: [], viewMode: { kind: '3d' }, activeTool: 'select', drawTemplate: null, nodePickMode: 'none', pendingNodePick: null,
+      selectedModelEntity: null, selectedAnalysisIndex: null, analysisInsertionIndex: null, selectedNodeIds: [], selectedElementIds: [], viewMode: { kind: '3d' }, activeTool: 'select', drawTemplate: null, shellTemplate: null, nodePickMode: 'none', pendingNodePick: null,
       results: null, projectFileName: fileName ?? s.projectFileName,
     }))
   },
@@ -534,7 +546,7 @@ export const useAppStore = create<AppStore>((set, get) => {
       selectedModelEntity: null,
       selectedAnalysisIndex: null,
       analysisInsertionIndex: null,
-      selectedNodeIds: [], selectedElementIds: [], viewMode: { kind: '3d' }, activeTool: 'select', drawTemplate: null,
+      selectedNodeIds: [], selectedElementIds: [], viewMode: { kind: '3d' }, activeTool: 'select', drawTemplate: null, shellTemplate: null,
       nodePickMode: 'none',
       pendingNodePick: null,
       results: null,
@@ -683,6 +695,10 @@ export const useAppStore = create<AppStore>((set, get) => {
   setViewSetting: (key, value) => set((s) => ({ viewSettings: { ...s.viewSettings, [key]: value } })),
 
   unitsDialogOpen: false,
+  editDialog: null,
+  setEditDialog: (editDialog) => set({ editDialog }),
+  status: '',
+  setStatus: (status) => set({ status }),
   setUnitsDialogOpen: (unitsDialogOpen) => set({ unitsDialogOpen }),
   viewMode: { kind: '3d' },
   setViewMode: (viewMode) => set({ viewMode }),
@@ -693,6 +709,10 @@ export const useAppStore = create<AppStore>((set, get) => {
   setDrawTemplate: (drawTemplate) => set({ drawTemplate }),
   supportPreset: 'fixed',
   drawAllStories: false,
+  shellTemplate: null,
+  shellDivisions: 4,
+  setShellTemplate: (shellTemplate) => set({ shellTemplate }),
+  setShellDivisions: (shellDivisions) => set({ shellDivisions: Math.max(1, Math.min(50, Math.round(shellDivisions) || 1)) }),
   setDrawAllStories: (drawAllStories) => set({ drawAllStories }),
   toolInput: '',
   setToolInput: (toolInput) => set({ toolInput }),

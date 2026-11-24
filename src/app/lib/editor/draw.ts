@@ -26,6 +26,8 @@ export class DrawBatch {
   constructor(model: Model) { this.model = model; this.tol = mergeTolerance(model) }
 
   private write(w: ModelWrite) { this.writes.push(w); this.model = applyModelWrite(this.model, w) }
+  /** Any other write, kept in this batch (copies of existing entities). */
+  writeRaw(w: ModelWrite) { this.write(w) }
 
   /** The node at `p` (within tolerance), or a new one. Coordinates are trimmed to the model's dimension. */
   node(p: P3): number {

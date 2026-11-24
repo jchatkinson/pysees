@@ -12,9 +12,10 @@ const HINTS: Record<Exclude<ToolId, 'select'>, string> = {
   frame: 'Click points to draw members. Right-click or Enter ends the chain; Esc leaves the tool. Shift locks to an axis.',
   quickBeam: 'Click a grid bay to place a beam on it.',
   quickColumn: 'Plan: click a grid intersection (column from the story below). Elevation: click a bay between levels.',
+  shell: 'Plan: click a grid cell for a floor. Elevation: click a panel between grids and levels for a wall. Each side is split into the divisions below.',
   support: 'Click a node to give it this support.',
 }
-const TITLES: Record<Exclude<ToolId, 'select'>, string> = { frame: 'Draw frame', quickBeam: 'Quick beams', quickColumn: 'Quick columns', support: 'Supports' }
+const TITLES: Record<Exclude<ToolId, 'select'>, string> = { frame: 'Draw frame', quickBeam: 'Quick beams', quickColumn: 'Quick columns', shell: 'Shells', support: 'Supports' }
 
 type NewKind = 'ElasticBeamColumn' | 'DispBeamColumn' | 'Truss'
 const ELASTIC_FIELDS: { key: string; cat: Category; only3d?: boolean }[] = [
@@ -72,6 +73,68 @@ function NewProperty({ onDone }: { onDone: (t: DrawTemplate) => void }) {
 }
 
 /** Floating options for the active draw tool: what it draws (a derived property, or a new one) or the support preset. */
+/** The shell tool's property (derived shell properties, or a new elastic plate section) and mesh divisions. */
+function ShellOptions() {
+  const model = useAppStore((s) => s.model)
+  const template = useAppStore((s) => s.shellTemplate)
+  const setTemplate = useAppStore((s) => s.setShellTemplate)
+  const divisions = useAppStore((s) => s.shellDivisions)
+  const setDivisions = useAppStore((s) => s.setShellDivisions)
+  const writeModelEntity = useAppStore((s) => s.writeModelEntity)
+  const units = useUnits()
+  const [creating, setCreating] = useState(false)
+  const [text, setText] = useState<Record<string, string>>({ nu: '0.2' })
+  const props = useMemo(() => deriveProperties(model).filter((p) => p.kind === 'shell'), [model])
+  const plateSections = [...model.sections.values()].filter((s) => s.secType === 'ElasticMembranePlateSection')
+  const items = useMemo(() => {
+    const list = props.map((p) => ({ value: p.key, label: `${p.name} (${p.elementIds.length})` }))
+    for (const s of plateSections) {
+      const t = { eleType: 'ShellMITC4', args: { secTag: s.id } }
+      if (!list.some((i) => i.value === templateKey(t))) list.push({ value: templateKey(t), label: `${templateName(model, t)} (unused)` })
+    }
+    return list
+  }, [props, plateSections, model])
+  useEffect(() => { if (!template && items[0]) { const p = props[0]; setTemplate(p ? { eleType: p.eleType, args: p.args } : { eleType: 'ShellMITC4', args: { secTag: plateSections[0].id } }) } }, [template, items, props, plateSections, setTemplate])
+  const pick = (key: string | null) => {
+    const p = props.find((x) => x.key === key)
+    if (p) return setTemplate({ eleType: p.eleType, args: p.args })
+    const s = plateSections.find((x) => templateKey({ eleType: 'ShellMITC4', args: { secTag: x.id } }) === key)
+    if (s) setTemplate({ eleType: 'ShellMITC4', args: { secTag: s.id } })
+  }
+  const create = () => {
+    const eMod = units.parse('stress', text.E ?? ''), h = units.parse('length', text.h ?? ''), nu = Number(text.nu)
+    if (!(eMod && eMod > 0 && h && h > 0 && nu >= 0 && nu < 0.5)) return
+    const id = model.nextIds.section
+    writeModelEntity({ kind: 'section', entity: { id, secType: 'ElasticMembranePlateSection', args: { type: 'ElasticMembranePlateSection', secTag: id, eMod, nu, h, rho: 0 }, children: [] } })
+    setTemplate({ eleType: 'ShellMITC4', args: { secTag: id } })
+    setCreating(false)
+  }
+  const field = (key: string, label: string, cat?: Category) => (
+    <label key={key} className="grid grid-cols-[2.5rem_1fr] items-center gap-1">
+      <span>{label}</span>
+      <Input className="h-6 text-xs" value={text[key] ?? ''} placeholder={cat && units.active ? units.symbol(cat) : ''} onChange={(e) => setText({ ...text, [key]: e.target.value })} />
+    </label>
+  )
+  return (
+    <div className="grid gap-1.5">
+      <Select items={items} value={template ? templateKey(template) : ''} onValueChange={pick}>
+        <SelectTrigger size="sm" className="h-7 w-full text-xs"><SelectValue placeholder={items.length ? 'Shell property' : 'No shell sections yet'} /></SelectTrigger>
+        <SelectContent>{items.map((i) => <SelectItem key={i.value} value={i.value}>{i.label}</SelectItem>)}</SelectContent>
+      </Select>
+      <label className="grid grid-cols-[4.5rem_1fr] items-center gap-1">
+        <span>Divisions</span>
+        <Input type="number" min={1} max={50} className="h-6 text-xs" value={divisions} onChange={(e) => setDivisions(Number(e.target.value))} />
+      </label>
+      {creating ? (
+        <div className="grid gap-1.5 border-t pt-1.5">
+          {field('E', 'E', 'stress')}{field('nu', 'ν')}{field('h', 'h', 'length')}
+          <Button size="sm" className="h-6 text-xs" onClick={create}>Create plate section</Button>
+        </div>
+      ) : <Button size="sm" variant="outline" className="h-6 text-xs" onClick={() => setCreating(true)}>New shell section…</Button>}
+    </div>
+  )
+}
+
 export function DrawOptions() {
   const tool = useAppStore((s) => s.activeTool)
   const model = useAppStore((s) => s.model)
@@ -90,7 +153,7 @@ export function DrawOptions() {
   }, [props, template, model])
 
   // Start drawing with the most used property when nothing is chosen yet.
-  useEffect(() => { if (tool !== 'select' && tool !== 'support' && !template && props[0]) setTemplate({ eleType: props[0].eleType, args: props[0].args }) }, [tool, template, props, setTemplate])
+  useEffect(() => { if (tool !== 'select' && tool !== 'support' && tool !== 'shell' && !template && props[0]) setTemplate({ eleType: props[0].eleType, args: props[0].args }) }, [tool, template, props, setTemplate])
 
   if (tool === 'select') return null
   const pick = (key: string | null) => {
@@ -104,7 +167,7 @@ export function DrawOptions() {
       {tool === 'frame' && <p className="mb-1.5 text-[11px] leading-snug text-muted-foreground">After the first point, type a length and press Enter to place the next point towards the cursor.</p>}
       {toolInput && <div className="mb-1.5 rounded-sm bg-muted px-1.5 py-0.5 font-mono">Length: {toolInput}<span className="animate-pulse">▌</span></div>}
       {allStories && tool !== 'support' && <div className="mb-1.5 text-[11px] font-medium text-primary">Drawing on all stories</div>}
-      {tool === 'support' ? (
+      {tool === 'shell' ? <ShellOptions /> : tool === 'support' ? (
         <Select items={[{ value: 'fixed', label: 'Fixed' }, { value: 'pinned', label: 'Pinned' }, { value: 'roller', label: 'Roller (vertical)' }]} value={preset} onValueChange={(v) => v && setPreset(v as typeof preset)}>
           <SelectTrigger size="sm" className="h-7 w-full text-xs"><SelectValue /></SelectTrigger>
           <SelectContent>
