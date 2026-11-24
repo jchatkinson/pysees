@@ -3,6 +3,14 @@ import { memberFrame } from '@/app/lib/memberFrame'
 import { shellFrame } from '@/app/lib/shells'
 import { isShell } from '@/app/lib/commands/tables'
 import { toVec3 } from './utils'
+import { isStudWall, studWallArgs } from '@/app/lib/studWalls'
+
+/** A stud wall's node ids around its outline: the bottom chord left to right (corner, stations, corner), then the top chord back. */
+function wallOutline(el: ElementEntity): number[] {
+  const stations = studWallArgs(el.args).stations ?? []
+  const chord = (c: 'top' | 'bottom') => stations.map((s, i) => ({ x: s.x, id: el.nodes[4 + i] })).filter((_, i) => stations[i].chord === c).sort((a, b) => a.x - b.x).map((s) => s.id)
+  return [el.nodes[0], ...chord('bottom'), el.nodes[1], el.nodes[2], ...chord('top').reverse(), el.nodes[3]]
+}
 
 /** Line segments each element span is split into. Fixed so the line buffer layout never changes
  * between undeformed and displaced display — only the positions are rewritten. */
@@ -12,7 +20,8 @@ export const SEGMENTS_PER_SPAN = 8
  * Stable, array-backed view of the model for the GPU buffers. Node row `i` / element row `j` are
  * positions in the sorted-by-id lists below; results data and instance buffers are indexed by them.
  */
-export type ElementKind = 'beam' | 'truss' | 'shell' | 'other'
+/** `wall` is a Carapace stud wall: its closed outline through the corners and chord stations, filled like a shell. */
+export type ElementKind = 'beam' | 'truss' | 'shell' | 'wall' | 'other'
 
 export interface SceneIndex {
   /** Model dimension: 2D elements live in the XY plane. */
@@ -36,7 +45,8 @@ export interface SceneIndex {
 }
 
 /** Line spans of an element: a chain of `n - 1`, or for a shell the closed outline of `n`. */
-export const spanCount = (kind: ElementKind, nodeCount: number) => (kind === 'shell' ? nodeCount : nodeCount - 1)
+export const isClosed = (kind: ElementKind) => kind === 'shell' || kind === 'wall'
+export const spanCount = (kind: ElementKind, nodeCount: number) => (isClosed(kind) ? nodeCount : nodeCount - 1)
 /** The node rows at the ends of span `span`; a shell's last span closes back to its first node. */
 export const spanEnds = (rows: number[], span: number): [number, number] => [rows[span], rows[(span + 1) % rows.length]]
 
@@ -59,14 +69,15 @@ export function buildSceneIndex(
   const starts: number[] = []
   let segmentCount = 0
   for (const el of [...elements.values()].sort((a, b) => a.id - b.id)) {
-    const rows = el.nodes.map((id) => nodeIndex.get(id)).filter((r): r is number => r !== undefined)
-    if (rows.length < 2 || (isShell(el.eleType) && (rows.length !== el.nodes.length || rows.length < 3))) continue
-    const kind: ElementKind = isShell(el.eleType) ? 'shell' : /BeamColumn$/i.test(el.eleType) ? 'beam' : /^truss$/i.test(el.eleType) ? 'truss' : 'other'
+    const wall = isStudWall(el.eleType)
+    const rows = (wall ? wallOutline(el) : el.nodes).map((id) => nodeIndex.get(id)).filter((r): r is number => r !== undefined)
+    if (rows.length < 2 || ((wall || isShell(el.eleType)) && (rows.length !== el.nodes.length || rows.length < 3))) continue
+    const kind: ElementKind = wall ? 'wall' : isShell(el.eleType) ? 'shell' : /BeamColumn$/i.test(el.eleType) ? 'beam' : /^truss$/i.test(el.eleType) ? 'truss' : 'other'
     elementIds.push(el.id)
     elementNodes.push(rows)
     elementKind.push(kind)
-    const shell = kind === 'shell' ? shellFrame(rows.map((r) => [nodeCoords[r * 3], nodeCoords[r * 3 + 1], nodeCoords[r * 3 + 2]])) : null
-    const frame = shell ? { x: shell.e1, y: shell.e2, z: shell.e3 } : kind === 'shell' ? null : memberFrame(nodeCoords.subarray(rows[0] * 3, rows[0] * 3 + 3), nodeCoords.subarray(rows[1] * 3, rows[1] * 3 + 3), ndm, geomTransfs.get(Number(el.args.transfTag))?.args.vecxz)
+    const shell = kind === 'wall' ? shellFrame([el.nodes[0], el.nodes[1], el.nodes[2], el.nodes[3]].map((id) => nodeIndex.get(id)!).map((r) => [nodeCoords[r * 3], nodeCoords[r * 3 + 1], nodeCoords[r * 3 + 2]])) : kind === 'shell' ? shellFrame(rows.map((r) => [nodeCoords[r * 3], nodeCoords[r * 3 + 1], nodeCoords[r * 3 + 2]])) : null
+    const frame = shell ? { x: shell.e1, y: shell.e2, z: shell.e3 } : isClosed(kind) ? null : memberFrame(nodeCoords.subarray(rows[0] * 3, rows[0] * 3 + 3), nodeCoords.subarray(rows[1] * 3, rows[1] * 3 + 3), ndm, geomTransfs.get(Number(el.args.transfTag))?.args.vecxz)
     frames.push(...(frame ? [...frame.x, ...frame.y, ...frame.z] : [0, 0, 0, 0, 0, 0, 0, 0, 0]))
     starts.push(segmentCount)
     segmentCount += spanCount(kind, rows.length) * SEGMENTS_PER_SPAN

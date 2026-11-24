@@ -14,8 +14,7 @@ import { LoadsLayer } from './Loads'
 import { GridlinesLayer } from './Gridlines'
 import { LevelsLayer } from './Levels'
 import { levelElevations } from '@/app/lib/levels'
-import { buildSceneIndex } from './sceneIndex'
-import { Building } from './Building'
+import { buildSceneIndex, isClosed } from './sceneIndex'
 import { DisplayBuffers } from './displayBuffers'
 import { ResultsDriver } from './ResultsDriver'
 import { DiagramLayer } from './Diagrams'
@@ -57,7 +56,7 @@ export const ViewportScene = forwardRef<ViewportSceneRef, object>(function Viewp
   const extruded = viewSettings.extruded && viewSettings.showElements
   // Displaced shapes stay as lines; the extruded members are the undeformed model.
   const deformedShown = useAppStore((s) => (s.resultsView.type === 'deformed' || s.resultsView.type === 'mode' || (s.resultsView.type === 'contour' && s.resultsView.contourDeformed)) && s.resultsView.runId !== null)
-  const showReactions = useAppStore((s) => s.resultsView.showReactions && s.resultsView.runId !== null && !s.model.building)
+  const showReactions = useAppStore((s) => s.resultsView.showReactions && s.resultsView.runId !== null)
   const clearSceneSelection = useAppStore((s) => s.clearSceneSelection)
 
   const controlsRef = useRef<OrbitControlsImpl | null>(null)
@@ -69,10 +68,22 @@ export const ViewportScene = forwardRef<ViewportSceneRef, object>(function Viewp
   const mode = useMemo(() => validViewMode(viewModeRaw, levels, gridlines, ndm), [viewModeRaw, levels, gridlines, ndm])
   // A plan or elevation shows a slice of the model: everything downstream (drawing, picking, results) sees only that slice.
   const slice = useMemo(() => viewSlice(mode, model.nodes, model.elements, levels, gridlines, ndm), [mode, model.nodes, model.elements, levels, gridlines, ndm])
-  const nodes = slice?.nodes ?? model.nodes
-  const elements = slice?.elements ?? model.elements
+  const isolated = useAppStore((s) => s.isolated)
+  // "Show selection only" narrows the view further: the isolated elements and nodes (with the elements' nodes).
+  const { nodes, elements } = useMemo(() => {
+    const n0 = slice?.nodes ?? model.nodes, e0 = slice?.elements ?? model.elements
+    if (!isolated) return { nodes: n0, elements: e0 }
+    const keepE = new Set(isolated.elements), keepN = new Set(isolated.nodes)
+    const elements = new Map([...e0].filter(([id]) => keepE.has(id)))
+    for (const e of elements.values()) for (const n of e.nodes) keepN.add(n)
+    return { nodes: new Map([...n0].filter(([id]) => keepN.has(id))), elements }
+  }, [slice, model.nodes, model.elements, isolated])
   const sceneIndex = useMemo(() => buildSceneIndex(nodes, elements, model.geomTransfs, ndm), [nodes, elements, model.geomTransfs, ndm])
   const displayBuffers = useMemo(() => new DisplayBuffers(sceneIndex), [sceneIndex])
+  // The canvas renders on demand: redraw after any store change and whenever the results buffers are rewritten.
+  const invalidate = useThree((st) => st.invalidate)
+  useEffect(() => { displayBuffers.onChange = invalidate; return () => { displayBuffers.onChange = null } }, [displayBuffers, invalidate])
+  useEffect(() => useAppStore.subscribe(() => invalidate()), [invalidate])
   const fixes = useMemo(() => [...model.fixes.values()].filter((f) => nodes.has(f.nodeId)).sort((a, b) => a.nodeId - b.nodeId), [model.fixes, nodes])
   const isOrtho = mode.kind !== '3d' || orthographic
   const view = useMemo(() => viewCamera(mode, gridlines, ndm), [mode, gridlines, ndm])
@@ -103,7 +114,7 @@ export const ViewportScene = forwardRef<ViewportSceneRef, object>(function Viewp
       if (viewSettings.showElements && nodePickMode === 'none') sceneIndex.elementIds.forEach((id, e) => {
         const pts = sceneIndex.elementNodes[e].map((row) => screen[row])
         if (pts.some((p) => !p)) return
-        if (polylineInRect(pts as Pt[], sceneIndex.elementKind[e] === 'shell', rect, exclusive)) elements.push(id)
+        if (polylineInRect(pts as Pt[], isClosed(sceneIndex.elementKind[e]), rect, exclusive)) elements.push(id)
       })
       setSceneSelection({ nodes, elements }, additive)
     },
@@ -121,20 +132,13 @@ export const ViewportScene = forwardRef<ViewportSceneRef, object>(function Viewp
     },
   }), [camera, size, sceneIndex, displayBuffers, setSceneSelection, viewSettings.showNodes, viewSettings.showElements, nodePickMode])
 
-  // The model's extent: nodes, plus a stud-wall building's box (its walls are not nodes). Building models are in mm,
-  // so the camera's clipping planes and orbit limits scale with this rather than assuming a metre-sized model.
+  // The model's extent. Models may be in mm, so the camera's clipping planes and orbit limits scale with this rather than assuming a metre-sized model.
   const bounds = useMemo(() => {
     const box = new Box3()
     for (const node of model.nodes.values()) box.expandByPoint(new Vector3(...toVec3(node.coords)))
     if (model.nodes.size === 0) for (const g of gridlines) { box.expandByPoint(new Vector3(...toVec3(g.start))); box.expandByPoint(new Vector3(...toVec3(g.end))) }
-    if (model.building) {
-      const walls = model.building.spec.storeys[0]?.walls ?? []
-      const lx = walls.find((w) => w.name === 'front')?.layout.length ?? 0, lz = walls.find((w) => w.name === 'left')?.layout.length ?? 0
-      const top = model.building.spec.storeys.reduce((y, s) => y + s.wallHeight + s.floorDepth, 0)
-      box.expandByPoint(new Vector3(0, 0, 0)); box.expandByPoint(new Vector3(lx, lz, top))
-    }
     return box
-  }, [model.nodes, model.building, gridlines])
+  }, [model.nodes, gridlines])
   // What a plan or elevation frames: the slice, plus the grids in a plan; the whole model when the slice is empty.
   const viewBounds = useMemo(() => {
     if (!slice) return bounds
@@ -210,10 +214,6 @@ export const ViewportScene = forwardRef<ViewportSceneRef, object>(function Viewp
     camera.updateProjectionMatrix()
   }, [camera, radius])
 
-  // A new or edited building is far larger than the default camera's view: frame it.
-  const fitRef = useRef(fit)
-  useEffect(() => { fitRef.current = fit }, [fit])
-  useEffect(() => { if (model.building) fitRef.current() }, [model.building])
 
   useEffect(() => {
     if (!viewportAction) return
@@ -256,7 +256,6 @@ export const ViewportScene = forwardRef<ViewportSceneRef, object>(function Viewp
         only={mode.kind === 'plan' ? mode.level : undefined}
       />
       {slice && mode.kind === 'plan' && viewSettings.showStoryAbove && viewSettings.showElements && <GhostElements elements={slice.ghostElements} nodes={model.nodes} />}
-      {model.building && <Building entity={model.building} />}
       <ResultsDriver index={sceneIndex} buffers={displayBuffers} />
       <DiagramLayer buffers={displayBuffers} />
       <ElementsLayer

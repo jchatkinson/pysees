@@ -1,37 +1,41 @@
-import { Line } from '@react-three/drei'
+import { useMemo, useRef } from 'react'
+import { useFrame } from '@react-three/fiber'
+import { Vector3 } from 'three'
 import type { FixEntity, NodeEntity } from '@/app/types/model'
 import { toVec3 } from './utils'
-import { ScreenSize } from './ScreenSize'
+import { worldUnitsPerPixel } from './screenScale'
+import { useCameraChange, useSegmentLines } from './batchHooks'
 
 /** Half-length of each support axis line, in screen pixels. */
 const FIX_GLYPH_SIZE = 20
+const AXES: [number, number, number][] = [[1, 0, 0], [0, 1, 0], [0, 0, 1]]
 
-function FixGlyph({ coords, dofs }: { coords: number[]; dofs: number[] }) {
-  const [x, y, z] = toVec3(coords)
-  const t = FIX_GLYPH_SIZE
-  return (
-    <ScreenSize position={[x, y, z]}>
-      {dofs.includes(1) && <Line points={[[-t, 0, 0], [t, 0, 0]]} color="#dc2626" lineWidth={2} />}
-      {dofs.includes(2) && <Line points={[[0, -t, 0], [0, t, 0]]} color="#dc2626" lineWidth={2} />}
-      {dofs.includes(3) && <Line points={[[0, 0, -t], [0, 0, t]]} color="#dc2626" lineWidth={2} />}
-    </ScreenSize>
-  )
-}
-
-export function SupportsLayer({
-  fixes,
-  nodeMap,
-}: {
-  fixes: FixEntity[]
-  nodeMap: Map<number, NodeEntity>
-}) {
-  return (
-    <>
-      {fixes.map((fix) => {
-        const node = nodeMap.get(fix.nodeId)
-        if (!node) return null
-        return <FixGlyph key={fix.nodeId} coords={node.coords} dofs={fix.dofs} />
-      })}
-    </>
-  )
+/** Every support as one fat-line draw: a red axis line per fixed translation, sized in pixels at each node, redrawn when the camera moves. */
+export function SupportsLayer({ fixes, nodeMap }: { fixes: FixEntity[]; nodeMap: Map<number, NodeEntity> }) {
+  const segs = useMemo(() => {
+    const out: { at: [number, number, number]; axis: [number, number, number] }[] = []
+    for (const fix of fixes) {
+      const node = nodeMap.get(fix.nodeId)
+      if (!node) continue
+      const at = toVec3(node.coords)
+      AXES.forEach((axis, k) => { if (fix.dofs.includes(k + 1)) out.push({ at, axis }) })
+    }
+    return out
+  }, [fixes, nodeMap])
+  const { lines, write } = useSegmentLines(segs.length, '#dc2626', 2)
+  const changed = useCameraChange()
+  const filled = useRef<object | null>(null)
+  const seenSegs = useRef<typeof segs | null>(null)
+  useFrame((state) => {
+    const fresh = filled.current !== lines || seenSegs.current !== segs
+    if (!changed(state, fresh)) return
+    filled.current = lines
+    seenSegs.current = segs
+    const tmp = new Vector3()
+    write((buf) => segs.forEach(({ at, axis }, i) => {
+      const t = worldUnitsPerPixel(state.camera, tmp.set(...at), state.size.height) * FIX_GLYPH_SIZE
+      for (let k = 0; k < 3; k++) { buf[i * 6 + k] = at[k] - axis[k] * t; buf[i * 6 + 3 + k] = at[k] + axis[k] * t }
+    }))
+  })
+  return segs.length ? <primitive object={lines} /> : null
 }

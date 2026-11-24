@@ -2,7 +2,7 @@ import type { LucideIcon } from 'lucide-react'
 import {
   Undo2, Redo2, SquareDashedMousePointer, SquareDashed, Grid3x3, Ruler, ZoomIn, ZoomOut, Maximize2, CircleDot, Minus, Anchor, ArrowDown, ArrowDownToLine, Hash, Tag, Tags,
   Grid2x2, Layers, Rows3, Box, LayoutGrid, Building2, Square, ChevronUp, ChevronDown, Ghost, CircleOff, Spline, MoveHorizontal, Activity, RotateCw, Waves, Palette,
-  BarChart3, ChartLine, Sigma, Trash2, Layers3, Cuboid, SquareStack, Move, Copy, FlipHorizontal2, Scissors, Merge, ArrowDownToDot, ArrowDownWideNarrow, MousePointer2, PenLine, GripHorizontal, Columns2,
+  BarChart3, ChartLine, Sigma, Trash2, Layers3, Cuboid, SquareStack, Focus, Eye, Command, Move, Copy, FlipHorizontal2, Scissors, Merge, ArrowDownToDot, ArrowDownWideNarrow, MousePointer2, PenLine, GripHorizontal, Columns2,
 } from 'lucide-react'
 import { useAppStore, type AppStore } from '@/app/store/useAppStore'
 import { stepView, validViewMode } from '@/app/lib/editor/viewCamera'
@@ -49,7 +49,7 @@ const hasRun = (s: AppStore) => s.resultsView.runId !== null
 const resultType = (type: ResultType, label: string, icon: LucideIcon, tip: string, extra: Partial<RibbonCommand> = {}): RibbonCommand => ({
   id: `result.${type}`, label, icon, tip,
   isActive: (s) => hasRun(s) && s.resultsView.type === type,
-  enabled: (s) => hasRun(s) && !s.model.building,
+  enabled: (s) => hasRun(s),
   run: (s) => s.setResultsView({ type }),
   ...extra,
 })
@@ -75,6 +75,9 @@ export const COMMANDS = {
   redo: { id: 'redo', label: 'Redo', icon: Redo2, hotkey: ['mod+y', 'mod+shift+z'], enabled: (s) => (modelUndoable(s) ? s.modelFuture.length > 0 : s.analysisHistory.cursor < s.analysisHistory.commands.length - 1), run: (s) => (modelUndoable(s) ? s.modelRedo() : s.analysisRedo()) },
   selectAll: { id: 'selectAll', label: 'Select all', icon: SquareDashedMousePointer, tip: 'Select every node and element', hotkey: ['mod+a'], enabled: (s) => hasModel(s) && s.nodePickMode === 'none', run: (s) => s.selectAll() },
   deleteSelection: { id: 'deleteSelection', label: 'Delete', icon: Trash2, tip: 'Delete the selected nodes and elements', hotkey: ['delete'], enabled: (s) => s.activePanel === 'model' && s.activeTool === 'select' && s.nodePickMode === 'none' && s.selectedNodeIds.length + s.selectedElementIds.length > 0, run: (s) => s.deleteSelection() },
+  isolate: { id: 'isolate', label: 'Isolate', icon: Focus, tip: 'Show only the selected objects', enabled: (s) => s.isolated !== null || hasSelection(s), isActive: (s) => s.isolated !== null, run: (s) => { if (s.isolated) s.setIsolated(null); else { s.setIsolated({ nodes: [...s.selectedNodeIds], elements: [...s.selectedElementIds] }); s.requestViewportAction('fit') } } },
+  showAll: { id: 'showAll', label: 'Show all', icon: Eye, tip: 'Show every object again', enabled: (s) => s.isolated !== null, run: (s) => s.setIsolated(null) },
+  palette: { id: 'palette', label: 'Commands', icon: Command, tip: 'Search all commands', hotkey: ['mod+k'], run: (s) => s.setPaletteOpen(true) },
   clearSelection: { id: 'clearSelection', label: 'Clear', icon: SquareDashed, tip: 'Clear the selection', enabled: (s) => s.selectedNodeIds.length + s.selectedElementIds.length > 0, run: (s) => s.clearSceneSelection() },
   gridsLevels: { id: 'gridsLevels', label: 'Grids & levels', icon: Grid3x3, tip: 'Edit grid lines and story levels', run: (s) => s.setGridlinesDialogOpen(true) },
   units: { id: 'units', label: 'Units', icon: Ruler, tip: 'Model and display units', enabled: hasModel, run: (s) => s.setUnitsDialogOpen(true) },
@@ -142,7 +145,7 @@ export const COMMANDS = {
   resultTorsion: resultType('torsion', 'T', RotateCw, 'Torsion', { visible: only3d }),
   resultContour: resultType('contour', 'Contour', Palette, 'Shell stress resultants', { visible: (s) => only3d(s) && [...s.model.elements.values()].some((e) => isShell(e.eleType)) }),
   resultMode: resultType('mode', 'Modes', Waves, 'Mode shapes (modal case)'),
-  resultReactions: { id: 'resultReactions', label: 'Reactions', icon: Anchor, tip: 'Support reactions at the current step', isActive: (s) => s.resultsView.showReactions, enabled: (s) => hasRun(s) && !s.model.building, run: (s) => s.setResultsView({ showReactions: !s.resultsView.showReactions }) },
+  resultReactions: { id: 'resultReactions', label: 'Reactions', icon: Anchor, tip: 'Support reactions at the current step', isActive: (s) => s.resultsView.showReactions, enabled: (s) => hasRun(s), run: (s) => s.setResultsView({ showReactions: !s.resultsView.showReactions }) },
   resultValues: { id: 'resultValues', label: 'Values', icon: Hash, tip: 'Value labels on results', isActive: (s) => s.resultsView.showValues, enabled: hasRun, run: (s) => s.setResultsView({ showValues: !s.resultsView.showValues }) },
   resultPanel: { id: 'resultPanel', label: 'Display', icon: BarChart3, tip: 'Display Results panel (case, scale, details)', isActive: (s) => s.resultsView.open, enabled: hasRun, run: (s) => s.setResultsView({ open: !s.resultsView.open }) },
   resultPlot: { id: 'resultPlot', label: 'Plot', icon: ChartLine, tip: 'Plot results', isActive: (s) => s.plotView.open, enabled: hasRun, run: (s) => s.setPlotView({ open: !s.plotView.open }) },
@@ -165,7 +168,7 @@ export const RIBBON_TABS: RibbonTabDef[] = [
   ] },
   { id: 'edit', label: 'Edit', groups: [
     { label: 'History', commands: ['undo', 'redo'] },
-    { label: 'Select', commands: ['toolSelect', 'selectAll', 'clearSelection', 'deleteSelection'] },
+    { label: 'Select', commands: ['toolSelect', 'selectAll', 'clearSelection', 'deleteSelection', 'isolate'] },
     { label: 'Modify', commands: ['editMove', 'editCopy', 'editMirror', 'editDivide', 'editMerge'] },
     { label: 'Assign loads', commands: ['assignNodalLoad', 'assignMemberLoad'] },
     { label: 'View', commands: ['view3d', 'viewPlan', 'viewElevation', 'showExtruded'], custom: 'stories' },
@@ -175,6 +178,7 @@ export const RIBBON_TABS: RibbonTabDef[] = [
     { label: 'Stories', custom: 'stories' },
     { label: 'Zoom', commands: ['zoomIn', 'zoomOut', 'fit'] },
     { label: 'Show', commands: ['showExtruded', 'showNodes', 'showElements', 'showSupports'] },
+    { label: 'Isolate', commands: ['isolate', 'showAll'] },
     { label: 'Loads', commands: ['showNodalLoads', 'showElementLoads', 'showLoadValues'], custom: 'loadPatterns' },
     { label: 'Labels', commands: ['showNodeIds', 'showElementIds'] },
     { label: 'Reference', commands: ['showGrid', 'showGridlines', 'showLevels'] },

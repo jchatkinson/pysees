@@ -3,7 +3,7 @@ import { useFrame, type ThreeEvent } from '@react-three/fiber'
 import { BufferAttribute, BufferGeometry, DoubleSide, Mesh, MeshBasicMaterial } from 'three'
 import { useAppStore } from '@/app/store/useAppStore'
 import type { DisplayBuffers } from './displayBuffers'
-import type { SceneIndex } from './sceneIndex'
+import { isClosed, type SceneIndex } from './sceneIndex'
 
 const SURFACE_COLOR = 0x93c5fd
 const SURFACE_OPACITY = 0.28
@@ -16,7 +16,7 @@ function triangulate(index: SceneIndex): { triangles: number[]; owner: number[] 
   const triangles: number[] = []
   const owner: number[] = []
   index.elementNodes.forEach((rows, e) => {
-    if (index.elementKind[e] !== 'shell') return
+    if (!isClosed(index.elementKind[e])) return
     for (let k = 1; k + 1 < rows.length; k++) {
       triangles.push(rows[0], rows[k], rows[k + 1])
       owner.push(e)
@@ -49,9 +49,10 @@ export function ShellSurfaces({ index, buffers }: { index: SceneIndex; buffers: 
   // The selected shells are their own mesh over the same vertex data, so they follow the displaced positions too.
   const selectedGeometry = useMemo(() => {
     const triangles: number[] = []
+    const rowOf = new Map(index.elementIds.map((id, j) => [id, j]))
     for (const id of selectedIds) {
-      const row = index.elementIds.indexOf(id)
-      if (row < 0 || index.elementKind[row] !== 'shell') continue
+      const row = rowOf.get(id)
+      if (row === undefined || !isClosed(index.elementKind[row])) continue
       const rows = index.elementNodes[row]
       for (let k = 1; k + 1 < rows.length; k++) triangles.push(rows[0], rows[k], rows[k + 1])
     }

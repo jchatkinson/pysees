@@ -55,7 +55,7 @@ AnalysisHistory      ─┼─► compileInputV1 ─► Carapace wasm worker ─
 - Carapace runs 2D (ndm=2/ndf=3) and 3D (ndm=3/ndf=6) models: `ElasticBeamColumn`, `DispBeamColumn` (fiber, with `-GJ` torsion in 3D) and `Truss`, plus 3D `ShellMITC4` / `ShellDKGT` (4- and 3-node shells with `ElasticMembranePlateSection`; nodal, self-weight and pressure loads); 3D `Corotational`, `-jntOffset`, zero-length and `forceBeamColumn` are diagnostics. **3D models are Z-up** (plan is X–Y, levels rise in Z; 2D models are in the XY plane, Y up). A beam's local axes come from its transformation's `vecxz` (`lib/memberFrame.ts`, OpenSees rule: `y = vecxz × x`, `z = x × y`), and loads, the deformed shape and the 3D force diagrams (Vy/Vz, Mz/My, T) all use them.
 - `lib/carapace/compileInputV1.ts` compiles Model + sequence into `CarapaceInputV1`
   (`types/carapaceInputV1.ts`, mirrors Rust `input_v1` in `../carapace/wasm-bridge`), returning
-  diagnostics for anything unsupported. It also emits the native `building` table for stud-wall building models. Material/section arg names are the **schema** names (lowercase,
+  diagnostics for anything unsupported. Carapace-only stud walls (`studWall` elements, `Anchorage` material, `floorLoad` pattern children; `lib/studWalls.ts`) compile to `studWalls` / `floorLoads`; the stud-wall template is Carapace's `expandBuilding` turned into ordinary entities, and OpenSees export approximates each wall as elastic shells with a warning (`lib/studWallExport.ts`). Material/section arg names are the **schema** names (lowercase,
   e.g. `fy`, `e0`, `epsU`), not OpenSees doc capitalisation.
 - `workers/carapaceWorker.ts` decodes the input, advances in chunks (cooperative cancel), and streams
   recorder batches to `workers/resultsStorageWorker.ts` over a `MessageChannel`. Client side:
@@ -120,6 +120,11 @@ Drawing (`activeTool` in the store; `components/r3f/ToolLayer.tsx`, `components/
 `properties.ts`): tools emit ordinary `ModelWrite`s through `DrawBatch` (merges coincident nodes, reuses a `geomTransf` with a matching
 `vecxz`) and commit one undo step via `writeModelEntities`. Frame properties are derived from the elements (element type + args minus
 `transfTag`), never stored. While a tool is active, scene clicks don't change the selection. Edit operations (`lib/editor/edit.ts`: move, copy/replicate, mirror, divide, merge, load writes) run from the Edit tab through `EditDialog` and commit one undo step via `editModel` / `writeModelEntities`; the shell tool meshes grid cells (`cellAt`, `meshQuad` in `snap.ts`). A selection of several objects shows `SelectionPanel` (reassign property, supports, delete) in place of the command form.
+
+Viewport performance rules: the canvas renders on demand, so anything that changes what is drawn outside React props must call
+`invalidate()` (store changes and `DisplayBuffers` already do). Draw many small things batched: one `useSegmentLines` /
+`InstancedMesh` per layer recomputed on `useCameraChange()`, labels through `ScreenLabels`; never an `<Html>`, drei `<Line>` or
+`useFrame` per item, and never drei `<Text>` (its SDF generator loses the WebGL context).
 
 Results live in IndexedDB (`lib/resultsStorage`), read per step for display (`useResultsSource`,
 `stepFrames`); 2D models render in the XY plane.

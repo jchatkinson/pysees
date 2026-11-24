@@ -51,7 +51,7 @@ export interface StepFrame {
 }
 
 function buildLayout(run: RunMetadata, recorders: RecorderMetadata[], stages: StageMetadata[]): RunLayout {
-  const columns: RunLayout['columns'] = { disp: new Map(), vel: new Map(), accel: new Map(), reaction: new Map(), force: new Map(), shell: new Map(), building: new Map() }
+  const columns: RunLayout['columns'] = { disp: new Map(), vel: new Map(), accel: new Map(), reaction: new Map(), force: new Map(), shell: new Map(), studWall: new Map() }
   for (const rec of recorders) {
     const kind = rec.kind ?? 'disp'
     const tag = Number(rec.recorderId.replace(/^[a-z]+:/, ''))

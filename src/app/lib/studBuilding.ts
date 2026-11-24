@@ -1,4 +1,4 @@
-import type { BuildingEntity, StudBuildingParams } from '@/app/types/model'
+import type { StudBuildingParams } from '@/app/types/model'
 import type { BuildingSpec, RecorderSpecWire, StudWallBaseComponent, StudWallQuantity, WallLayoutSpec, WallSpec } from '@/app/types/carapaceInputV1'
 
 export const STUD_BUILDING_DEFAULTS: StudBuildingParams = {
@@ -25,19 +25,13 @@ export function wallPiers(layout: WallLayoutSpec): BuildingPier[] {
 
 export const PIER_QUANTITIES: StudWallQuantity[] = ['q', 'gamma', 'momentBase', 'momentTop', 'chordLeft', 'chordRight']
 export const WALL_BASE_COMPONENTS: StudWallBaseComponent[] = ['shear', 'axial', 'moment']
-export const DRIFT_COMPONENTS = ['x', 'z', 'rotation'] as const
-export type BuildingRecorderTarget = { type: 'pier'; storey: number; wall: string; pier: number; width: number } | { type: 'wall'; storey: number; wall: string } | { type: 'drift'; storey: number }
-/** The recorder groups a building run stores, in column order: per storey and wall, its base reaction, then each pier;
- * then (rigid diaphragms only: Carapace rejects drift on flexible levels) each storey's drift. The compiler and the
- * results table both read this list, so a group's index is its results key. */
-export function buildingRecorders(spec: BuildingSpec): { target: BuildingRecorderTarget; labels: string[]; specs: RecorderSpecWire[] }[] {
-  const out: ReturnType<typeof buildingRecorders> = []
-  spec.storeys.forEach((storey, si) => storey.walls.forEach((wall) => {
-    out.push({ target: { type: 'wall', storey: si, wall: wall.name }, labels: WALL_BASE_COMPONENTS, specs: WALL_BASE_COMPONENTS.map((component) => ({ response: 'buildingWallBase', storey: si, wall: wall.name, component })) })
-    wallPiers(wall.layout).forEach((pier, pi) => out.push({ target: { type: 'pier', storey: si, wall: wall.name, pier: pi, width: pier.width }, labels: PIER_QUANTITIES, specs: PIER_QUANTITIES.map((quantity) => ({ response: 'buildingWallPier', storey: si, wall: wall.name, pier: pi, quantity })) }))
-  }))
-  if (spec.diaphragm === 'rigid') spec.storeys.forEach((_, si) => out.push({ target: { type: 'drift', storey: si }, labels: [...DRIFT_COMPONENTS], specs: DRIFT_COMPONENTS.map((component) => ({ response: 'buildingStoreyDrift', storey: si, component })) }))
-  return out
+/** A stud wall's recorded columns, in order: its base reaction (shear, axial, moment), then each pier's quantities as `p<n>.<quantity>`.
+ * The compiler records exactly this list per `studWall` element and the results table reads it back by label. */
+export function studWallRecorders(layout: WallLayoutSpec, elementIndex: number): { labels: string[]; specs: RecorderSpecWire[] } {
+  const labels: string[] = [], specs: RecorderSpecWire[] = []
+  for (const component of WALL_BASE_COMPONENTS) { labels.push(component); specs.push({ response: 'studWallBase', elementKind: 'studWall', elementIndex, component }) }
+  wallPiers(layout).forEach((_, pier) => PIER_QUANTITIES.forEach((quantity) => { labels.push(`p${pier + 1}.${quantity}`); specs.push({ response: 'studWallPier', elementKind: 'studWall', elementIndex, pier, quantity }) }))
+  return { labels, specs }
 }
 
 function layout(p: StudBuildingParams, length: number, window: boolean): WallLayoutSpec {
@@ -56,7 +50,8 @@ function layout(p: StudBuildingParams, length: number, window: boolean): WallLay
   }
 }
 
-export function studBuildingTemplate(params: Partial<StudBuildingParams> = {}): BuildingEntity {
+/** The template's `BuildingSpec` (Carapace's building generator input) and the resolved parameters. */
+export function studBuildingSpec(params: Partial<StudBuildingParams> = {}): { spec: BuildingSpec; p: StudBuildingParams } {
   const p = { ...STUD_BUILDING_DEFAULTS, ...params }
   const wall = (name: string, start: [number, number], direction: [number, number], length: number, window = false): WallSpec => ({ name, start, direction, layout: layout(p, length, window), loads: [] })
   const anchorage = { tension: p.holdDownStiffness, slack: p.anchorageSlack, bearing: { kind: 'o86Crush' as const, qr: p.crushCapacity } }
@@ -78,5 +73,5 @@ export function studBuildingTemplate(params: Partial<StudBuildingParams> = {}): 
       lateral: [{ slot: fx, fx: p.lateralDirection === 'x' ? force : 0, fz: p.lateralDirection === 'z' ? force : 0, at }],
     }
   })
-  return { spec: { storeys, foundationAnchorage: anchorage, diaphragm: p.diaphragm, combination: factors as [number, number, number, number, number, number, number, number] }, steps: p.steps, template: structuredClone(p) }
+  return { spec: { storeys, foundationAnchorage: anchorage, diaphragm: p.diaphragm, combination: factors as [number, number, number, number, number, number, number, number] }, p }
 }

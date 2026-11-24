@@ -1,12 +1,13 @@
 import { useEffect, useMemo } from 'react'
 import { useThree, type ThreeEvent } from '@react-three/fiber'
-import { Html, Line } from '@react-three/drei'
+import { Line } from '@react-three/drei'
 import { LineMaterial, LineSegments2, LineSegmentsGeometry } from 'three-stdlib'
 import { useAppStore } from '@/app/store/useAppStore'
 import { BufferLines } from './BufferLines'
 import type { DisplayBuffers } from './displayBuffers'
-import { fillSegmentPositions, type SceneIndex } from './sceneIndex'
+import { fillSegmentPositions, isClosed, type SceneIndex } from './sceneIndex'
 import { ShellSurfaces } from './Shells'
+import { ScreenLabels } from './ScreenLabels'
 
 const ELEMENT_COLOR = 0x4b5563
 const ELEMENT_LINE_WIDTH_PX = 2
@@ -15,19 +16,6 @@ const GHOST_LINE_WIDTH_PX = 1
 const DEFORMED_COLOR = 0x2563eb
 const SELECTED_COLOR = '#2563eb'
 const SELECTED_LINE_WIDTH_PX = 4
-
-const LABEL_STYLE: React.CSSProperties = {
-  fontSize: 9,
-  color: '#334155',
-  background: 'white',
-  border: '0.5px solid #cbd5e1',
-  borderRadius: 2,
-  padding: '0 3px',
-  lineHeight: '14px',
-  whiteSpace: 'nowrap',
-  userSelect: 'none',
-  pointerEvents: 'none',
-}
 
 /** Every element as one batched fat-line draw call; `ghost` draws the thin undeformed reference under a displaced shape. */
 function ElementLines({ index, ghost }: { index: SceneIndex; ghost: boolean }) {
@@ -70,11 +58,12 @@ function SelectedElements({ index }: { index: SceneIndex }) {
   const points = useMemo(() => {
     const out: [number, number, number][] = []
     const at = (r: number): [number, number, number] => [index.nodeCoords[r * 3], index.nodeCoords[r * 3 + 1], index.nodeCoords[r * 3 + 2]]
+    const row = new Map(index.elementIds.map((id, j) => [id, j]))
     for (const id of ids) {
-      const e = index.elementIds.indexOf(id)
-      if (e < 0) continue
+      const e = row.get(id)
+      if (e === undefined) continue
       const rows = index.elementNodes[e]
-      const shell = index.elementKind[e] === 'shell'
+      const shell = isClosed(index.elementKind[e])
       for (let k = 0; k < (shell ? rows.length : rows.length - 1); k++) out.push(at(rows[k]), at(rows[(k + 1) % rows.length]))
     }
     return out
@@ -83,21 +72,17 @@ function SelectedElements({ index }: { index: SceneIndex }) {
   return <Line points={points} segments color={SELECTED_COLOR} lineWidth={SELECTED_LINE_WIDTH_PX} />
 }
 
+const ID_STYLE: Partial<CSSStyleDeclaration> = { fontSize: '9px', color: '#334155', background: 'white', border: '0.5px solid #cbd5e1', borderRadius: '2px', padding: '0 3px', lineHeight: '14px' }
+
+/** Element ids at each element's centroid, as one DOM layer (see `ScreenLabels`). */
 function ElementLabels({ index }: { index: SceneIndex }) {
-  return (
-    <>
-      {index.elementIds.map((id, j) => {
-        const rows = index.elementNodes[j]
-        const mid: [number, number, number] = [0, 0, 0]
-        for (const r of rows) for (let k = 0; k < 3; k++) mid[k] += index.nodeCoords[r * 3 + k] / rows.length
-        return (
-          <Html key={id} position={mid} center style={LABEL_STYLE} zIndexRange={[10, 10]}>
-            E{id}
-          </Html>
-        )
-      })}
-    </>
-  )
+  const labels = useMemo(() => index.elementIds.map((id, j) => {
+    const rows = index.elementNodes[j]
+    const mid: [number, number, number] = [0, 0, 0]
+    for (const r of rows) for (let k = 0; k < 3; k++) mid[k] += index.nodeCoords[r * 3 + k] / rows.length
+    return { position: mid, text: `E${id}` }
+  }), [index])
+  return <ScreenLabels labels={labels} style={ID_STYLE} offset={[-8, -7]} />
 }
 
 export function ElementsLayer({

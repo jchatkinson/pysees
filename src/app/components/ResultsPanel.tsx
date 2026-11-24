@@ -59,7 +59,7 @@ const KIND_BY_RESULT_TYPE: Partial<Record<(typeof RESULT_TYPES)[number]['id'], R
   'shell-resultants': 'shell',
   'reactions': 'reaction',
 }
-const TARGET_HEADER: Record<RecorderKind, string> = { disp: 'Node', vel: 'Node', accel: 'Node', reaction: 'Node', force: 'Element', shell: 'Element', building: 'Building response' }
+const TARGET_HEADER: Record<RecorderKind, string> = { disp: 'Node', vel: 'Node', accel: 'Node', reaction: 'Node', force: 'Element', shell: 'Element', studWall: 'Stud wall' }
 
 export function ResultsPanel() {
   const [resultType, setResultType] = useState<string>('joint-displacements')

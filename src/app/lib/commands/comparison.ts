@@ -37,7 +37,7 @@ export function compareRuns(model: Model, run: CarapaceRun, files: Record<string
 
   const compared = zero(), scale = zero(), maxAbs = zero()
   for (const plan of run.compile.recorderPlans) {
-    if (plan.kind === 'building') continue
+    if (plan.kind === 'studWall') continue
     const quantity = plan.kind
     plan.componentLayout.forEach((_label, j) => {
       const mine = run.columns[plan.columnOffset + j]

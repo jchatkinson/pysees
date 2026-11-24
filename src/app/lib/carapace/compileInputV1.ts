@@ -1,4 +1,4 @@
-import type { Model, MaterialEntity, BeamIntegrationEntity } from '@/app/types/model'
+import type { Model, MaterialEntity, BeamIntegrationEntity, ElementEntity } from '@/app/types/model'
 import type { AnalysisHistory } from '@/app/types/analysisCommands'
 import type { AlgorithmKind, AnalysisStage } from '@/app/types/analysisSequence'
 import type * as W from '@/app/types/carapaceInputV1'
@@ -9,7 +9,8 @@ import { withLumpedBeamMass } from '@/app/lib/beamMass'
 import { pathSeries } from '@/app/lib/groundMotion'
 import { eleLoadKind } from '@/app/lib/shells'
 import { isShell } from '@/app/lib/commands/tables'
-import { buildingRecorders } from '@/app/lib/studBuilding'
+import { studWallRecorders } from '@/app/lib/studBuilding'
+import { isStudWall, studWallArgs, type FloorLoadArgs } from '@/app/lib/studWalls'
 
 export interface CompileInputV1Result {
   input: W.CarapaceInputV1 | null
@@ -27,7 +28,7 @@ export interface CompileInputV1Result {
   nodeTags: number[]
 }
 
-export type RecorderPlanKind = 'disp' | 'vel' | 'accel' | 'reaction' | 'force' | 'shell' | 'building'
+export type RecorderPlanKind = 'disp' | 'vel' | 'accel' | 'reaction' | 'force' | 'shell' | 'studWall'
 export interface RecorderPlan {
   recorderId: string
   kind: RecorderPlanKind
@@ -75,8 +76,8 @@ export function recorderIdFor(kind: RecorderPlanKind, tag: number): string {
 const NO_INDEX = -1
 
 /** Compiles a pysees Model + AnalysisHistory into the CarapaceInputV1 shape decodeInput() expects.
- * Scope (matches carapace-wasm's current decoder): native 3D stud-wall buildings and 2D/3D (ndm=2/ndf=3, ndm=3/ndf=6), Truss/ElasticBeamColumn/
- * DispBeamColumn elements (and zeroLengthSection in 2D), static, modal and transient stages, node displacement/reaction and element force recorders. Everything outside that is
+ * Scope (matches carapace-wasm's current decoder): 2D/3D (ndm=2/ndf=3, ndm=3/ndf=6), Truss/ElasticBeamColumn/
+ * DispBeamColumn elements, zeroLengths, 3D shells and stud walls (Carapace-only, with floor loads), zeroLengthSection in 2D, static, modal and transient stages, node displacement/reaction and element force recorders. Everything outside that is
  * reported as a diagnostic and dropped, never guessed at — this is the full validation boundary
  * pysees-handoff.md assigns to the compiler. */
 export function compileInputV1(model: Model, analysisHistory: AnalysisHistory): CompileInputV1Result {
@@ -87,24 +88,6 @@ export function compileInputV1(model: Model, analysisHistory: AnalysisHistory): 
   }
 
   if (!model.config) return fail('Model is not initialized.')
-  if (model.building) {
-    if (model.config.ndm !== 3 || model.config.ndf !== 6) return fail('Stud-wall buildings require a 3D model (ndm=3, ndf=6).')
-    const conflicts = model.nodes.size || model.masses.size || model.materials.size || model.sections.size || model.geomTransfs.size || model.beamIntegrations.size || model.elements.size || model.fixes.size || model.mpConstraints.size || model.regions.size || model.timeSeries.size || model.patterns.size || model.misc.size
-    if (conflicts) return fail('A stud-wall building cannot be combined with node, element, load, or other model tables.')
-    if (!Number.isInteger(model.building.steps) || model.building.steps < 1) return fail('Stud-wall building load steps must be a positive integer.')
-    if (analysisHistory.commands.length) diagnostics.push({ severity: 'info', message: 'Analysis history is ignored for a stud-wall building; the building uses its generated static load protocol.', commandIndex: -1 })
-    const recorders: W.RecorderSpecWire[] = [], recorderPlans: RecorderPlan[] = []
-    buildingRecorders(model.building.spec).forEach(({ labels, specs }, g) => {
-      recorderPlans.push({ recorderId: `building:${g}`, kind: 'building', targetTag: g, columnOffset: recorders.length, componentLayout: labels })
-      recorders.push(...specs)
-    })
-    const input: W.CarapaceInputV1 = {
-      header: { schemaVersion: 1, ndm: 3, engineVersion: 'pysees-dev', recordInitial: true },
-      building: model.building.spec,
-      sequence: { stages: [{ kind: 'static', id: 'building', steps: model.building.steps, integrator: { kind: 'loadControl', increment: 1 / model.building.steps }, algorithm: { kind: 'newton', tangent: 'current' }, convergence: { kind: 'normDispIncr', tol: 1e-7, maxIter: 100 }, holdPatternsAfter: [] }], recorders },
-    }
-    return { input, diagnostics, recordedNodeTags: [], dofsPerNode: 0, recorderPlans, nodeTags: [] }
-  }
   try { model = withLumpedBeamMass(model) } catch (e) { return fail(e instanceof Error ? e.message : String(e)) }
   const { ndm, ndf } = model.config!
   if (!((ndm === 2 && ndf === 3) || (ndm === 3 && ndf === 6))) {
@@ -202,6 +185,7 @@ export function compileInputV1(model: Model, analysisHistory: AnalysisHistory): 
   const zeroLengthSections: W.ZeroLengthSectionTable = { nodeI: [], nodeJ: [], fiberSection: [], materials: [], orient: [] }
   const shell3s: W.Shell3Table = { nodeIds: [], section: [] }
   const shell4s: W.Shell4Table = { nodeIds: [], section: [] }
+  const studWalls: W.StudWallTable = []
   const resolveSection = (secTag: number, context: string): number => {
     const idx = sectionIndex.get(secTag)
     if (idx === undefined) {
@@ -299,10 +283,6 @@ export function compileInputV1(model: Model, analysisHistory: AnalysisHistory): 
       elementRefs.set(ele.id, { kind: 'dispBeamColumn2d', index: dispBeamColumns.nodeI.length - 1 })
     } else if (ele.eleType === 'zeroLength') {
       const ctx = `ZeroLength ${ele.id}`
-      if (ndm !== 2) {
-        diagnostics.push({ severity: 'warning', message: `Element ${ele.id} (zeroLength) is not yet supported in 3D models by the Carapace compiler and was skipped`, commandIndex: -1 })
-        continue
-      }
       const row = zeroLengths.nodeI.length
       zeroLengths.nodeI.push(resolveNode(ele.nodes[0], ctx))
       zeroLengths.nodeJ.push(resolveNode(ele.nodes[1], ctx))
@@ -312,15 +292,16 @@ export function compileInputV1(model: Model, analysisHistory: AnalysisHistory): 
       const seenDirs = new Set<number>()
       mats.forEach((tag, i) => {
         const dir = dirs[i]
-        if (!Number.isInteger(dir) || dir < 1 || dir > 3) { diagnostics.push({ severity: 'error', message: `${ctx}: direction ${String(dirs[i])} is not 1, 2 or 3 in a 2D model`, commandIndex: -1 }); return }
+        if (!Number.isInteger(dir) || dir < 1 || dir > ndf) { diagnostics.push({ severity: 'error', message: `${ctx}: direction ${String(dirs[i])} is not between 1 and ${ndf} in a ${ndm}D model`, commandIndex: -1 }); return }
         if (seenDirs.has(dir)) diagnostics.push({ severity: 'error', message: `${ctx}: direction ${dir} has more than one material`, commandIndex: -1 })
         seenDirs.add(dir)
         zeroLengths.materials.push([row, dir - 1, resolveMaterial(tag, ctx)])
       })
       const orient = readOrient(ele.args.orient)
-      const problem = ele.args.orient === undefined ? null : orientProblem(ele.args.orient, 2)
+      const problem = ele.args.orient === undefined ? null : orientProblem(ele.args.orient, ndm)
       if (problem) diagnostics.push({ severity: 'error', message: `${ctx}: ${problem}`, commandIndex: -1 })
-      else if (orient) zeroLengths.orient!.push({ row, x: [orient[0], orient[1], orient[2]] })
+      else if (orient) zeroLengths.orient!.push({ row, x: [orient[0], orient[1], orient[2]], ...(ndm === 3 ? { yp: [orient[3], orient[4], orient[5]] as [number, number, number] } : {}) })
+      if (ndm === 3 && ele.args.friction !== undefined && ele.args.friction !== null) { diagnostics.push({ severity: 'error', message: `${ctx}: zeroLength friction is 2D only in PySees`, commandIndex: -1 }); continue }
       const friction = readZeroLengthFriction(ele.args.friction, ctx, diagnostics)
       if (friction) {
         if (!seenDirs.has(friction.normalDir)) diagnostics.push({ severity: 'error', message: `${ctx}: friction needs a material on its normal direction ${friction.normalDir}`, commandIndex: -1 })
@@ -328,6 +309,11 @@ export function compileInputV1(model: Model, analysisHistory: AnalysisHistory): 
         zeroLengths.friction!.push({ row, normalDof: friction.normalDir - 1, shearDofs: [friction.shearDir - 1], mu: friction.mu, k0: friction.k0, b: friction.b })
       }
       elementRefs.set(ele.id, { kind: 'zeroLength', index: row })
+    } else if (isStudWall(ele.eleType)) {
+      const ctx = `Stud wall ${ele.id}`
+      const row = compileStudWall(ele, ndm, (id) => resolveNode(id, ctx), diagnostics)
+      if (!row) continue
+      elementRefs.set(ele.id, { kind: 'studWall', index: studWalls.push(row) - 1 })
     } else if (ele.eleType === 'zeroLengthSection') {
       const secIdx = resolveSection(Number(ele.args.secTag), `ZeroLengthSection ${ele.id}`)
       zeroLengthSections.nodeI.push(resolveNode(ele.nodes[0], `ZeroLengthSection ${ele.id}`))
@@ -469,7 +455,21 @@ export function compileInputV1(model: Model, analysisHistory: AnalysisHistory): 
       }
     }
   }
-  if ((nodalLoads.node.length || elementLoads.pattern.length) && sequence.stages.length === 0) {
+  // Floor loads: a pattern-owned one-way floor whose reactions load its support walls (Carapace expands it at decode time).
+  const floorLoads: W.FloorTransferSpec[] = []
+  for (const id of patternIds) {
+    for (const child of model.patterns.get(id)!.children) {
+      if (child.kind !== 'floorLoad') continue
+      const a = child.args as unknown as FloorLoadArgs
+      const supports = a.supports.map((sup) => {
+        const ref = elementRefs.get(sup.wall)
+        if (ref?.kind !== 'studWall') diagnostics.push({ severity: 'error', message: `Floor load in pattern ${id}: support ${sup.wall} is not a stud wall`, commandIndex: -1 })
+        return { ...sup, wall: { kind: 'studWall' as const, index: ref?.index ?? NO_INDEX } }
+      })
+      floorLoads.push({ bounds: a.bounds, continuity: a.continuity, loads: a.loads as W.FloorTransferLoadSpec[], pattern: patternIndex.get(id)!, supports })
+    }
+  }
+  if ((nodalLoads.node.length || elementLoads.pattern.length || floorLoads.length) && sequence.stages.length === 0) {
     diagnostics.push({ severity: 'error', message: 'Model has loads but the analysis sequence has no stages', commandIndex: -1 })
   }
 
@@ -562,6 +562,15 @@ export function compileInputV1(model: Model, analysisHistory: AnalysisHistory): 
     }
   }
 
+  // Every stud wall records its base reaction and pier results (`studWallRecorders`), which the results table reads.
+  if (stages.length) for (const ele of model.elements.values()) {
+    const ref = elementRefs.get(ele.id)
+    if (ref?.kind !== 'studWall') continue
+    const { labels, specs } = studWallRecorders(studWalls[ref.index].layout, ref.index)
+    plan('studWall', ele.id, labels)
+    recorders.push(...specs)
+  }
+
   if (diagnostics.some((d) => d.severity === 'error')) return { input: null, diagnostics, recordedNodeTags: [], dofsPerNode: 0, recorderPlans: [], nodeTags: [] }
 
   const input: W.CarapaceInputV1 = {
@@ -578,9 +587,22 @@ export function compileInputV1(model: Model, analysisHistory: AnalysisHistory): 
     loadPatterns,
     nodalLoads,
     elementLoads,
+    ...(studWalls.length ? { studWalls } : {}),
+    ...(floorLoads.length ? { floorLoads } : {}),
     sequence: { stages, recorders },
   }
   return { input, diagnostics, recordedNodeTags, dofsPerNode, recorderPlans, nodeTags: nodeIds }
+}
+
+/** A `studWall` element → its `studWalls` row: the four corners, then one station per further node (chord and wall-local x from `args.stations`). */
+function compileStudWall(ele: ElementEntity, ndm: number, node: (id: number) => number, diagnostics: CompileDiagnostic[]): W.StudWallSpec | null {
+  const a = studWallArgs(ele.args)
+  const error = (message: string) => { diagnostics.push({ severity: 'error', message: `Stud wall ${ele.id}: ${message}`, commandIndex: -1 }); return null }
+  if (ndm !== 3) return error('stud walls need a 3D model in PySees')
+  if (!a.layout || !Array.isArray(a.stations)) return error('has no layout')
+  if (ele.nodes.length !== 4 + a.stations.length) return error(`has ${ele.nodes.length} nodes for 4 corners and ${a.stations.length} stations`)
+  const ids = ele.nodes.map(node)
+  return { corners: [ids[0], ids[1], ids[2], ids[3]], stations: a.stations.map((st, i) => ({ chord: st.chord, x: st.x, node: ids[4 + i] })), layout: a.layout }
 }
 
 /** The PySees-only Coulomb friction of a `zeroLength`: `{ normalDir, shearDir, mu, k0, b }` (1-based directions), or `undefined` when the element has none. */
@@ -777,6 +799,10 @@ export function compileMaterial(mat: MaterialEntity, diagnostics: CompileDiagnos
       if (!blank(a.eps0) && Number(a.eps0) !== 0) error('initial strain (eps0) is not supported by Carapace')
       return { kind: 'elasticPp', e: Number(a.e) || 0, eyp: Number(a.epsyP) || 0 }
     case 'ENT': return { kind: 'ent', e: Number(a.e) || 0 }
+    case 'Anchorage': {
+      if (a.bearing !== 'linear' && a.bearing !== 'o86Crush') error(`bearing must be linear or o86Crush (got "${String(a.bearing ?? '')}")`)
+      return { kind: 'anchorage', tension: num(a.tension), slack: num(a.slack), bearing: a.bearing === 'linear' ? { kind: 'linear', k: num(a.k) } : { kind: 'o86Crush', qr: num(a.qr) } }
+    }
     case 'Steel01': return { kind: 'steel01', fy: Number(a.fy) || 0, e0: Number(a.e0) || 0, b: Number(a.b) || 0, a1: Number(a.a1) || 0, a2: Number(a.a2) || 1, a3: Number(a.a3) || 0, a4: Number(a.a4) || 1 }
     case 'Steel02':
       if (!blank(a.sigInit) && Number(a.sigInit) !== 0) error('initial stress (sigInit) is not supported by Carapace')

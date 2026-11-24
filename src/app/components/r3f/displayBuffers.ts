@@ -49,6 +49,8 @@ export class DisplayBuffers {
   diagramVersion = 0
 
   private readonly undeformed: Float32Array
+  /** Called after every change, so an on-demand canvas draws the new contents. */
+  onChange: (() => void) | null = null
 
   constructor(index: SceneIndex) {
     this.undeformed = index.nodeCoords
@@ -67,6 +69,7 @@ export class DisplayBuffers {
     this.active = true
     this.contourActive = contour
     this.version++
+    this.onChange?.()
   }
 
   /** Back to the undeformed shape. */
@@ -77,6 +80,7 @@ export class DisplayBuffers {
     this.nodeLabels = []
     this.nodePositions.set(this.undeformed)
     this.version++
+    this.onChange?.()
   }
 
   /** Call after `fillDiagram` wrote the diagram arrays. */
@@ -86,11 +90,13 @@ export class DisplayBuffers {
     this.diagramLabels = result.labels
     this.diagramActive = true
     this.diagramVersion++
+    this.onChange?.()
   }
 
   resetDiagram(): void {
     if (!this.diagramActive) return
     this.diagramActive = false
     this.diagramVersion++
+    this.onChange?.()
   }
 }

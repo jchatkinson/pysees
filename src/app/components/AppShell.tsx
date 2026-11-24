@@ -11,6 +11,7 @@ import { InitModal } from '@/app/components/InitModal'
 import { GridlinesDialog } from '@/app/components/GridlinesDialog'
 import { UnitsDialog } from '@/app/components/UnitsDialog'
 import { EditDialog } from '@/app/components/EditDialog'
+import { CommandPalette } from '@/app/components/ribbon/CommandPalette'
 import { MaterialDialog } from '@/app/components/MaterialDialog'
 import { SectionDialog } from '@/app/components/sections/SectionDialog'
 import { Button } from '@/app/components/ui/button'
@@ -74,6 +75,7 @@ export function AppShell() {
       <GridlinesDialog />
       <ConnectedUnitsDialog />
       <EditDialog />
+      <CommandPalette />
       <MaterialDialog />
       <SectionDialog />
       <Ribbon />

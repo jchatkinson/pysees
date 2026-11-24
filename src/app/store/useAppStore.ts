@@ -241,6 +241,11 @@ export interface AppStore {
   toolInput: string
   setToolInput: (text: string) => void
   setSupportPreset: (p: 'fixed' | 'pinned' | 'roller') => void
+  /** "Show selection only": the viewport draws just these elements and nodes (with the elements' nodes); null shows everything. */
+  isolated: { nodes: number[]; elements: number[] } | null
+  setIsolated: (sel: { nodes: number[]; elements: number[] } | null) => void
+  paletteOpen: boolean
+  setPaletteOpen: (open: boolean) => void
   /** Orthographic projection for the 3D view. */
   orthographic: boolean
   setOrthographic: (on: boolean) => void
@@ -492,7 +497,7 @@ export const useAppStore = create<AppStore>((set, get) => {
       nextGridlineId: gridlines.reduce((max, g) => Math.max(max, g.id + 1), 1),
       levels,
       nextLevelId: levels.reduce((max, l) => Math.max(max, l.id + 1), 1),
-      selectedModelEntity: null, selectedNodeIds: [], selectedElementIds: [], viewMode: { kind: '3d' }, activeTool: 'select', drawTemplate: null, shellTemplate: null,
+      selectedModelEntity: null, selectedNodeIds: [], selectedElementIds: [], viewMode: { kind: '3d' }, isolated: null, activeTool: 'select', drawTemplate: null, shellTemplate: null,
       selectedAnalysisIndex: null,
       analysisInsertionIndex: null,
       resultsView: DEFAULT_RESULTS_VIEW,
@@ -526,7 +531,7 @@ export const useAppStore = create<AppStore>((set, get) => {
       hiddenLoadPatterns: project.display.hiddenLoadPatterns,
       resultsView: { ...DEFAULT_RESULTS_VIEW, ...keep<ResultsView>(project.display.resultsView, RESULTS_PREF_KEYS) },
       plotView: { ...DEFAULT_PLOT_VIEW, ...keep<PlotView>(project.display.plotView, PLOT_PREF_KEYS) },
-      selectedModelEntity: null, selectedAnalysisIndex: null, analysisInsertionIndex: null, selectedNodeIds: [], selectedElementIds: [], viewMode: { kind: '3d' }, activeTool: 'select', drawTemplate: null, shellTemplate: null, nodePickMode: 'none', pendingNodePick: null,
+      selectedModelEntity: null, selectedAnalysisIndex: null, analysisInsertionIndex: null, selectedNodeIds: [], selectedElementIds: [], viewMode: { kind: '3d' }, isolated: null, activeTool: 'select', drawTemplate: null, shellTemplate: null, nodePickMode: 'none', pendingNodePick: null,
       results: null, projectFileName: fileName ?? s.projectFileName,
     }))
   },
@@ -546,7 +551,7 @@ export const useAppStore = create<AppStore>((set, get) => {
       selectedModelEntity: null,
       selectedAnalysisIndex: null,
       analysisInsertionIndex: null,
-      selectedNodeIds: [], selectedElementIds: [], viewMode: { kind: '3d' }, activeTool: 'select', drawTemplate: null, shellTemplate: null,
+      selectedNodeIds: [], selectedElementIds: [], viewMode: { kind: '3d' }, isolated: null, activeTool: 'select', drawTemplate: null, shellTemplate: null,
       nodePickMode: 'none',
       pendingNodePick: null,
       results: null,
@@ -703,6 +708,10 @@ export const useAppStore = create<AppStore>((set, get) => {
   viewMode: { kind: '3d' },
   setViewMode: (viewMode) => set({ viewMode }),
   orthographic: false,
+  isolated: null,
+  setIsolated: (isolated) => set({ isolated }),
+  paletteOpen: false,
+  setPaletteOpen: (paletteOpen) => set({ paletteOpen }),
   activeTool: 'select',
   setActiveTool: (activeTool) => set((s) => ({ activeTool, ...(activeTool !== 'select' ? { selectedNodeIds: [], selectedElementIds: [], ...followSelection(s, [], []) } : {}) })),
   drawTemplate: null,

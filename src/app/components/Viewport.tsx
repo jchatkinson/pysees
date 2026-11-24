@@ -29,6 +29,10 @@ export function Viewport() {
   const ndm = useAppStore((s) => s.model.config?.ndm)
 
   const sceneRef = useRef<ViewportSceneRef>(null)
+  const [canvasGen, setCanvasGen] = useState(0)
+  const [contextLost, setContextLost] = useState(false)
+  const genRef = useRef(0)
+  const restart = () => { genRef.current++; setContextLost(false); setCanvasGen(genRef.current) }
   const [marquee, setMarquee] = useState<MarqueeRect | null>(null)
   const marqueeActive = useRef(false)
   const dragStart = useRef<{ x: number; y: number } | null>(null)
@@ -83,11 +87,21 @@ export function Viewport() {
       >
         {/* 3D models are Z-up. The orbit controls fix their up axis when created, so a different ndm remounts the canvas. */}
         <Canvas
-          key={ndm}
+          key={`${ndm}|${canvasGen}`}
           // Member lines are 2 px wide; give them a forgiving click target.
           raycaster={{ params: { Line2: { threshold: 6 } } } as never}
           camera={ndm === 3 ? { position: [10, -12, 8], up: [0, 0, 1], fov: 45, near: 0.1, far: 2000 } : { position: [8, 8, 10], fov: 45, near: 0.1, far: 2000 }}
           gl={{ antialias: true }}
+          // Draw only when something changed (camera, store, results); an idle model costs nothing.
+          frameloop="demand"
+          // A lost GL context (driver reset, too many contexts) shows a notice; when the browser restores it, rebuild the scene.
+          onCreated={({ gl }) => {
+            // Only the live canvas counts: a replaced one is force-lost as it unmounts.
+            const gen = genRef.current
+            // A canvas replaced for a new model (keyed by ndm) is detached when it is force-lost; only a mounted one counts.
+            gl.domElement.addEventListener('webglcontextlost', () => { if (gen === genRef.current && gl.domElement.isConnected) setContextLost(true) })
+            gl.domElement.addEventListener('webglcontextrestored', () => { if (gen === genRef.current) restart() })
+          }}
         >
           <ViewportScene ref={sceneRef} />
         </Canvas>
@@ -110,6 +124,14 @@ export function Viewport() {
       )}
 
       {hasConfig && <ViewLabel />}
+      {contextLost && (
+        <div className="absolute inset-0 z-50 grid place-items-center bg-background/70">
+          <div className="grid gap-2 rounded-sm border bg-background p-3 text-xs shadow">
+            <span>The 3D view lost its graphics context. It will come back when the browser restores it.</span>
+            <button type="button" className="justify-self-start underline" onClick={restart}>Restart the 3D view now</button>
+          </div>
+        </div>
+      )}
       {hasConfig && <DrawOptions />}
       {!hasConfig && (
         <div className="absolute inset-0 grid place-items-center pointer-events-none">

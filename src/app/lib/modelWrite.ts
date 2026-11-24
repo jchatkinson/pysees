@@ -3,7 +3,6 @@ import type {
   LoadAssignment, MPConstraintEntity, MassEntity, MaterialEntity, MiscEntity, Model,
   ModelEntityKind, NodeEntity, PatternEntity, RegionEntity, SectionEntity, TimeSeriesEntity,
 } from '@/app/types/model'
-import type { BuildingEntity } from '@/app/types/model'
 
 /** A single change to apply to the Model — the common currency between commandSchemas' create() and the store's writeModelEntity action. */
 export type ModelWrite =
@@ -20,11 +19,10 @@ export type ModelWrite =
   | { kind: 'timeSeries'; entity: TimeSeriesEntity }
   | { kind: 'pattern'; entity: PatternEntity }
   | { kind: 'misc'; entity: MiscEntity }
-  | { kind: 'building'; entity: BuildingEntity }
   | { kind: 'sectionChild'; sectionId: number; child: FiberSectionItem; childIndex?: number }
   | { kind: 'patternChild'; patternId: number; child: LoadAssignment; childIndex?: number }
 
-export type ModelDeletableKind = Exclude<ModelWrite['kind'], 'sectionChild' | 'patternChild' | 'building'>
+export type ModelDeletableKind = Exclude<ModelWrite['kind'], 'sectionChild' | 'patternChild'>
 
 function mapFor(model: Model, kind: ModelDeletableKind) {
   switch (kind) {
@@ -44,7 +42,7 @@ function mapFor(model: Model, kind: ModelDeletableKind) {
   }
 }
 
-function keyFor(write: Exclude<ModelWrite, { kind: 'sectionChild' | 'patternChild' | 'building' }>): number {
+function keyFor(write: Exclude<ModelWrite, { kind: 'sectionChild' | 'patternChild' }>): number {
   switch (write.kind) {
     case 'fix': return write.entity.nodeId
     case 'mass': return write.entity.nodeId
@@ -54,14 +52,12 @@ function keyFor(write: Exclude<ModelWrite, { kind: 'sectionChild' | 'patternChil
 
 /** True when a top-level write would overwrite an entity that already has that tag (child writes never do). */
 export function entityExists(model: Model, write: ModelWrite): boolean {
-  if (write.kind === 'building') return Boolean(model.building)
   if (write.kind === 'sectionChild' || write.kind === 'patternChild') return false
   return (mapFor(model, write.kind) as Map<number, unknown>).has(keyFor(write))
 }
 
 /** Applies a ModelWrite immutably, returning a new Model. Structural-shares unrelated maps. */
 export function applyModelWrite(model: Model, write: ModelWrite): Model {
-  if (write.kind === 'building') return { ...model, building: write.entity }
   if (write.kind === 'sectionChild') {
     const existing = model.sections.get(write.sectionId)
     if (!existing) return model

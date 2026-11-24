@@ -149,20 +149,26 @@ to the ribbon; the panels stay for detailed settings.
 
 ## 5. Stud walls as regular elements
 
-Today a stud-wall building is one `building` entity (`model.building`, `lib/studBuilding.ts`, drawn by `r3f/Building.tsx`), outside
-the node/element maps, and the model can't be exported. Goal: a stud wall is an ordinary element you draw, select, assign and delete
-like any other.
+Designed in Carapace: `../carapace/docs/stud-wall-elements-plan.md` (decisions 1–7, PySees phases P1–P5). Carapace's side (C1–C4) is
+done. PySees status:
 
-- New element kind for a wall panel (4 corner nodes, like a shell) carrying the stud-wall parameters (stud spacing, sheathing, openings,
-  hold-downs) as its args/property. Drawn with the shell draw tools ("Quick wall" in elevation or plan); floors are diaphragm/shell areas.
-- Carapace: the compiler groups wall-panel elements into the native `building` table it already emits, so the solver side changes little.
-  Anything the grouping can't express (non-rectangular layouts, walls not on a story) is a compile diagnostic.
-- OpenSees export: each panel is written as an elastic shell (`ShellMITC4` + `ElasticMembranePlateSection` with an equivalent stiffness
-  from the panel's sheathing/stud properties) and the export shows a warning listing those elements ("stud wall exported as an elastic
-  shell; nonlinear sheathing, hold-downs and slack are not represented"), plus a comment in the script.
-- The existing `StudBuildingForm` becomes a generator that writes those elements (like a template), not a separate entity. Old
-  projects with a `building` entity are converted on open.
-- Comes after phase 3 (needs the drawing tools and derived properties); its own design doc first.
+- **Done (P2, P4, P5, part of P1/P3).** The template (`lib/studWalls.ts`) calls Carapace's `expandBuilding` (Z-up) and writes ordinary
+  entities: nodes and supports, `studWall` elements (args `{ label, layout, stations }`, nodes = 4 corners + one per chord station),
+  anchorage `zeroLength`s with the Carapace-only `Anchorage` material, `equalDOF` / `rigidDiaphragm` constraints, one named pattern per load
+  slot (nodal storey forces, `floorLoad` children naming their support walls), a static stage, levels and grids. The `building` entity,
+  card, directive and building-only results code are gone. The compiler emits `studWalls`, `floorLoads`, anchorage materials and 3D
+  zero-lengths, and records each wall's base reaction and pier quantities (`studWallRecorders`); the results card lists every wall's
+  base reaction and the selected wall's piers. Walls draw as filled outlines through their chord nodes (scene kind `wall`), so they
+  follow the deformed shape. Selecting a wall or an anchorage shows a read-only card.
+- **OpenSees export (decision):** each wall becomes a `ShellMITC4` mesh (`lib/studWallExport.ts`) with an `ElasticMembranePlateSection`
+  whose shear stiffness matches the sheathing (`G t = Ga`, or `Bv` for O86), with a WARNING comment giving its axial stiffness relative to
+  the studs; anchorage → `Elastic` (tension / initial bearing stiffness); a floor load → its one-way reactions as nodal loads on the support
+  walls' top nodes; DOFs nothing stiffens in the shell model are fixed. Project files keep the authored items in generated blocks.
+- **Needs** the constraint compiler from the mpConstraints branch (`equalDOF` / `rigidDiaphragm` → Carapace tables, `constraints
+  Transformation` in exports): without it the stud-wall runs are rejected (6 tests in `studBuilding.test.ts`).
+- **Not yet:** a wall layout editor and drawing tool, flexible-diaphragm elements (`diaphragms` table; the template's flexible option
+  works because the expansion loads the walls directly), `wallLoad` element loads, openings and studs in the viewport outline,
+  stud-wall results in the plot channel picker.
 
 ## 6. Phasing
 
@@ -182,15 +188,15 @@ like any other.
    into divisions, new elastic plate sections). Rigid diaphragms wait on Carapace: its compiler ignores every mpConstraint today
    (flagged separately). Select-by lists beyond the selection pane's "by property" are not done.
 6. **Stud walls as elements** (section 5).
-7. **Polish**: section box in 3D, extruded deformed shape, command palette, end releases.
-8. **Performance audit** (after the plan is otherwise complete). The canvas crashes too easily (WebGL context lost, the "sad face"),
-   e.g. when toggling view settings. Found and fixed one cause already: drei's SDF `<Text>` (level and load labels) generates glyphs on
-   its own WebGL context, and that took the viewport's context down; labels are HTML now, so avoid `<Text>`. Audit and fix: GPU resources not disposed when layers remount (drei `Line`/`Html` per item,
-   geometries and materials rebuilt on toggles), per-object components where one batched draw would do (supports, loads, labels,
-   ghosts, reactions → `InstancedMesh` / merged `LineSegments2`, drei `Instances`/`Merged`), `Html` labels at scale (cap or switch to
-   SDF text / `troika` with culling), `frameloop="demand"` with `invalidate()`, `AdaptiveDpr`/`PerformanceMonitor`, BVH raycasting
-   (`three-mesh-bvh` via drei `Bvh`) for picking, and handling `webglcontextlost`/`restored` so a lost context recovers instead of
-   killing the canvas. Target: a 10k-element model stays interactive; profile with a generated large model before and after.
+7. **Polish** (partly done): command palette (Ctrl/⌘+K, header search) and "Isolate" / "Show all" (show selection only, filtered like
+   plans so hidden objects can't be picked) instead of a clipping section box. Not done: extruded deformed shape, end releases.
+8. **Performance audit** (first pass done). Measured on a 15-story 8×8-bay frame (1296 nodes, 3375 elements, a load on every beam):
+   view toggles went from 9–17 s to ~1.3 s and heap from ~400 to ~170 MB. Changes: the canvas renders on demand (`frameloop="demand"`;
+   store changes and `DisplayBuffers` invalidate); loads and supports are one fat-line draw per colour, rewritten only when the camera
+   moves (`batchHooks.ts`); id / value / load labels are one DOM layer each (`ScreenLabels`) instead of an `<Html>` per item; drei
+   `<Text>` removed (it took the WebGL context down); a lost context shows a notice and rebuilds the scene on restore; Vite ignores
+   `.claude/` so agent worktrees don't reload the app. Next: `three-mesh-bvh` picking and instanced node glyph scaling for 10k+ models,
+   and profiling on real GPU hardware (this environment renders WebGL on the CPU through SwiftShader).
 
 Tests: tools and snap are pure (`lib/editor/*.test.ts`: a tool fed points produces the expected writes; snap priority; node merging;
 transform reuse; property derivation and naming). Playwright is installed but unused; phase 2 is a good time to
