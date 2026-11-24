@@ -5,7 +5,7 @@ import { Input } from '@/app/components/ui/input'
 import { Label } from '@/app/components/ui/label'
 import { Button } from '@/app/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/app/components/ui/tooltip'
-import { ArrowLeft, FilePlus, FolderOpen, House } from 'lucide-react'
+import { ArrowLeft, Building2, FilePlus, FolderOpen, House } from 'lucide-react'
 import { useAppStore } from '@/app/store/useAppStore'
 import { UNIT_PRESETS, type BaseUnits, type UnitPrefs } from '@/app/lib/units/units'
 import { canImport, readScriptFile } from '@/app/lib/project/open'
@@ -18,6 +18,10 @@ import {
   plateTemplate,
   precastWallTemplate,
   PRECAST_WALL_DEFAULTS,
+  towerTemplate,
+  towerSize,
+  TOWER_DEFAULTS,
+  type TowerParams,
   type CantileverParams,
   type FrameParams,
 } from '@/app/lib/templates'
@@ -37,7 +41,7 @@ import type { StudBuildingParams } from '@/app/types/model'
 
 const NO_UNITS = 'none'
 
-type Choice = 'new' | 'load' | 'momentCurvature' | 'cantilever' | 'frame' | 'frame3d' | 'plate' | 'precastWall' | 'studBuilding'
+type Choice = 'new' | 'load' | 'momentCurvature' | 'cantilever' | 'frame' | 'frame3d' | 'plate' | 'precastWall' | 'tower' | 'studBuilding'
 
 interface CardProps {
   title: string
@@ -154,6 +158,14 @@ function InitDialog() {
     } catch (e) { setStudError(e instanceof Error ? e.message : typeof e === 'object' && e && 'reason' in e ? String((e as { reason: unknown }).reason) : String(e)) } finally { setStudBusy(false) }
   }
 
+  // Tower (the stress-test model)
+  const [tower, setTower] = useState<TowerParams>(TOWER_DEFAULTS)
+  const towerFields: [keyof TowerParams, string, number, number][] = [
+    ['stories', 'Stories', 1, 1], ['storyH', 'Story height (m)', 0.1, 0.5], ['baysX', 'Bays in X', 1, 1], ['bayX', 'Bay width in X (m)', 0.1, 0.5],
+    ['baysY', 'Bays in Y', 1, 1], ['bayY', 'Bay width in Y (m)', 0.1, 0.5], ['mesh', 'Slab elements per bay side', 1, 1],
+  ]
+  const towerCount = towerSize(tower)
+
   function select(c: Choice) {
     setChoice(c)
     setStep(2)
@@ -186,6 +198,9 @@ function InitDialog() {
         dowelEnd: { Fy: dowelEnd.Fy * 1e3, K: dowelEnd.K * 1e6, b: dowelEnd.b }, dowelJoint: { Fy: dowelJoint.Fy * 1e3, K: dowelJoint.K * 1e6, b: dowelJoint.b },
       })
       initModel(t.ndm, t.ndf, { ...TEMPLATE_UNITS, writes: t.writes, analysisCommands: t.analysisCommands, levels: t.levels })
+    } else if (choice === 'tower') {
+      const t = towerTemplate(tower)
+      initModel(t.ndm, t.ndf, { ...TEMPLATE_UNITS, writes: t.writes, analysisCommands: t.analysisCommands, levels: t.levels })
     }
   }
 
@@ -205,6 +220,7 @@ function InitDialog() {
     frame3d: '3D Frame',
     plate: 'Plate',
     precastWall: 'Precast Wall',
+    tower: 'Tower',
     studBuilding: 'Stud-wall building',
   }
 
@@ -263,6 +279,7 @@ function InitDialog() {
                 image={precastWallImg}
                 onClick={() => select('precastWall')}
               />
+              <Card title="Tower" description="Large flat-slab building: frame plus meshed shell slabs at every level. A stress test." icon={<Building2 />} onClick={() => select('tower')} />
               <Card title="Stud-wall building" description="Multistorey light-frame box with floors, openings, anchorage and lateral loads." icon={<House />} onClick={() => select('studBuilding')} />
             </div>
           </>
@@ -472,6 +489,24 @@ function InitDialog() {
                   </div>
                 </div>
                 <p className="text-xs text-muted-foreground">3D model (ndm=3, ndf=6), Z up, clamped along x = 0. Four-node MITC4 shells.</p>
+              </div>
+            )}
+
+            {choice === 'tower' && (
+              <div className="grid gap-4 py-2">
+                <div className="grid grid-cols-2 gap-3">
+                  {towerFields.map(([key, label, min, step]) => (
+                    <div key={key} className="grid gap-1.5">
+                      <Label>{label}</Label>
+                      <Input type="number" value={tower[key]} min={min} step={step} onChange={(e) => { const v = Math.max(min, Number(e.target.value)); setTower((t) => ({ ...t, [key]: step === 1 ? Math.trunc(v) : v })) }} />
+                    </div>
+                  ))}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  3D model (ndm=3, ndf=6), Z up: 600×600 columns, 400×700 beams on every gridline, a 200 mm ShellMITC4 slab per level under self-weight
+                  and 3.5 kPa. Eigen (6 modes) then gravity. {towerCount.nodes.toLocaleString()} nodes, {towerCount.elements.toLocaleString()} elements,
+                  {' '}{towerCount.dofs.toLocaleString()} DOFs.
+                </p>
               </div>
             )}
 

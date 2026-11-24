@@ -1,6 +1,6 @@
 import { emptyModel, type Model } from '@/app/types/model'
 import type { SchemaContext } from '@/app/types/schema'
-import { applyModelWrite, entityExists, type ModelWrite } from '@/app/lib/modelWrite'
+import { ModelDraft, entityExists, type ModelWrite } from '@/app/lib/modelWrite'
 import { validateSchemaResult } from '@/app/lib/commandSchemas'
 import { GENERATED_COMMAND_SCHEMAS } from '@/app/generated/commandSchemas.generated'
 import { canonicalFn, decodeCommand, type DecodeSink } from '@/app/lib/commands/decode'
@@ -17,6 +17,7 @@ const OPENSEES_FNS = new Set(GENERATED_COMMAND_SCHEMAS.map((s) => s.fn))
 /** Applies decoded writes to a growing model, validating each one and tracking the enclosing pattern / fiber section. */
 export class Builder implements DecodeSink {
   model: Model
+  private draft: ModelDraft
   writes: ModelWrite[] = []
   diagnostics: ImportDiagnostic[] = []
   pattern: number | null = null
@@ -35,6 +36,7 @@ export class Builder implements DecodeSink {
     this.ndf = ndf
     this.ctx = { ndm, ndf }
     this.model = { ...emptyModel(), config: { ndm, ndf } }
+    this.draft = new ModelDraft(this.model)
   }
 
   note(severity: ImportDiagnostic['severity'], message: string, line = this.line) { this.diagnostics.push({ severity, message, line }) }
@@ -45,7 +47,8 @@ export class Builder implements DecodeSink {
     if (entityExists(this.model, w)) this.note('warning', 'redefines a tag that already exists; the later definition wins.')
     // A comment directly above a pattern becomes its (UI-only) name; that is how the exporter writes it.
     if (w.kind === 'pattern' && this.comment) w = { ...w, entity: { ...w.entity, name: this.comment } }
-    this.model = applyModelWrite(this.model, w)
+    if (this.draft.model !== this.model) this.draft = new ModelDraft(this.model) // `model` was replaced from outside
+    this.model = this.draft.apply(w).model
     this.writes.push(w)
     if (w.kind === 'pattern') this.pattern = w.entity.id
     if (w.kind === 'section') this.fiberSection = /fiber/i.test(w.entity.secType) ? w.entity.id : null

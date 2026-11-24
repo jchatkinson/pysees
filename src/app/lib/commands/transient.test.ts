@@ -95,7 +95,7 @@ describe('transient pipeline', () => {
     expect(earthquake.steps).toBe(1999)
     expect(earthquake.groundMotions.map((g) => [g.direction, g.scaleFactor])).toEqual([[0, 0.1], [1, 0.1]])
     for (const dof of [0, 1]) {
-      const indices = run.compile.input!.sequence.recorders.flatMap((r, i) => r.response === 'nodeDisp' && r.dof === dof ? [i] : [])
+      const indices = run.compile.recorderPlans.flatMap((p) => (p.kind === 'disp' ? [p.columnOffset + dof] : []))
       expect(indices.some((i) => run.columns[i].slice(10, 2009).some((v) => Math.abs(v) > 1e-6))).toBe(true)
     }
     const comparison = compareRuns(model, run, reference.files)

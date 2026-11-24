@@ -27,6 +27,9 @@ function ops(fn: string, args: PositionalArg[]): AnalysisCommand {
   return { type: 'ANALYSIS_OPS', fn, values: { __args: args } }
 }
 
+/** `Plain` cannot handle multi-point constraints; `Transformation` is what Carapace uses whenever the model has them. */
+const constraintsOp = (model: Model) => ops('constraints', [model.mpConstraints.size ? 'Transformation' : 'Plain'])
+
 const ALGORITHM_OPTIONS = ['Newton', 'ModifiedNewton', 'KrylovNewton', 'NewtonLineSearch', 'Linear']
 const ALGORITHM_KINDS: Record<string, AlgorithmKind> = {
   Newton: 'newton-raphson', ModifiedNewton: 'modified-newton', KrylovNewton: 'krylov-newton', NewtonLineSearch: 'newton-line-search', Linear: 'linear',
@@ -136,10 +139,10 @@ const runGravityAnalysis: AnalysisBlockDef = {
     { kind: 'choice', name: 'holdLoads', label: 'Hold Loads Afterward', options: ['Yes', 'No'], yields: { Yes: [], No: [] }, defaultValue: 'Yes', description: 'Freeze these loads at full value for later stages (loadConst).' },
     ...CONVERGENCE_SCHEMA,
   ],
-  build: (params) => {
+  build: (params, model) => {
     const steps = Math.max(1, Math.trunc(Number(params.steps) || 10))
     return [
-      ops('constraints', ['Plain']),
+      constraintsOp(model),
       ops('numberer', ['RCM']),
       ops('system', ['BandGeneral']),
       ...convergenceOps(params),
@@ -175,13 +178,13 @@ const runPushoverAnalysis: AnalysisBlockDef = {
     { kind: 'int', name: 'steps', label: 'Steps', defaultValue: 100, required: true },
     ...CONVERGENCE_SCHEMA,
   ],
-  build: (params) => {
+  build: (params, model) => {
     const nodeTag = Math.trunc(Number(params.nodeTag) || 0)
     const dof = Math.trunc(Number(params.dof) || 1)
     const increment = Number(params.increment) || 0.01
     const steps = Math.max(1, Math.trunc(Number(params.steps) || 100))
     return [
-      ops('constraints', ['Plain']),
+      constraintsOp(model),
       ops('numberer', ['RCM']),
       ops('system', ['BandGeneral']),
       ...convergenceOps(params),
@@ -234,8 +237,8 @@ const runEarthquakeAnalysis: AnalysisBlockDef = {
     { kind: 'int', name: 'nSteps', label: 'Num Steps', defaultValue: 1000, required: true },
     ...CONVERGENCE_SCHEMA,
   ],
-  build: (params) => [
-    ops('constraints', ['Plain']),
+  build: (params, model) => [
+    constraintsOp(model),
     ops('numberer', ['RCM']),
     ops('system', ['BandGeneral']),
     ...convergenceOps(params),
@@ -266,8 +269,8 @@ const runEigenAnalysis: AnalysisBlockDef = {
   label: 'Run Eigen Analysis',
   description: 'Eigenvalue (modal) analysis of the current model state: natural frequencies and mode shapes for the lowest `modes` modes.',
   paramsSchema: [{ kind: 'int', name: 'modes', label: 'Number of Modes', defaultValue: 3, required: true }],
-  build: (params) => [
-    ops('constraints', ['Plain']),
+  build: (params, model) => [
+    constraintsOp(model),
     ops('numberer', ['RCM']),
     ops('system', ['BandGeneral']),
     ops('eigen', [Math.max(1, Math.trunc(Number(params.modes) || 3))]),

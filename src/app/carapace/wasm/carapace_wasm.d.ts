@@ -802,7 +802,7 @@ export interface Expansion {
  * `embeddedBars`, one value per segment); `axialForce` and `ruptured` are
  * [`EmbeddedBarQuantity`]'s and belong to `embeddedBars` only.
  */
-export type BulkQuantity = "strain" | "stress" | "principalStrain" | "principalStress" | "kc2" | "axialForce" | "ruptured" | "displacement" | "reaction" | "deformation" | "force";
+export type BulkQuantity = "strain" | "stress" | "principalStrain" | "principalStress" | "kc2" | "axialForce" | "ruptured" | "displacement" | "reaction" | "deformation" | "force" | "velocity" | "acceleration" | "endForce" | "load";
 
 /**
  * What a [`RecorderSpec::EmbeddedBar`] reads.
@@ -844,7 +844,7 @@ export type RebarRouting = "tcm" | "pom";
 /**
  * Which element table a [`RecorderSpec::Bulk`] records.
  */
-export type BulkTable = "triangles" | "quads" | "embeddedBars" | "nodes" | "zeroLengths";
+export type BulkTable = "triangles" | "quads" | "embeddedBars" | "nodes" | "zeroLengths" | "elements";
 
 /**
  * Which material limit controls (`core::LimitKind`).
@@ -1661,7 +1661,7 @@ export type PlaneStateSpec = "planeStress" | "planeStrain";
 
 export type Quad4FormulationSpec = "full" | "enhanced";
 
-export type RecorderSpec = { response: "studWallPier"; elementKind: ElementKind; elementIndex: number; pier: number; quantity: StudWallQuantity } | { response: "studWallBase"; elementKind: ElementKind; elementIndex: number; component: StudWallBaseComponent } | { response: "diaphragmBay"; elementIndex: number; bay: number; quantity: WallBayQuantity } | { response: "nodeDifference"; node: number; otherNode?: number; dof: number } | { response: "nodeDisp"; node: number; dof: number } | { response: "nodeVel"; node: number; dof: number } | { response: "nodeAccel"; node: number; dof: number } | { response: "elementForce"; elementKind: ElementKind; elementIndex: number; component: number } | { response: "elementLoad"; elementKind: ElementKind; elementIndex: number; component: number } | { response: "modeShape"; mode: number; node: number; dof: number } | { response: "reaction"; node: number; dof: number } | { response: "fiber"; elementKind: ElementKind; elementIndex: number; point: number; fiber: number; quantity: FiberResponseKind } | { response: "gaussPoint"; elementKind: ElementKind; elementIndex: number; point: number; quantity: GaussQuantity; component: number } | { response: "embeddedBar"; bar: number; segment: number; quantity: EmbeddedBarQuantity } | { response: "bulk"; table: BulkTable; quantity: BulkQuantity };
+export type RecorderSpec = { response: "studWallPier"; elementKind: ElementKind; elementIndex: number; pier: number; quantity: StudWallQuantity } | { response: "studWallBase"; elementKind: ElementKind; elementIndex: number; component: StudWallBaseComponent } | { response: "diaphragmBay"; elementIndex: number; bay: number; quantity: WallBayQuantity } | { response: "nodeDifference"; node: number; otherNode?: number; dof: number } | { response: "nodeDisp"; node: number; dof: number } | { response: "nodeVel"; node: number; dof: number } | { response: "nodeAccel"; node: number; dof: number } | { response: "elementForce"; elementKind: ElementKind; elementIndex: number; component: number } | { response: "elementLoad"; elementKind: ElementKind; elementIndex: number; component: number } | { response: "modeShape"; mode: number; node: number; dof: number } | { response: "reaction"; node: number; dof: number } | { response: "fiber"; elementKind: ElementKind; elementIndex: number; point: number; fiber: number; quantity: FiberResponseKind } | { response: "gaussPoint"; elementKind: ElementKind; elementIndex: number; point: number; quantity: GaussQuantity; component: number } | { response: "embeddedBar"; bar: number; segment: number; quantity: EmbeddedBarQuantity } | { response: "bulk"; table: BulkTable; quantity: BulkQuantity; elementKind?: ElementKind; rows?: number[] };
 
 export type SectionProbeError = { kind: "invalidFibers"; reason: string } | { kind: "invalidMaterial"; reason: string } | { kind: "degenerateSection" } | { kind: "invalidRequest"; reason: string } | { kind: "noGrid" };
 

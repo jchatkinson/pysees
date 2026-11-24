@@ -6,7 +6,7 @@ import { emptyModel } from '@/app/types/model'
 import type { GridlineEntity } from '@/app/types/gridlines'
 import type { LevelEntity } from '@/app/types/levels'
 import { validateUniaxialMaterialValues } from '@/app/lib/commandSchemas'
-import { applyModelWrite, deleteEntity, previewDeleteEntity, removeModelChild, type ModelDeletableKind, type ModelWrite } from '@/app/lib/modelWrite'
+import { applyModelWrite, applyModelWrites, deleteEntity, previewDeleteEntity, removeModelChild, type ModelDeletableKind, type ModelWrite } from '@/app/lib/modelWrite'
 import { runMaterialPreview as runCarapaceMaterialPreview } from '@/app/lib/carapace/materialPreview'
 import { compileInputV1 } from '@/app/lib/carapace/compileInputV1'
 import { runCarapaceOnWorker, nextCarapaceRunId } from '@/app/lib/carapace/carapaceWorkerClient'
@@ -344,14 +344,14 @@ export const useAppStore = create<AppStore>((set, get) => {
   runCarapace: async () => {
     const { model, analysisHistory } = get()
     set({ carapaceRun: { status: 'compiling', diagnostics: [], result: null, error: null, progress: null, runId: null } })
-    const { input, diagnostics, recordedNodeTags, dofsPerNode, recorderPlans, nodeTags } = compileInputV1(model, analysisHistory)
+    const { input, diagnostics, recordedNodeTags, dofsPerNode, recorderPlans, rowLayout, nodeTags } = compileInputV1(model, analysisHistory)
     if (!input) {
       set({ carapaceRun: { status: 'error', diagnostics, result: null, error: 'Compile failed — see diagnostics.', progress: null, runId: null } })
       return
     }
     const runId = nextCarapaceRunId()
     set((s) => ({ carapaceRun: { status: 'running', diagnostics, result: null, error: null, progress: null, runId }, resultsView: { ...s.resultsView, runId: null, caseStage: null, step: 0, stepFrac: 0, playing: false } }))
-    const { promise, cancel } = runCarapaceOnWorker(runId, input, recordedNodeTags, dofsPerNode, recorderPlans, nodeTags, {
+    const { promise, cancel } = runCarapaceOnWorker(runId, input, recordedNodeTags, dofsPerNode, recorderPlans, rowLayout, nodeTags, {
       onProgress: (progress) => set((s) => (s.carapaceRun.runId === runId ? { carapaceRun: { ...s.carapaceRun, progress } } : {})),
     })
     activeCarapaceCancel = cancel
@@ -483,7 +483,7 @@ export const useAppStore = create<AppStore>((set, get) => {
     void clearAllRuns()
     let model = emptyModel()
     model = { ...model, config: { ndm, ndf, ...(extra?.units ? { units: extra.units } : {}) } }
-    for (const write of extra?.writes ?? []) model = applyModelWrite(model, write)
+    model = applyModelWrites(model, extra?.writes ?? [])
     const analysisCommands = extra?.analysisCommands ?? []
     const gridlines = extra?.gridlines ?? []
     const levels = extra?.levels ?? []
@@ -579,7 +579,7 @@ export const useAppStore = create<AppStore>((set, get) => {
     return { model, modelPast: pushModelPast(s.modelPast, s.model), modelFuture: [], selectedNodeIds: [], selectedElementIds: [], ...(kind === 'node' || kind === 'element' ? { selectedModelEntity: null } : {}) }
   }),
   writeModelEntities: (writes) => set((s) => (writes.length === 0 ? s : {
-    model: writes.reduce(applyModelWrite, s.model),
+    model: applyModelWrites(s.model, writes),
     modelPast: pushModelPast(s.modelPast, s.model),
     modelFuture: [],
   })),

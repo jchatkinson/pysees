@@ -164,8 +164,7 @@ done. PySees status:
   whose shear stiffness matches the sheathing (`G t = Ga`, or `Bv` for O86), with a WARNING comment giving its axial stiffness relative to
   the studs; anchorage → `Elastic` (tension / initial bearing stiffness); a floor load → its one-way reactions as nodal loads on the support
   walls' top nodes; DOFs nothing stiffens in the shell model are fixed. Project files keep the authored items in generated blocks.
-- **Needs** the constraint compiler from the mpConstraints branch (`equalDOF` / `rigidDiaphragm` → Carapace tables, `constraints
-  Transformation` in exports): without it the stud-wall runs are rejected (6 tests in `studBuilding.test.ts`).
+- Constraints (`equalDOF` / `rigidDiaphragm`) compile through the mpConstraints work, and exports with constraints use `constraints('Transformation')`; the exported building runs in real OpenSees (`studBuilding.test.ts`).
 - **Not yet:** a wall layout editor and drawing tool, flexible-diaphragm elements (`diaphragms` table; the template's flexible option
   works because the expansion loads the walls directly), `wallLoad` element loads, openings and studs in the viewport outline,
   stud-wall results in the plot channel picker.

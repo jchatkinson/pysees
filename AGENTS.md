@@ -52,14 +52,20 @@ AnalysisHistory      ─┼─► compileInputV1 ─► Carapace wasm worker ─
 
 ## Carapace pipeline
 
-- Carapace runs 2D (ndm=2/ndf=3) and 3D (ndm=3/ndf=6) models: `ElasticBeamColumn`, `DispBeamColumn` (fiber, with `-GJ` torsion in 3D) and `Truss`, plus 3D `ShellMITC4` / `ShellDKGT` (4- and 3-node shells with `ElasticMembranePlateSection`; nodal, self-weight and pressure loads); 3D `Corotational`, `-jntOffset`, zero-length and `forceBeamColumn` are diagnostics. **3D models are Z-up** (plan is X–Y, levels rise in Z; 2D models are in the XY plane, Y up). A beam's local axes come from its transformation's `vecxz` (`lib/memberFrame.ts`, OpenSees rule: `y = vecxz × x`, `z = x × y`), and loads, the deformed shape and the 3D force diagrams (Vy/Vz, Mz/My, T) all use them.
+- Carapace runs 2D (ndm=2/ndf=3) and 3D (ndm=3/ndf=6) models: `ElasticBeamColumn`, `DispBeamColumn` (fiber, with `-GJ` torsion in 3D) and `Truss`, plus 3D `ShellMITC4` / `ShellDKGT` (4- and 3-node shells with `ElasticMembranePlateSection`; nodal, self-weight and pressure loads); 3D `Corotational`, `-jntOffset`, zero-length and `forceBeamColumn` are diagnostics. Multi-point constraints (`equalDOF`, `equalDOF_Mixed`, `rigidLink beam|bar`, 3D `rigidDiaphragm`) compile to Carapace's constraint tables (`compileConstraints`), and the exported script switches to `constraints('Transformation')`; a 2D `rigidDiaphragm` is an error, as in OpenSees. **3D models are Z-up** (plan is X–Y, levels rise in Z; 2D models are in the XY plane, Y up). A beam's local axes come from its transformation's `vecxz` (`lib/memberFrame.ts`, OpenSees rule: `y = vecxz × x`, `z = x × y`), and loads, the deformed shape and the 3D force diagrams (Vy/Vz, Mz/My, T) all use them.
 - `lib/carapace/compileInputV1.ts` compiles Model + sequence into `CarapaceInputV1`
   (`types/carapaceInputV1.ts`, mirrors Rust `input_v1` in `../carapace/wasm-bridge`), returning
   diagnostics for anything unsupported. Carapace-only stud walls (`studWall` elements, `Anchorage` material, `floorLoad` pattern children; `lib/studWalls.ts`) compile to `studWalls` / `floorLoads`; the stud-wall template is Carapace's `expandBuilding` turned into ordinary entities, and OpenSees export approximates each wall as elastic shells with a warning (`lib/studWallExport.ts`). Material/section arg names are the **schema** names (lowercase,
   e.g. `fy`, `e0`, `epsU`), not OpenSees doc capitalisation.
+- Recorders compile to Carapace **bulk** recorders: one per node quantity (displacement, reaction, velocity, acceleration) and per element
+  table (end forces, beam loads, shell resultants), each with the `rows` it records; each returns one flat `Float64Array` per step.
+  `rowLayout` maps every value onto the stored row, which keeps OpenSees' recorder layout (one row per step, a column group per node or
+  element, `recorderPlans`). Only stud-wall building recorders are still scalar. `lib/resultsStorage/recorderRows.ts` builds the rows
+  for the worker and the test runner alike.
 - `workers/carapaceWorker.ts` decodes the input, advances in chunks (cooperative cancel), and streams
-  recorder batches to `workers/resultsStorageWorker.ts` over a `MessageChannel`. Client side:
+  step rows to `workers/resultsStorageWorker.ts` over a `MessageChannel`. Client side:
   `lib/carapace/carapaceWorkerClient.ts`. Store state: `carapaceRun`.
+- Large-model timings: `PERF=1 npx vitest run src/app/lib/perf` (`towerTemplate`, a 20-story flat-slab tower; `TOWER=stories,baysX,baysY,mesh`, `DUMP=file.json` for the native CLI).
 - Rebuild the bundled wasm after Carapace changes: `scripts/build-carapace.sh` (needs the `../carapace` checkout,
   `wasm-bindgen`).
 - Material Preview (`MaterialPreviewOverlay`, `lib/carapace/materialPreview.ts`) drives Carapace's

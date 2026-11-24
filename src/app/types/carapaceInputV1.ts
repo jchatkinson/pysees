@@ -45,9 +45,16 @@ export interface FiberTable { sectionOffsets: number[]; y: number[]; z?: number[
 /** Identity multi-point constraints (`core::Domain::equal_dof`): row `i` ties `constrained[i]`'s
  * dofs listed in `dofs` (sparse `(row, dof)` pairs) exactly to the same dofs of `retained[i]`. */
 export interface EqualDofTable { retained: number[]; constrained: number[]; dofs: [number, number][] }
-/** 2D rigid diaphragm (`core::Domain::rigid_diaphragm`): row `i` ties every node listed
- * against it in `constrained` (sparse `(row, nodeIndex)` pairs) own `ux` to `retained[i]`'s `ux`. */
-export interface RigidDiaphragmTable { retained: number[]; constrained: [number, number][] }
+/** Rigid diaphragm: row `i` ties every node listed against it in `constrained` (sparse `(row, nodeIndex)` pairs) to `retained[i]`. In 2D
+ * only `ux`; in 3D the two translations in the plane normal to `normal[i]` (with the lever arm of the retained node's rotation about it).
+ * `normal` is 3D only (default Y). The constrained nodes' rotation about the normal is not tied; add an `equalDofs` row for that. */
+export interface RigidDiaphragmTable { retained: number[]; normal?: Axis3Spec[]; constrained: [number, number][] }
+export type Axis3Spec = 'x' | 'y' | 'z'
+/** Rigid links (`core::Domain::rigid_link`): `slave[i]` moves with `master[i]` as a rigid body (small rotations, lever arm from the coordinates). */
+export interface RigidLinkTable { master: number[]; slave: number[] }
+/** General linear constraints: row `i` sets `u[slaveNode[i], slaveDof[i]] = sum termCoeff * u[termNode, termDof]` over the terms
+ * `termOffsets[i]..termOffsets[i + 1]`. `termOffsets` has rows + 1 entries. Node indices and 0-based dofs. */
+export interface LinearConstraintTable { slaveNode: number[]; slaveDof: number[]; termOffsets: number[]; termNode: number[]; termDof: number[]; termCoeff: number[] }
 
 export type TimeSeriesSpec = { kind: 'constant' } | { kind: 'linear'; slope: number } | { kind: 'path'; times: number[]; factors: number[] } | { kind: 'boundedPath'; times: number[]; factors: number[]; useLast: boolean }
 export interface LoadPatternTable { series: TimeSeriesSpec[]; scaleFactor: number[] }
@@ -100,7 +107,7 @@ export type StageSpec =
   | { kind: 'modal'; id: string; modes: number }
   | { kind: 'reset'; id: string }
   | { kind: 'transient'; id: string; steps: number; dt: number; damping: { alphaM: number; betaK: number; modalAnchors?: ModalDampingAnchors }; groundMotions: { direction: number; series: TimeSeriesSpec; scaleFactor: number }[]; algorithm: AlgorithmSpec; convergence?: ConvergenceSpec }
-/** Scalar recorder channels stored by the browser results worker. Acceleration and velocity are relative to the ground. */
+/** Recorder channels stored by the browser results worker. Acceleration and velocity are relative to the ground. */
 export type RecorderSpecWire =
   /** One stud-wall pier quantity (shear flow, drift, base/top moment, chord forces); piers as `wallPiers` finds them. */
   | { response: 'studWallPier'; elementKind: 'studWall'; elementIndex: number; pier: number; quantity: StudWallQuantity }
@@ -115,6 +122,10 @@ export type RecorderSpecWire =
   | { response: 'elementLoad'; elementKind: ElementKind; elementIndex: number; component: number }
   /** One shell resultant (`component` 0..8: Nx Ny Nxy Mx My Mxy Qx Qy, OpenSees' order and sign) at Gauss point `point` (0..4). */
   | { response: 'gaussPoint'; elementKind: ElementKind; elementIndex: number; point: number; quantity: 'stress' | 'strain'; component: number }
+  /** A whole node or element table (or the `rows` of it, in that order) per step, as one flat Float64Array: row, then Gauss point, then component. */
+  | { response: 'bulk'; table: 'nodes' | 'elements'; quantity: BulkQuantity; elementKind?: ElementKind; rows?: number[] }
+/** `nodes`: displacement, reaction, velocity, acceleration (ndf each). `elements`: endForce (the elementForce components), load (wx, wy(, wz)), stress / strain (shell resultants per Gauss point). */
+export type BulkQuantity = 'displacement' | 'reaction' | 'velocity' | 'acceleration' | 'endForce' | 'load' | 'stress' | 'strain'
 export interface SequenceSpec { stages: StageSpec[]; recorders: RecorderSpecWire[] }
 
 export interface BuildingSpec { storeys: StoreySpec[]; foundationAnchorage: AnchorageSpec; diaphragm: DiaphragmKind; combination?: [number, number, number, number, number, number, number, number] }
@@ -161,6 +172,10 @@ export interface CarapaceInputV1 {
   dispBeamColumns3d?: FiberBeamColumn3dTable
   zeroLengths?: ZeroLengthTable
   zeroLengthSections?: ZeroLengthSectionTable
+  equalDofs?: EqualDofTable
+  rigidDiaphragms?: RigidDiaphragmTable
+  rigidLinks?: RigidLinkTable
+  linearConstraints?: LinearConstraintTable
   shellSections?: ShellSectionSpec[]
   shell3s?: Shell3Table
   shell4s?: Shell4Table
