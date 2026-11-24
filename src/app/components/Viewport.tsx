@@ -6,8 +6,23 @@ import { MaterialPreviewOverlay } from './MaterialPreviewOverlay'
 import { ResultExtremaOverlay } from './ResultExtremaOverlay'
 import { ResultsDisplayPanel } from './ResultsDisplayPanel'
 import { PlotOverlay } from './plot/PlotOverlay'
+import { viewLabel } from '@/app/lib/editor/viewSlice'
+import { currentView } from './ribbon/commands'
+import { DrawOptions } from './DrawOptions'
 
 type MarqueeRect = { x1: number; y1: number; x2: number; y2: number }
+
+/** Which view is shown ("Plan @ L3 (z = 9)"), in the viewport's top-left corner. */
+function ViewLabel() {
+  const mode = useAppStore(currentView)
+  const levels = useAppStore((s) => s.levels)
+  const gridlines = useAppStore((s) => s.gridlines)
+  return (
+    <span className="absolute left-2 top-2 z-30 pointer-events-none rounded-sm border bg-background/90 px-1.5 py-0.5 text-[11px] font-medium">
+      {viewLabel(mode, levels, gridlines, (v) => String(Number(v.toPrecision(6))))}
+    </span>
+  )
+}
 
 export function Viewport() {
   const hasConfig = useAppStore((s) => Boolean(s.model.config))
@@ -26,7 +41,8 @@ export function Viewport() {
         ref={containerRef}
         className="absolute inset-0"
         onPointerDownCapture={(e) => {
-          if (e.button !== 0 || !containerRef.current) return
+          // A draw tool owns left clicks: no box selection while drawing.
+          if (e.button !== 0 || !containerRef.current || useAppStore.getState().activeTool !== 'select') return
           const bounds = containerRef.current.getBoundingClientRect()
           dragStart.current = { x: e.clientX - bounds.left, y: e.clientY - bounds.top }
         }}
@@ -44,13 +60,13 @@ export function Viewport() {
             setMarquee((m) => m ? { ...m, x2: x, y2: y } : null)
           }
         }}
-        onPointerUpCapture={() => {
+        onPointerUpCapture={(e) => {
           if (dragStart.current === null || !sceneRef.current || !containerRef.current) return
           const wasMarquee = marqueeActive.current
           marqueeActive.current = false
           dragStart.current = null
           if (wasMarquee) {
-            if (marquee) sceneRef.current.selectInRect(marquee)
+            if (marquee) sceneRef.current.selectInRect(marquee, e.shiftKey || e.ctrlKey || e.metaKey)
             setMarquee(null)
             // The browser still fires a native `click` after this pointerup (mousedown and
             // mouseup landed on the same canvas element), which would otherwise hit the
@@ -93,6 +109,8 @@ export function Viewport() {
         />
       )}
 
+      {hasConfig && <ViewLabel />}
+      {hasConfig && <DrawOptions />}
       {!hasConfig && (
         <div className="absolute inset-0 grid place-items-center pointer-events-none">
           <span className="rounded-sm border bg-background/90 px-2 py-1 text-xs text-muted-foreground">

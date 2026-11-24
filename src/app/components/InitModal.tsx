@@ -5,7 +5,7 @@ import { Input } from '@/app/components/ui/input'
 import { Label } from '@/app/components/ui/label'
 import { Button } from '@/app/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/app/components/ui/tooltip'
-import { ArrowLeft, FilePlus, FolderOpen } from 'lucide-react'
+import { ArrowLeft, FilePlus, FolderOpen, House } from 'lucide-react'
 import { useAppStore } from '@/app/store/useAppStore'
 import { UNIT_PRESETS, type BaseUnits, type UnitPrefs } from '@/app/lib/units/units'
 import { canImport, readScriptFile } from '@/app/lib/project/open'
@@ -30,10 +30,11 @@ import frame2dImg from '@/app/assets/templates/frame2d.png'
 import frame3dImg from '@/app/assets/templates/frame3d.png'
 import plateImg from '@/app/assets/templates/plate.png'
 import precastWallImg from '@/app/assets/templates/precastWall.png'
+import { StudBuildingForm } from '@/app/components/StudBuildingForm'
 
 const NO_UNITS = 'none'
 
-type Choice = 'new' | 'load' | 'momentCurvature' | 'cantilever' | 'frame' | 'frame3d' | 'plate' | 'precastWall'
+type Choice = 'new' | 'load' | 'momentCurvature' | 'cantilever' | 'frame' | 'frame3d' | 'plate' | 'precastWall' | 'studBuilding'
 
 interface CardProps {
   title: string
@@ -131,6 +132,13 @@ function InitDialog() {
   const [wallB, setWallB] = useState(PRECAST_WALL_DEFAULTS.b)
   const [wallFriction, setWallFriction] = useState(PRECAST_WALL_DEFAULTS.friction)
   const [wallMu, setWallMu] = useState(PRECAST_WALL_DEFAULTS.mu)
+  // Reinforcement (percent of the gross area) and the base dowels (kN, kN/mm): the two bars at an end of the assembly, and at an interior edge.
+  const [wallWebRho, setWallWebRho] = useState(PRECAST_WALL_DEFAULTS.wallRho * 100)
+  const [wallBoundaryRho, setWallBoundaryRho] = useState(PRECAST_WALL_DEFAULTS.boundaryRho * 100)
+  const [wallSpliceRho, setWallSpliceRho] = useState(PRECAST_WALL_DEFAULTS.spliceRho * 100)
+  const [wallBoundaryRatio, setWallBoundaryRatio] = useState(PRECAST_WALL_DEFAULTS.boundaryRatio * 100)
+  const [dowelEnd, setDowelEnd] = useState({ Fy: PRECAST_WALL_DEFAULTS.dowelEnd.Fy / 1e3, K: PRECAST_WALL_DEFAULTS.dowelEnd.K / 1e6, b: PRECAST_WALL_DEFAULTS.dowelEnd.b })
+  const [dowelJoint, setDowelJoint] = useState({ Fy: PRECAST_WALL_DEFAULTS.dowelJoint.Fy / 1e3, K: PRECAST_WALL_DEFAULTS.dowelJoint.K / 1e6, b: PRECAST_WALL_DEFAULTS.dowelJoint.b })
 
   function select(c: Choice) {
     setChoice(c)
@@ -160,6 +168,8 @@ function InitDialog() {
       const t = precastWallTemplate({
         panels: wallPanels, panelWidth: wallWidth, panelHeight: wallHeight, thickness: wallThickness, ...(storyHeights.length ? { storyHeights } : {}),
         connectorsPerJoint: wallConnectors, Kv: wallKv * 1e6, Fy: wallFy * 1e3, b: wallB, friction: wallFriction, mu: wallMu,
+        wallRho: wallWebRho / 100, boundaryRho: wallBoundaryRho / 100, spliceRho: wallSpliceRho / 100, boundaryRatio: wallBoundaryRatio / 100,
+        dowelEnd: { Fy: dowelEnd.Fy * 1e3, K: dowelEnd.K * 1e6, b: dowelEnd.b }, dowelJoint: { Fy: dowelJoint.Fy * 1e3, K: dowelJoint.K * 1e6, b: dowelJoint.b },
       })
       initModel(t.ndm, t.ndf, { ...TEMPLATE_UNITS, writes: t.writes, analysisCommands: t.analysisCommands, levels: t.levels })
     }
@@ -181,6 +191,7 @@ function InitDialog() {
     frame3d: '3D Frame',
     plate: 'Plate',
     precastWall: 'Precast Wall',
+    studBuilding: 'Stud-wall building',
   }
 
   return (
@@ -238,6 +249,7 @@ function InitDialog() {
                 image={precastWallImg}
                 onClick={() => select('precastWall')}
               />
+              <Card title="Stud-wall building" description="Multistorey light-frame box with floors, openings, anchorage and lateral loads." icon={<House />} onClick={() => select('studBuilding')} />
             </div>
           </>
         )}
@@ -489,6 +501,47 @@ function InitDialog() {
                     <Input type="number" value={wallB} min={0} max={1} step={0.001} onChange={(e) => setWallB(Math.min(1, Math.max(0, Number(e.target.value))))} />
                   </div>
                 </div>
+                <div className="grid gap-1.5">
+                  <Label className="text-xs font-medium">Reinforcement (% of gross area)</Label>
+                  <div className="grid grid-cols-4 gap-3">
+                    <div className="grid gap-1.5">
+                      <Label>Web</Label>
+                      <Input type="number" value={wallWebRho} min={0} max={20} step={0.05} onChange={(e) => setWallWebRho(Math.min(20, Math.max(0, Number(e.target.value))))} />
+                    </div>
+                    <div className="grid gap-1.5">
+                      <Label>Boundary</Label>
+                      <Input type="number" value={wallBoundaryRho} min={0} max={20} step={0.1} onChange={(e) => setWallBoundaryRho(Math.min(20, Math.max(0, Number(e.target.value))))} />
+                    </div>
+                    <div className="grid gap-1.5">
+                      <Label>Splice extra</Label>
+                      <Input type="number" value={wallSpliceRho} min={0} max={20} step={0.05} onChange={(e) => setWallSpliceRho(Math.min(20, Math.max(0, Number(e.target.value))))} />
+                    </div>
+                    <div className="grid gap-1.5">
+                      <Label>Boundary length (%)</Label>
+                      <Input type="number" value={wallBoundaryRatio} min={1} max={50} step={1} onChange={(e) => setWallBoundaryRatio(Math.min(50, Math.max(1, Number(e.target.value))))} />
+                    </div>
+                  </div>
+                </div>
+                <div className="grid gap-1.5">
+                  <Label className="text-xs font-medium">Base dowels, 1 ft from each panel edge</Label>
+                  {([['End of the assembly', dowelEnd, setDowelEnd], ['Interior edge', dowelJoint, setDowelJoint]] as const).map(([name, dowel, set]) => (
+                    <div key={name} className="grid grid-cols-4 gap-3 items-end">
+                      <span className="text-xs text-muted-foreground pb-2">{name}</span>
+                      <div className="grid gap-1.5">
+                        <Label>Yield (kN)</Label>
+                        <Input type="number" value={dowel.Fy} min={0.1} step={10} onChange={(e) => set({ ...dowel, Fy: Math.max(0.1, Number(e.target.value)) })} />
+                      </div>
+                      <div className="grid gap-1.5">
+                        <Label>Stiffness (kN/mm)</Label>
+                        <Input type="number" value={dowel.K} min={0.1} step={10} onChange={(e) => set({ ...dowel, K: Math.max(0.1, Number(e.target.value)) })} />
+                      </div>
+                      <div className="grid gap-1.5">
+                        <Label>Hardening</Label>
+                        <Input type="number" value={dowel.b} min={0} max={1} step={0.005} onChange={(e) => set({ ...dowel, b: Math.min(1, Math.max(0, Number(e.target.value))) })} />
+                      </div>
+                    </div>
+                  ))}
+                </div>
                 <div className="grid grid-cols-3 gap-3 items-end">
                   <label className="flex items-center gap-2 text-sm col-span-2">
                     <input type="checkbox" checked={wallFriction} onChange={(e) => setWallFriction(e.target.checked)} />
@@ -500,17 +553,19 @@ function InitDialog() {
                   </div>
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  2D model (ndm=2, ndf=3), the paper's four-panel benchmark. Panels are fiber beam columns, joined by Steel02 shear connectors and standing on compression-only bearings, Steel02 dowels and a stabilizing shear spring. Other values (concrete and steel strengths, bars, bearings, dowels, gravity, lateral pattern) take the paper's values and are editable in the model.
+                  2D model (ndm=2, ndf=3), the paper's four-panel benchmark. Panels are fiber beam columns, joined by Steel02 shear connectors and standing on compression-only bearings, Steel02 dowels and a stabilizing shear spring. Other values (concrete and steel strengths, bearings, gravity, lateral pattern) take the paper's values and are editable in the model.
                   Friction runs in Carapace only; an exported script carries it as a warning, so turn it off for a model that runs the same in OpenSees.
                 </p>
               </div>
             )}
 
-            <div className="flex justify-end">
+            {choice === 'studBuilding' && <StudBuildingForm onCreate={(entity) => initModel(3, 6, { units: { length: 'mm', force: 'N', time: 's' }, unitPrefs: { force: 'kN', stress: 'MPa' }, writes: [{ kind: 'building', entity }] })} />}
+
+            {choice !== 'studBuilding' && <div className="flex justify-end">
               {choice === 'load'
                 ? <Button disabled={!preview || !canImport(preview.result)} onClick={handleLoad}>Open</Button>
                 : <Button onClick={handleCreate}>Create Model</Button>}
-            </div>
+            </div>}
           </>
         )}
       </DialogContent>

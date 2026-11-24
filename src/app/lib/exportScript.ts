@@ -52,6 +52,7 @@ function encodeAnalysis(analysisHistory: AnalysisHistory, model: Model, ctx: Sch
 
 /** The script as language-neutral commands. `annotate` adds the `# @pysees` directives a saved project needs to be opened again (OpenSeesPy only). */
 export function scriptCalls(model: Model, analysisHistory: AnalysisHistory, annotate = false): Call[] {
+  if (model.building) throw new Error('Stud-wall buildings run in Carapace only and cannot be exported to OpenSees')
   const enabled = analysisHistory.commands.filter((c) => !c.disabled)
   const earthquake = enabled.some((c) => c.type === 'ANALYSIS_BLOCK' && c.blockId === 'run-earthquake-analysis')
   const authored = model

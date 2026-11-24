@@ -8,6 +8,8 @@ export interface MaterialEntity { id: number; kind: 'uniaxial' | 'nD'; matType: 
 export interface FiberSectionItem { kind: 'fiber' | 'patch' | 'layer'; subType: string; args: Record<string, unknown> }
 /** Present when a Fiber section's children were last (re)generated from the Section Editor's parametric templates — lets the dialog reopen straight into the template form. Cleared once a user hand-edits a child. */
 export interface SectionTemplateMeta { kind: import('@/app/lib/sections/types').SectionTemplateKind; params: Record<string, unknown> }
+export interface StudBuildingParams { storeys: number; length: number; width: number; wallHeight: number; floorDepth: number; studSpacing: number; windowWidth: number; windowHead: number; noWindows: boolean; sheathing: 'o86' | 'linear'; diaphragm: 'rigid' | 'flexible'; steps: number; lateralShear: number; lateralDirection: 'x' | 'z'; lateralType: 'wind' | 'earthquake'; eccentricity: number; holdDownStiffness: number; anchorageSlack: number; crushCapacity: number; bandGa: number; bearingStiffness: number; combination: string; factors: number[]; deadFloor: number; liveFloor: number; deadRoof: number; snow: number }
+export interface BuildingEntity { spec: import('@/app/types/carapaceInputV1').BuildingSpec; steps: number; template?: StudBuildingParams }
 export interface SectionEntity { id: number; secType: string; args: Record<string, unknown>; children: FiberSectionItem[]; template?: SectionTemplateMeta } // children only meaningful for 'Fiber'/'NDFiber' secType
 export interface GeomTransfEntity { id: number; transfType: string; args: Record<string, unknown> }
 export interface BeamIntegrationEntity { id: number; intType: string; args: Record<string, unknown> }
@@ -37,6 +39,7 @@ export interface Model {
   timeSeries: Map<number, TimeSeriesEntity>
   patterns: Map<number, PatternEntity>
   misc: Map<number, MiscEntity>
+  building?: BuildingEntity
   nextIds: Record<ModelEntityKind, number>
 }
 
@@ -60,6 +63,7 @@ export function emptyModel(): Model {
     timeSeries: new Map(),
     patterns: new Map(),
     misc: new Map(),
+    building: undefined,
     nextIds: {
       node: 1, material: 1, section: 1, geomTransf: 1, beamIntegration: 1, element: 1,
       mpConstraint: 1, region: 1, timeSeries: 1, pattern: 1, misc: 1,

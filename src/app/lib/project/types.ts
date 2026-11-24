@@ -51,7 +51,7 @@ export interface ProjectSource {
 }
 
 /** Results-view fields kept in a project (the rest is playback or run state). */
-export const RESULTS_PREF_KEYS = ['fps', 'loop', 'smooth', 'type', 'scales', 'modeSpeed', 'contour', 'contourDeformed', 'showUndeformed', 'showValues', 'fillDiagrams'] as const
+export const RESULTS_PREF_KEYS = ['fps', 'loop', 'smooth', 'type', 'scales', 'modeSpeed', 'contour', 'contourDeformed', 'showUndeformed', 'showValues', 'showReactions', 'fillDiagrams'] as const
 /** Plot-overlay fields kept in a project: the plot configuration and the window geometry. */
 export const PLOT_PREF_KEYS = ['pos', 'size', 'maximized', 'series', 'sharedX', 'x', 'showStageTicks', 'showStepMarker', 'showEditor', 'nextSeriesId'] as const
 

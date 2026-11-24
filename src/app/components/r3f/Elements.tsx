@@ -58,20 +58,29 @@ function ElementLines({ index, ghost }: { index: SceneIndex; ghost: boolean }) {
     const starts = index.elementSegmentStart
     let lo = 0, hi = index.elementIds.length - 1
     while (lo < hi) { const mid = (lo + hi + 1) >> 1; if (starts[mid] <= segment) lo = mid; else hi = mid - 1 }
-    selectElementFromScene(index.elementIds[lo])
+    selectElementFromScene(index.elementIds[lo], e.nativeEvent.shiftKey || e.nativeEvent.ctrlKey || e.nativeEvent.metaKey)
   }
 
   return <primitive object={lines} onClick={onClick} />
 }
 
-/** The element chosen in the model list or the scene, drawn over the model lines. */
-function SelectedElement({ index }: { index: SceneIndex }) {
-  const id = useAppStore((s) => (s.selectedModelEntity?.kind === 'element' ? s.selectedModelEntity.id : null))
-  const e = id === null ? -1 : index.elementIds.indexOf(id)
-  if (e < 0) return null
-  const rows = index.elementKind[e] === 'shell' ? [...index.elementNodes[e], index.elementNodes[e][0]] : index.elementNodes[e]
-  const points = rows.map((r) => [index.nodeCoords[r * 3], index.nodeCoords[r * 3 + 1], index.nodeCoords[r * 3 + 2]] as [number, number, number])
-  return <Line points={points} color={SELECTED_COLOR} lineWidth={SELECTED_LINE_WIDTH_PX} />
+/** The selected elements (from the model list or the scene), drawn over the model lines as one batched line set. */
+function SelectedElements({ index }: { index: SceneIndex }) {
+  const ids = useAppStore((s) => s.selectedElementIds)
+  const points = useMemo(() => {
+    const out: [number, number, number][] = []
+    const at = (r: number): [number, number, number] => [index.nodeCoords[r * 3], index.nodeCoords[r * 3 + 1], index.nodeCoords[r * 3 + 2]]
+    for (const id of ids) {
+      const e = index.elementIds.indexOf(id)
+      if (e < 0) continue
+      const rows = index.elementNodes[e]
+      const shell = index.elementKind[e] === 'shell'
+      for (let k = 0; k < (shell ? rows.length : rows.length - 1); k++) out.push(at(rows[k]), at(rows[(k + 1) % rows.length]))
+    }
+    return out
+  }, [ids, index])
+  if (points.length === 0) return null
+  return <Line points={points} segments color={SELECTED_COLOR} lineWidth={SELECTED_LINE_WIDTH_PX} />
 }
 
 function ElementLabels({ index }: { index: SceneIndex }) {
@@ -110,7 +119,7 @@ export function ElementsLayer({
       {showElements && <ShellSurfaces index={index} buffers={buffers} />}
       {showElements && hasSegments && (!deformedMode || showUndeformed) && <ElementLines index={index} ghost={deformedMode} />}
       {deformedMode && hasSegments && <BufferLines positions={buffers.deformedSegments} color={DEFORMED_COLOR} widthPx={ELEMENT_LINE_WIDTH_PX} isActive={() => buffers.active} getVersion={() => buffers.version} />}
-      {showElements && !deformedMode && <SelectedElement index={index} />}
+      {showElements && !deformedMode && <SelectedElements index={index} />}
       {showElementIds && <ElementLabels index={index} />}
     </>
   )

@@ -38,7 +38,7 @@ const history = { commands: [{ type: 'ANALYSIS_BLOCK', blockId: 'whole-model-rec
 
 describe('fiber coordinates are measured from the fibers\' area centroid', () => {
   it('compiles each section with its fibers\' area-weighted centroid at y = 0', () => {
-    const fibers = compileInputV1(column(), history as never).input!.fibers
+    const fibers = compileInputV1(column(), history as never).input!.fibers!
     const area = fibers.area, y = fibers.y
     expect(area.reduce((q, a, i) => q + a * y[i], 0) / area.reduce((a, b) => a + b, 0)).toBeCloseTo(0, 15)
     expect(y.at(-2)).toBeCloseTo(-1.3 + 2.25e-3, 4) // the heavy bar moved by the centroid offset (-2.25 mm)

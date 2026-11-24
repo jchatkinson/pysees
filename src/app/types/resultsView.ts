@@ -40,6 +40,8 @@ export interface ResultsView {
   contourDeformed: boolean
   showUndeformed: boolean
   showValues: boolean
+  /** Arrows and values of the support reactions at the current step (any result type). */
+  showReactions: boolean
   fillDiagrams: boolean
 }
 
@@ -62,5 +64,6 @@ export const DEFAULT_RESULTS_VIEW: ResultsView = {
   contourDeformed: true,
   showUndeformed: true,
   showValues: false,
+  showReactions: false,
   fillDiagrams: true,
 }

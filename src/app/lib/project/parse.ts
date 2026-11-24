@@ -112,13 +112,16 @@ export function parseProject(text: string): ImportResult {
   else if ((header.data.version as number) > PROJECT_VERSION) error(`This file was saved by a newer PySees (project format ${header.data.version}; this version reads up to ${PROJECT_VERSION}).`, header.line)
   if (diagnostics.length) return fail()
 
-  const { calls, diagnostics: parseDiagnostics } = parsePython(out.join('\n'))
+  const parsed = parsePython(out.join('\n'))
+  const calls = parsed.calls
+  const parseDiagnostics = entities.some(({ data }) => data.kind === 'building') ? parsed.diagnostics.filter((d) => !d.message.startsWith('No "model" command found;')) : parsed.diagnostics
   const built = buildModel(calls, 'py', parseDiagnostics, (index, b) => applyGenerated(blocks[index].header, b))
-  diagnostics.push(...built.diagnostics)
+  diagnostics.push(...built.diagnostics.filter((d) => !entities.some(({ data }) => data.kind === 'building') || !d.message.startsWith('No "model" command found;')))
   if (diagnostics.some((d) => d.severity === 'error')) return { ...fail(), ndm: built.ndm, ndf: built.ndf }
 
   let model: Model = built.model
   const h = header!.data
+  if (entities.some(({ data }) => data.kind === 'building') && built.writes.length === 0 && h.ndm === 3 && h.ndf === 6) model = { ...model, config: { ndm: 3, ndf: 6 } }
   if (model.config?.ndm !== h.ndm || model.config?.ndf !== h.ndf) error(`The project header says ndm=${String(h.ndm)}, ndf=${String(h.ndf)} but the model command says ndm=${model.config?.ndm}, ndf=${model.config?.ndf}.`, header!.line)
 
   const units = parseBaseUnits(h.units)
@@ -145,6 +148,11 @@ export function parseProject(text: string): ImportResult {
       const element = isInt(data.id) ? model.elements.get(data.id) : undefined
       if (!element || element.eleType !== 'zeroLength' || !isRec(data.friction)) error(`Element annotation does not match a zeroLength element (id ${String(data.id)}).`, line)
       else model = { ...model, elements: new Map(model.elements).set(element.id, { ...element, args: { ...element.args, friction: data.friction } }) }
+    } else if (data.kind === 'building') {
+      const entity = data.entity
+      const hasTables = model.nodes.size || model.masses.size || model.materials.size || model.sections.size || model.geomTransfs.size || model.beamIntegrations.size || model.elements.size || model.fixes.size || model.mpConstraints.size || model.regions.size || model.timeSeries.size || model.patterns.size || model.misc.size
+      if (model.building || hasTables || !isRec(entity) || !isRec(entity.spec) || !Array.isArray(entity.spec.storeys) || !Number.isInteger(entity.steps) || (entity.steps as number) < 1) error('Building annotation is invalid or conflicts with another model.', line)
+      else model = { ...model, building: entity as unknown as NonNullable<Model['building']> }
     } else if (data.kind === 'material') {
       const material = isInt(data.id) ? model.materials.get(data.id) : undefined
       if (!material || material.kind !== 'uniaxial' || !(MATERIAL_USAGES as readonly unknown[]).includes(data.usage)) error(`Material annotation does not match a uniaxial material (id ${String(data.id)}).`, line)

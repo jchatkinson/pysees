@@ -19,6 +19,10 @@ import { DEFAULT_PLOT_VIEW, SERIES_COLORS, type Channel, type PlotView, type Ser
 import { RESULTS_PREF_KEYS, PLOT_PREF_KEYS, type ProjectDocument } from '@/app/lib/project/types'
 import type { BaseUnits, Category, UnitPrefs } from '@/app/lib/units/units'
 import type { CompileDiagnostic } from '@/app/lib/compileAnalysisSequence'
+import type { ViewMode } from '@/app/lib/editor/viewSlice'
+import type { DrawTemplate } from '@/app/lib/editor/properties'
+
+export type ToolId = 'select' | 'frame' | 'quickBeam' | 'quickColumn' | 'support'
 
 /** Suits both forces and displacements in most structural problems. */
 export const DEFAULT_ZERO_TOLERANCE = 1e-6
@@ -39,7 +43,7 @@ const DEFAULT_STRAIN_PROTOCOL = [0, 0.001, -0.001, 0.002, -0.002, 0.003, -0.003,
 let activePreviewJob: string | null = null
 const MODEL_UNDO_DEPTH = 100
 
-interface AppStore {
+export interface AppStore {
   model: Model
   modelPast: Model[]
   modelFuture: Model[]
@@ -55,6 +59,8 @@ interface AppStore {
   levels: LevelEntity[]
   nextLevelId: number
   gridlinesDialogOpen: boolean
+  unitsDialogOpen: boolean
+  setUnitsDialogOpen: (open: boolean) => void
   setGridlinesDialogOpen: (open: boolean) => void
   materialDialogOpen: boolean
   setMaterialDialogOpen: (open: boolean) => void
@@ -101,14 +107,19 @@ interface AppStore {
   setSelectedAnalysisIndex: (index: number | null) => void
   setAnalysisInsertionIndex: (index: number | null) => void
 
-  // viewport node selection
+  // viewport selection: nodes and elements together (nodes alone while a form picks nodes)
   selectedNodeIds: number[]
+  selectedElementIds: number[]
+  /** Replace the scene selection, or add to it (`additive`). The properties panel follows when exactly one object is selected. */
+  setSceneSelection: (sel: { nodes: number[]; elements: number[] }, additive?: boolean) => void
+  /** Select every node and element. */
+  selectAll: () => void
   setSelectedNodeIds: (ids: number[]) => void
   toggleNodeInSelection: (id: number, additive: boolean) => void
   /** Scene -> properties: after a node click or marquee, show the one selected node in the command panel (or drop a stale node view). Model panel only, and not while a form is picking nodes. */
   selectNodesFromScene: () => void
-  /** Scene -> properties: a clicked element becomes the selected model entity. */
-  selectElementFromScene: (id: number) => void
+  /** Scene -> properties: a clicked element is selected (toggled into the selection when `additive`). */
+  selectElementFromScene: (id: number, additive?: boolean) => void
   /** Scene -> properties: a click on empty space clears the node selection and a node/element properties view. */
   clearSceneSelection: () => void
   nodePickMode: 'none' | 'idlist' | 'vec-sequential'
@@ -127,6 +138,8 @@ interface AppStore {
     showGrid: boolean
     showGridlines: boolean
     showLevels: boolean
+    /** Plan views also draw the story above as dashed, unpickable ghosts. */
+    showStoryAbove: boolean
   }
   /** Pattern tags whose loads are hidden in the viewport; a pattern is shown unless listed, so new patterns appear by default. */
   hiddenLoadPatterns: number[]
@@ -173,6 +186,8 @@ interface AppStore {
   /** Replaces the whole authored project in one update (model, analysis, layout, report, display preferences) and resets results, undo history and selections. */
   loadProject: (project: ProjectDocument, fileName?: string) => void
   writeModelEntity: (write: ModelWrite) => void
+  /** Apply several writes as one edit (one undo step). */
+  writeModelEntities: (writes: ModelWrite[]) => void
   previewDeleteModelEntity: (kind: ModelDeletableKind, id: number) => string[]
   deleteModelEntity: (kind: ModelDeletableKind, id: number) => void
   removeModelEntityChild: (parent: 'section' | 'pattern', parentId: number, childIndex: number) => void
@@ -191,6 +206,20 @@ interface AppStore {
 
   setViewSetting: (key: keyof AppStore['viewSettings'], value: boolean) => void
   requestViewportAction: (kind: 'zoomIn' | 'zoomOut' | 'fit') => void
+  /** 3D, a story plan or a grid elevation (see `lib/editor/viewSlice.ts`). Plan and elevation use an orthographic camera. */
+  viewMode: ViewMode
+  setViewMode: (mode: ViewMode) => void
+  /** The viewport's tool: selection, or a draw tool (see `components/r3f/ToolLayer.tsx`). Draw tools ignore scene selection clicks. */
+  activeTool: ToolId
+  setActiveTool: (tool: ToolId) => void
+  /** What the frame / beam / column tools draw (element type and args without the transform). */
+  drawTemplate: DrawTemplate | null
+  setDrawTemplate: (t: DrawTemplate | null) => void
+  supportPreset: 'fixed' | 'pinned' | 'roller'
+  setSupportPreset: (p: 'fixed' | 'pinned' | 'roller') => void
+  /** Orthographic projection for the 3D view. */
+  orthographic: boolean
+  setOrthographic: (on: boolean) => void
   importResults: (files: { name: string; data: string }[]) => void
   runMaterialPreview: (protocolOverride?: number[]) => void
   setMaterialPreviewPanelOpen: (open: boolean) => void
@@ -202,6 +231,17 @@ interface AppStore {
 function pushModelPast(past: Model[], model: Model): Model[] {
   const next = [...past, model]
   return next.length > MODEL_UNDO_DEPTH ? next.slice(next.length - MODEL_UNDO_DEPTH) : next
+}
+
+const union = (a: number[], b: number[]) => [...new Set([...a, ...b])]
+
+/** The properties panel follows the scene selection on the model panel: one object shows its form; anything else drops a node/element view. */
+function followSelection(s: AppStore, nodes: number[], elements: number[]): Partial<AppStore> {
+  if (s.activePanel !== 'model') return {}
+  if (nodes.length === 1 && elements.length === 0 && s.model.nodes.has(nodes[0])) return { selectedModelEntity: { kind: 'node', id: nodes[0] } }
+  if (elements.length === 1 && nodes.length === 0 && s.model.elements.has(elements[0])) return { selectedModelEntity: { kind: 'element', id: elements[0] } }
+  const kind = s.selectedModelEntity?.kind
+  return kind === 'node' || kind === 'element' ? { selectedModelEntity: null } : {}
 }
 
 export const useAppStore = create<AppStore>((set, get) => {
@@ -307,8 +347,10 @@ export const useAppStore = create<AppStore>((set, get) => {
   selectedModelEntity: null,
   // The scene highlights a selected node, so a node picked from the list (or deselected) keeps `selectedNodeIds` in step.
   setSelectedModelEntity: (sel) => set((s) => {
-    if (sel?.kind === 'node') return { selectedModelEntity: sel, selectedNodeIds: [sel.id] }
-    return { selectedModelEntity: sel, ...(s.selectedModelEntity?.kind === 'node' ? { selectedNodeIds: [] } : {}) }
+    if (sel?.kind === 'node') return { selectedModelEntity: sel, selectedNodeIds: [sel.id], selectedElementIds: [] }
+    if (sel?.kind === 'element') return { selectedModelEntity: sel, selectedNodeIds: [], selectedElementIds: [sel.id] }
+    const kind = s.selectedModelEntity?.kind
+    return { selectedModelEntity: sel, ...(kind === 'node' || kind === 'element' ? { selectedNodeIds: [], selectedElementIds: [] } : {}) }
   }),
 
   selectedAnalysisIndex: null,
@@ -317,23 +359,37 @@ export const useAppStore = create<AppStore>((set, get) => {
   setAnalysisInsertionIndex: (index) => set({ analysisInsertionIndex: index }),
 
   selectedNodeIds: [],
+  selectedElementIds: [],
   setSelectedNodeIds: (ids) => set({ selectedNodeIds: ids }),
+  setSceneSelection: (sel, additive) => set((s) => {
+    if (s.activeTool !== 'select') return s
+    if (s.nodePickMode !== 'none') return { selectedNodeIds: additive ? union(s.selectedNodeIds, sel.nodes) : sel.nodes }
+    const nodes = additive ? union(s.selectedNodeIds, sel.nodes) : sel.nodes
+    const elements = additive ? union(s.selectedElementIds, sel.elements) : sel.elements
+    return { selectedNodeIds: nodes, selectedElementIds: elements, ...followSelection(s, nodes, elements) }
+  }),
+  selectAll: () => set((s) => {
+    if (s.nodePickMode !== 'none') return s
+    const nodes = [...s.model.nodes.keys()], elements = [...s.model.elements.keys()]
+    return { selectedNodeIds: nodes, selectedElementIds: elements, ...followSelection(s, nodes, elements) }
+  }),
   toggleNodeInSelection: (id, additive) => set((s) => {
-    if (!additive) return { selectedNodeIds: [id] }
+    if (s.activeTool !== 'select') return s
+    if (!additive) return { selectedNodeIds: [id], ...(s.nodePickMode === 'none' ? { selectedElementIds: [] } : {}) }
     const has = s.selectedNodeIds.includes(id)
     return { selectedNodeIds: has ? s.selectedNodeIds.filter((x) => x !== id) : [...s.selectedNodeIds, id] }
   }),
-  selectNodesFromScene: () => set((s) => {
-    if (s.activePanel !== 'model' || s.nodePickMode !== 'none') return s
-    const ids = s.selectedNodeIds
-    if (ids.length === 1 && s.model.nodes.has(ids[0])) return { selectedModelEntity: { kind: 'node', id: ids[0] } }
-    return s.selectedModelEntity?.kind === 'node' ? { selectedModelEntity: null } : s
+  selectNodesFromScene: () => set((s) => (s.nodePickMode !== 'none' ? s : followSelection(s, s.selectedNodeIds, s.selectedElementIds))),
+  selectElementFromScene: (id, additive) => set((s) => {
+    if (s.nodePickMode !== 'none' || s.activeTool !== 'select') return s
+    const has = s.selectedElementIds.includes(id)
+    const nodes = additive ? s.selectedNodeIds : []
+    const elements = !additive ? [id] : has ? s.selectedElementIds.filter((x) => x !== id) : [...s.selectedElementIds, id]
+    return { selectedNodeIds: nodes, selectedElementIds: elements, ...followSelection(s, nodes, elements) }
   }),
-  selectElementFromScene: (id) => set((s) => (s.activePanel !== 'model' || s.nodePickMode !== 'none' ? s : { selectedModelEntity: { kind: 'element', id }, selectedNodeIds: [] })),
   clearSceneSelection: () => set((s) => {
-    if (s.nodePickMode !== 'none') return s
-    const kind = s.selectedModelEntity?.kind
-    return { selectedNodeIds: [], ...(s.activePanel === 'model' && (kind === 'node' || kind === 'element') ? { selectedModelEntity: null } : {}) }
+    if (s.nodePickMode !== 'none' || s.activeTool !== 'select') return s
+    return { selectedNodeIds: [], selectedElementIds: [], ...followSelection(s, [], []) }
   }),
   nodePickMode: 'none',
   setNodePickMode: (mode) => set({ nodePickMode: mode }),
@@ -351,6 +407,7 @@ export const useAppStore = create<AppStore>((set, get) => {
     showGrid: true,
     showGridlines: true,
     showLevels: true,
+    showStoryAbove: true,
   },
   hiddenLoadPatterns: [],
   toggleLoadPatternVisible: (id) => set((s) => ({ hiddenLoadPatterns: s.hiddenLoadPatterns.includes(id) ? s.hiddenLoadPatterns.filter((x) => x !== id) : [...s.hiddenLoadPatterns, id] })),
@@ -410,7 +467,7 @@ export const useAppStore = create<AppStore>((set, get) => {
       nextGridlineId: gridlines.reduce((max, g) => Math.max(max, g.id + 1), 1),
       levels,
       nextLevelId: levels.reduce((max, l) => Math.max(max, l.id + 1), 1),
-      selectedModelEntity: null,
+      selectedModelEntity: null, selectedNodeIds: [], selectedElementIds: [], viewMode: { kind: '3d' }, activeTool: 'select', drawTemplate: null,
       selectedAnalysisIndex: null,
       analysisInsertionIndex: null,
       resultsView: DEFAULT_RESULTS_VIEW,
@@ -444,7 +501,7 @@ export const useAppStore = create<AppStore>((set, get) => {
       hiddenLoadPatterns: project.display.hiddenLoadPatterns,
       resultsView: { ...DEFAULT_RESULTS_VIEW, ...keep<ResultsView>(project.display.resultsView, RESULTS_PREF_KEYS) },
       plotView: { ...DEFAULT_PLOT_VIEW, ...keep<PlotView>(project.display.plotView, PLOT_PREF_KEYS) },
-      selectedModelEntity: null, selectedAnalysisIndex: null, analysisInsertionIndex: null, selectedNodeIds: [], nodePickMode: 'none', pendingNodePick: null,
+      selectedModelEntity: null, selectedAnalysisIndex: null, analysisInsertionIndex: null, selectedNodeIds: [], selectedElementIds: [], viewMode: { kind: '3d' }, activeTool: 'select', drawTemplate: null, nodePickMode: 'none', pendingNodePick: null,
       results: null, projectFileName: fileName ?? s.projectFileName,
     }))
   },
@@ -464,7 +521,7 @@ export const useAppStore = create<AppStore>((set, get) => {
       selectedModelEntity: null,
       selectedAnalysisIndex: null,
       analysisInsertionIndex: null,
-      selectedNodeIds: [],
+      selectedNodeIds: [], selectedElementIds: [], viewMode: { kind: '3d' }, activeTool: 'select', drawTemplate: null,
       nodePickMode: 'none',
       pendingNodePick: null,
       results: null,
@@ -482,6 +539,11 @@ export const useAppStore = create<AppStore>((set, get) => {
     modelPast: pushModelPast(s.modelPast, s.model),
     modelFuture: [],
   })),
+  writeModelEntities: (writes) => set((s) => (writes.length === 0 ? s : {
+    model: writes.reduce(applyModelWrite, s.model),
+    modelPast: pushModelPast(s.modelPast, s.model),
+    modelFuture: [],
+  })),
 
   previewDeleteModelEntity: (kind, id) => previewDeleteEntity(get().model, kind, id),
 
@@ -490,6 +552,7 @@ export const useAppStore = create<AppStore>((set, get) => {
     modelPast: pushModelPast(s.modelPast, s.model),
     modelFuture: [],
     selectedModelEntity: s.selectedModelEntity?.kind === kind && s.selectedModelEntity.id === id ? null : s.selectedModelEntity,
+    ...(kind === 'node' ? { selectedNodeIds: s.selectedNodeIds.filter((x) => x !== id) } : kind === 'element' ? { selectedElementIds: s.selectedElementIds.filter((x) => x !== id) } : {}),
   })),
 
   removeModelEntityChild: (parent, parentId, childIndex) => set((s) => ({
@@ -597,6 +660,18 @@ export const useAppStore = create<AppStore>((set, get) => {
 
   setViewSetting: (key, value) => set((s) => ({ viewSettings: { ...s.viewSettings, [key]: value } })),
 
+  unitsDialogOpen: false,
+  setUnitsDialogOpen: (unitsDialogOpen) => set({ unitsDialogOpen }),
+  viewMode: { kind: '3d' },
+  setViewMode: (viewMode) => set({ viewMode }),
+  orthographic: false,
+  activeTool: 'select',
+  setActiveTool: (activeTool) => set((s) => ({ activeTool, ...(activeTool !== 'select' ? { selectedNodeIds: [], selectedElementIds: [], ...followSelection(s, [], []) } : {}) })),
+  drawTemplate: null,
+  setDrawTemplate: (drawTemplate) => set({ drawTemplate }),
+  supportPreset: 'fixed',
+  setSupportPreset: (supportPreset) => set({ supportPreset }),
+  setOrthographic: (orthographic) => set({ orthographic }),
   requestViewportAction: (kind) => set((s) => ({ viewportAction: { kind, token: (s.viewportAction?.token ?? 0) + 1 } })),
 
   importResults: (files) => set({ results: { files } }),

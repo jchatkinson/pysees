@@ -37,6 +37,8 @@ export function compareRuns(model: Model, run: CarapaceRun, files: Record<string
 
   const compared = zero(), scale = zero(), maxAbs = zero()
   for (const plan of run.compile.recorderPlans) {
+    if (plan.kind === 'building') continue
+    const quantity = plan.kind
     plan.componentLayout.forEach((_label, j) => {
       const mine = run.columns[plan.columnOffset + j]
       let theirs: number[] | undefined
@@ -53,9 +55,9 @@ export function compareRuns(model: Model, run: CarapaceRun, files: Record<string
         theirs = rows.map((r) => r[1 + nodes.indexOf(plan.targetTag) * ndf + j])
       }
       if (!theirs || theirs.length !== mine.length) return
-      compared[plan.kind]++
-      scale[plan.kind] = Math.max(scale[plan.kind], ...theirs.map(Math.abs))
-      maxAbs[plan.kind] = Math.max(maxAbs[plan.kind], ...mine.map((v, i) => Math.abs(v - theirs![i])))
+      compared[quantity]++
+      scale[quantity] = Math.max(scale[quantity], ...theirs.map(Math.abs))
+      maxAbs[quantity] = Math.max(maxAbs[quantity], ...mine.map((v, i) => Math.abs(v - theirs![i])))
     })
   }
   const maxRel = zero()

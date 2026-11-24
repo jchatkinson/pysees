@@ -2,8 +2,8 @@ import type { ModalDampingAnchors } from '@/app/lib/rayleighDamping'
 // Mirrors carapace/wasm-bridge/src/input_v1/{mod,tables,materials,sequence}.rs's serde (camelCase)
 // wire shape — what decodeInput() in carapace_wasm expects (see src/app/lib/carapace/compileInputV1.ts,
 // the only place that constructs one). One format serves 2D and 3D (`header.ndm`): the compiler targets
-// ndm=2/ndf=3 and ndm=3/ndf=6, emitting the other profile's tables empty. Every table is optional on the wire; the ones this compiler always
-// emits are required here, and tables it never emits (force beam-columns, zero-lengths, equal DOFs,
+// ndm=2/ndf=3 and ndm=3/ndf=6, emitting the other profile's tables empty. Every table is optional on the wire; tables this compiler emits are optional in the wire type so a native
+// building input can contain only header/building/sequence. Tables this compiler never emits (force beam-columns, zero-lengths, equal DOFs,
 // diaphragms, rigid links, linear constraints, plane materials, triangles, quads) are left out. The model has no
 // continuum elements yet; when it does, mirror `planeMaterials`/`triangles`/`quads` and the body/edge loads and
 // `gaussPoint` recorders from carapace_wasm.d.ts.
@@ -100,6 +100,10 @@ export type StageSpec =
   | { kind: 'transient'; id: string; steps: number; dt: number; damping: { alphaM: number; betaK: number; modalAnchors?: ModalDampingAnchors }; groundMotions: { direction: number; series: TimeSeriesSpec; scaleFactor: number }[]; algorithm: AlgorithmSpec; convergence?: ConvergenceSpec }
 /** Scalar recorder channels stored by the browser results worker. Acceleration and velocity are relative to the ground. */
 export type RecorderSpecWire =
+  | { response: 'buildingWallPier'; storey: number; wall: string; pier: number; quantity: StudWallQuantity }
+  /** A named wall's total base reaction in its local axes: shear, axial (up positive: the gravity takedown is positive) and moment about the wall centre. */
+  | { response: 'buildingWallBase'; storey: number; wall: string; component: StudWallBaseComponent }
+  | { response: 'buildingStoreyDrift'; storey: number; component: BuildingDriftComponent }
   | { response: 'nodeDisp'; node: number; dof: number }
   | { response: 'nodeVel'; node: number; dof: number }
   | { response: 'nodeAccel'; node: number; dof: number }
@@ -111,23 +115,48 @@ export type RecorderSpecWire =
   | { response: 'gaussPoint'; elementKind: ElementKind; elementIndex: number; point: number; quantity: 'stress' | 'strain'; component: number }
 export interface SequenceSpec { stages: StageSpec[]; recorders: RecorderSpecWire[] }
 
+export interface BuildingSpec { storeys: StoreySpec[]; foundationAnchorage: AnchorageSpec; diaphragm: DiaphragmKind; combination?: [number, number, number, number, number, number, number, number] }
+export interface StoreySpec { wallHeight: number; floorDepth: number; bandGa: number; rimEa: number; anchorage: AnchorageSpec; bearing: number; walls: WallSpec[]; floors?: FloorSpec[]; lateral?: LateralLoad[] }
+export interface AnchorageSpec { tension: number; slack: number; bearing: AnchorageBearingSpec }
+export type AnchorageBearingSpec = { kind: 'linear'; k: number } | { kind: 'o86Crush'; qr: number }
+export type DiaphragmKind = 'rigid' | 'flexible'
+export interface WallSpec { name: string; start: [number, number]; direction: [number, number]; layout: WallLayoutSpec; loads?: SlotWallLoad[] }
+export interface SlotWallLoad { slot: number; load: WallLoadSpec }
+export interface WallLayoutSpec { length: number; height: number; studs: WallStudSpec[]; topEa: number; topEi: number | undefined; topDistribution: ChordDistributionSpec; bottomEa: number; bottomEi: number; openings?: WallOpeningSpec[]; sheathing: WallSheathingSpec | undefined; foundation?: boolean }
+export interface WallStudSpec { x: number; ea: number }
+export interface WallOpeningSpec { x0: number; x1: number; headHeight: number; headerEi: number; jackEa: number; door: boolean }
+export type ChordDistributionSpec = 'beam' | 'direct'
+export interface WallSheathingSpec { law: WallShearLawSpec }
+export type WallShearLawSpec = { kind: 'linear'; ga: number } | { kind: 'o86'; bv: number; nailSpacing: number; nailDiameter: number }
+export type WallLoadSpec = { kind: 'topPoint'; x: number; fx: number; fy: number } | { kind: 'topLine'; x0: number; x1: number; wx0: number; wx1: number; wy0: number; wy1: number }
+/** `bounds` is the plan rectangle `[x0, x1, z0, z1]`; load coordinates `s` run along the span and `t` across it. */
+export interface FloorSpec { bounds: [number, number, number, number]; supports: string[]; spanAxis: SpanAxis; loads: FloorLoadSpec[]; continuity: FloorContinuitySpec }
+export type SpanAxis = 'x' | 'z'
+export type FloorContinuitySpec = 'simple' | 'continuous'
+export type FloorLoadSpec = { kind: 'area'; slot: number; w: number; region?: [number, number, number, number] | null } | { kind: 'line'; slot: number; w: number; s: number; t0: number; t1: number } | { kind: 'lineAlong'; slot: number; w: number; t: number; s0: number; s1: number } | { kind: 'point'; slot: number; p: number; s: number; t: number }
+export interface LateralLoad { slot: number; fx: number; fz: number; at: [number, number] }
+export type StudWallQuantity = 'q' | 'gamma' | 'momentBase' | 'momentTop' | 'chordLeft' | 'chordRight'
+export type BuildingDriftComponent = 'x' | 'z' | 'rotation'
+export type StudWallBaseComponent = 'shear' | 'axial' | 'moment'
+
 export interface CarapaceInputV1 {
   header: { schemaVersion: number; ndm: 2 | 3; engineVersion: string; recordInitial?: boolean }
-  nodes: NodeTable
-  materials: MaterialSpec[]
-  fibers: FiberTable
-  trusses: TrussTable
-  elasticBeamColumns2d: ElasticBeamColumn2dTable
-  dispBeamColumns2d: FiberBeamColumn2dTable
+  building?: BuildingSpec
+  nodes?: NodeTable
+  materials?: MaterialSpec[]
+  fibers?: FiberTable
+  trusses?: TrussTable
+  elasticBeamColumns2d?: ElasticBeamColumn2dTable
+  dispBeamColumns2d?: FiberBeamColumn2dTable
   elasticBeamColumns3d?: ElasticBeamColumn3dTable
   dispBeamColumns3d?: FiberBeamColumn3dTable
   zeroLengths?: ZeroLengthTable
-  zeroLengthSections: ZeroLengthSectionTable
+  zeroLengthSections?: ZeroLengthSectionTable
   shellSections?: ShellSectionSpec[]
   shell3s?: Shell3Table
   shell4s?: Shell4Table
-  loadPatterns: LoadPatternTable
-  nodalLoads: NodalLoadTable
-  elementLoads: ElementLoadTable
+  loadPatterns?: LoadPatternTable
+  nodalLoads?: NodalLoadTable
+  elementLoads?: ElementLoadTable
   sequence: SequenceSpec
 }

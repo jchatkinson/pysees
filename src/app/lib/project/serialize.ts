@@ -12,6 +12,8 @@ export function serializeProject(doc: ProjectDocument): string {
     directive('layout', { gridlines: doc.gridlines, levels: doc.levels, nextGridlineId: doc.nextGridlineId, nextLevelId: doc.nextLevelId }),
     directive('report', { savedPlots: doc.savedPlots, nextSavedPlotId: doc.nextSavedPlotId, activeSavedPlotId: doc.activeSavedPlotId }),
     directive('display', doc.display),
+    ...(model.building ? [directive('entity', { kind: 'building', entity: model.building })] : []),
   ]
-  return printScript([...header, ...scriptCalls(model, { commands, cursor: commands.length - 1 }, true)], 'py')
+  const buildingAnalysis = model.building ? commands.flatMap((command) => [directive('analysis', { command }, 'begin'), directive('analysis', undefined, 'end')]) : []
+  return printScript([...header, ...(model.building ? buildingAnalysis : scriptCalls(model, { commands, cursor: commands.length - 1 }, true))], 'py')
 }

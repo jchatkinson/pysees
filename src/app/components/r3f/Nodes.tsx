@@ -100,7 +100,7 @@ function NodeInstances({
       onClick={(e) => {
         e.stopPropagation()
         if (e.instanceId === undefined) return
-        onToggle(index.nodeIds[e.instanceId], e.nativeEvent.shiftKey)
+        onToggle(index.nodeIds[e.instanceId], e.nativeEvent.shiftKey || e.nativeEvent.ctrlKey || e.nativeEvent.metaKey)
       }}
     >
       <sphereGeometry args={[1, 20, 20]} />

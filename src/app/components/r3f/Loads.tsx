@@ -1,6 +1,6 @@
 import { useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
-import { Billboard, Line, Text } from '@react-three/drei'
+import { Html, Line } from '@react-three/drei'
 import type { Group } from 'three'
 import { Vector3 } from 'three'
 import type { ElementEntity, GeomTransfEntity, NodeEntity, PatternEntity } from '@/app/types/model'
@@ -18,13 +18,17 @@ const ARROW_HEAD_WIDTH = 5
 
 const LABEL_FONT_PX = 11
 
-/** Screen-sized, camera-facing text. Pixel-sized like ScreenSize, but the owner can reposition it each frame via the returned group ref. */
+// HTML, not drei's SDF <Text>: its WebGL glyph generator was taking the viewport's WebGL context down with it.
+const labelStyle = (color: string, anchor: 'middle' | 'bottom'): React.CSSProperties => ({
+  fontSize: LABEL_FONT_PX, color, whiteSpace: 'nowrap', userSelect: 'none', pointerEvents: 'none', textShadow: '0 0 2px #fff, 0 0 2px #fff',
+  transform: anchor === 'middle' ? 'translate(-50%, -50%)' : 'translate(-50%, calc(-100% - 4px))',
+})
+
+/** A load value label; the owner can reposition it each frame via the returned group ref. */
 function LoadLabel({ text, color, groupRef }: { text: string; color: string; groupRef: React.RefObject<Group | null> }) {
   return (
     <group ref={groupRef}>
-      <Billboard>
-        <Text fontSize={LABEL_FONT_PX} color={color} outlineWidth={1} outlineColor="#ffffff" anchorX="center" anchorY="middle">{text}</Text>
-      </Billboard>
+      <Html style={labelStyle(color, 'middle')} zIndexRange={[10, 10]}>{text}</Html>
     </group>
   )
 }
@@ -62,11 +66,9 @@ function NodalLoadGlyph({ coords, values, color, showValues, ndm, label }: { coo
         lineWidth={2}
       />
       {showValues && (
-        <Billboard position={tip.toArray() as [number, number, number]}>
-          <Text fontSize={LABEL_FONT_PX} color={color} outlineWidth={1} outlineColor="#ffffff" anchorX="center" anchorY="bottom" position={[0, 4, 0]}>
-            {label ?? values.map((v, i) => (v ? `${dofName(i, ndm)}: ${formatLoadValue(v)}` : null)).filter(Boolean).join('  ')}
-          </Text>
-        </Billboard>
+        <Html position={tip.toArray() as [number, number, number]} style={labelStyle(color, 'bottom')} zIndexRange={[10, 10]}>
+          {label ?? values.map((v, i) => (v ? `${dofName(i, ndm)}: ${formatLoadValue(v)}` : null)).filter(Boolean).join('  ')}
+        </Html>
       )}
     </ScreenSize>
   )

@@ -7,6 +7,7 @@ export const __wbg_wasmsession_free: (a: number, b: number) => void;
 export const createMaterialProbe: (a: any) => [number, number, number];
 export const createSectionProbe: (a: any) => [number, number, number];
 export const decodeInput: (a: any) => [number, number, number];
+export const expandBuilding: (a: any, b: any) => [number, number, number];
 export const wasmmaterialprobe_applyStrain: (a: number, b: number) => [number, number, number];
 export const wasmmaterialprobe_reset: (a: number) => [number, number];
 export const wasmsectionprobe_axialExtremes: (a: number, b: number) => [number, number, number];

@@ -55,7 +55,7 @@ AnalysisHistory      ─┼─► compileInputV1 ─► Carapace wasm worker ─
 - Carapace runs 2D (ndm=2/ndf=3) and 3D (ndm=3/ndf=6) models: `ElasticBeamColumn`, `DispBeamColumn` (fiber, with `-GJ` torsion in 3D) and `Truss`, plus 3D `ShellMITC4` / `ShellDKGT` (4- and 3-node shells with `ElasticMembranePlateSection`; nodal, self-weight and pressure loads); 3D `Corotational`, `-jntOffset`, zero-length and `forceBeamColumn` are diagnostics. **3D models are Z-up** (plan is X–Y, levels rise in Z; 2D models are in the XY plane, Y up). A beam's local axes come from its transformation's `vecxz` (`lib/memberFrame.ts`, OpenSees rule: `y = vecxz × x`, `z = x × y`), and loads, the deformed shape and the 3D force diagrams (Vy/Vz, Mz/My, T) all use them.
 - `lib/carapace/compileInputV1.ts` compiles Model + sequence into `CarapaceInputV1`
   (`types/carapaceInputV1.ts`, mirrors Rust `input_v1` in `../carapace/wasm-bridge`), returning
-  diagnostics for anything unsupported. Material/section arg names are the **schema** names (lowercase,
+  diagnostics for anything unsupported. It also emits the native `building` table for stud-wall building models. Material/section arg names are the **schema** names (lowercase,
   e.g. `fy`, `e0`, `epsU`), not OpenSees doc capitalisation.
 - `workers/carapaceWorker.ts` decodes the input, advances in chunks (cooperative cancel), and streams
   recorder batches to `workers/resultsStorageWorker.ts` over a `MessageChannel`. Client side:
@@ -100,13 +100,22 @@ against it in `ndmLayouts.test.ts`. Tag the arg, don't branch on `ndm` in UI or 
 
 | Alias      | Component(s)                                   | Description |
 |------------|------------------------------------------------|-------------|
-| top menu   | `TopBar`                                       | File (new, export .py), edit (undo/redo), view settings |
+| ribbon     | `ribbon/Ribbon`, `ribbon/commands.ts`, `ribbon/FileGroup` | The app's menu and toolbar: File button plus Model / View / Results tabs of grouped commands. Commands and hotkeys come from one table in `commands.ts` |
 | left panel | `ModelPanel` / `AnalysisPanel` (`AppShell`)    | Model entities and analysis blocks; toggled by `activePanel` |
 | right      | `CommandForm`, `MaterialDialog`, `sections/*`  | Schema forms, material picker/preview, fiber section editor |
 | bot menu   | `ActionBar`                                    | Status, zoom, cursor coords |
 | viewport   | `Viewport` + `components/r3f/*`                | 3D model and results scene (nodes, elements, supports, loads, gridlines, levels, deformed shape, force diagrams) |
 | results    | `ResultsPanel`, `ResultsDisplayPanel`, `plot/*` | Run controls, display options, step playback, plot overlay and data tables |
 | overlays   | `MaterialPreviewOverlay`, `PlotOverlay`        | Floating panels over the viewport |
+
+Views (`viewMode` in the store, `lib/editor/viewSlice.ts` / `viewCamera.ts`): 3D (perspective or orthographic), a story plan or a grid elevation
+(orthographic, pan/zoom only). A plan or elevation filters the model before the scene index is built, so hidden objects are neither drawn nor
+pickable and results draw on the slice. A plan shows the story above as dashed ghosts (`GhostElements`).
+
+Drawing (`activeTool` in the store; `components/r3f/ToolLayer.tsx`, `components/DrawOptions.tsx`, `lib/editor/draw.ts`, `snap.ts`,
+`properties.ts`): tools emit ordinary `ModelWrite`s through `DrawBatch` (merges coincident nodes, reuses a `geomTransf` with a matching
+`vecxz`) and commit one undo step via `writeModelEntities`. Frame properties are derived from the elements (element type + args minus
+`transfTag`), never stored. While a tool is active, scene clicks don't change the selection.
 
 Results live in IndexedDB (`lib/resultsStorage`), read per step for display (`useResultsSource`,
 `stepFrames`); 2D models render in the XY plane.

@@ -3,7 +3,7 @@ import type { Model } from '@/app/types/model'
 import type { AnalysisSequence, AnalysisStage, RecorderSpec } from '@/app/types/analysisSequence'
 import { getAnalysisBlock } from '@/app/lib/analysisBlocks'
 
-export interface CompileDiagnostic { severity: 'error' | 'warning'; message: string; commandIndex: number }
+export interface CompileDiagnostic { severity: 'error' | 'warning' | 'info'; message: string; commandIndex: number }
 
 export interface CompileAnalysisSequenceResult {
   sequence: AnalysisSequence

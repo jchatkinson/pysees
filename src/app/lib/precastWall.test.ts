@@ -141,6 +141,21 @@ describe('precast wall template: structure follows the parameters', () => {
     expect(fixed.length).toBe(2 * (11 + 1)) // 11 bearings and the stabilizer, per panel
   })
 
+  it('takes the dowel properties and reinforcement ratios', () => {
+    const { model } = build({ dowelEnd: { Fy: 300e3, K: 400e6, b: 0.02 }, dowelJoint: { Fy: 50e3, K: 100e6, b: 0.03 }, wallRho: 0.004, boundaryRho: 0.02, spliceRho: 0.001, boundaryRatio: 0.25 })
+    const parallel = elements(model, 'zeroLength', (a) => Array.isArray(a.mat) && model.materials.get(Number(a.mat[0]))?.matType === 'Parallel')
+    const dowels = new Set(parallel.map((e) => {
+      const dowel = model.materials.get(Number((model.materials.get(Number((e.args.mat as number[])[0]))!.args.matTags as number[])[1]))!
+      return JSON.stringify([dowel.args.fy, dowel.args.e0, dowel.args.b])
+    }))
+    expect([...dowels].sort()).toEqual([JSON.stringify([50e3, 100e6, 0.03]), JSON.stringify([300e3, 400e6, 0.02])].sort())
+    const [wall, splice] = [...model.sections.values()]
+    const steel = (s: typeof wall) => s.children.filter((c) => model.materials.get(Number(c.args.matTag))!.matType === 'MinMax').reduce((a, c) => a + Number(c.args.A), 0)
+    const gross = 10 * FT * 8 * IN
+    expect(steel(wall) / gross).toBeCloseTo(0.5 * 0.02 + 0.5 * 0.004, 6) // boundary zones are 25% of the width at each end
+    expect(steel(splice) / gross - steel(wall) / gross).toBeCloseTo(0.001, 6)
+  })
+
   it('takes any number of stories and any heights', () => {
     const { model } = build({ panels: 2, panelHeight: 22, storyHeights: [3, 3.5, 3.5, 4, 4, 4], lateralWeights: [] })
     expect(new Set([...model.patterns.get(2)!.children].map((c) => model.nodes.get(Number(c.args.nodeTag))!.coords[1].toFixed(3))).size).toBe(6)

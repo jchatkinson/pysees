@@ -64,6 +64,12 @@ export interface ZeroLengthSectionTable {
 }
 
 /**
+ * A floor load in span-aligned coordinates, positive down (`building::FloorLoadSpec` without the building's
+ * load slot: the pattern of the `floorLoads` row says which pattern it belongs to).
+ */
+export type FloorTransferLoadSpec = { kind: "area"; w: number; region: [number, number, number, number] | undefined } | { kind: "line"; w: number; s: number; t0: number; t1: number } | { kind: "lineAlong"; w: number; t: number; s0: number; s1: number } | { kind: "point"; p: number; s: number; t: number };
+
+/**
  * A force applied to a bar end through a load pattern: `force` (N) is the tension it puts in the bar (outward along the bar's tangent).
  */
 export interface BarEndLoadSpec {
@@ -151,6 +157,12 @@ export interface ConcreteSpec {
 }
 
 /**
+ * Components of a stud wall's base reaction, the sums over its base nodes: `shear` (local x), `axial`
+ * (local y, up positive: the gravity takedown is positive) and `moment` (`Σ (x − L/2) f_y`).
+ */
+export type StudWallBaseComponent = "shear" | "axial" | "moment";
+
+/**
  * Compression envelope of a `csfmConcrete` plane material.
  */
 export type CsfmConcreteLawSpec = "parabolaRectangle" | "elasticIdeallyPlastic";
@@ -175,7 +187,7 @@ export interface ShellModifiersSpec {
  * Every element formulation, 2D and 3D. A kind that does not belong to the
  * model's `ndm` is `DecodeError::ElementKindNotInProfile`.
  */
-export type ElementKind = "truss" | "elasticBeamColumn2d" | "elasticBeamColumn3d" | "dispBeamColumn2d" | "dispBeamColumn3d" | "forceBeamColumn2d" | "forceBeamColumn3d" | "zeroLength" | "zeroLengthSection" | "tri3" | "quad4" | "shell3" | "shell4" | "embeddedBar";
+export type ElementKind = "truss" | "elasticBeamColumn2d" | "elasticBeamColumn3d" | "dispBeamColumn2d" | "dispBeamColumn3d" | "forceBeamColumn2d" | "forceBeamColumn3d" | "zeroLength" | "zeroLengthSection" | "tri3" | "quad4" | "shell3" | "shell4" | "embeddedBar" | "studWall" | "diaphragm";
 
 /**
  * Everything a finished `Modal` stage computed.
@@ -343,7 +355,7 @@ export interface EmbeddedBarGroup {
  * One arena entry. Composite variants reference other entries by their
  * `u32` index into the same arena, resolved by [`resolve_materials`].
  */
-export type MaterialSpec = { kind: "elastic"; e: number } | { kind: "elasticPp"; e: number; eyp: number } | { kind: "gap"; e: number; gap: number } | { kind: "ent"; e: number } | { kind: "steel01"; fy: number; e0: number; b: number; a1: number; a2: number; a3: number; a4: number } | { kind: "concrete01"; fpc: number; epsc0: number; fpcu: number; epscu: number } | { kind: "steel02"; fy: number; e0: number; b: number; r0: number; cr1: number; cr2: number; a1: number; a2: number; a3: number; a4: number } | { kind: "concrete02"; fc: number; epsc0: number; fcu: number; epscu: number; rat: number; ft: number; ets: number } | { kind: "parallel"; children: [number, number][] } | { kind: "series"; children: number[] } | { kind: "minMax"; inner: number; minStrain: number; maxStrain: number } | { kind: "csfmRebar"; es: number; fy: number; ft: number; epsU: number; fctm: number; ecm: number; diameter: number; rhoEff: number; lambda: number; tensionStiffening: boolean } | { kind: "hysteretic"; mom1p: number; rot1p: number; mom2p: number; rot2p: number; mom3p: number; rot3p: number; mom1n: number; rot1n: number; mom2n: number; rot2n: number; mom3n: number; rot3n: number; pinchX: number; pinchY: number; damfc1: number; damfc2: number; beta: number } | { kind: "pinching4"; stress1p: number; strain1p: number; stress2p: number; strain2p: number; stress3p: number; strain3p: number; stress4p: number; strain4p: number; stress1n: number; strain1n: number; stress2n: number; strain2n: number; stress3n: number; strain3n: number; stress4n: number; strain4n: number; rDispP: number; rForceP: number; uForceP: number; rDispN: number; rForceN: number; uForceN: number; gammaKParams: [number, number, number, number]; gammaKLimit: number; gammaDParams: [number, number, number, number]; gammaDLimit: number; gammaFParams: [number, number, number, number]; gammaFLimit: number; gammaE: number; dmgCyc: Pinching4DmgCycSpec };
+export type MaterialSpec = { kind: "elastic"; e: number } | { kind: "elasticPp"; e: number; eyp: number } | { kind: "gap"; e: number; gap: number } | { kind: "ent"; e: number } | { kind: "steel01"; fy: number; e0: number; b: number; a1: number; a2: number; a3: number; a4: number } | { kind: "concrete01"; fpc: number; epsc0: number; fpcu: number; epscu: number } | { kind: "steel02"; fy: number; e0: number; b: number; r0: number; cr1: number; cr2: number; a1: number; a2: number; a3: number; a4: number } | { kind: "concrete02"; fc: number; epsc0: number; fcu: number; epscu: number; rat: number; ft: number; ets: number } | { kind: "parallel"; children: [number, number][] } | { kind: "series"; children: number[] } | { kind: "minMax"; inner: number; minStrain: number; maxStrain: number } | { kind: "csfmRebar"; es: number; fy: number; ft: number; epsU: number; fctm: number; ecm: number; diameter: number; rhoEff: number; lambda: number; tensionStiffening: boolean } | { kind: "anchorage"; tension: number; slack: number; bearing: AnchorageBearingSpec } | { kind: "hysteretic"; mom1p: number; rot1p: number; mom2p: number; rot2p: number; mom3p: number; rot3p: number; mom1n: number; rot1n: number; mom2n: number; rot2n: number; mom3n: number; rot3n: number; pinchX: number; pinchY: number; damfc1: number; damfc2: number; beta: number } | { kind: "pinching4"; stress1p: number; strain1p: number; stress2p: number; strain2p: number; stress3p: number; strain3p: number; stress4p: number; strain4p: number; stress1n: number; strain1n: number; stress2n: number; strain2n: number; stress3n: number; strain3n: number; stress4n: number; strain4n: number; rDispP: number; rForceP: number; uForceP: number; rDispN: number; rForceN: number; uForceN: number; gammaKParams: [number, number, number, number]; gammaKLimit: number; gammaDParams: [number, number, number, number]; gammaDLimit: number; gammaFParams: [number, number, number, number]; gammaFLimit: number; gammaE: number; dmgCyc: Pinching4DmgCycSpec };
 
 /**
  * One bulk recorder's output over the accepted steps of one `advance` call. `values` holds
@@ -450,6 +462,15 @@ export interface EmbeddedBarSpec {
      * A force on the last end of the bar, as `startLoad`.
      */
     endLoad?: BarEndLoadSpec;
+}
+
+/**
+ * One macro wall row. `corners` and stations index `nodes`.
+ */
+export interface StudWallSpec {
+    corners: [number, number, number, number];
+    stations: WallStationSpec[];
+    layout: WallLayoutSpec;
 }
 
 /**
@@ -754,6 +775,9 @@ export interface CarapaceInputV1 {
     shellSections?: ShellSectionSpec[];
     shell3s?: Shell3Table;
     shell4s?: Shell4Table;
+    studWalls?: StudWallSpec[];
+    diaphragms?: DiaphragmSpec[];
+    floorLoads?: FloorTransferSpec[];
     rigidDiaphragms?: RigidDiaphragmTable;
     rigidLinks?: RigidLinkTable;
     linearConstraints?: LinearConstraintTable;
@@ -761,6 +785,15 @@ export interface CarapaceInputV1 {
     nodalLoads?: NodalLoadTable;
     elementLoads?: ElementLoadTable;
     sequence?: SequenceSpec;
+}
+
+/**
+ * The generated model and where its parts are. `input.sequence` is empty and every load row has `stage` 0:
+ * append at least one stage (and recorders) before decoding.
+ */
+export interface Expansion {
+    input: CarapaceInputV1;
+    map: ExpansionMap;
 }
 
 /**
@@ -817,6 +850,12 @@ export type BulkTable = "triangles" | "quads" | "embeddedBars" | "nodes" | "zero
  * Which material limit controls (`core::LimitKind`).
  */
 export type LimitKindDetail = "concreteCrushing" | "concreteTensileStrain" | "rebarRupture" | "rebarStrainLimit" | "bondSlip" | "anchorageSlip";
+
+/**
+ * Which model axis is vertical. The spec's plan coordinates `(x, z)` map to model `(x, z)` for `Y` (the
+ * default) and to model `(x, y)` for `Z`; elevations go along `+Y` or `+Z`.
+ */
+export type UpAxis = "y" | "z";
 
 /**
  * Wire form of `core::ArcLength`. Omitted `minRadius`/`maxRadius` default
@@ -884,7 +923,7 @@ export type TransformSpec3 = { kind: "linear3"; vecXz: [number, number, number] 
  * `Serialize`, not `Deserialize` — a `DecodeError` only ever flows *out*
  * to JS (`boundary.rs`), as a `{ kind: "...", ... }`-shaped object.
  */
-export type DecodeError = { kind: "invalidAnalysisOption"; stage: string; field: string } | { kind: "unsupportedNdm"; got: number } | { kind: "tableNotInProfile"; table: string } | { kind: "elementKindNotInProfile"; table: string } | { kind: "invalidRecorderComponent"; recorder: number; component: number; width: number } | { kind: "invalidGaussPoint"; recorder: number; point: number; count: number } | { kind: "invalidEmbeddedBarSegment"; recorder: number; bar: number; segment: number; count: number } | { kind: "recorderNotApplicable"; recorder: number; reason: string } | { kind: "invalidPlaneMaterial"; index: number; reason: string } | { kind: "invalidMaterial"; index: number; reason: string } | { kind: "invalidShellSection"; index: number; reason: string } | { kind: "invalidRow"; table: string; row: number; reason: string } | { kind: "unknownNodeIndex"; table: string; row: number } | { kind: "unknownMaterialIndex"; table: string; row: number } | { kind: "cyclicMaterialReference"; index: number } | { kind: "unknownPatternIndex"; table: string; row: number } | { kind: "unknownFiberSectionIndex"; row: number } | { kind: "unknownElementIndex"; table: string; row: number } | { kind: "unknownStageIndex"; table: string; row: number } | { kind: "unsupportedElementLoad"; elementKind: string } | { kind: "invalidDof"; table: string; row: number; dof: number } | { kind: "unknownConstraintRow"; table: string; row: number } | { kind: "invalidOrientation"; table: string; row: number } | { kind: "invalidModel"; error: ModelErrorDetail };
+export type DecodeError = { kind: "invalidAnalysisOption"; stage: string; field: string } | { kind: "unsupportedNdm"; got: number } | { kind: "tableNotInProfile"; table: string } | { kind: "elementKindNotInProfile"; table: string } | { kind: "invalidRecorderComponent"; recorder: number; component: number; width: number } | { kind: "invalidRecorderPier"; recorder: number; pier: number; count: number } | { kind: "invalidRecorderBay"; recorder: number; bay: number; count: number } | { kind: "invalidGaussPoint"; recorder: number; point: number; count: number } | { kind: "invalidEmbeddedBarSegment"; recorder: number; bar: number; segment: number; count: number } | { kind: "recorderNotApplicable"; recorder: number; reason: string } | { kind: "invalidPlaneMaterial"; index: number; reason: string } | { kind: "invalidMaterial"; index: number; reason: string } | { kind: "invalidAnchorageMaterial"; index: number } | { kind: "invalidMacroElement"; table: string; row: number; reason: string } | { kind: "invalidFloorTransfer"; row: number; reason: string } | { kind: "invalidShellSection"; index: number; reason: string } | { kind: "invalidRow"; table: string; row: number; reason: string } | { kind: "unknownNodeIndex"; table: string; row: number } | { kind: "unknownMaterialIndex"; table: string; row: number } | { kind: "cyclicMaterialReference"; index: number } | { kind: "unknownPatternIndex"; table: string; row: number } | { kind: "unknownFiberSectionIndex"; row: number } | { kind: "unknownElementIndex"; table: string; row: number } | { kind: "unknownStageIndex"; table: string; row: number } | { kind: "unsupportedElementLoad"; elementKind: string } | { kind: "invalidDof"; table: string; row: number; dof: number } | { kind: "unknownConstraintRow"; table: string; row: number } | { kind: "invalidOrientation"; table: string; row: number } | { kind: "invalidModel"; error: ModelErrorDetail };
 
 /**
  * `Session::modal_results`'s payload: every `Modal` stage that has finished so far, in order.
@@ -1040,6 +1079,12 @@ export interface CutbackDetail {
     retries: number;
 }
 
+export interface AnchorageSpec {
+    tension: number;
+    slack: number;
+    bearing: AnchorageBearingSpec;
+}
+
 export interface ArcSeedSpec {
     components: ArcSeedComponentSpec[];
     load?: number;
@@ -1082,10 +1127,31 @@ export interface BondPointInfo {
     endSpring?: number;
 }
 
+export interface BuildingSpec {
+    storeys: StoreySpec[];
+    foundationAnchorage: AnchorageSpec;
+    diaphragm: DiaphragmKind;
+    combination?: [number, number, number, number, number, number, number, number];
+}
+
 export interface ContinuationStopDetail {
     reason: StopReasonDetail;
     landedExactly: boolean;
     overshoot: number;
+}
+
+export interface DiaphragmLayoutSpec {
+    u: number[];
+    v: number[];
+    level: number;
+    bays: (WallShearLawSpec | undefined)[];
+    eaU: number[];
+    eaV: number[];
+}
+
+export interface DiaphragmSpec {
+    nodes: number[];
+    layout: DiaphragmLayoutSpec;
 }
 
 export interface DisplacementTargetSpec {
@@ -1133,6 +1199,49 @@ export interface ElementLoadTable {
      * See [`NodalLoadTable::stage`] — same per-stage registration timing.
      */
     stage: number[];
+}
+
+export interface ExpansionMap {
+    storeys: StoreyMap[];
+    /**
+     * Per load slot (`0..8`): its row in `loadPatterns`, or `null` when no load uses the slot.
+     */
+    slotPatterns: (number | undefined)[];
+}
+
+export interface FloorSpec {
+    bounds: [number, number, number, number];
+    supports: string[];
+    spanAxis: SpanAxis;
+    loads: FloorLoadSpec[];
+    continuity: FloorContinuitySpec;
+}
+
+export interface FloorTransferSpec {
+    bounds: [number, number, number, number];
+    continuity: FloorContinuitySpec;
+    supports: FloorTransferSupportSpec[];
+    /**
+     * The load pattern the reactions load (an index into `loadPatterns`): each support wall gets them as
+     * `wallLoad`s of this pattern.
+     */
+    pattern: number;
+    loads: FloorTransferLoadSpec[];
+}
+
+export interface FloorTransferSupportSpec {
+    s: number;
+    t0: number;
+    t1: number;
+    wall: WallTargetSpec;
+    xAtT0: number;
+    reversed: boolean;
+}
+
+export interface FloorZoneSpec {
+    depth: number;
+    ga: number;
+    rimEa: number;
 }
 
 export interface GeneralSpec {
@@ -1222,6 +1331,13 @@ export interface IsolineRequest {
 
 export interface IsolineResult {
     points: IsolinePoint[];
+}
+
+export interface LateralLoad {
+    slot: number;
+    fx: number;
+    fz: number;
+    at: [number, number];
 }
 
 export interface LoadFactorTargetSpec {
@@ -1329,6 +1445,11 @@ export interface NodalLoadTable {
     stage: number[];
 }
 
+export interface PierLink {
+    x: number;
+    element: number;
+}
+
 export interface SectionProbeConfig {
     /**
      * Carapace materials that `core` entries of `materials` refer to by index (may be empty).
@@ -1346,6 +1467,16 @@ export interface SectionProbeConfig {
 export interface SequenceSpec {
     stages: StageSpec[];
     recorders: RecorderSpec[];
+}
+
+export interface SlotWallLoad {
+    slot: number;
+    load: WallLoadSpec;
+}
+
+export interface StationNode {
+    x: number;
+    node: number;
 }
 
 export interface SteelSpec {
@@ -1368,6 +1499,111 @@ export interface SteelSpec {
     dropAfterLastPoint?: boolean;
 }
 
+export interface StoreyMap {
+    /**
+     * In spec order.
+     */
+    walls: WallMap[];
+    /**
+     * `zeroLengths` rows joining this storey's walls to the walls below (empty for storey 0).
+     */
+    linksBelow: number[];
+    /**
+     * The rigid diaphragm's retained node (`nodes` index); `null` for flexible diaphragms.
+     */
+    master: number | undefined;
+    /**
+     * Every wall's exterior top node (`nodes` indices, ascending): the diaphragm nodes.
+     */
+    nodes: number[];
+}
+
+export interface StoreySpec {
+    wallHeight: number;
+    floorDepth: number;
+    bandGa: number;
+    rimEa: number;
+    anchorage: AnchorageSpec;
+    bearing: number;
+    walls: WallSpec[];
+    floors?: FloorSpec[];
+    lateral?: LateralLoad[];
+}
+
+export interface WallLayoutSpec {
+    length: number;
+    height: number;
+    studs: WallStudSpec[];
+    topEa: number;
+    topEi: number | undefined;
+    topDistribution: ChordDistributionSpec;
+    bottomEa: number;
+    bottomEi: number;
+    openings?: WallOpeningSpec[];
+    sheathing: WallSheathingSpec | undefined;
+    foundation?: boolean;
+    /**
+     * Floor zone above the framing (stud-wall tables only; a building takes it from its storey).
+     */
+    floor?: FloorZoneSpec;
+}
+
+export interface WallMap {
+    name: string;
+    /**
+     * Row in `studWalls`.
+     */
+    element: number;
+    /**
+     * `nodes` indices: bottom start, bottom end, top end, top start.
+     */
+    corners: [number, number, number, number];
+    /**
+     * Exterior top row (the floor zone's top when there is one): wall-local `x` and `nodes` index.
+     */
+    topNodes: StationNode[];
+    /**
+     * Bottom stations: pier ends on the foundation, the supporting stud positions above it.
+     */
+    bottomNodes: StationNode[];
+    /**
+     * The anchorage `zeroLengths` row at each pier end: to the ground (storey 0) or to the wall below.
+     */
+    pierLinks: PierLink[];
+}
+
+export interface WallOpeningSpec {
+    x0: number;
+    x1: number;
+    headHeight: number;
+    headerEi: number;
+    jackEa: number;
+    door: boolean;
+}
+
+export interface WallSheathingSpec {
+    law: WallShearLawSpec;
+}
+
+export interface WallSpec {
+    name: string;
+    start: [number, number];
+    direction: [number, number];
+    layout: WallLayoutSpec;
+    loads?: SlotWallLoad[];
+}
+
+export interface WallStationSpec {
+    chord: WallChordSpec;
+    x: number;
+    node: number;
+}
+
+export interface WallStudSpec {
+    x: number;
+    ea: number;
+}
+
 export interface ZeroLengthTable {
     nodeI: number[];
     nodeJ: number[];
@@ -1387,19 +1623,29 @@ export type AlgorithmSpec = { kind: "linear" } | { kind: "newton"; tangent?: Tan
 
 export type AllHosts = "all";
 
+export type AnchorageBearingSpec = { kind: "linear"; k: number } | { kind: "o86Crush"; qr: number };
+
 export type ArcDirectionSpec = "increasing" | "decreasing";
 
 export type ArcPredictorSpec = "secant" | "tangent";
+
+export type ChordDistributionSpec = "beam" | "direct";
 
 export type ConcreteModel = "elastic" | "elasticNoTension" | "elasticPlastic" | "parabolic" | "whitney" | "hognestad" | "userCurve";
 
 export type ConvergenceSpec = { kind: "normUnbalance"; tol: number; maxIter: number } | { kind: "normDispIncr"; tol: number; maxIter: number } | { kind: "energyIncr"; tol: number; maxIter: number } | { kind: "combined"; forceTol: number; momentTol?: number; relativeTol?: number; displacementTol?: number; maxIter: number };
 
-export type ElementLoadSpec = { kind: "uniform"; wx: number; wy: number; wz?: number } | { kind: "trapezoid"; wxI: number; wyI: number; wxJ: number; wyJ: number } | { kind: "body"; bx: number; by: number } | { kind: "edgeTraction"; edge: number; tx: number; ty: number } | { kind: "edgePressure"; edge: number; pressure: number } | { kind: "shellPressure"; pressure: number } | { kind: "shellBody"; bx: number; by: number; bz: number };
+export type DiaphragmKind = "rigid" | "flexible";
+
+export type ElementLoadSpec = { kind: "uniform"; wx: number; wy: number; wz?: number } | { kind: "trapezoid"; wxI: number; wyI: number; wxJ: number; wyJ: number } | { kind: "body"; bx: number; by: number } | { kind: "edgeTraction"; edge: number; tx: number; ty: number } | { kind: "edgePressure"; edge: number; pressure: number } | { kind: "shellPressure"; pressure: number } | { kind: "shellBody"; bx: number; by: number; bz: number } | { kind: "wallLoad"; load: WallLoadSpec };
 
 export type EmbeddedBarHostsSpec = AllHosts | HostElementSpec[];
 
 export type Factoring = { kind: "groups"; factors: number[] } | { kind: "aci"; barGroup: number; phiTension: number; phiCompression: number; epsY: number; epsTl?: number };
+
+export type FloorContinuitySpec = "simple" | "continuous";
+
+export type FloorLoadSpec = { kind: "area"; slot: number; w: number; region: [number, number, number, number] | undefined } | { kind: "line"; slot: number; w: number; s: number; t0: number; t1: number } | { kind: "lineAlong"; slot: number; w: number; t: number; s0: number; s1: number } | { kind: "point"; slot: number; p: number; s: number; t: number };
 
 export type GeneralModel = "elastic" | "userCurve";
 
@@ -1415,9 +1661,11 @@ export type PlaneStateSpec = "planeStress" | "planeStrain";
 
 export type Quad4FormulationSpec = "full" | "enhanced";
 
-export type RecorderSpec = { response: "nodeDisp"; node: number; dof: number } | { response: "nodeVel"; node: number; dof: number } | { response: "nodeAccel"; node: number; dof: number } | { response: "elementForce"; elementKind: ElementKind; elementIndex: number; component: number } | { response: "elementLoad"; elementKind: ElementKind; elementIndex: number; component: number } | { response: "modeShape"; mode: number; node: number; dof: number } | { response: "reaction"; node: number; dof: number } | { response: "fiber"; elementKind: ElementKind; elementIndex: number; point: number; fiber: number; quantity: FiberResponseKind } | { response: "gaussPoint"; elementKind: ElementKind; elementIndex: number; point: number; quantity: GaussQuantity; component: number } | { response: "embeddedBar"; bar: number; segment: number; quantity: EmbeddedBarQuantity } | { response: "bulk"; table: BulkTable; quantity: BulkQuantity };
+export type RecorderSpec = { response: "studWallPier"; elementKind: ElementKind; elementIndex: number; pier: number; quantity: StudWallQuantity } | { response: "studWallBase"; elementKind: ElementKind; elementIndex: number; component: StudWallBaseComponent } | { response: "diaphragmBay"; elementIndex: number; bay: number; quantity: WallBayQuantity } | { response: "nodeDifference"; node: number; otherNode?: number; dof: number } | { response: "nodeDisp"; node: number; dof: number } | { response: "nodeVel"; node: number; dof: number } | { response: "nodeAccel"; node: number; dof: number } | { response: "elementForce"; elementKind: ElementKind; elementIndex: number; component: number } | { response: "elementLoad"; elementKind: ElementKind; elementIndex: number; component: number } | { response: "modeShape"; mode: number; node: number; dof: number } | { response: "reaction"; node: number; dof: number } | { response: "fiber"; elementKind: ElementKind; elementIndex: number; point: number; fiber: number; quantity: FiberResponseKind } | { response: "gaussPoint"; elementKind: ElementKind; elementIndex: number; point: number; quantity: GaussQuantity; component: number } | { response: "embeddedBar"; bar: number; segment: number; quantity: EmbeddedBarQuantity } | { response: "bulk"; table: BulkTable; quantity: BulkQuantity };
 
 export type SectionProbeError = { kind: "invalidFibers"; reason: string } | { kind: "invalidMaterial"; reason: string } | { kind: "degenerateSection" } | { kind: "invalidRequest"; reason: string } | { kind: "noGrid" };
+
+export type SpanAxis = "x" | "z";
 
 export type StageSpec = { kind: "static"; id: string; steps: number; integrator: IntegratorSpec; algorithm: AlgorithmSpec; convergence?: ConvergenceSpec; holdPatternsAfter: number[] } | { kind: "modal"; id: string; modes: number } | { kind: "reset"; id: string } | { kind: "transient"; id: string; steps: number; dt: number; damping: DampingSpec; groundMotions: GroundMotionSpec[]; algorithm?: AlgorithmSpec; convergence?: ConvergenceSpec };
 
@@ -1425,11 +1673,23 @@ export type SteelModel = "elastic" | "elasticNoCompression" | "elasticPlastic" |
 
 export type StopReasonDetail = "displacementTarget" | "loadFactorTarget" | "loadFactorZeroCrossing" | "chordLength" | "stepCount" | "materialLimit";
 
+export type StudWallQuantity = "q" | "gamma" | "momentBase" | "momentTop" | "chordLeft" | "chordRight";
+
 export type TangentStrategySpec = "current" | "reuseAtStepStart" | "initial";
 
 export type TimeSeriesSpec = { kind: "constant" } | { kind: "linear"; slope: number } | { kind: "path"; times: number[]; factors: number[] } | { kind: "boundedPath"; times: number[]; factors: number[]; useLast: boolean };
 
 export type TransformSpec = "linear" | "pDelta" | "corotational";
+
+export type WallBayQuantity = "q" | "gamma";
+
+export type WallChordSpec = "top" | "bottom";
+
+export type WallLoadSpec = { kind: "topPoint"; x: number; fx: number; fy: number } | { kind: "topLine"; x0: number; x1: number; wx0: number; wx1: number; wy0: number; wy1: number };
+
+export type WallShearLawSpec = { kind: "linear"; ga: number } | { kind: "o86"; bv: number; nailSpacing: number; nailDiameter: number };
+
+export type WallTargetSpec = { kind: "studWall"; index: number };
 
 
 /**
@@ -1564,6 +1824,13 @@ export function createSectionProbe(config: SectionProbeConfig): WasmSectionProbe
  */
 export function decodeInput(value: CarapaceInputV1): WasmSession;
 
+/**
+ * Expands a `BuildingSpec` into an ordinary `CarapaceInputV1` (without a sequence) and the index map of what was
+ * generated (`{ input, map }`, see `building::expand` and `docs/building.md`). `up` is `"y"` (plan x-z, the
+ * default convention) or `"z"` (plan x-y, elevations along +Z). Rejects with `{ kind: "invalidBuilding", reason }`.
+ */
+export function expandBuilding(spec: BuildingSpec, up: UpAxis): Expansion;
+
 export type InitInput = RequestInfo | URL | Response | BufferSource | WebAssembly.Module;
 
 export interface InitOutput {
@@ -1574,6 +1841,7 @@ export interface InitOutput {
     readonly createMaterialProbe: (a: any) => [number, number, number];
     readonly createSectionProbe: (a: any) => [number, number, number];
     readonly decodeInput: (a: any) => [number, number, number];
+    readonly expandBuilding: (a: any, b: any) => [number, number, number];
     readonly wasmmaterialprobe_applyStrain: (a: number, b: number) => [number, number, number];
     readonly wasmmaterialprobe_reset: (a: number) => [number, number];
     readonly wasmsectionprobe_axialExtremes: (a: number, b: number) => [number, number, number];

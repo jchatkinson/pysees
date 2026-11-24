@@ -1,5 +1,5 @@
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '@/app/components/ui/resizable'
-import { TopBar } from '@/app/components/TopBar'
+import { Ribbon } from '@/app/components/ribbon/Ribbon'
 import { ActionBar } from '@/app/components/ActionBar'
 import { ModelPanel } from '@/app/components/ModelPanel'
 import { AnalysisPanel } from '@/app/components/AnalysisPanel'
@@ -9,10 +9,17 @@ import { ResultsPanel } from '@/app/components/ResultsPanel'
 import { Viewport } from '@/app/components/Viewport'
 import { InitModal } from '@/app/components/InitModal'
 import { GridlinesDialog } from '@/app/components/GridlinesDialog'
+import { UnitsDialog } from '@/app/components/UnitsDialog'
 import { MaterialDialog } from '@/app/components/MaterialDialog'
 import { SectionDialog } from '@/app/components/sections/SectionDialog'
 import { Button } from '@/app/components/ui/button'
 import { useAppStore } from '@/app/store/useAppStore'
+
+function ConnectedUnitsDialog() {
+  const open = useAppStore((s) => s.unitsDialogOpen)
+  const setOpen = useAppStore((s) => s.setUnitsDialogOpen)
+  return <UnitsDialog open={open} onOpenChange={setOpen} />
+}
 
 function LeftPanel() {
   const activePanel = useAppStore((s) => s.activePanel)
@@ -64,9 +71,10 @@ export function AppShell() {
     <div className="flex flex-col h-screen overflow-hidden">
       <InitModal />
       <GridlinesDialog />
+      <ConnectedUnitsDialog />
       <MaterialDialog />
       <SectionDialog />
-      <TopBar />
+      <Ribbon />
       <div className="flex-1 min-h-0 overflow-hidden">
         <ResizablePanelGroup orientation="horizontal">
           <ResizablePanel defaultSize="20%">

@@ -31,7 +31,7 @@ function triangulate(index: SceneIndex): { triangles: number[]; owner: number[] 
  */
 export function ShellSurfaces({ index, buffers }: { index: SceneIndex; buffers: DisplayBuffers }) {
   const selectElementFromScene = useAppStore((s) => s.selectElementFromScene)
-  const selectedId = useAppStore((s) => (s.selectedModelEntity?.kind === 'element' ? s.selectedModelEntity.id : null))
+  const selectedIds = useAppStore((s) => s.selectedElementIds)
   const seen = useRef(-1)
   const ref = useRef<Mesh>(null)
 
@@ -46,18 +46,21 @@ export function ShellSurfaces({ index, buffers }: { index: SceneIndex; buffers: 
   }, [index, buffers])
   const material = useMemo(() => new MeshBasicMaterial({ color: SURFACE_COLOR, opacity: SURFACE_OPACITY, transparent: true, side: DoubleSide, depthWrite: false, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 }), [])
   const selectedMaterial = useMemo(() => new MeshBasicMaterial({ color: SELECTED_COLOR, opacity: SELECTED_OPACITY, transparent: true, side: DoubleSide, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 }), [])
-  // The selected shell is its own mesh over the same vertex data, so it follows the displaced positions too.
+  // The selected shells are their own mesh over the same vertex data, so they follow the displaced positions too.
   const selectedGeometry = useMemo(() => {
-    const row = selectedId === null ? -1 : index.elementIds.indexOf(selectedId)
-    if (row < 0 || index.elementKind[row] !== 'shell') return null
+    const triangles: number[] = []
+    for (const id of selectedIds) {
+      const row = index.elementIds.indexOf(id)
+      if (row < 0 || index.elementKind[row] !== 'shell') continue
+      const rows = index.elementNodes[row]
+      for (let k = 1; k + 1 < rows.length; k++) triangles.push(rows[0], rows[k], rows[k + 1])
+    }
+    if (triangles.length === 0) return null
     const g = new BufferGeometry()
     g.setAttribute('position', position)
-    const rows = index.elementNodes[row]
-    const triangles: number[] = []
-    for (let k = 1; k + 1 < rows.length; k++) triangles.push(rows[0], rows[k], rows[k + 1])
     g.setIndex(triangles)
     return g
-  }, [index, position, selectedId])
+  }, [index, position, selectedIds])
 
   useFrame(() => {
     const mesh = ref.current
@@ -83,7 +86,7 @@ export function ShellSurfaces({ index, buffers }: { index: SceneIndex; buffers: 
   const onClick = (e: ThreeEvent<MouseEvent>) => {
     if (e.faceIndex == null) return
     e.stopPropagation()
-    selectElementFromScene(index.elementIds[owner[e.faceIndex]])
+    selectElementFromScene(index.elementIds[owner[e.faceIndex]], e.nativeEvent.shiftKey || e.nativeEvent.ctrlKey || e.nativeEvent.metaKey)
   }
 
   if (owner.length === 0) return null

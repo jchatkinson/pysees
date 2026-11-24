@@ -6,6 +6,9 @@ import { useAppStore } from '@/app/store/useAppStore'
 
 export function ActionBar() {
   const requestViewportAction = useAppStore((s) => s.requestViewportAction)
+  const orthographic = useAppStore((s) => s.orthographic)
+  const setOrthographic = useAppStore((s) => s.setOrthographic)
+  const viewMode = useAppStore((s) => s.viewMode)
 
   return (
     <footer className="h-9 border-t flex items-center px-3 gap-2 shrink-0 text-xs text-muted-foreground">
@@ -45,7 +48,7 @@ export function ActionBar() {
         <Tooltip>
           <TooltipTrigger
             render={
-              <Button variant="ghost" size="icon" className="size-7" aria-label="Toggle perspective / orthographic">
+              <Button variant={orthographic ? 'secondary' : 'ghost'} size="icon" className="size-7" aria-label="Toggle perspective / orthographic" disabled={viewMode.kind !== '3d'} onClick={() => setOrthographic(!orthographic)}>
                 <Box className="size-3.5" />
               </Button>
             }

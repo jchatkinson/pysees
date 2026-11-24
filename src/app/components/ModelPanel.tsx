@@ -6,6 +6,8 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/app/components/ui/too
 import { useAppStore } from '@/app/store/useAppStore'
 import type { ModelDeletableKind } from '@/app/lib/modelWrite'
 import type { Model } from '@/app/types/model'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/app/components/ui/dialog'
+import { StudBuildingForm } from '@/app/components/StudBuildingForm'
 
 interface Row { kind: ModelDeletableKind; id: number; summary: string }
 
@@ -68,6 +70,8 @@ function rowsFor(model: Model): { label: string; rows: Row[] }[] {
 
 export function ModelPanel() {
   const model = useAppStore((s) => s.model)
+  const writeModelEntity = useAppStore((s) => s.writeModelEntity)
+  const [buildingOpen, setBuildingOpen] = useState(false)
   const selectedModelEntity = useAppStore((s) => s.selectedModelEntity)
   const setSelectedModelEntity = useAppStore((s) => s.setSelectedModelEntity)
   const modelUndo = useAppStore((s) => s.modelUndo)
@@ -118,9 +122,10 @@ export function ModelPanel() {
         </div>
       </div>
       <div className="flex-1 min-h-0 overflow-hidden">
+        {model.building && <div className="m-2 rounded border p-2 text-xs"><div className="font-medium">Building</div><p className="text-muted-foreground">{model.building.spec.storeys.length} storeys · {(model.building.spec.storeys[0]?.walls[0]?.layout.length ?? 0) / 1000} × {(model.building.spec.storeys[0]?.walls[2]?.layout.length ?? 0) / 1000} m · {model.building.spec.storeys[0]?.walls.length ?? 0} walls/storey · {model.building.template?.combination ?? 'custom combination'}</p><Button variant="outline" size="sm" className="mt-2 h-7" onClick={() => setBuildingOpen(true)}>Edit…</Button></div>}
         <ScrollArea className="h-full">
           <div ref={listRef} className="py-0.5 px-0.5">
-            {groups.length === 0 && (
+            {groups.length === 0 && !model.building && (
               <p className="text-[10px] text-muted-foreground text-center py-6">No model entities yet.</p>
             )}
             {groups.map((group) => {
@@ -157,6 +162,7 @@ export function ModelPanel() {
           </div>
         </ScrollArea>
       </div>
+      <Dialog open={buildingOpen} onOpenChange={setBuildingOpen}><DialogContent className="sm:max-w-2xl"><DialogHeader><DialogTitle>Edit stud-wall building</DialogTitle></DialogHeader>{model.building && <StudBuildingForm initial={model.building.template} onCancel={() => setBuildingOpen(false)} onCreate={(entity) => { writeModelEntity({ kind: 'building', entity }); setBuildingOpen(false) }} />}</DialogContent></Dialog>
     </div>
   )
 }

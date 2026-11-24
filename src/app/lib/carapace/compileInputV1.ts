@@ -9,6 +9,7 @@ import { withLumpedBeamMass } from '@/app/lib/beamMass'
 import { pathSeries } from '@/app/lib/groundMotion'
 import { eleLoadKind } from '@/app/lib/shells'
 import { isShell } from '@/app/lib/commands/tables'
+import { buildingRecorders } from '@/app/lib/studBuilding'
 
 export interface CompileInputV1Result {
   input: W.CarapaceInputV1 | null
@@ -26,7 +27,7 @@ export interface CompileInputV1Result {
   nodeTags: number[]
 }
 
-export type RecorderPlanKind = 'disp' | 'vel' | 'accel' | 'reaction' | 'force' | 'shell'
+export type RecorderPlanKind = 'disp' | 'vel' | 'accel' | 'reaction' | 'force' | 'shell' | 'building'
 export interface RecorderPlan {
   recorderId: string
   kind: RecorderPlanKind
@@ -74,7 +75,7 @@ export function recorderIdFor(kind: RecorderPlanKind, tag: number): string {
 const NO_INDEX = -1
 
 /** Compiles a pysees Model + AnalysisHistory into the CarapaceInputV1 shape decodeInput() expects.
- * Scope (matches carapace-wasm's current decoder): 2D (ndm=2/ndf=3) and 3D (ndm=3/ndf=6), Truss/ElasticBeamColumn/
+ * Scope (matches carapace-wasm's current decoder): native 3D stud-wall buildings and 2D/3D (ndm=2/ndf=3, ndm=3/ndf=6), Truss/ElasticBeamColumn/
  * DispBeamColumn elements (and zeroLengthSection in 2D), static, modal and transient stages, node displacement/reaction and element force recorders. Everything outside that is
  * reported as a diagnostic and dropped, never guessed at — this is the full validation boundary
  * pysees-handoff.md assigns to the compiler. */
@@ -86,6 +87,24 @@ export function compileInputV1(model: Model, analysisHistory: AnalysisHistory): 
   }
 
   if (!model.config) return fail('Model is not initialized.')
+  if (model.building) {
+    if (model.config.ndm !== 3 || model.config.ndf !== 6) return fail('Stud-wall buildings require a 3D model (ndm=3, ndf=6).')
+    const conflicts = model.nodes.size || model.masses.size || model.materials.size || model.sections.size || model.geomTransfs.size || model.beamIntegrations.size || model.elements.size || model.fixes.size || model.mpConstraints.size || model.regions.size || model.timeSeries.size || model.patterns.size || model.misc.size
+    if (conflicts) return fail('A stud-wall building cannot be combined with node, element, load, or other model tables.')
+    if (!Number.isInteger(model.building.steps) || model.building.steps < 1) return fail('Stud-wall building load steps must be a positive integer.')
+    if (analysisHistory.commands.length) diagnostics.push({ severity: 'info', message: 'Analysis history is ignored for a stud-wall building; the building uses its generated static load protocol.', commandIndex: -1 })
+    const recorders: W.RecorderSpecWire[] = [], recorderPlans: RecorderPlan[] = []
+    buildingRecorders(model.building.spec).forEach(({ labels, specs }, g) => {
+      recorderPlans.push({ recorderId: `building:${g}`, kind: 'building', targetTag: g, columnOffset: recorders.length, componentLayout: labels })
+      recorders.push(...specs)
+    })
+    const input: W.CarapaceInputV1 = {
+      header: { schemaVersion: 1, ndm: 3, engineVersion: 'pysees-dev', recordInitial: true },
+      building: model.building.spec,
+      sequence: { stages: [{ kind: 'static', id: 'building', steps: model.building.steps, integrator: { kind: 'loadControl', increment: 1 / model.building.steps }, algorithm: { kind: 'newton', tangent: 'current' }, convergence: { kind: 'normDispIncr', tol: 1e-7, maxIter: 100 }, holdPatternsAfter: [] }], recorders },
+    }
+    return { input, diagnostics, recordedNodeTags: [], dofsPerNode: 0, recorderPlans, nodeTags: [] }
+  }
   try { model = withLumpedBeamMass(model) } catch (e) { return fail(e instanceof Error ? e.message : String(e)) }
   const { ndm, ndf } = model.config!
   if (!((ndm === 2 && ndf === 3) || (ndm === 3 && ndf === 6))) {

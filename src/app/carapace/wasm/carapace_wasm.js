@@ -403,6 +403,22 @@ export function decodeInput(value) {
     }
     return WasmSession.__wrap(ret[0]);
 }
+
+/**
+ * Expands a `BuildingSpec` into an ordinary `CarapaceInputV1` (without a sequence) and the index map of what was
+ * generated (`{ input, map }`, see `building::expand` and `docs/building.md`). `up` is `"y"` (plan x-z, the
+ * default convention) or `"z"` (plan x-y, elevations along +Z). Rejects with `{ kind: "invalidBuilding", reason }`.
+ * @param {BuildingSpec} spec
+ * @param {UpAxis} up
+ * @returns {Expansion}
+ */
+export function expandBuilding(spec, up) {
+    const ret = wasm.expandBuilding(spec, up);
+    if (ret[2]) {
+        throw takeFromExternrefTable0(ret[1]);
+    }
+    return takeFromExternrefTable0(ret[0]);
+}
 function __wbg_get_imports() {
     const import0 = {
         __proto__: null,

@@ -1,5 +1,7 @@
+import { Fragment } from 'react'
 import { Html, Line } from '@react-three/drei'
 import type { GridlineEntity } from '@/app/types/gridlines'
+import { gridCrossing } from '@/app/lib/editor/snap'
 
 const LABEL_STYLE: React.CSSProperties = {
   fontSize: 10,
@@ -55,16 +57,36 @@ export function GridlinesLayer({
   showGridlines,
   ndm,
   levelElevations,
+  elevationGrid,
 }: {
   gridlines: GridlineEntity[]
   showGridlines: boolean
   ndm: 2 | 3
   levelElevations: number[]
+  /** In an elevation on this grid (3D), the grids crossing it are drawn as vertical lines where they cross. */
+  elevationGrid?: number | null
 }) {
   if (!showGridlines) return null
   const elevationRange: [number, number] = levelElevations.length > 0
     ? [Math.min(0, ...levelElevations), Math.max(0, ...levelElevations)]
     : [0, DEFAULT_2D_TOP]
+  const on = ndm === 3 && elevationGrid != null ? gridlines.find((g) => g.id === elevationGrid) : undefined
+  if (on) return (
+    <>
+      <Gridline gridline={on} ndm={ndm} elevationRange={elevationRange} />
+      {gridlines.map((g) => {
+        const p = g.id === on.id ? null : gridCrossing(on, g)
+        if (!p) return null
+        const start: [number, number, number] = [p[0], p[1], elevationRange[0]]
+        return (
+          <Fragment key={g.id}>
+            <Line points={[start, [p[0], p[1], Math.max(elevationRange[1], elevationRange[0] + 1e-9)]]} color={GRID_LINE_COLOR} lineWidth={1} dashed dashScale={8} />
+            <Html position={start} center style={LABEL_STYLE} zIndexRange={[10, 10]}>{g.label}</Html>
+          </Fragment>
+        )
+      })}
+    </>
+  )
   return (
     <>
       {gridlines.map((gridline) => (

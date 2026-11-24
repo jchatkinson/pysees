@@ -1,4 +1,4 @@
-import { Billboard, Line, Text } from '@react-three/drei'
+import { Html, Line } from '@react-three/drei'
 import type { LevelEntity } from '@/app/types/levels'
 import type { GridlineEntity } from '@/app/types/gridlines'
 import { levelElevations } from '@/app/lib/levels'
@@ -6,6 +6,7 @@ import { GRID_LINE_COLOR } from './Gridlines'
 
 const DEFAULT_HALF_EXTENT = 5
 const TEXT_OFFSET = 0.4
+const LEVEL_LABEL_STYLE: React.CSSProperties = { fontSize: 11, fontWeight: 600, color: GRID_LINE_COLOR, whiteSpace: 'nowrap', userSelect: 'none', pointerEvents: 'none', transform: 'translate(-100%, -50%)' }
 
 function anchorPoint(gridlines: GridlineEntity[], ndm: 2 | 3): [number, number] {
   const xs = gridlines.flatMap((g) => [g.start[0] ?? 0, g.end[0] ?? 0])
@@ -58,11 +59,10 @@ function Level({
             dashScale={8}
           />
         )}
-      <Billboard position={ndm === 3 ? [anchor[0] - TEXT_OFFSET, anchor[1] - TEXT_OFFSET, elevation] : [anchor[0] - TEXT_OFFSET, elevation, anchor[1] - TEXT_OFFSET]}>
-        <Text fontSize={0.28} color={GRID_LINE_COLOR} anchorX="right" anchorY="middle">
-          {level.label}
-        </Text>
-      </Billboard>
+      {/* HTML, not drei's SDF <Text>: its WebGL glyph generator was taking the viewport's WebGL context down with it. */}
+      <Html position={ndm === 3 ? [anchor[0] - TEXT_OFFSET, anchor[1] - TEXT_OFFSET, elevation] : [anchor[0] - TEXT_OFFSET, elevation, anchor[1] - TEXT_OFFSET]} style={LEVEL_LABEL_STYLE} zIndexRange={[10, 10]}>
+        {level.label}
+      </Html>
     </>
   )
 }
@@ -72,18 +72,21 @@ export function LevelsLayer({
   gridlines,
   ndm,
   showLevels,
+  only,
 }: {
   levels: LevelEntity[]
   gridlines: GridlineEntity[]
   ndm: 2 | 3
   showLevels: boolean
+  /** Draw only this level (a plan view); -1 = base, which has no level line. */
+  only?: number
 }) {
   if (!showLevels || levels.length === 0) return null
   const elevations = levelElevations(levels)
   const anchor = anchorPoint(gridlines, ndm)
   return (
     <>
-      {levels.map((level, i) => (
+      {levels.map((level, i) => (only !== undefined && i !== only ? null :
         <Level key={level.id} level={level} elevation={elevations[i]} ndm={ndm} gridlines={gridlines} anchor={anchor} />
       ))}
     </>

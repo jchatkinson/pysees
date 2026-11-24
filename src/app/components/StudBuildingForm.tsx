@@ -1,0 +1,29 @@
+import { useState } from 'react'
+import { Button } from '@/app/components/ui/button'
+import { Input } from '@/app/components/ui/input'
+import { Label } from '@/app/components/ui/label'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/app/components/ui/select'
+import { STUD_BUILDING_DEFAULTS, studBuildingTemplate } from '@/app/lib/studBuilding'
+import type { StudBuildingParams } from '@/app/types/model'
+
+export function StudBuildingForm({ initial, onCreate, onCancel }: { initial?: StudBuildingParams; onCreate: (entity: ReturnType<typeof studBuildingTemplate>) => void; onCancel?: () => void }) {
+  const [p, setP] = useState<StudBuildingParams>(() => ({ ...STUD_BUILDING_DEFAULTS, ...initial, factors: [...(initial?.factors ?? STUD_BUILDING_DEFAULTS.factors)] }))
+  const set = <K extends keyof StudBuildingParams>(key: K, value: StudBuildingParams[K]) => setP((v) => ({ ...v, [key]: value }))
+  const num = (key: keyof StudBuildingParams, label: string, scale: number, min = 0, max?: number) => <div className="grid gap-1"><Label>{label}</Label><Input type="number" min={min} max={max} value={Number(p[key]) / scale} onChange={(e) => { const raw = Number(e.target.value); set(key, Math.min(max ?? Infinity, Math.max(min, raw)) * scale as never) }} /></div>
+  return <div className="grid gap-3 max-h-[65vh] overflow-auto py-2 pr-1">
+    <div className="grid grid-cols-3 gap-2">{num('storeys','Storeys',1,1,6)}{num('length','Plan length Lx (m)',1000,1)}{num('width','Plan width Lz (m)',1000,1)}{num('wallHeight','Wall height (mm)',1,1)}{num('floorDepth','Floor depth (mm)',1,0)}{num('studSpacing','Stud spacing (mm)',1,1)}{num('windowWidth','Window width (m; 0 = none)',1000,0)}{num('windowHead','Window head (mm)',1,1)}{num('steps','Load steps',1,1)}</div>
+    <div className="grid grid-cols-3 gap-2">{num('holdDownStiffness','Hold-down stiffness (kN/mm)',1000)}{num('anchorageSlack','Hold-down slack (mm)',1)}{num('crushCapacity','Bearing crush capacity qr (kN)',1000)}{num('bandGa','Band shear stiffness (kN/mm)',1000)}{num('bearingStiffness','Link bearing stiffness (kN/mm)',1000)}</div>
+    <div className="grid grid-cols-2 gap-2">{num('lateralShear','Base lateral shear (kN)',1000)}{num('eccentricity','Accidental eccentricity (%)',1)}{num('deadFloor','Floor dead load (kPa)',0.001)}{num('liveFloor','Floor live load (kPa)',0.001)}{num('deadRoof','Roof dead load (kPa)',0.001)}{num('snow','Snow load (kPa)',0.001)}</div>
+    <div className="grid grid-cols-2 gap-2">
+      <div className="grid gap-1"><Label>Sheathing law</Label><Select value={p.sheathing} onValueChange={(v) => set('sheathing', v as StudBuildingParams['sheathing'])}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="o86">CSA O86</SelectItem><SelectItem value="linear">Linear Ga</SelectItem></SelectContent></Select></div>
+      <div className="grid gap-1"><Label>Diaphragm</Label><Select value={p.diaphragm} onValueChange={(v) => set('diaphragm', v as StudBuildingParams['diaphragm'])}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="rigid">Rigid</SelectItem><SelectItem value="flexible">Flexible</SelectItem></SelectContent></Select></div>
+      <div className="grid gap-1"><Label>Lateral direction</Label><Select value={p.lateralDirection} onValueChange={(v) => set('lateralDirection', v as StudBuildingParams['lateralDirection'])}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="x">X</SelectItem><SelectItem value="z">Z</SelectItem></SelectContent></Select></div>
+      <div className="grid gap-1"><Label>Lateral load type</Label><Select value={p.lateralType} onValueChange={(v) => set('lateralType', v as StudBuildingParams['lateralType'])}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="wind">Wind (W)</SelectItem><SelectItem value="earthquake">Earthquake (E)</SelectItem></SelectContent></Select></div>
+      <div className="grid gap-1"><Label>Combination preset</Label><Select value={p.combination} onValueChange={(v) => { if (!v) return; const factors: Record<string, number[]> = { unfactored:[1,1,1,1,0,0,0,0], '1.4D':[1.4,0,0,0,0,0,0,0], '1.25D + 1.5L + 1.0S':[1.25,1.5,1,0,0,0,0,0], '1.25D + 1.4W + 0.5L':[1.25,.5,0,1.4,0,0,0,0], '0.9D + 1.4W':[.9,0,0,1.4,0,0,0,0], '1.0D + 1.0E + 0.5L + 0.25S':[1,.5,.25,0,1,0,0,0], '0.9D + 1.0E':[.9,0,0,0,1,0,0,0] }; set('combination',v); set('factors', factors[v] ?? p.factors) }}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{['unfactored','1.4D','1.25D + 1.5L + 1.0S','1.25D + 1.4W + 0.5L','0.9D + 1.4W','1.0D + 1.0E + 0.5L + 0.25S','0.9D + 1.0E'].map((v)=><SelectItem key={v} value={v}>{v === 'unfactored' ? '1.0D + 1.0L + 1.0S + 1.0W (all unfactored)' : v}</SelectItem>)}</SelectContent></Select></div>
+    </div>
+    <div className="grid grid-cols-4 gap-2">{['D','L','S','W','E','unused 1','unused 2','unused 3'].map((slot, i) => <div key={slot} className="grid gap-1"><Label>{slot}</Label><Input type="number" step="0.05" value={p.factors[i] ?? 0} onChange={(e) => { const factors = [...p.factors]; factors[i] = Number(e.target.value); set('factors', factors); set('combination', 'custom') }} /></div>)}</div>
+    <label className="flex items-center gap-2 text-xs"><input type="checkbox" checked={p.noWindows} onChange={(e) => set('noWindows', e.target.checked)} /> No windows</label>
+    <p className="text-xs text-muted-foreground">N, mm, s model; form values show m, kN and kPa. Four stacked walls per storey, platform floors, hold-downs at every pier end. OpenSees export is unavailable for stud-wall buildings.</p>
+    <div className="flex justify-end gap-2">{onCancel && <Button variant="outline" onClick={onCancel}>Cancel</Button>}<Button onClick={() => onCreate(studBuildingTemplate(p))}>{initial ? 'Save building' : 'Create building'}</Button></div>
+  </div>
+}
