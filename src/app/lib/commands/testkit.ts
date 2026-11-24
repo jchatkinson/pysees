@@ -2,7 +2,7 @@ import { emptyModel, type Model } from '@/app/types/model'
 import type { AnalysisHistory } from '@/app/types/analysisCommands'
 import type { ModelWrite } from '@/app/lib/modelWrite'
 import { applyModelWrites } from '@/app/lib/modelWrite'
-import { cantileverTemplate, frameTemplate, frame3dTemplate, momentCurvatureTemplate, plateTemplate, precastWallTemplate, type TemplateResult } from '@/app/lib/templates'
+import { cantileverTemplate, frameTemplate, frame3dTemplate, momentCurvatureTemplate, plateTemplate, precastWallTemplate, towerTemplate, type TemplateResult } from '@/app/lib/templates'
 
 export function modelFromWrites(ndm: 2 | 3, ndf: number, writes: ModelWrite[]): Model {
   return applyModelWrites({ ...emptyModel(), config: { ndm, ndf } }, writes)
@@ -242,3 +242,7 @@ export function plain(m: Model) {
     mpConstraints: sorted(m.mpConstraints), regions: sorted(m.regions), timeSeries: sorted(m.timeSeries), patterns: sorted(m.patterns), misc: sorted(m.misc),
   }
 }
+
+/** A small `towerTemplate` (2 stories, 2×1 bays, 2×2 slab mesh): beams sharing slab nodes, shell self-weight and pressure. Shell element forces
+ * are left out of the OpenSees comparison for the same reason as `shell-patch-with-triangle`'s: OpenSees has no shell pressure. */
+export const towerFixture = (): Fixture => ({ ...fromTemplate('tower', towerTemplate({ stories: 2, storyH: 3, baysX: 2, bayX: 6, baysY: 1, bayY: 6, mesh: 2 })), skip: ['force'] })

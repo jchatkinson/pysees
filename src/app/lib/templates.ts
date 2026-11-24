@@ -445,6 +445,14 @@ export { precastWallTemplate, PRECAST_WALL_DEFAULTS, type PrecastWallParams } fr
 // `mesh`×`mesh` per bay at every level. Beams are split at the slab mesh so they share its nodes. Sized to stress the app and Carapace.
 // ---------------------------------------------------------------------------
 export interface TowerParams { stories: number; storyH: number; baysX: number; bayX: number; baysY: number; bayY: number; mesh: number }
+export const TOWER_DEFAULTS: TowerParams = { stories: 20, storyH: 4, baysX: 6, bayX: 8, baysY: 4, bayY: 8, mesh: 4 }
+
+/** Node, element and free-DOF counts of `towerTemplate`, for showing the size before building it. */
+export function towerSize({ stories, baysX, baysY, mesh }: TowerParams) {
+  const grid = (baysX + 1) * (baysY + 1), perLevel = (baysX * mesh + 1) * (baysY * mesh + 1)
+  const beams = (baysY + 1) * baysX * mesh + (baysX + 1) * baysY * mesh
+  return { nodes: grid + stories * perLevel, elements: stories * (grid + beams + baysX * baysY * mesh * mesh), dofs: 6 * stories * perLevel }
+}
 
 const TOWER_COLUMN = { A: 0.36, E: 30e9, G: 12.5e9, J: 1.8e-2, Iy: 1.08e-2, Iz: 1.08e-2 } // 600×600
 const TOWER_BEAM = { A: 0.28, E: 30e9, G: 12.5e9, J: 7.5e-3, Iy: 3.7e-3, Iz: 1.14e-2 } // 400 wide × 700 deep, strong axis vertical
