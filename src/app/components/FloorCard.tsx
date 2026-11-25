@@ -12,7 +12,7 @@ import { studWallArgs } from '@/app/lib/studWalls'
 import { Input } from '@/app/components/ui/input'
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@/app/components/ui/select'
 
-const studWallLabel = (model: Model, id: number) => { const e = model.elements.get(id); const l = e && studWallArgs(e.args).label; return l ? `${id} · ${l}` : `Wall ${id}` }
+const studWallLabel = (model: Model, id: number) => { const e = model.elements.get(id); if (e && e.eleType !== 'studWall') return `Beam ${id}`; const l = e && studWallArgs(e.args).label; return l ? `${id} · ${l}` : `Wall ${id}` }
 const Row = ({ k, v }: { k: string; v: string }) => <><span className="text-muted-foreground">{k}</span><span className="tabular-nums">{v}</span></>
 
 /** Each pattern's area load on the floor (the first `floorLoad` on it), or undefined. */
@@ -76,7 +76,8 @@ function FloorEditor({ element }: { element: ElementEntity }) {
   // Bearing check on the edited framing: strips, the walls they bear on, and anything that can't span.
   const trial = { ...model, elements: new Map(model.elements).set(element.id, { ...element, args: args as unknown as Record<string, unknown> }) }
   const check = errors.length ? null : floorTransferRows(trial, element.id, [{ kind: 'area', w: 1 }])
-  const walls = check ? [...new Set(check.rows.flatMap((r) => r.supports.map((s) => s.wall)))].sort((p, q) => p - q) : []
+  const walls = check ? [...new Set([...check.rows.flatMap((r) => r.supports.map((s) => s.wall)), ...check.wallLines.map((l) => l.wall)])].sort((p, q) => p - q) : []
+  const beams = check ? [...new Set(check.nodal.map((n) => n.beam))].sort((p, q) => p - q) : []
   // Takedown: each bearing wall's reaction per pattern (Σ strip reactions × widths; simple spans by statics, continuous by three moments).
   const loaded = new Map(patterns.flatMap((p) => { const v = w.get(p.id); return v !== undefined && Number.isFinite(v) && v !== 0 ? [[p.id, v] as [number, number]] : [] }))
   const takedown = check && loaded.size ? floorTakedown(trial, element.id, loaded) : null
@@ -121,7 +122,7 @@ function FloorEditor({ element }: { element: ElementEntity }) {
       <div className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5">
         <Row k="Outline" v={`${element.nodes.length} nodes, area ${show('area', area)}`} />
         <Row k="Depth" v={`${show('length', depth)} (joist + subfloor)`} />
-        <Row k="Bears on" v={walls.length ? `walls ${walls.join(', ')}` : 'no walls'} />
+        <Row k="Bears on" v={[walls.length ? `walls ${walls.join(', ')}` : 'no walls', ...(beams.length ? [`beams ${beams.join(', ')}`] : [])].join('; ')} />
         {check && <Row k="Joist strips" v={String(check.rows.length)} />}
       </div>
       {check?.problems.map((p) => <p key={p} className="text-[10px] text-amber-700">{p[0].toUpperCase() + p.slice(1)}.</p>)}
@@ -143,12 +144,12 @@ function FloorEditor({ element }: { element: ElementEntity }) {
       <div className="font-medium pt-1">Area loads</div>
       {patterns.length ? <div className="grid grid-cols-2 gap-1">{patterns.map((p) => field(`w${p.id}`, p.name ?? `Pattern ${p.id}`, 'stress', 'none'))}</div>
         : <p className="text-[10px] text-muted-foreground">Add a load pattern to load this floor.</p>}
-      <p className="text-[10px] text-muted-foreground">Per unit floor area, downward. Each joist strip carries its tributary width to the stud walls it crosses (hand-calculation reactions; the joists add no stiffness).</p>
+      <p className="text-[10px] text-muted-foreground">Per unit floor area, downward. Each joist strip carries its tributary width to the stud walls and beams it crosses (hand-calculation reactions; the joists add no stiffness). A beam takes each strip's reaction as point loads on its nodes.</p>
 
       {takedown && takedown.size > 0 && <>
         <div className="font-medium pt-1">Takedown</div>
         <Table>
-          <TableHeader><TableRow><TableHead className="h-6 px-1">Wall</TableHead>{[...loaded.keys()].map((p) => <TableHead key={p} className="h-6 px-1">{patterns.find((x) => x.id === p)?.name ?? `Pattern ${p}`}</TableHead>)}</TableRow></TableHeader>
+          <TableHeader><TableRow><TableHead className="h-6 px-1">Support</TableHead>{[...loaded.keys()].map((p) => <TableHead key={p} className="h-6 px-1">{patterns.find((x) => x.id === p)?.name ?? `Pattern ${p}`}</TableHead>)}</TableRow></TableHeader>
           <TableBody>
             {[...takedown].sort(([p], [q]) => p - q).map(([wall, m]) => (
               <TableRow key={wall}><TableCell className="px-1 py-0.5">{studWallLabel(model, wall)}</TableCell>{[...loaded.keys()].map((p) => <TableCell key={p} className="px-1 py-0.5 tabular-nums">{show('force', m.get(p))}</TableCell>)}</TableRow>
@@ -156,7 +157,7 @@ function FloorEditor({ element }: { element: ElementEntity }) {
             <TableRow><TableCell className="px-1 py-0.5 text-muted-foreground">Total</TableCell>{[...loaded.keys()].map((p) => <TableCell key={p} className="px-1 py-0.5 tabular-nums text-muted-foreground">{show('force', [...takedown.values()].reduce((sum, m) => sum + (m.get(p) ?? 0), 0))}</TableCell>)}</TableRow>
           </TableBody>
         </Table>
-        <p className="text-[10px] text-muted-foreground">Floor reactions on each wall (downward), unfactored. Total = load × floor area, less any strips that bear on fewer than two walls.</p>
+        <p className="text-[10px] text-muted-foreground">Floor reactions on each wall and beam (downward), unfactored. Total = load × floor area, less any strips that bear on fewer than two supports.</p>
       </>}
 
       {dirty && errors.length > 0 && <ul className="list-disc pl-4 text-[10px] text-destructive">{errors.map((p) => <li key={p}>{p}</li>)}</ul>}

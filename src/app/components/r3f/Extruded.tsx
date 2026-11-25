@@ -180,8 +180,8 @@ function StudWalls({ index, elements, model, selected, onPick, buffers }: { inde
 }
 
 /**
- * The extruded view: members drawn at their section's real outline (fiber sections) or a nominal square of their area (elastic members,
- * trusses), swept along their local axes; shells at their thickness; stud walls as their framing. Fiber detail stays in the properties panel.
+ * The extruded view: members drawn at their section's real outline (fiber sections) or a nominal one (an elastic member's equivalent
+ * rectangle, a truss's square of its area), swept along their local axes, level members hanging from their axis (top face on it); shells at their thickness; stud walls as their framing. Fiber detail stays in the properties panel.
  */
 export function ExtrudedLayer({ index, elements, buffers }: { index: SceneIndex; elements: Map<number, ElementEntity>; buffers?: DisplayBuffers }) {
   const model = useAppStore((s) => s.model)
@@ -203,8 +203,13 @@ export function ExtrudedLayer({ index, elements, buffers }: { index: SceneIndex;
       const len = Math.hypot(b[0] - a[0], b[1] - a[1], b[2] - a[2])
       const f = index.elementFrames.subarray(e * 9, e * 9 + 9)
       if (!(len > 0) || (f[0] === 0 && f[1] === 0 && f[2] === 0)) return
+      // A level member (beam, joist) hangs from its axis: drawn with its top face on the node line, as framing sits under the floor it
+      // carries (drawing only: the analysis has no offset). Columns and braces stay centred.
+      const up = model.config?.ndm === 2 ? 1 : 2, level = Math.abs(f[up]) < 0.05
+      const top = level ? Math.max(...s.outline.outer.map((p) => p.y * f[3 + up] + p.z * f[6 + up])) : 0, o = [a[0], a[1], a[2]]
+      o[up] -= top
       // Columns of the matrix: section y → local y, section z → local z, prism Z (0..1) → local x scaled to the length.
-      const m = new Matrix4().set(f[3], f[6], f[0] * len, a[0], f[4], f[7], f[1] * len, a[1], f[5], f[8], f[2] * len, a[2], 0, 0, 0, 1)
+      const m = new Matrix4().set(f[3], f[6], f[0] * len, o[0], f[4], f[7], f[1] * len, o[1], f[5], f[8], f[2] * len, o[2], 0, 0, 0, 1)
       let g = byKey.get(s.key)
       if (!g) {
         let geometry = geometries.get(s.key)

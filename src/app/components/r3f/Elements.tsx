@@ -8,7 +8,7 @@ import type { DisplayBuffers } from './displayBuffers'
 import { fillSegmentPositions, isClosed, type SceneIndex } from './sceneIndex'
 import { ShellSurfaces } from './Shells'
 import { LABEL_LIMIT } from './utils'
-import { ScreenLabels } from './ScreenLabels'
+import { SceneLabels, type SceneLabelStyle } from './SceneLabels'
 
 const ELEMENT_COLOR = 0x4b5563
 const ELEMENT_LINE_WIDTH_PX = 2
@@ -73,9 +73,9 @@ function SelectedElements({ index }: { index: SceneIndex }) {
   return <Line points={points} segments color={SELECTED_COLOR} lineWidth={SELECTED_LINE_WIDTH_PX} />
 }
 
-const ID_STYLE: Partial<CSSStyleDeclaration> = { fontSize: '9px', color: '#334155', background: 'white', border: '0.5px solid #cbd5e1', borderRadius: '2px', padding: '0 3px', lineHeight: '14px' }
+const ID_STYLE: SceneLabelStyle = { size: 9, color: '#334155', anchor: 'center', box: { fill: '#ffffff', stroke: '#cbd5e1', padX: 3, height: 14, radius: 2 }, lift: 32 }
 
-/** Element ids at each element's centroid, as one DOM layer (see `ScreenLabels`). */
+/** Element ids at each element's centroid, drawn in the scene (see `SceneLabels`). */
 function ElementLabels({ index }: { index: SceneIndex }) {
   const labels = useMemo(() => index.elementIds.map((id, j) => {
     const rows = index.elementNodes[j]
@@ -83,7 +83,7 @@ function ElementLabels({ index }: { index: SceneIndex }) {
     for (const r of rows) for (let k = 0; k < 3; k++) mid[k] += index.nodeCoords[r * 3 + k] / rows.length
     return { position: mid, text: `E${id}` }
   }), [index])
-  return <ScreenLabels labels={labels} style={ID_STYLE} offset={[-8, -7]} />
+  return <SceneLabels labels={labels} style={ID_STYLE} />
 }
 
 export function ElementsLayer({

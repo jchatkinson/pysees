@@ -49,3 +49,11 @@ export function evenlySpacedGridlines(params: EvenlySpacedGridParams, startId: n
   }
   return lines
 }
+
+/** Dash and gap in world units, from the size of the grid (a fixed `dashScale` makes sub-pixel dashes in a mm model, which shimmer). */
+export type Dash = { dashSize: number; gapSize: number }
+export function gridSize(gridlines: GridlineEntity[], elevationRange: [number, number] = [0, 0]): number {
+  const xs = gridlines.flatMap((g) => [g.start[0] ?? 0, g.end[0] ?? 0]), ys = gridlines.flatMap((g) => [g.start[1] ?? 0, g.end[1] ?? 0])
+  return Math.max(xs.length ? Math.max(...xs) - Math.min(...xs) : 0, ys.length ? Math.max(...ys) - Math.min(...ys) : 0, elevationRange[1] - elevationRange[0]) || 1
+}
+export const gridDash = (size: number): Dash => ({ dashSize: size / 150, gapSize: size / 300 })

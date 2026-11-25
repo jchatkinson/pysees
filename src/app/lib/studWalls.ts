@@ -7,7 +7,7 @@ import type { ElementEntity, Model, StudBuildingParams } from '@/app/types/model
 import { studBuildingSpec, wallPiers } from '@/app/lib/studBuilding'
 import { ModelDraft } from '@/app/lib/modelWrite'
 import { wallLoadArgs } from '@/app/lib/shells'
-import { applyFraming, guessFraming, lumberScale, type WallFraming } from '@/app/lib/lumber'
+import { applyFraming, guessFraming, lumberScale, type OpeningFraming, type WallFraming } from '@/app/lib/lumber'
 import type { FloorAreaLoadArgs, JoistFloorArgs } from '@/app/lib/floors'
 
 /** A `studWall` element's args: its layout and, for each node after the four corners, the chord and wall-local x of that station. */
@@ -138,7 +138,7 @@ export function expansionToModel(input: WasmInput, map: Expansion['map'], p: Stu
   // Record the whole model (displacements, reactions, element forces) as every template does, so the run has results to show.
   const analysisCommands: AnalysisCommand[] = [{ type: 'ANALYSIS_BLOCK', blockId: 'whole-model-recorder', params: { directory: 'out' } }, { type: 'ANALYSIS_BLOCK', blockId: 'run-gravity-analysis', params: { patterns: patternIds, steps: p.steps, holdLoads: 'Yes', algorithm: 'Newton', tol: 1e-7, maxIter: 100 } }]
   const storey = p.wallHeight + p.floorDepth
-  const levels: LevelEntity[] = Array.from({ length: p.storeys }, (_, i) => ({ id: i + 1, label: i === p.storeys - 1 ? 'Roof' : `Floor ${i + 2}`, height: storey * (i + 1) }))
+  const levels: LevelEntity[] = Array.from({ length: p.storeys }, (_, i) => ({ id: i + 1, label: i === p.storeys - 1 ? 'Roof' : `Floor ${i + 2}`, height: storey }))
   const gridlines: GridlineEntity[] = [
     { id: 1, label: 'A', start: [0, 0], end: [p.length, 0] }, { id: 2, label: 'B', start: [0, p.width], end: [p.length, p.width] },
     { id: 3, label: '1', start: [0, 0], end: [0, p.width] }, { id: 4, label: '2', start: [p.length, 0], end: [p.length, p.width] },
@@ -267,6 +267,9 @@ export function holdDownMaterial(batch: { model: Model; writeRaw: (w: ModelWrite
   return id
 }
 
+/** An opening for `drawStudWall`, in wall-local x; a window's `sill` is drawing-only. Lumber defaults: (2) 2x10 header, double jacks. */
+export interface DrawnOpening { x0: number; x1: number; head: number; door: boolean; sill?: number; header?: string; headerPlies?: number; jackPlies?: number }
+
 /** What the wall tool draws: a layout recipe (regular studs from the start corner) plus the hold-down material at pier ends. */
 export interface StudWallTemplate {
   spacing: number; studEa: number; endEa: number
@@ -318,23 +321,34 @@ export function templateLayout(t: StudWallTemplate, length: number, height: numb
 
 /**
  * Draw one stud wall in plan from `a` to `b` (z ignored), spanning `z0` to `z1`: its own corner and station nodes (walls never share nodes;
- * they are joined by links), and at each pier end a hold-down: to the top node of a stud wall right below (a zero-length with the anchorage
+ * they are joined by links), and at each pier end a hold-down: to the top node of a stud wall (or a beam-column's node) right below (a zero-length with the anchorage
  * material vertically and an equalDOF along the wall, as Carapace's building expansion does) or, on the lowest level, to a new fixed ground
  * node (anchorage vertically, stiff elastic in plan). Returns the wall's id, or null when it has no length or height.
+ * `extra` adds openings (framed from the template's lumber, which it then needs) and studs at given x, e.g. under the pier ends of a wall above.
  */
-export function drawStudWall(batch: { model: Model; writeRaw: (w: ModelWrite) => void }, a: number[], b: number[], z0: number, z1: number, t: StudWallTemplate, label?: string): number | null {
+export function drawStudWall(batch: { model: Model; writeRaw: (w: ModelWrite) => void }, a: number[], b: number[], z0: number, z1: number, t: StudWallTemplate, label?: string, extra?: { openings?: DrawnOpening[]; studs?: number[] }): number | null {
   const dx = b[0] - a[0], dy = (b[1] ?? 0) - (a[1] ?? 0), L = Number(Math.hypot(dx, dy).toPrecision(12)), Htop = z1 - z0
   const depth = t.floor?.depth ?? 0
   if (!(L > 0) || !(Htop - depth > 0)) return null
   const ex = [dx / L, dy / L]
   const plain = templateLayout(t, L, Htop - depth)
-  const layout = t.framing ? applyFraming(plain, t.framing, lumberScale(batch.model.config?.units, Htop)) : plain
+  const ops = (extra?.openings ?? []).filter((o) => o.x0 >= 0 && o.x1 <= L && o.x1 > o.x0)
+  if (ops.length && !t.framing) throw new Error('drawStudWall: openings need the template\'s lumber framing')
+  if (ops.length || extra?.studs?.length) {
+    const xs = [...plain.studs.map((s) => s.x), ...ops.flatMap((o) => [o.x0, o.x1]), ...(extra?.studs ?? []).filter((x) => x > 0 && x < L)].sort((p, q) => p - q)
+    plain.studs = xs.filter((x, i) => i === 0 || x - xs[i - 1] > 1e-9 * L).map((x) => ({ x, ea: x === 0 || x === L ? t.endEa : t.studEa }))
+    plain.openings = ops.map((o) => ({ x0: o.x0, x1: o.x1, headHeight: o.head, headerEi: 0, jackEa: 0, door: o.door }))
+  }
+  const framing = t.framing && { ...t.framing, openings: ops.map((o): OpeningFraming => ({ header: o.header ?? '2x10', headerPlies: o.headerPlies ?? 2, jackPlies: o.jackPlies ?? 2, ...(o.sill !== undefined && !o.door ? { sill: o.sill } : {}) })) }
+  const layout = framing ? applyFraming(plain, framing, lumberScale(batch.model.config?.units, Htop)) : plain
   const at = (x: number, z: number) => [a[0] + ex[0] * x, (a[1] ?? 0) + ex[1] * x, z].map((v) => Number(v.toPrecision(12)))
   const newNode = (p: number[]) => { const id = batch.model.nextIds.node; batch.writeRaw({ kind: 'node', entity: { id, coords: p } }); return id }
-  // Top nodes of existing walls (and their planes), looked up before this wall adds its own.
+  // Top nodes of existing walls (and their planes), looked up before this wall adds its own; beam-column nodes too (a wall on a beam or
+  // a cantilevered joist).
   const tol = 1e-6 * Math.max(1, L, Math.abs(z1))
   const tops: { node: number; p: number[] }[] = []
   for (const w of batch.model.elements.values()) {
+    if (/BeamColumn$/i.test(w.eleType)) { for (const id of w.nodes) { const c = batch.model.nodes.get(id)?.coords; if (c) tops.push({ node: id, p: c }) } continue }
     if (!isStudWall(w.eleType)) continue
     const wa = studWallArgs(w.args)
     const ids = [w.nodes[2], w.nodes[3], ...wa.stations.flatMap((s, i) => (s.chord === 'top' ? [w.nodes[4 + i]] : []))]
@@ -347,7 +361,7 @@ export function drawStudWall(batch: { model: Model; writeRaw: (w: ModelWrite) =>
   const stations = [...inner([...layout.studs.map((s) => s.x), ...ends]).map((x) => ({ chord: 'top' as const, x })), ...inner(ends).map((x) => ({ chord: 'bottom' as const, x }))]
   const stationNodes = stations.map((s) => newNode(at(s.x, s.chord === 'top' ? z1 : z0)))
   const id = batch.model.nextIds.element
-  const args: StudWallArgs = { ...(label ? { label } : {}), layout, stations, ...(t.framing ? { framing: { ...t.framing, openings: [] } } : {}) }
+  const args: StudWallArgs = { ...(label ? { label } : {}), layout, stations, ...(framing ? { framing } : {}) }
   batch.writeRaw({ kind: 'element', entity: { id, eleType: 'studWall', nodes: [...corners, ...stationNodes], args: args as unknown as Record<string, unknown> } })
   const anchorage = t.anchorage ?? (t.holdDown && holdDownMaterial(batch, t.holdDown))
   if (anchorage === undefined || !batch.model.materials.has(anchorage)) return id

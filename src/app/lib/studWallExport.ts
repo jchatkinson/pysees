@@ -185,10 +185,13 @@ export function floorLoadNodal(model: Model, child: LoadAssignment): Call[] {
   const ndf = model.config?.ndf ?? 6
   const forces = new Map<number, V3>()
   const add = (node: number, v: V3) => { const f = forces.get(node) ?? [0, 0, 0]; forces.set(node, [f[0] + v[0], f[1] + v[1], f[2] + v[2]]) }
-  const rows = floorLoadRows(model, child).rows
+  const { rows, wallLines, nodal } = floorLoadRows(model, child)
   for (const a of rows) floorRowNodal(model, a, add)
+  // Strips on beams, already solved: wall shares onto the wall's top nodes, beam shares on the beam's nodes.
+  for (const l of wallLines) { const e = model.elements.get(l.wall); if (e) spreadOnTop(model, e, add, l.x0, l.x1, [0, -l.q], [0, -l.q]) }
+  for (const n of nodal) add(n.node, [0, 0, -n.fz])
   const calls: Call[] = [...forces].sort(([p], [q]) => p - q).map(([node, v]) => ({ fn: 'load', args: [node, ...Array.from({ length: ndf }, (_, i) => (i < 3 ? round(v[i]) : 0))] }))
-  if (calls.length) calls[0].comment = `WARNING: Carapace-only floor load (${rows[0]?.continuity ?? 'simple'} one-way spans${isFloorAreaLoad(child) ? `, joist floor ${child.args.floor}` : ''}) written as its reactions on the support walls' top nodes.`
+  if (calls.length) calls[0].comment = `WARNING: Carapace-only floor load (${rows[0]?.continuity ?? 'simple'} one-way spans${isFloorAreaLoad(child) ? `, joist floor ${child.args.floor}` : ''}) written as its reactions on the support walls' top nodes (and beam nodes).`
   return calls
 }
 

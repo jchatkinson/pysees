@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react'
-import { Html, Line } from '@react-three/drei'
+import { useEffect, useMemo, useState } from 'react'
+import { Line } from '@react-three/drei'
 import { useAppStore } from '@/app/store/useAppStore'
 import { useResultsSource } from '@/app/lib/resultsStorage/useResultsSource'
 import { formatResult } from '@/app/lib/formatResult'
@@ -7,6 +7,7 @@ import { useUnits } from '@/app/lib/units/useUnits'
 import type { FixEntity } from '@/app/types/model'
 import type { SceneIndex } from './sceneIndex'
 import { ScreenSize } from './ScreenSize'
+import { SceneLabels, type SceneLabelStyle } from './SceneLabels'
 
 const COLOR = '#16a34a'
 /** Arrow length and head size, in screen pixels. */
@@ -15,12 +16,12 @@ const HEAD = 8
 const FORCES = ['Fx', 'Fy', 'Fz'] as const
 const MOMENTS = ['Mx', 'My', 'Mz'] as const
 
-const LABEL_STYLE: React.CSSProperties = { fontSize: 10, color: '#166534', background: 'rgba(255,255,255,0.9)', border: '0.5px solid #86efac', borderRadius: 2, padding: '0 3px', lineHeight: '14px', whiteSpace: 'pre', userSelect: 'none', pointerEvents: 'none' }
+const LABEL_STYLE: SceneLabelStyle = { size: 10, color: '#166534', offset: [6, 6], box: { fill: 'rgba(255,255,255,0.9)', stroke: '#86efac', padX: 3, height: 14, radius: 2 }, lift: 32 }
 
 interface Reaction { nodeId: number; position: [number, number, number]; forces: [number, number, number]; moments: [number, number, number] }
 
 /** One force arrow per non-zero global component, pointing the way the support pushes on the structure, ending at the node. */
-function ReactionGlyph({ r, tol, label }: { r: Reaction; tol: number; label: string }) {
+function ReactionGlyph({ r, tol }: { r: Reaction; tol: number }) {
   return (
     <ScreenSize position={r.position}>
       {r.forces.map((f, k) => {
@@ -33,7 +34,6 @@ function ReactionGlyph({ r, tol, label }: { r: Reaction; tol: number; label: str
         const h2: [number, number, number] = [0, 1, 2].map((i) => -d[i] * HEAD - side[i] * HEAD * 0.5) as [number, number, number]
         return <Line key={k} points={[tail, [0, 0, 0], h1, [0, 0, 0], h2]} segments={false} color={COLOR} lineWidth={2} />
       })}
-      <Html position={[0, 0, 0]} style={{ ...LABEL_STYLE, transform: 'translate(6px, 6px)' }} zIndexRange={[11, 11]}>{label}</Html>
     </ScreenSize>
   )
 }
@@ -66,15 +66,20 @@ export function ReactionsLayer({ index, fixes }: { index: SceneIndex; fixes: Fix
     return () => { live = false }
   }, [source, step, fixes, index])
 
+  // One label per reaction, all in one layer: a row per non-zero component.
+  const labels = useMemo(() => {
+    const fmt = (cat: 'force' | 'moment', v: number) => `${formatResult(units.toDisplay(cat, v), tol)}${units.active ? ` ${units.symbol(cat)}` : ''}`
+    return reactions.flatMap((r) => {
+      const lines = [...FORCES.map((n, k) => [n, r.forces[k], 'force'] as const), ...MOMENTS.map((n, k) => [n, r.moments[k], 'moment'] as const)]
+        .filter(([, v]) => Math.abs(v) >= tol).map(([n, v, cat]) => `${n} ${fmt(cat, v)}`)
+      return lines.length ? [{ position: r.position, text: lines.join('\n') }] : []
+    })
+  }, [reactions, tol, units])
   if (!source) return null
-  const fmt = (cat: 'force' | 'moment', v: number) => `${formatResult(units.toDisplay(cat, v), tol)}${units.active ? ` ${units.symbol(cat)}` : ''}`
   return (
     <>
-      {reactions.map((r) => {
-        const lines = [...FORCES.map((n, k) => [n, r.forces[k], 'force'] as const), ...MOMENTS.map((n, k) => [n, r.moments[k], 'moment'] as const)]
-          .filter(([, v]) => Math.abs(v) >= tol).map(([n, v, cat]) => `${n} ${fmt(cat, v)}`)
-        return lines.length ? <ReactionGlyph key={r.nodeId} r={r} tol={tol} label={lines.join('\n')} /> : null
-      })}
+      {reactions.map((r) => <ReactionGlyph key={r.nodeId} r={r} tol={tol} />)}
+      <SceneLabels labels={labels} style={LABEL_STYLE} />
     </>
   )
 }

@@ -222,7 +222,7 @@ done. PySees status:
 8. **Performance audit** (first pass done). Measured on a 15-story 8×8-bay frame (1296 nodes, 3375 elements, a load on every beam):
    view toggles went from 9–17 s to ~1.3 s and heap from ~400 to ~170 MB. Changes: the canvas renders on demand (`frameloop="demand"`;
    store changes and `DisplayBuffers` invalidate); loads and supports are one fat-line draw per colour, rewritten only when the camera
-   moves (`batchHooks.ts`); id / value / load labels are one DOM layer each (`ScreenLabels`) instead of an `<Html>` per item; drei
+   moves (`batchHooks.ts`); id / value / load labels are one instanced draw each (`SceneLabels`, depth tested) instead of an `<Html>` per item; drei
    `<Text>` removed (it took the WebGL context down); a lost context shows a notice and rebuilds the scene on restore; Vite ignores
    `.claude/` so agent worktrees don't reload the app. Next: `three-mesh-bvh` picking and instanced node glyph scaling for 10k+ models,
    and profiling on real GPU hardware (this environment renders WebGL on the CPU through SwiftShader).

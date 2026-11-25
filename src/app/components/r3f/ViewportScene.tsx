@@ -6,6 +6,7 @@ import { Box3, MOUSE, OrthographicCamera as OrthographicCameraImpl, PerspectiveC
 import { useAppStore } from '@/app/store/useAppStore'
 import { toVec3 } from './utils'
 import { SceneHelpers } from './SceneHelpers'
+import { FlyControls } from './FlyControls'
 import { NodesLayer } from './Nodes'
 import { ElementsLayer } from './Elements'
 import { SupportsLayer } from './Supports'
@@ -105,7 +106,8 @@ export const ViewportScene = forwardRef<ViewportSceneRef, object>(function Viewp
   const fixes = useMemo(() => [...model.fixes.values()].filter((f) => nodes.has(f.nodeId)).sort((a, b) => a.nodeId - b.nodeId), [model.fixes, nodes])
   const isOrtho = mode.kind !== '3d' || orthographic
   const view = useMemo(() => viewCamera(mode, gridlines, ndm), [mode, gridlines, ndm])
-  const viewKey = `${JSON.stringify(mode)}|${isOrtho}`
+  // Stepping between plan levels keeps the camera (same direction, pan and zoom), so the key leaves the level out.
+  const viewKey = `${mode.kind === 'plan' ? 'plan' : JSON.stringify(mode)}|${isOrtho}`
   // The default camera, set here rather than by drei's <OrthographicCamera makeDefault>, which on unmount restores whichever camera
   // was the default when it rendered (after plan → 3D ortho → perspective, that was the plan camera, +Y up). The Canvas's own
   // perspective camera is kept for 3D; each orthographic view gets a fresh camera built with its own up (OrbitControls reads `up`
@@ -195,6 +197,11 @@ export const ViewportScene = forwardRef<ViewportSceneRef, object>(function Viewp
     return box.isEmpty() ? bounds : box
   }, [slice, bounds, mode, levels, gridlines])
   const radius = bounds.isEmpty() ? 2 : Math.max(bounds.getSize(new Vector3()).length(), 1) * 0.5 // bounding sphere
+  const center = useMemo(() => (bounds.isEmpty() ? new Vector3() : bounds.getCenter(new Vector3())), [bounds])
+  // Fly mode is a 3D perspective thing: an orthographic camera or a plan / elevation ends it.
+  const flyMode = useAppStore((s) => s.flyMode)
+  const flying = flyMode && !isOrtho
+  useEffect(() => { if (flyMode && isOrtho) useAppStore.getState().setFlyMode(false) }, [flyMode, isOrtho])
   const maxDistance = Math.max(500, radius * 20)
 
   // The 3D perspective camera's last viewing direction, so the 3D orthographic view starts from the same angle.
@@ -242,6 +249,17 @@ export const ViewportScene = forwardRef<ViewportSceneRef, object>(function Viewp
     framedKey.current = `${viewKey}|${camera.uuid}`
     fit(view?.back.clone() ?? (isOrtho ? lastDirection.current.clone() : undefined))
   }, [camera, viewKey, isOrtho, view, fit])
+  // Changing plan level moves the camera and target to the new elevation, keeping the plan position and zoom.
+  const planZ = mode.kind === 'plan' ? planElevation(levels, mode.level) : null
+  const lastPlanZ = useRef<number | null>(null)
+  useEffect(() => {
+    const controls = controlsRef.current, prev = lastPlanZ.current
+    lastPlanZ.current = planZ
+    if (planZ === null || prev === null || prev === planZ || !controls) return
+    const dz = planZ - prev
+    controls.target.z += dz; camera.position.z += dz
+    controls.update(); invalidate()
+  }, [planZ, camera, invalidate])
   // Remember the perspective direction while it's the active camera.
   useEffect(() => {
     const controls = controlsRef.current
@@ -344,10 +362,12 @@ export const ViewportScene = forwardRef<ViewportSceneRef, object>(function Viewp
         showValues={viewSettings.showLoadValues}
       />}
       {/* Plans and elevations are flat drawings: pan and zoom only. */}
+      {flying && <FlyControls radius={radius} center={center} />}
       <OrbitControls
         key={`controls|${viewKey}`}
         ref={controlsRef}
         makeDefault
+        enabled={!flying}
         enableRotate={mode.kind === '3d'}
         enablePan
         enableZoom

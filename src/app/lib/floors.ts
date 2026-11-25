@@ -54,78 +54,111 @@ export function chordsAt(st: P2[], t: number): P2[] {
   return out
 }
 
-/** Joist strips: bands of width `spacing` across the floor from its lowest `t`, each with the chords of its centre line. */
+/** Joist strips: bands of width `spacing` across the floor from its lowest `t`, each with the chords of its centre line. A band that an
+ * outline corner falls inside is split there, so the chords hold across each piece (a rectilinear outline's area comes out exact). */
 export function floorStrips(st: P2[], spacing: number): { t0: number; t1: number; chords: P2[] }[] {
-  const ts = st.map((p) => p[1]), lo = Math.min(...ts), hi = Math.max(...ts)
+  const ts = st.map((p) => p[1]), lo = Math.min(...ts), hi = Math.max(...ts), eps = 1e-9 * (hi - lo)
   if (!(spacing > 0) || !(hi > lo)) return []
+  const corners = [...new Set(ts)].sort((p, q) => p - q)
   const out: { t0: number; t1: number; chords: P2[] }[] = []
-  for (let t0 = lo; t0 < hi - 1e-9 * (hi - lo); t0 += spacing) {
-    const t1 = Math.min(t0 + spacing, hi)
-    out.push({ t0, t1, chords: chordsAt(st, (t0 + t1) / 2) })
+  for (let t0 = lo; t0 < hi - eps; t0 += spacing) {
+    const t1 = Math.min(t0 + spacing, hi), cuts = [t0, ...corners.filter((t) => t > t0 + eps && t < t1 - eps), t1]
+    for (let k = 0; k + 1 < cuts.length; k++) out.push({ t0: cuts[k], t1: cuts[k + 1], chords: chordsAt(st, (cuts[k] + cuts[k + 1]) / 2) })
   }
   return out
 }
 
-/** A stud wall the floor can bear on: its top line, perpendicular to the joists, at the floor's level. */
-interface Bearing { wall: number; s: number; ta: number; tb: number; L: number; sign: 1 | -1 }
+/** Frame elements a floor can bear on: beam-columns (two nodes). */
+export const isFloorBeam = (e: ElementEntity) => /BeamColumn$/i.test(e.eleType) && e.nodes.length === 2
+
+/** A stud wall's top line or a beam the floor can bear on: perpendicular to the joists, at the floor's level. `wall` or `beam` (its
+ * element and end nodes) says which. */
+interface Bearing { wall?: number; beam?: { element: number; i: number; j: number }; s: number; ta: number; tb: number; L: number; sign: 1 | -1 }
 function bearings(model: Model, f: NonNullable<ReturnType<typeof floorFrame>>, tol: number): Bearing[] {
   const out: Bearing[] = []
   for (const w of model.elements.values()) {
-    if (!isStudWall(w.eleType)) continue
-    const a = model.nodes.get(w.nodes[3])?.coords, b = model.nodes.get(w.nodes[2])?.coords // top start, top end
+    const wall = isStudWall(w.eleType), beam = !wall && isFloorBeam(w)
+    if (!wall && !beam) continue
+    const [na, nb] = wall ? [w.nodes[3], w.nodes[2]] : [w.nodes[0], w.nodes[1]] // a wall's top start and end
+    const a = model.nodes.get(na)?.coords, b = model.nodes.get(nb)?.coords
     if (!a || !b || Math.abs((a[2] ?? 0) - f.z) > tol || Math.abs((b[2] ?? 0) - f.z) > tol) continue
     const dx = b[0] - a[0], dy = (b[1] ?? 0) - (a[1] ?? 0), L = Math.hypot(dx, dy)
     if (!(L > 0)) continue
     const along = (dx * f.d[0] + dy * f.d[1]) / L, across = (dx * f.n[0] + dy * f.n[1]) / L
-    if (Math.abs(along) > 1e-3) continue // a wall parallel (or skew) to the joists carries none of them
+    if (Math.abs(along) > 1e-3) continue // parallel (or skew) to the joists: carries none of them
     const s = a[0] * f.d[0] + (a[1] ?? 0) * f.d[1], ta = a[0] * f.n[0] + (a[1] ?? 0) * f.n[1]
-    out.push({ wall: w.id, s, ta, tb: ta + across * L, L, sign: across > 0 ? 1 : -1 })
+    out.push({ ...(wall ? { wall: w.id } : { beam: { element: w.id, i: na, j: nb } }), s, ta, tb: ta + across * L, L, sign: across > 0 ? 1 : -1 })
   }
   return out
 }
 
-export interface FloorTransfer { rows: FloorLoadArgs[]; problems: string[] }
+/**
+ * A floor load's transfer. `rows`: Carapace floor-transfer rows, for the strips that bear only on walls. Strips that bear on a beam are
+ * solved here with the same statics (`stripReactions`) and come out as loads: `wallLines` (downward force per length `q` over wall-local
+ * [x0, x1] of a wall's top) and `nodal` (downward force `fz` on a beam's end nodes, each strip's reaction split by its position).
+ */
+export interface FloorTransfer { rows: FloorLoadArgs[]; problems: string[]; wallLines: { wall: number; x0: number; x1: number; q: number }[]; nodal: { node: number; beam: number; fz: number }[] }
 
 /**
- * A floor load as Carapace floor-transfer rows: one per joist strip piece, its bounds the strip, its supports the bearing walls the
- * strip's centre line crosses inside the piece (each loaded over the strip's width, kept within the wall), its loads the floor's.
- * Strips with fewer than two bearings can't span and are reported (a cantilever past the last wall is fine: it bears on two).
+ * A floor load as one row per joist strip piece: its bounds the strip, its supports the bearings the strip's centre line crosses inside
+ * the piece (a wall loaded over the strip's width, kept within the wall), its loads the floor's. Strips with fewer than two bearing lines
+ * can't span and are reported (a cantilever past the last support is fine: it bears on two).
  */
 export function floorTransferRows(model: Model, floorId: number, loads: FloorAreaLoadArgs['loads']): FloorTransfer {
   const e = model.elements.get(floorId)
-  const problems: string[] = []
-  if (!e || !isJoistFloor(e.eleType)) return { rows: [], problems: [`floor ${floorId} is not a joist floor`] }
+  const problems: string[] = [], wallLines: FloorTransfer['wallLines'] = [], nodal = new Map<number, { beam: number; fz: number }>()
+  const empty = (p: string): FloorTransfer => ({ rows: [], problems: [p], wallLines: [], nodal: [] })
+  if (!e || !isJoistFloor(e.eleType)) return empty(`floor ${floorId} is not a joist floor`)
   const a = joistFloorArgs(e.args), f = floorFrame(model, e)
-  if (!f) return { rows: [], problems: [`floor ${floorId} has fewer than three nodes`] }
+  if (!f) return empty(`floor ${floorId} has fewer than three nodes`)
   const ss = f.st.map((p) => p[0]), size = Math.max(Math.max(...ss) - Math.min(...ss), ...f.st.map((p) => Math.abs(p[1])), 1)
   const tol = 1e-6 * size
-  const walls = bearings(model, f, Math.max(tol, 1e-6 * Math.abs(f.z)))
+  const all = bearings(model, f, Math.max(tol, 1e-6 * Math.abs(f.z)))
+  const total = loads.reduce((sum, l) => sum + l.w, 0)
   const rows: FloorLoadArgs[] = []
   let unsupported = 0, short = 0
   for (const strip of floorStrips(f.st, a.spacing)) {
     const tc = (strip.t0 + strip.t1) / 2, w = strip.t1 - strip.t0
     for (const [s0, s1] of strip.chords) {
+      const crossing = all.filter((b) => b.s >= s0 - tol && b.s <= s1 + tol && tc >= Math.min(b.ta, b.tb) - tol && tc <= Math.max(b.ta, b.tb) + tol)
       // A wall shorter than the strip can't take its full width (Carapace splits strips where supports end); it is left out and reported.
-      const crossing = walls.filter((b) => b.s >= s0 - tol && b.s <= s1 + tol && tc >= Math.min(b.ta, b.tb) - tol && tc <= Math.max(b.ta, b.tb) + tol)
-      const on = crossing.filter((b) => b.L >= w - tol)
-      short += crossing.length - on.length
-      if (new Set(on.map((b) => b.s.toFixed(6))).size < 2) { unsupported++; continue }
-      const supports = on.map((b) => {
-        // Wall-local x of the strip's start, shifted so the strip's width stays on the wall.
-        const x0 = Math.min(Math.max((tc - b.ta) * b.sign - w / 2, 0), b.L - w)
-        return { s: Math.min(Math.max(b.s, s0), s1), t0: strip.t0, t1: strip.t1, wall: b.wall, xAtT0: b.sign > 0 ? x0 : x0 + w, reversed: b.sign < 0 }
+      // A beam takes the strip's reaction as a point load, so any piece of it the centre line crosses will do (one per line).
+      const walls = crossing.filter((b) => b.wall !== undefined && b.L >= w - tol)
+      short += crossing.filter((b) => b.wall !== undefined).length - walls.length
+      const beams = crossing.filter((b, i, list) => b.beam && !walls.some((x) => Math.abs(x.s - b.s) <= tol) && list.findIndex((x) => x.beam && Math.abs(x.s - b.s) <= tol) === i)
+      const on = [...walls, ...beams]
+      const levels = [...new Set(on.map((b) => b.s))].sort((p, q) => p - q).filter((x, i, l) => i === 0 || x - l[i - 1] > tol)
+      if (levels.length < 2) { unsupported++; continue }
+      // Wall-local x of the strip's start, shifted so the strip's width stays on the wall.
+      const startOn = (b: Bearing) => Math.min(Math.max((tc - b.ta) * b.sign - w / 2, 0), b.L - w)
+      if (!beams.length) {
+        const supports = walls.map((b) => { const x0 = startOn(b); return { s: Math.min(Math.max(b.s, s0), s1), t0: strip.t0, t1: strip.t1, wall: b.wall!, xAtT0: b.sign > 0 ? x0 : x0 + w, reversed: b.sign < 0 } })
+        rows.push({ bounds: [s0, s1, strip.t0, strip.t1], continuity: a.continuity, loads: loads.map((l) => ({ kind: 'area' as const, w: l.w, region: undefined })), supports })
+        continue
+      }
+      const R = stripReactions(levels.map((l) => Math.min(Math.max(l, s0), s1)), s0, s1, total, a.continuity === 'continuous')
+      levels.forEach((lv, i) => {
+        const at = on.filter((b) => Math.abs(b.s - lv) <= tol)
+        for (const b of at) {
+          const share = R[i] / at.length
+          if (b.wall !== undefined) { const x0 = startOn(b); wallLines.push({ wall: b.wall, x0, x1: x0 + w, q: share }); continue }
+          const xi = Math.min(Math.max(((tc - b.ta) * b.sign) / b.L, 0), 1), F = share * w
+          for (const [node, part] of [[b.beam!.i, 1 - xi], [b.beam!.j, xi]] as const) {
+            const prev = nodal.get(node)
+            nodal.set(node, { beam: b.beam!.element, fz: (prev?.fz ?? 0) + F * part })
+          }
+        }
       })
-      rows.push({ bounds: [s0, s1, strip.t0, strip.t1], continuity: a.continuity, loads: loads.map((l) => ({ kind: 'area' as const, w: l.w, region: undefined })), supports })
     }
   }
-  if (unsupported) problems.push(`${unsupported} joist strip${unsupported > 1 ? 's' : ''} of floor ${floorId} bear${unsupported > 1 ? '' : 's'} on fewer than two stud walls and carr${unsupported > 1 ? 'y' : 'ies'} no load to the walls`)
+  if (unsupported) problems.push(`${unsupported} joist strip${unsupported > 1 ? 's' : ''} of floor ${floorId} bear${unsupported > 1 ? '' : 's'} on fewer than two walls or beams and carr${unsupported > 1 ? 'y' : 'ies'} no load`)
   if (short) problems.push(`floor ${floorId}: ${short} bearing${short > 1 ? 's' : ''} on walls shorter than the joist spacing ${short > 1 ? 'were' : 'was'} left out`)
-  return { rows, problems }
+  return { rows, problems, wallLines, nodal: [...nodal].map(([node, v]) => ({ node, ...v })) }
 }
 
 /** The floor's transfer rows for a `floorLoad` child: a joist-floor load expands; an explicit (template) row stays as it is. */
 export function floorLoadRows(model: Model, child: LoadAssignment): FloorTransfer {
-  if (!isFloorAreaLoad(child)) return { rows: [child.args as unknown as FloorLoadArgs], problems: [] }
+  if (!isFloorAreaLoad(child)) return { rows: [child.args as unknown as FloorLoadArgs], problems: [], wallLines: [], nodal: [] }
   const a = child.args as unknown as FloorAreaLoadArgs
   return floorTransferRows(model, a.floor, a.loads)
 }
@@ -173,27 +206,27 @@ export function stripReactions(levels: number[], s0: number, s1: number, w: numb
   return R
 }
 
-/** Each bearing wall's total reaction (force, downward positive) from a floor's area loads, per pattern: Σ strip reaction × strip width,
- * walls at one support line sharing it equally. */
+/** Each bearing's total reaction (force, downward positive) from a floor's area loads, per pattern, keyed by its wall or beam element:
+ * Σ strip reaction × strip width, bearings at one support line sharing it equally. */
 export function floorTakedown(model: Model, floorId: number, loads: Map<number, number>): Map<number, Map<number, number>> {
   const out = new Map<number, Map<number, number>>()
   const e = model.elements.get(floorId)
   if (!e) return out
   const continuous = joistFloorArgs(e.args).continuity === 'continuous'
-  const { rows } = floorTransferRows(model, floorId, [{ kind: 'area', w: 1 }])
+  const put = (id: number, unit: number) => {
+    const m = out.get(id) ?? new Map<number, number>()
+    for (const [pattern, w] of loads) m.set(pattern, (m.get(pattern) ?? 0) + w * unit)
+    out.set(id, m)
+  }
+  const { rows, wallLines, nodal } = floorTransferRows(model, floorId, [{ kind: 'area', w: 1 }])
   for (const r of rows) {
     const levels = [...new Set(r.supports.map((s) => s.s))].sort((p, q) => p - q)
     const unit = stripReactions(levels, r.bounds[0], r.bounds[1], 1, continuous)
     const width = r.bounds[3] - r.bounds[2]
-    levels.forEach((lv, i) => {
-      const at = r.supports.filter((s) => s.s === lv)
-      for (const s of at) for (const [pattern, w] of loads) {
-        const m = out.get(s.wall) ?? new Map<number, number>()
-        m.set(pattern, (m.get(pattern) ?? 0) + (w * unit[i] * width) / at.length)
-        out.set(s.wall, m)
-      }
-    })
+    levels.forEach((lv, i) => { const at = r.supports.filter((s) => s.s === lv); for (const s of at) put(s.wall, (unit[i] * width) / at.length) })
   }
+  for (const l of wallLines) put(l.wall, l.q * (l.x1 - l.x0))
+  for (const n of nodal) put(n.beam, n.fz)
   return out
 }
 

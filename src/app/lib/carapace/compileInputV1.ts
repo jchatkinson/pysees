@@ -494,8 +494,19 @@ export function compileInputV1(model: Model, analysisHistory: AnalysisHistory): 
   for (const id of patternIds) {
     for (const child of model.patterns.get(id)!.children) {
       if (child.kind !== 'floorLoad') continue
-      const { rows, problems } = floorLoadRows(model, child)
+      const { rows, problems, wallLines, nodal } = floorLoadRows(model, child)
       for (const p of problems) diagnostics.push({ severity: 'warning', message: `Floor load in pattern ${id}: ${p}`, commandIndex: -1 })
+      // Strips that bear on a beam are solved in PySees: their wall shares as top-line wall loads, their beam shares as nodal loads.
+      const pIdx = patternIndex.get(id)!, stage = claimedStage.get(id) ?? firstStaticWire
+      for (const l of wallLines) {
+        const ref = elementRefs.get(l.wall)
+        if (ref?.kind !== 'studWall') { diagnostics.push({ severity: 'error', message: `Floor load in pattern ${id}: support ${l.wall} is not a stud wall`, commandIndex: -1 }); continue }
+        elementLoads.pattern.push(pIdx); elementLoads.elementKind.push('studWall'); elementLoads.elementIndex.push(ref.index); elementLoads.stage.push(stage)
+        elementLoads.load.push({ kind: 'wallLoad', load: { kind: 'topLine', x0: l.x0, x1: l.x1, wx0: 0, wx1: 0, wy0: -l.q, wy1: -l.q } })
+      }
+      for (const n of nodal) {
+        nodalLoads.pattern.push(pIdx); nodalLoads.node.push(resolveNode(n.node, `Floor load in pattern ${id}`)); nodalLoads.dof.push(ndm - 1); nodalLoads.value.push(-n.fz); nodalLoads.stage.push(stage)
+      }
       for (const a of rows) {
         const supports = a.supports.map((sup) => {
           const ref = elementRefs.get(sup.wall)
@@ -505,6 +516,17 @@ export function compileInputV1(model: Model, analysisHistory: AnalysisHistory): 
         floorLoads.push({ bounds: a.bounds, continuity: a.continuity, loads: a.loads as W.FloorTransferLoadSpec[], pattern: patternIndex.get(id)!, supports })
       }
     }
+  }
+  // Carapace replaces a nodal load given twice for one pattern, node and DOF (OpenSees adds them): sum the rows first.
+  {
+    const at = new Map<string, number>(), merged: W.NodalLoadTable = { pattern: [], node: [], dof: [], value: [], stage: [] }
+    nodalLoads.node.forEach((node, i) => {
+      const key = `${nodalLoads.pattern[i]}:${node}:${nodalLoads.dof[i]}:${nodalLoads.stage[i]}`, k = at.get(key)
+      if (k !== undefined) { merged.value[k] += nodalLoads.value[i]; return }
+      at.set(key, merged.node.length)
+      merged.pattern.push(nodalLoads.pattern[i]); merged.node.push(node); merged.dof.push(nodalLoads.dof[i]); merged.value.push(nodalLoads.value[i]); merged.stage.push(nodalLoads.stage[i])
+    })
+    Object.assign(nodalLoads, merged)
   }
   if ((nodalLoads.node.length || elementLoads.pattern.length || floorLoads.length) && sequence.stages.length === 0) {
     diagnostics.push({ severity: 'error', message: 'Model has loads but the analysis sequence has no stages', commandIndex: -1 })

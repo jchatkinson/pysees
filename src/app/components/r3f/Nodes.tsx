@@ -6,7 +6,7 @@ import { useAppStore } from '@/app/store/useAppStore'
 import type { DisplayBuffers, NodeLabel } from './displayBuffers'
 import type { SceneIndex } from './sceneIndex'
 import { LABEL_LIMIT } from './utils'
-import { ScreenLabels } from './ScreenLabels'
+import { SceneLabels, type SceneLabelStyle } from './SceneLabels'
 
 /** Node marker (a small ✕) size in screen pixels, and when selected. */
 const NODE_PX = 7
@@ -126,21 +126,22 @@ function NodePoints({
   )
 }
 
-// One DOM layer each (see `ScreenLabels`), not an <Html> per node: thousands of those each project themselves every frame.
-const ID_STYLE: Partial<CSSStyleDeclaration> = { fontSize: '9px', color: '#475569', background: 'white', border: '0.5px solid #cbd5e1', borderRadius: '2px', padding: '0 3px', lineHeight: '14px' }
-const VALUE_STYLE: Partial<CSSStyleDeclaration> = { ...ID_STYLE, lineHeight: '12px', background: 'rgba(255,255,255,0.9)' }
+// One instanced draw each (see `SceneLabels`), not an <Html> per node. Lifted so a node inside an extruded member still shows its label.
+const ID_BOX = { fill: '#ffffff', stroke: '#cbd5e1', padX: 3, height: 14, radius: 2 }
+const ID_STYLE: SceneLabelStyle = { size: 9, color: '#475569', offset: [4, -16], box: ID_BOX, lift: 32 }
+const VALUE_STYLE: SceneLabelStyle = { ...ID_STYLE, offset: [8, 6], box: { ...ID_BOX, height: 12, fill: 'rgba(255,255,255,0.9)' } }
 
 /** Per-node displacement text for the deformed view, refreshed when ResultsDriver publishes a new step. */
 function NodeValueLabels({ buffers }: { buffers: DisplayBuffers }) {
   const [shown, setShown] = useState<{ version: number; labels: NodeLabel[] }>({ version: -1, labels: [] })
   useFrame(() => { if (shown.version !== buffers.version) setShown({ version: buffers.version, labels: buffers.active ? buffers.nodeLabels : [] }) })
   const labels = useMemo(() => shown.labels.map((l) => ({ position: l.position as [number, number, number], text: l.text })), [shown])
-  return <ScreenLabels labels={labels} style={VALUE_STYLE} offset={[8, 6]} />
+  return <SceneLabels labels={labels} style={VALUE_STYLE} />
 }
 
 function NodeLabels({ index }: { index: SceneIndex }) {
   const labels = useMemo(() => index.nodeIds.map((id, i) => ({ position: [index.nodeCoords[i * 3], index.nodeCoords[i * 3 + 1], index.nodeCoords[i * 3 + 2]] as [number, number, number], text: `N${id}` })), [index])
-  return <ScreenLabels labels={labels} style={ID_STYLE} />
+  return <SceneLabels labels={labels} style={ID_STYLE} />
 }
 
 export function NodesLayer({

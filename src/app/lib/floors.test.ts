@@ -48,7 +48,7 @@ describe('joist floors', () => {
   it('reports strips with fewer than two bearing walls', () => {
     const { rows, problems } = floorTransferRows(lFloor(90), 10, [{ kind: 'area', w: 1 }])
     expect(rows).toEqual([])
-    expect(problems[0]).toMatch(/fewer than two stud walls/)
+    expect(problems[0]).toMatch(/fewer than two walls or beams/)
   })
 })
 
@@ -88,5 +88,32 @@ describe('floor framing for drawing', () => {
     // Every rim lies inside the outline.
     for (const r of rims) expect([r.t0, r.t1].every((t) => t >= -1e-9 && t <= 6000 + 1e-9)).toBe(true)
     expect(fr.slab).toMatchObject({ z0: 2421, z1: 2440 })
+  })
+
+  // A joist floor between a wall (x = 0) and a beam (x = 4000) with a 1000 overhang past the beam: strips that bear on the beam are solved
+  // in PySees, wall share as a top-line load, beam share split onto the beam's nodes by position.
+  it('bears on beams: lever-rule reactions, the beam share on its nodes', () => {
+    const writes: ModelWrite[] = []
+    let n = 0
+    const node = (x: number, y: number, z: number) => { writes.push({ kind: 'node', entity: { id: ++n, coords: [x, y, z] } }); return n }
+    const w = [node(0, 0, 0), node(0, 2000, 0), node(0, 2000, 2440), node(0, 0, 2440)]
+    writes.push({ kind: 'element', entity: { id: 1, eleType: 'studWall', nodes: w, args: {} } })
+    const b0 = node(4000, 0, 2440), b1 = node(4000, 2000, 2440)
+    writes.push({ kind: 'element', entity: { id: 2, eleType: 'ElasticBeamColumn', nodes: [b0, b1], args: {} } })
+    const outline = [[0, 0], [5000, 0], [5000, 2000], [0, 2000]].map(([x, y]) => node(x, y, 2440))
+    const args: JoistFloorArgs = { angle: 0, spacing: 400, joist: { grade: 'o86-spf', size: '2x10', plies: 1 }, continuity: 'simple' }
+    writes.push({ kind: 'element', entity: { id: 10, eleType: 'joistFloor', nodes: outline, args: args as unknown as Record<string, unknown> } })
+    const model = modelFromWrites(3, 6, writes)
+    const t = floorTransferRows(model, 10, [{ kind: 'area', w: 0.002 }])
+    expect(t.rows).toEqual([])
+    expect(t.problems).toEqual([])
+    // Per unit width: span 4000, overhang 1000 → beam 0.002·5000·2500/4000, wall the rest.
+    const beam = 0.002 * 5000 * 2500 / 4000 * 2000, wall = 0.002 * 5000 * 2000 - beam
+    expect(t.wallLines.reduce((sum, l) => sum + l.q * (l.x1 - l.x0), 0)).toBeCloseTo(wall, 6)
+    expect(t.nodal.reduce((sum, v) => sum + v.fz, 0)).toBeCloseTo(beam, 6)
+    expect(t.nodal.find((v) => v.node === b0)!.fz).toBeCloseTo(beam / 2, 6) // symmetric about the beam's mid-length
+    const td = floorTakedown(model, 10, new Map([[1, 0.002]]))
+    expect(td.get(1)!.get(1)).toBeCloseTo(wall, 6)
+    expect(td.get(2)!.get(1)).toBeCloseTo(beam, 6)
   })
 })

@@ -19,7 +19,13 @@ describe('memberShape', () => {
     expect(s.nominal).toBe(false)
     expect(s.outline.outer).toEqual([{ y: -0.2, z: -0.1 }, { y: 0.2, z: -0.1 }, { y: 0.2, z: 0.1 }, { y: -0.2, z: 0.1 }])
   })
-  it('elastic members, elastic sections and trusses are nominal squares of their area', () => {
+  it('an elastic member with second moments is its equivalent rectangle (depth along local z from Iy)', () => {
+    const b = 190, d = 286, s = memberShape(model(), ele('ElasticBeamColumn', { A: b * d, Iy: b * d ** 3 / 12, Iz: d * b ** 3 / 12 }))!
+    expect(s.nominal).toBe(true)
+    expect(s.outline.outer[2].y).toBeCloseTo(b / 2, 6)
+    expect(s.outline.outer[2].z).toBeCloseTo(d / 2, 6)
+  })
+  it('elastic members without second moments, elastic sections and trusses are nominal squares of their area', () => {
     const side = (s: ReturnType<typeof memberShape>) => s!.outline.outer[1].y - s!.outline.outer[0].y
     expect(side(memberShape(model(), ele('ElasticBeamColumn', { A: 0.09 })))).toBeCloseTo(0.3)
     expect(side(memberShape(model(), ele('DispBeamColumn', { integrationTag: 2 })))).toBeCloseTo(0.2)

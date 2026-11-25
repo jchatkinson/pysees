@@ -281,6 +281,9 @@ export interface AppStore {
   /** Orthographic projection for the 3D view. */
   orthographic: boolean
   setOrthographic: (on: boolean) => void
+  /** Fly the 3D perspective camera with the keyboard and mouse (`components/r3f/FlyControls.tsx`); not saved. */
+  flyMode: boolean
+  setFlyMode: (on: boolean) => void
   /** Label families switched on but not drawn because the view holds too many (set by the viewport, shown next to the view name). */
   hiddenLabels: string[]
   setHiddenLabels: (names: string[]) => void
@@ -816,6 +819,8 @@ export const useAppStore = create<AppStore>((set, get) => {
   setToolInput: (toolInput) => set({ toolInput }),
   setSupportPreset: (supportPreset) => set({ supportPreset }),
   setOrthographic: (orthographic) => set({ orthographic }),
+  flyMode: false,
+  setFlyMode: (flyMode) => set({ flyMode }),
   hiddenLabels: [],
   shellLoadRange: null,
   setShellLoadRange: (shellLoadRange) => set({ shellLoadRange }),

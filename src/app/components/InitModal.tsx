@@ -37,15 +37,18 @@ import precastWallImg from '@/app/assets/templates/precastWall.png'
 import gridImg from '@/app/assets/templates/grid.png'
 import towerImg from '@/app/assets/templates/tower.png'
 import studBuildingImg from '@/app/assets/templates/studBuilding.png'
+import rowhouseImg from '@/app/assets/templates/rowhouse.png'
 import { StudBuildingForm } from '@/app/components/StudBuildingForm'
 import { GridTemplateForm } from '@/app/components/GridTemplateForm'
 import { studBuildingModel } from '@/app/lib/studWalls'
 import { loadCarapaceWasm } from '@/app/lib/carapace/wasm'
+import { rowhouseTemplate, ROWHOUSE_PDF } from '@/app/lib/rowhouseTemplate'
+import { putPdf } from '@/app/lib/underlays/fileStore'
 import type { StudBuildingParams } from '@/app/types/model'
 
 const NO_UNITS = 'none'
 
-type Choice = 'new' | 'load' | 'grid' | 'momentCurvature' | 'cantilever' | 'frame' | 'frame3d' | 'plate' | 'precastWall' | 'tower' | 'studBuilding'
+type Choice = 'new' | 'load' | 'grid' | 'momentCurvature' | 'cantilever' | 'frame' | 'frame3d' | 'plate' | 'precastWall' | 'tower' | 'studBuilding' | 'rowhouse'
 
 interface CardProps {
   title: string
@@ -86,6 +89,7 @@ export function InitModal() {
 function InitDialog() {
   const initModel = useAppStore((s) => s.initModel)
   const loadProject = useAppStore((s) => s.loadProject)
+  const addUnderlay = useAppStore((s) => s.addUnderlay)
   const fileInput = useRef<HTMLInputElement>(null)
   const [preview, setPreview] = useState<ImportPreview | null>(null)
   const pickFile = async (file: File | undefined) => {
@@ -162,6 +166,20 @@ function InitDialog() {
     } catch (e) { setStudError(e instanceof Error ? e.message : typeof e === 'object' && e && 'reason' in e ? String((e as { reason: unknown }).reason) : String(e)) } finally { setStudBusy(false) }
   }
 
+  // BC Rowhouse: the model, then its drawing sheets as underlays (the model is still made when the PDF can't be fetched or stored).
+  async function createRowhouse() {
+    setStudBusy(true); setStudError('')
+    const t = rowhouseTemplate()
+    let file: string | null = null
+    try {
+      const res = await fetch(ROWHOUSE_PDF.url)
+      if (res.ok) file = await putPdf(await res.arrayBuffer(), ROWHOUSE_PDF.fileName)
+    } catch { file = null }
+    setStudBusy(false)
+    initModel(t.ndm, t.ndf, { units: t.units, unitPrefs: { force: 'kN', stress: 'MPa' }, writes: t.writes, analysisCommands: t.analysisCommands, levels: t.levels, gridlines: t.gridlines })
+    if (file) for (const u of t.underlays(file)) addUnderlay(u)
+  }
+
   // Tower (the stress-test model)
   const [tower, setTower] = useState<TowerParams>(TOWER_DEFAULTS)
   const towerFields: [keyof TowerParams, string, number, number][] = [
@@ -202,6 +220,8 @@ function InitDialog() {
         dowelEnd: { Fy: dowelEnd.Fy * 1e3, K: dowelEnd.K * 1e6, b: dowelEnd.b }, dowelJoint: { Fy: dowelJoint.Fy * 1e3, K: dowelJoint.K * 1e6, b: dowelJoint.b },
       })
       initModel(t.ndm, t.ndf, { ...TEMPLATE_UNITS, writes: t.writes, analysisCommands: t.analysisCommands, levels: t.levels })
+    } else if (choice === 'rowhouse') {
+      void createRowhouse()
     } else if (choice === 'tower') {
       const t = towerTemplate(tower)
       initModel(t.ndm, t.ndf, { ...TEMPLATE_UNITS, writes: t.writes, analysisCommands: t.analysisCommands, levels: t.levels })
@@ -227,6 +247,7 @@ function InitDialog() {
     precastWall: 'Precast Wall',
     tower: 'Tower',
     studBuilding: 'Stud-wall building',
+    rowhouse: 'BC Rowhouse',
   }
 
   return (
@@ -287,6 +308,7 @@ function InitDialog() {
               />
               <Card title="Tower" description="Large flat-slab building: frame plus meshed shell slabs at every level. A stress test." image={towerImg} onClick={() => select('tower')} />
               <Card title="Stud-wall building" description="Multistorey light-frame box with floors, openings, anchorage and lateral loads." image={studBuildingImg} onClick={() => select('studBuilding')} />
+              <Card title="BC Rowhouse" description="Two-unit, two-storey wood-frame rowhouse from a real drawing set, with its plans as underlays." image={rowhouseImg} onClick={() => select('rowhouse')} />
             </div>
           </>
         )}
@@ -616,12 +638,26 @@ function InitDialog() {
 
             {choice === 'grid' && <GridTemplateForm />}
 
+            {choice === 'rowhouse' && (
+              <div className="grid gap-2 py-1 text-sm">
+                <p>The CMHC Housing Design Catalogue's BC rowhouse (sheets A101–A103, S101–S103): two units on grids 1–5 / A–D, in N, mm.</p>
+                <ul className="list-disc pl-5 text-xs text-muted-foreground space-y-1">
+                  <li>20 stud walls (2x6 SPF @ 400, 12.5 mm ply) with the drawings' windows and doors, including the interior bearing walls by the stairs, held down to the foundation, the wall below or the cantilever.</li>
+                  <li>Second floor framed as on S102: a 610 mm cantilever backing onto (5) and (3) 2x12 beams, east–west joists to the interior walls, open stair voids; roof framing east–west. Rigid diaphragms at both levels.</li>
+                  <li>Dead, live and snow area loads, then an equivalent static earthquake in X (Y has factor 0).</li>
+                  <li>Plans as underlays on each level (structural sheets hidden; turn them on in Underlays).</li>
+                  <li>Not modelled yet: two-sided shear walls (SW2-B), the gable roof and wall self-weight.</li>
+                </ul>
+                {studError && <p className="text-xs text-destructive">{studError}</p>}
+              </div>
+            )}
+
             {choice === 'studBuilding' && <>{studError && <p className="text-xs text-destructive">{studError}</p>}<StudBuildingForm busy={studBusy} onCreate={(params) => void createStudBuilding(params)} /></>}
 
             {choice !== 'studBuilding' && choice !== 'grid' && <div className="flex justify-end">
               {choice === 'load'
                 ? <Button disabled={!preview || !canImport(preview.result)} onClick={handleLoad}>Open</Button>
-                : <Button onClick={handleCreate}>Create Model</Button>}
+                : <Button disabled={studBusy} onClick={handleCreate}>Create Model</Button>}
             </div>}
           </>
         )}

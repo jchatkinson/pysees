@@ -1,21 +1,18 @@
-import { useRef, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { useFrame } from '@react-three/fiber'
-import { Html } from '@react-three/drei'
 import { DoubleSide } from 'three'
 import type { Mesh } from 'three'
 import { useAppStore } from '@/app/store/useAppStore'
 import { isDiagramType } from '@/app/types/resultsView'
 import { BufferLines } from './BufferLines'
 import { LABEL_LIMIT } from './utils'
+import { SceneLabels, type SceneLabelStyle } from './SceneLabels'
 import type { DiagramLabel, DisplayBuffers } from './displayBuffers'
 
 const OUTLINE_COLOR = 0x334155
 const OUTLINE_WIDTH_PX = 1.5
 
-const LABEL_STYLE: React.CSSProperties = {
-  fontSize: 9, color: '#0f172a', background: 'rgba(255,255,255,0.85)', borderRadius: 2, padding: '0 3px',
-  lineHeight: '14px', whiteSpace: 'nowrap', userSelect: 'none', pointerEvents: 'none',
-}
+const LABEL_STYLE: SceneLabelStyle = { size: 9, color: '#0f172a', anchor: 'center', box: { fill: 'rgba(255,255,255,0.85)', stroke: 'transparent', padX: 3, height: 14, radius: 2 }, lift: 32 }
 
 const fmt = (v: number) => Number(v.toPrecision(3)).toString()
 
@@ -46,13 +43,8 @@ function DiagramFill({ buffers }: { buffers: DisplayBuffers }) {
 function DiagramLabels({ buffers }: { buffers: DisplayBuffers }) {
   const [shown, setShown] = useState<{ version: number; labels: DiagramLabel[] }>({ version: -1, labels: [] })
   useFrame(() => { if (shown.version !== buffers.diagramVersion) setShown({ version: buffers.diagramVersion, labels: buffers.diagramActive ? buffers.diagramLabels : [] }) })
-  return (
-    <>
-      {shown.labels.length <= LABEL_LIMIT && shown.labels.filter((l) => Math.abs(l.value) > 1e-9).map((l, i) => (
-        <Html key={i} position={l.position} center style={LABEL_STYLE} zIndexRange={[10, 10]}>{fmt(l.value)}</Html>
-      ))}
-    </>
-  )
+  const labels = useMemo(() => (shown.labels.length <= LABEL_LIMIT ? shown.labels.filter((l) => Math.abs(l.value) > 1e-9).map((l) => ({ position: l.position as [number, number, number], text: fmt(l.value) })) : []), [shown])
+  return <SceneLabels labels={labels} style={LABEL_STYLE} />
 }
 
 /** N/V/M/T force diagrams (filled, outlined, optionally labelled) drawn from the buffers ResultsDriver fills. */

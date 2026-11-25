@@ -14,7 +14,7 @@ import { isShell } from '@/app/lib/commands/tables'
 import { areaLoadText, batchesLoads, formatLoadValue, patternColor, toVec3 } from './utils'
 import { worldUnitsPerPixel } from './screenScale'
 import { useCameraChange, useSegmentLines } from './batchHooks'
-import { ScreenLabels, type ScreenLabel } from './ScreenLabels'
+import { SceneLabels, type SceneLabel, type SceneLabelStyle } from './SceneLabels'
 
 /**
  * Applied loads, batched: per pattern colour, all nodal arrows are one fat-line draw and all member-load boxes another. Positions are
@@ -36,7 +36,7 @@ const ARROW_HEAD_MAX_PX = 9
 const MAX_STACK_FRACTION = 0.4
 const ARROWS_PER_ELEMENT = 5
 
-const labelStyle = (color: string): Partial<CSSStyleDeclaration> => ({ fontSize: '11px', color, textShadow: '0 0 2px #fff, 0 0 2px #fff' })
+const labelStyle = (color: string, offset: [number, number]): SceneLabelStyle => ({ size: 11, color, halo: '#ffffff', offset })
 
 /** DOF labels by position: 2D is X, Y, rotation about Z; 3D adds Z and the X/Y rotations. Anything past that falls back to a number. */
 function dofName(i: number, ndm: number): string {
@@ -86,9 +86,9 @@ function NodalArrows({ arrows, color }: { arrows: NodalArrow[]; color: string })
       }
     })
   })
-  const labels = useMemo<ScreenLabel[]>(() => arrows.filter((a) => a.label).map((a) => ({ position: a.at, text: a.label! })), [arrows])
-  const style = useMemo(() => labelStyle(color), [color])
-  return <>{arrows.length > 0 && <primitive object={lines} />}{labels.length > 0 && <ScreenLabels labels={labels} style={style} offset={[6, -18]} />}</>
+  const labels = useMemo<SceneLabel[]>(() => arrows.filter((a) => a.label).map((a) => ({ position: a.at, text: a.label! })), [arrows])
+  const style = useMemo(() => labelStyle(color, [6, -18]), [color])
+  return <>{arrows.length > 0 && <primitive object={lines} />}<SceneLabels labels={labels} style={style} /></>
 }
 
 interface MemberLoad { pid: number; a: Vector3; b: Vector3; w: Vector3; label: string }
@@ -141,9 +141,9 @@ function MemberLoadBoxes({ loads, ratioFor, offsetFor, refPoint, maxUnit, color,
     const unit = Math.min(worldUnitsPerPixel(state.camera, refPoint, state.size.height) * MAX_LEN_PX, maxUnit)
     write((buf) => { for (let i = 0; i < fixed.length; i++) buf[i] = fixed[i] + scaled[i] * unit })
   })
-  const labels = useMemo<ScreenLabel[]>(() => (showValues ? loads.map((l) => ({ position: l.a.clone().lerp(l.b, 0.5).toArray() as [number, number, number], text: l.label })) : []), [loads, showValues])
-  const style = useMemo(() => labelStyle(color), [color])
-  return <>{loads.length > 0 && <primitive object={lines} />}{labels.length > 0 && <ScreenLabels labels={labels} style={style} offset={[6, 6]} />}</>
+  const labels = useMemo<SceneLabel[]>(() => (showValues ? loads.map((l) => ({ position: l.a.clone().lerp(l.b, 0.5).toArray() as [number, number, number], text: l.label })) : []), [loads, showValues])
+  const style = useMemo(() => labelStyle(color, [6, 6]), [color])
+  return <>{loads.length > 0 && <primitive object={lines} />}<SceneLabels labels={labels} style={style} /></>
 }
 
 /** Renders nodal `load` and uniform `eleLoad` assignments from the patterns not hidden (Model entities, not a command history position). */

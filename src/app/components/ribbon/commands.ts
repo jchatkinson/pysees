@@ -2,7 +2,7 @@ import type { LucideIcon } from 'lucide-react'
 import {
   Undo2, Redo2, SquareDashedMousePointer, SquareDashed, Grid3x3, Ruler, ZoomIn, ZoomOut, Maximize2, CircleDot, Minus, Anchor, ArrowDown, ArrowDownToLine, Hash, Tag, Tags,
   Grid2x2, Layers, Rows3, Box, LayoutGrid, Building2, Square, ChevronUp, ChevronDown, Ghost, CircleOff, Spline, MoveHorizontal, Activity, RotateCw, Waves, Palette,
-  BarChart3, ChartLine, Sigma, Trash2, Layers3, Cuboid, SquareStack, Focus, Eye, Command, Move, Copy, FlipHorizontal2, Scissors, Merge, ArrowDownToDot, ArrowDownWideNarrow, MousePointer2, PenLine, GripHorizontal, Columns2, BrickWall, FileImage, Image } from 'lucide-react'
+  BarChart3, ChartLine, Sigma, Trash2, Layers3, Cuboid, SquareStack, Focus, Eye, Command, Move, Copy, FlipHorizontal2, Scissors, Merge, ArrowDownToDot, ArrowDownWideNarrow, MousePointer2, PenLine, GripHorizontal, Columns2, BrickWall, FileImage, Image, Plane } from 'lucide-react'
 import { useAppStore, type AppStore } from '@/app/store/useAppStore'
 import { stepView, validViewMode } from '@/app/lib/editor/viewCamera'
 import type { ViewMode } from '@/app/lib/editor/viewSlice'
@@ -117,6 +117,7 @@ export const COMMANDS = {
     run: (s) => { if (currentView(s).kind !== 'elevation') s.setViewMode({ kind: 'elevation', gridId: ndmOf(s) === 3 ? s.gridlines[0]?.id ?? null : null }) },
   },
   orthographic: { id: 'orthographic', label: 'Ortho', icon: Square, tip: 'Orthographic 3D view', isActive: (s) => s.orthographic, enabled: (s) => currentView(s).kind === '3d', run: (s) => s.setOrthographic(!s.orthographic) },
+  fly: { id: 'fly', label: 'Fly', icon: Plane, tip: 'Fly the camera: W A S D to move, Q / E down and up, right-drag to look, wheel forward and back, Shift faster, Alt slower, Esc to stop', hotkey: ['shift+f'], isActive: (s) => s.flyMode, enabled: (s) => currentView(s).kind === '3d' && !s.orthographic, run: (s) => s.setFlyMode(!s.flyMode) },
   viewNext: { id: 'viewNext', label: 'Up / next', icon: ChevronUp, tip: 'Story above, or the next grid', hotkey: ['pageup'], enabled: (s) => step(s, 1) !== null, run: (s) => { const m = step(s, 1); if (m) s.setViewMode(m) } },
   viewPrev: { id: 'viewPrev', label: 'Down / prev', icon: ChevronDown, tip: 'Story below, or the previous grid', hotkey: ['pagedown'], enabled: (s) => step(s, -1) !== null, run: (s) => { const m = step(s, -1); if (m) s.setViewMode(m) } },
   showStoryAbove: { ...viewToggle('showStoryAbove', 'Above', Ghost, 'Show the story above a plan as dashed outlines'), visible: only3d },
@@ -178,7 +179,7 @@ export const RIBBON_TABS: RibbonTabDef[] = [
     { label: 'View', commands: ['view3d', 'viewPlan', 'viewElevation', 'showExtruded'], custom: 'stories' },
   ] },
   { id: 'view', label: 'View', groups: [
-    { label: 'View', commands: ['view3d', 'viewPlan', 'viewElevation', 'orthographic'] },
+    { label: 'View', commands: ['view3d', 'viewPlan', 'viewElevation', 'orthographic', 'fly'] },
     { label: 'Stories', custom: 'stories' },
     { label: 'Zoom', commands: ['zoomIn', 'zoomOut', 'fit'] },
     { label: 'Show', commands: ['showExtruded', 'showNodes', 'showElements', 'showSupports'] },
