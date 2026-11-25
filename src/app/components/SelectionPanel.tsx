@@ -5,6 +5,7 @@ import { useAppStore } from '@/app/store/useAppStore'
 import { deleteEntity } from '@/app/lib/modelWrite'
 import { deriveProperties, templateKey, templateOf } from '@/app/lib/editor/properties'
 import { DrawBatch, isFrameTemplate, supportDofs, transfTypeFor } from '@/app/lib/editor/draw'
+import { assignDiaphragms, removeDiaphragms } from '@/app/lib/editor/edit'
 
 const Section = ({ title, children }: { title: string; children: React.ReactNode }) => (
   <div className="grid gap-1.5 border-b px-3 py-2">
@@ -51,6 +52,16 @@ export function SelectionPanel() {
     for (const id of nodeIds) b.support(id, supportDofs(preset, ndm, model.config?.ndf ?? 6))
     writeModelEntities(b.writes)
   }
+  const inDiaphragm = useMemo(() => {
+    const ids = new Set(nodeIds)
+    return [...model.mpConstraints.values()].filter((c) => c.kind === 'rigidDiaphragm' && [c.args.rNodeTag, ...((c.args.cNodeTags as unknown[]) ?? [])].some((n) => ids.has(Number(n)))).length
+  }, [model, nodeIds])
+  const [diaphragmNote, setDiaphragmNote] = useState('')
+  const addDiaphragms = () => {
+    const r = assignDiaphragms(model, nodeIds)
+    editModel(() => r.model)
+    setDiaphragmNote(`${r.diaphragms} diaphragm${r.diaphragms === 1 ? '' : 's'} assigned${r.skipped ? `; ${r.skipped} node${r.skipped === 1 ? '' : 's'} left out (supported in plane, or alone on a level)` : ''}.`)
+  }
   const removeSupports = () => editModel((m) => nodeIds.reduce((acc, id) => (acc.fixes.has(id) ? deleteEntity(acc, 'fix', id) : acc), m))
 
   return (
@@ -96,6 +107,15 @@ export function SelectionPanel() {
             <Button size="sm" className="h-7 text-xs" onClick={addSupports}>Assign</Button>
             <Button size="sm" variant="outline" className="h-7 text-xs" disabled={supported === 0} onClick={removeSupports}>Remove</Button>
           </div>
+        </Section>
+      )}
+      {ndm === 3 && nodeIds.length > 1 && (
+        <Section title={`Rigid diaphragm${inDiaphragm ? ` (${inDiaphragm} touched)` : ''}`}>
+          <div className="flex gap-1">
+            <Button size="sm" className="h-7 flex-1 text-xs" title="One diaphragm per level, retained at the centroid of that level's selected nodes" onClick={addDiaphragms}>Assign per level</Button>
+            <Button size="sm" variant="outline" className="h-7 text-xs" disabled={!inDiaphragm} onClick={() => { editModel((m) => removeDiaphragms(m, nodeIds)); setDiaphragmNote('') }}>Remove</Button>
+          </div>
+          {diaphragmNote && <p className="text-[11px] text-muted-foreground">{diaphragmNote}</p>}
         </Section>
       )}
       <Section title="Edit">

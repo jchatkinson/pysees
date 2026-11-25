@@ -19,7 +19,7 @@ export interface PresetContext {
 
 const pick = (components: string[], prefer: string) => (components.includes(prefer) ? prefer : components[0])
 
-const response = (kind: 'disp' | 'reaction' | 'force', component: string, mode: 'single' | 'sum' | 'difference', tags: number[], scale = 1): Channel =>
+const response = (kind: 'disp' | 'reaction' | 'force' | 'studWall', component: string, mode: 'single' | 'sum' | 'difference', tags: number[], scale = 1): Channel =>
   ({ type: 'response', kind, component, mode, tags, scale })
 
 /** Selected nodes that have recorded displacements, else the first recorded node. */
@@ -67,6 +67,14 @@ export const PLOT_PRESETS: PlotPreset[] = [
         x: response('disp', pick(ctx.targets.disp.components, 'dx'), 'single', [control]),
         series: [{ y: response('reaction', pick(ctx.targets.reaction.components, 'Fx'), 'sum', ctx.targets.reaction.tags, -1) }],
       }
+    },
+  },
+  {
+    id: 'wall-base-shear', label: 'Stud wall base shear', hint: 'Each wall’s base shear vs step (at most 8)',
+    build: (ctx) => {
+      const walls = ctx.targets.studWall.tags.slice(0, 8)
+      if (!walls.length || !ctx.targets.studWall.components.includes('shear')) return null
+      return { x: { type: 'step' }, series: walls.map((t) => ({ y: response('studWall', 'shear', 'single', [t]) })) }
     },
   },
   {

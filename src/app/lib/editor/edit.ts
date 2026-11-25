@@ -178,3 +178,62 @@ export function memberLoadWrite(patternId: number, eleTags: number[], w: { wy: n
   if (ndm === 3) args.wz = w.wz
   return { kind: 'patternChild' as const, patternId, child: { kind: 'eleLoad' as const, args } }
 }
+
+const diaphragmNodes = (c: { kind: string; args: Record<string, unknown> }) => (c.kind === 'rigidDiaphragm' ? [Number(c.args.rNodeTag), ...((c.args.cNodeTags as number[] | undefined) ?? []).map(Number)] : [])
+
+/**
+ * One rigid diaphragm (perpendicular to Z) per level among the selected nodes of a 3D model. Each level's retained node is a node at the
+ * centroid of that level's nodes (an existing node there, or a new one with its out-of-plane DOFs fixed). Nodes with a fixed in-plane DOF
+ * are left out (a constrained DOF can't also be fixed), and any diaphragm already holding one of the nodes is replaced.
+ */
+export function assignDiaphragms(model: Model, nodeIds: number[]): { model: Model; diaphragms: number; skipped: number } {
+  const tol = mergeTolerance(model)
+  const ids = new Set(nodeIds.filter((id) => model.nodes.has(id)))
+  let m = model
+  for (const c of model.mpConstraints.values()) if (diaphragmNodes(c).some((n) => ids.has(n))) { const next = new Map(m.mpConstraints); next.delete(c.id); m = { ...m, mpConstraints: next } }
+  let skipped = 0
+  const levels: { z: number; nodes: number[] }[] = []
+  for (const id of ids) {
+    if (m.fixes.get(id)?.dofs.some((d) => d === 1 || d === 2 || d === 6)) { skipped++; continue }
+    const z = m.nodes.get(id)!.coords[2] ?? 0
+    const level = levels.find((l) => Math.abs(l.z - z) <= tol)
+    if (level) level.nodes.push(id); else levels.push({ z, nodes: [id] })
+  }
+  const b = new DrawBatch(m)
+  let diaphragms = 0
+  for (const { z, nodes } of levels) {
+    if (nodes.length < 2) { skipped += nodes.length; continue }
+    const c = (k: number) => clean(nodes.reduce((s, id) => s + m.nodes.get(id)!.coords[k], 0) / nodes.length)
+    const before = b.model.nodes.size
+    const master = b.node([c(0), c(1), z])
+    const isNew = b.model.nodes.size > before
+    if (isNew || (![...b.model.elements.values()].some((e) => e.nodes.includes(master)) && !b.model.fixes.has(master))) b.support(master, [3, 4, 5])
+    const cNodeTags = nodes.filter((id) => id !== master)
+    b.writeRaw({ kind: 'mpConstraint', entity: { id: b.model.nextIds.mpConstraint, kind: 'rigidDiaphragm', args: { perpDirn: 3, rNodeTag: master, cNodeTags } } })
+    diaphragms++
+  }
+  return { model: b.model, diaphragms, skipped }
+}
+
+/** Remove every diaphragm that holds one of the nodes, and its retained node when nothing else uses it (no element, load, mass or other constraint). */
+export function removeDiaphragms(model: Model, nodeIds: number[]): Model {
+  const ids = new Set(nodeIds)
+  const gone = [...model.mpConstraints.values()].filter((c) => diaphragmNodes(c).some((n) => ids.has(n)))
+  if (!gone.length) return model
+  const mpConstraints = new Map(model.mpConstraints)
+  for (const c of gone) mpConstraints.delete(c.id)
+  let m: Model = { ...model, mpConstraints }
+  const loaded = new Set<number>()
+  for (const p of m.patterns.values()) for (const ch of p.children) if (ch.kind !== 'eleLoad' && ch.args.nodeTag !== undefined) loaded.add(Number(ch.args.nodeTag))
+  for (const c of gone) {
+    const r = Number(c.args.rNodeTag)
+    const used = loaded.has(r) || m.masses.has(r) || [...m.elements.values()].some((e) => e.nodes.includes(r))
+      || [...m.mpConstraints.values()].some((o) => diaphragmNodes(o).includes(r) || o.args.rNodeTag === r || o.args.cNodeTag === r)
+    if (!used && !ids.has(r)) {
+      const nodes = new Map(m.nodes), fixes = new Map(m.fixes)
+      nodes.delete(r); fixes.delete(r)
+      m = { ...m, nodes, fixes }
+    }
+  }
+  return m
+}

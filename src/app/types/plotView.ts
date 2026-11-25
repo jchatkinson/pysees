@@ -1,4 +1,5 @@
-export type ResponseKind = 'disp' | 'vel' | 'accel' | 'reaction' | 'force'
+/** `studWall`: a wall's recorded base reaction (shear, axial, moment) and pier quantities, by element id. */
+export type ResponseKind = 'disp' | 'vel' | 'accel' | 'reaction' | 'force' | 'studWall'
 
 /**
  * One axis quantity. `response` is a signed sum of recorded columns of one kind and component:

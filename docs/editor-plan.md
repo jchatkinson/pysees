@@ -166,14 +166,16 @@ done. PySees status:
   walls' top nodes; DOFs nothing stiffens in the shell model are fixed. Project files keep the authored items in generated blocks.
 - Constraints (`equalDOF` / `rigidDiaphragm`) compile through the mpConstraints work, and exports with constraints use `constraints('Transformation')`; the exported building runs in real OpenSees (`studBuilding.test.ts`).
 - **Not yet:** a wall layout editor and drawing tool, flexible-diaphragm elements (`diaphragms` table; the template's flexible option
-  works because the expansion loads the walls directly), `wallLoad` element loads, openings and studs in the viewport outline,
-  stud-wall results in the plot channel picker.
+  works because the expansion loads the walls directly), `wallLoad` element loads.
+- Since then: studs and openings (outline and diagonals, to the head height) draw on the wall face, placed bilinearly between the corners
+  so they follow the deformed shape (`r3f/WallDetail.tsx`); the plot picker has a Stud wall quantity (base shear / axial / moment and
+  pier quantities, by element id) and a "Stud wall base shear" preset.
 
 ## 6. Phasing
 
 1. **Foundations** (done): : `writeModelEntities` batch + single undo step; selection set for nodes+elements with
    window/crossing on elements; `ribbonCommands.ts` + `Ribbon` shell with the existing View-menu toggles and zoom/fit moved in.
-2. **Views** (done except reactions; slices filter the model instead of using GPU clipping planes): ortho plan/elevation cameras, story/grid stepping, cutting planes with pick filtering, ghosting. Results ribbon tab
+2. **Views** (done; slices filter the model instead of using GPU clipping planes): ortho plan/elevation cameras, story/grid stepping, cutting planes with pick filtering, ghosting. Results ribbon tab
    (Show / Case / Labels) over the existing `resultsView`, plus reactions display.
 3. **Drawing** (done): tool framework, snapping (node → grid → midpoint, free points on a drawing increment), node merging, derived
    properties, frame / quick beams / quick columns / supports, typed lengths, all-stories drawing in plans, and the multi-selection pane
@@ -182,10 +184,10 @@ done. PySees status:
 4. **Extruded view** (done): instanced section sweeps for beams/columns/trusses (one `InstancedMesh` per distinct outline), shell slabs at
    their thickness, fiber detail (section preview) in the properties pane. Nominal √A squares for elastic members can dwarf real sections
    when a model uses very stiff elastic links (the precast-wall template's rigid arms); revisit if that's a problem.
-5. **Edit & assign** (done except diaphragms): Edit tab with move, copy/replicate, mirror, divide (element loads follow the parts) and
+5. **Edit & assign** (done): Edit tab with move, copy/replicate, mirror, divide (element loads follow the parts) and
    merge coincident nodes; nodal and uniform member loads assigned to a Plain pattern; shell tool (plan cells / elevation panels meshed
-   into divisions, new elastic plate sections). Rigid diaphragms wait on Carapace: its compiler ignores every mpConstraint today
-   (flagged separately). Select-by lists beyond the selection pane's "by property" are not done.
+   into divisions, new elastic plate sections). Rigid diaphragms: the selection pane assigns one per level (3D), retained at a
+   centroid node with its out-of-plane DOFs fixed, skipping nodes supported in plane; constraints draw as light spokes with the supports. Select-by lists beyond the selection pane's "by property" are not done.
 6. **Stud walls as elements** (section 5).
 7. **Polish** (partly done): command palette (Ctrl/⌘+K, header search) and "Isolate" / "Show all" (show selection only, filtered like
    plans so hidden objects can't be picked) instead of a clipping section box. Not done: extruded deformed shape, end releases.

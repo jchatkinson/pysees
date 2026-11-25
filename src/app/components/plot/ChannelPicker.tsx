@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Button } from '@/app/components/ui/button'
 import { Input } from '@/app/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/app/components/ui/select'
-import { KIND_LABELS, TARGET_LABELS, type AvailableTargets } from '@/app/lib/plot/channels'
+import { KIND_LABELS, RESPONSE_KINDS, TARGET_LABELS, type AvailableTargets } from '@/app/lib/plot/channels'
 import type { Channel, ResponseKind } from '@/app/types/plotView'
 
 type TypeId = 'step' | 'time' | ResponseKind
@@ -51,7 +51,7 @@ export function ChannelPicker({ value, onChange, targets, selectedNodeIds }: {
   const typeOptions: { id: TypeId; label: string; disabled?: boolean }[] = [
     { id: 'step', label: 'Step' },
     { id: 'time', label: 'Pseudo-time' },
-    ...(['disp', 'vel', 'accel', 'reaction', 'force'] as const).map((k) => ({ id: k, label: KIND_LABELS[k], disabled: targets[k].tags.length === 0 })),
+    ...RESPONSE_KINDS.filter((k) => k !== 'studWall' || targets[k].tags.length).map((k) => ({ id: k, label: KIND_LABELS[k], disabled: targets[k].tags.length === 0 })),
   ]
 
   if (value.type !== 'response') {
@@ -107,7 +107,7 @@ export function ChannelPicker({ value, onChange, targets, selectedNodeIds }: {
             aria-invalid={!valid} className="h-7 flex-1 text-xs"
           />
           {value.mode === 'sum' && <Button type="button" variant="outline" size="sm" className="h-7 px-1.5 text-[10px]" title={`Use every ${target.toLowerCase()}`} onClick={() => patch({ tags: t.tags })}>All</Button>}
-          {value.kind !== 'force' && <Button type="button" variant="outline" size="sm" className="h-7 px-1.5 text-[10px]" title="Use the nodes selected in the viewport" disabled={!selected.length || (value.mode === 'difference' && selected.length !== 2) || (value.mode === 'single' && selected.length < 1)} onClick={() => patch({ tags: value.mode === 'single' ? selected.slice(0, 1) : selected })}>Use selection</Button>}
+          {value.kind !== 'force' && value.kind !== 'studWall' && <Button type="button" variant="outline" size="sm" className="h-7 px-1.5 text-[10px]" title="Use the nodes selected in the viewport" disabled={!selected.length || (value.mode === 'difference' && selected.length !== 2) || (value.mode === 'single' && selected.length < 1)} onClick={() => patch({ tags: value.mode === 'single' ? selected.slice(0, 1) : selected })}>Use selection</Button>}
         </div>
       </Field>
         <Field label="Combine">

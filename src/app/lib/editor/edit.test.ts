@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest'
 import { emptyModel, type Model } from '@/app/types/model'
 import { applyModelWrite } from '@/app/lib/modelWrite'
 import { DrawBatch } from './draw'
-import { copySelection, divideMembers, mergeNodes, mirror, moveSelection, translate } from './edit'
+import { assignDiaphragms, copySelection, divideMembers, mergeNodes, mirror, moveSelection, removeDiaphragms, translate } from './edit'
+import { compileInputV1 } from '@/app/lib/carapace/compileInputV1'
+import { deleteEntity } from '@/app/lib/modelWrite'
 
 const elastic = { eleType: 'ElasticBeamColumn', args: { A: 0.1, E: 200e9, G: 80e9, J: 1e-4, Iy: 1e-4, Iz: 2e-4 } }
 /** A column and a beam: nodes 1 (0,0,0, fixed), 2 (0,0,3), 3 (6,0,3); elements 1 (column), 2 (beam) with a uniform load. */
@@ -70,5 +72,30 @@ describe('shell cells', async () => {
   it('meshes a quad', () => {
     const q = meshQuad([[0, 0, 0], [4, 0, 0], [4, 2, 0], [0, 2, 0]], 2, 1)
     expect(q).toEqual([[[0, 0, 0], [2, 0, 0], [2, 2, 0], [0, 2, 0]], [[2, 0, 0], [4, 0, 0], [4, 2, 0], [2, 2, 0]]])
+  })
+
+  it('assigns one diaphragm per level at the centroid, skipping supported nodes, and removes it with its retained node', () => {
+    const b = new DrawBatch({ ...emptyModel(), config: { ndm: 3, ndf: 6 } })
+    for (const [x, y] of [[0, 0], [6, 0], [6, 4], [0, 4]]) { b.member(elastic, [x, y, 0], [x, y, 3]); b.member(elastic, [x, y, 3], [x, y, 6]) }
+    for (const id of [...b.model.nodes.keys()]) if (b.model.nodes.get(id)!.coords[2] === 0) b.support(id, [1, 2, 3, 4, 5, 6])
+    const m0 = b.model
+    const { model, diaphragms, skipped } = assignDiaphragms(m0, [...m0.nodes.keys()])
+    expect(diaphragms).toBe(2)
+    expect(skipped).toBe(4)
+    const ds = [...model.mpConstraints.values()]
+    for (const d of ds) {
+      const r = model.nodes.get(Number(d.args.rNodeTag))!
+      expect([r.coords[0], r.coords[1]]).toEqual([3, 2])
+      expect(model.fixes.get(r.id)!.dofs).toEqual([3, 4, 5])
+      expect(d.args.cNodeTags).toHaveLength(4)
+    }
+    expect(compileInputV1(model, { commands: [], cursor: -1 }).input?.rigidDiaphragms?.retained).toHaveLength(2)
+    // Reassigning replaces rather than duplicates; deleting a floor node shrinks its diaphragm.
+    expect(assignDiaphragms(model, [...model.nodes.keys()]).model.mpConstraints.size).toBe(2)
+    const cut = deleteEntity(model, 'node', Number((ds[0].args.cNodeTags as number[])[0]))
+    expect(cut.mpConstraints.get(ds[0].id)!.args.cNodeTags).toHaveLength(3)
+    const removed = removeDiaphragms(model, [Number((ds[0].args.cNodeTags as number[])[0])])
+    expect(removed.mpConstraints.size).toBe(1)
+    expect(removed.nodes.has(Number(ds[0].args.rNodeTag))).toBe(false)
   })
 })

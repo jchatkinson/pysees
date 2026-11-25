@@ -9,6 +9,8 @@ import { SceneHelpers } from './SceneHelpers'
 import { NodesLayer } from './Nodes'
 import { ElementsLayer } from './Elements'
 import { SupportsLayer } from './Supports'
+import { ConstraintsLayer } from './Constraints'
+import { WallDetailLayer } from './WallDetail'
 import { ZeroLengthsLayer } from './ZeroLengths'
 import { LoadsLayer } from './Loads'
 import { batchesLoads, LABEL_LIMIT, loadGlyphCount } from './utils'
@@ -294,11 +296,13 @@ export const ViewportScene = forwardRef<ViewportSceneRef, object>(function Viewp
       {viewSettings.showElements && (
         <ZeroLengthsLayer index={sceneIndex} buffers={displayBuffers} elements={model.elements} ndm={model.config?.ndm === 2 ? 2 : 3} />
       )}
+      {viewSettings.showElements && <WallDetailLayer index={sceneIndex} buffers={displayBuffers} elements={model.elements} />}
       <ToolLayer mode={mode} nodes={nodes} elements={elements} ndm={ndm} />
       {showReactions && <ReactionsLayer index={sceneIndex} fixes={fixes} />}
       {viewSettings.showSupports && (
         <SupportsLayer fixes={fixes} nodeMap={nodes} />
       )}
+      {viewSettings.showSupports && <ConstraintsLayer constraints={model.mpConstraints} index={sceneIndex} buffers={displayBuffers} />}
       {!showingResults && <LoadsLayer
         patterns={patterns}
         nodeMap={nodes}
