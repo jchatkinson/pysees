@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { Html } from '@react-three/drei'
-import { BufferAttribute, BufferGeometry, DoubleSide, Vector3 } from 'three'
+import { BufferAttribute, BufferGeometry, DoubleSide, Vector3, ShapeUtils, Vector2 } from 'three'
 import type { ElementEntity, GeomTransfEntity, NodeEntity, PatternEntity, SectionEntity } from '@/app/types/model'
 import { alongTotal, loadDirection, shellAreaLoads, type ShellAreaLoad } from '@/app/lib/shellLoads'
+import { isJoistFloor } from '@/app/lib/floors'
 import { rampColor } from '@/app/lib/shellContour'
 import { useUnits } from '@/app/lib/units/useUnits'
 import { useAppStore } from '@/app/store/useAppStore'
@@ -163,8 +164,10 @@ function ShellLoadContour({ loads, patterns, nodeMap, elementMap }: { loads: Map
     for (const [tag, q] of loads) {
       const xyz = elementMap.get(tag)!.nodes.map((n) => toVec3(nodeMap.get(n)?.coords ?? []))
       const rgb = rampColor(max - min > 1e-12 * Math.max(1, max) ? (q.magnitude - min) / (max - min) : 0.5)
-      for (let k = 1; k + 1 < xyz.length; k++) {
-        for (const p of [xyz[0], xyz[k], xyz[k + 1]]) { position.push(...p); color.push(...rgb) }
+      // A floor may be concave: triangulate its plan outline; shells are convex, a fan does.
+      const tris = isJoistFloor(elementMap.get(tag)!.eleType) ? ShapeUtils.triangulateShape(xyz.map((p) => new Vector2(p[0], p[1])), []) : xyz.slice(2).map((_, k) => [0, k + 1, k + 2])
+      for (const [i, j, k] of tris) {
+        for (const p of [xyz[i], xyz[j], xyz[k]]) { position.push(...p); color.push(...rgb) }
         owner.push(tag)
       }
     }
@@ -192,7 +195,7 @@ function ShellLoadContour({ loads, patterns, nodeMap, elementMap }: { loads: Map
       </mesh>
       {q && hover && (
         <Html position={hover.point} style={TOOLTIP_STYLE} zIndexRange={[20, 20]}>
-          {[`Shell ${hover.tag}: ${fmt(q.magnitude)} ${loadDirection(q)}`, ...q.parts.map((p) => `${name(p.patternId)} · ${p.kind === 'pressure' ? 'pressure' : 'self-weight'} ${fmt(alongTotal(p, q))}`)].join('\n')}
+          {[`${isJoistFloor(elementMap.get(hover.tag)?.eleType ?? '') ? 'Floor' : 'Shell'} ${hover.tag}: ${fmt(q.magnitude)} ${loadDirection(q)}`, ...q.parts.map((p) => `${name(p.patternId)} · ${p.kind === 'pressure' ? 'pressure' : p.kind === 'floor' ? 'floor load' : 'self-weight'} ${fmt(alongTotal(p, q))}`)].join('\n')}
         </Html>
       )}
     </>

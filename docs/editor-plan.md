@@ -187,6 +187,15 @@ done. PySees status:
     type taken from an existing wall (`studWallTemplateOf`) or entered as a new one (with a new `Anchorage` material). Each wall gets its
     own nodes (`drawStudWall`); pier ends are held down to a stud wall's top node right below (anchorage zeroLength + equalDOF along the
     wall) or, on the lowest level, to a new fixed ground node. New walls join a diaphragm when their top nodes are (re)assigned.
+- **Joist floors (F1 done):** `joistFloor` elements (any plan polygon; joist angle, spacing, lumber, simple/continuous spans, subfloor), area
+  loads per pattern in `FloorCard`, Floor draw tool (polygon in plans), template floors converted (same takedown as the explicit rows).
+  F2 done: extruded joists (at spacing, size, plies), rims on edges no wall carries (axis-aligned edges), see-through subfloor; joist
+  lines in the line view; floor loads in the area-load contour; takedown table in `FloorCard` (`floorTakedown`: simple by statics,
+  continuous by three moments; equals Carapace's wall axial). Next: F3 floor depth ↔ wall floor zone check, "diaphragm from floors";
+  rims on skew edges.
+- **Wall results (done):** Piers / Members switch in the axial view. Members: Carapace's `memberForce` bulk recorder (per wall: studs bottom/top,
+  jacks, cripples), bars per member, framing heat-coloured in the extruded view, member table, extrema and member-spacing auto scale.
+  Not done: header and plate shear / moment diagrams. Later (Carapace): bearing on beams/girders, joist stiffness, line/point floor loads.
 - **Not yet:** per-bay sheathing / openings in the flexible diaphragm form; drawing openings directly; an edit that also moves a rigid
   master's loads when a rigid diaphragm is re-assigned (the selection pane builds a new master).
 

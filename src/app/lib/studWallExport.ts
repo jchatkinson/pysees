@@ -3,6 +3,7 @@ import type { Call } from '@/app/lib/commands/tokens'
 import { isStudWall, studWallArgs, type FloorLoadArgs } from '@/app/lib/studWalls'
 import { wallLoadSpec } from '@/app/lib/shells'
 import { diaphragmArgs, isDiaphragm } from '@/app/lib/diaphragms'
+import { floorLoadRows, isFloorAreaLoad, isJoistFloor } from '@/app/lib/floors'
 
 // Stud walls and floor loads are Carapace-only. OpenSees export approximates them (docs/editor-plan.md, section 5):
 // - each wall is a mesh of ShellMITC4s with an ElasticMembranePlateSection whose shear stiffness matches the sheathing
@@ -111,7 +112,7 @@ export function studWallExport(model: Model): StudWallExport | null {
   // What else stiffens a node: other elements on all their DOFs (zero-lengths only on their directions), and constraints, which make a
   // constrained DOF follow its retained node (both ends count as stiffened, as the tie carries the stiffness across).
   for (const e of model.elements.values()) {
-    if (isStudWall(e.eleType) || isDiaphragm(e.eleType)) continue
+    if (isStudWall(e.eleType) || isDiaphragm(e.eleType) || isJoistFloor(e.eleType)) continue // a joist floor stiffens nothing
     const dofs = e.eleType === 'zeroLength' && Array.isArray(e.args.dir) ? (e.args.dir as number[]).map(Number) : [1, 2, 3, 4, 5, 6]
     e.nodes.forEach((n) => mark(n, dofs))
   }
@@ -181,12 +182,20 @@ export function wallLoadNodal(model: Model, child: LoadAssignment): Call[] {
 /** A floor load's reactions as nodal loads on its support walls' top nodes, in the floor's pattern. One-way spans between the supports
  * sorted by `s` (simple spans, lever rule; load beyond the outer supports goes to the nearest one). `continuous` is treated as simple. */
 export function floorLoadNodal(model: Model, child: LoadAssignment): Call[] {
-  const a = child.args as unknown as FloorLoadArgs
-  const supports = [...a.supports].sort((p, q) => p.s - q.s)
   const ndf = model.config?.ndf ?? 6
   const forces = new Map<number, V3>()
   const add = (node: number, v: V3) => { const f = forces.get(node) ?? [0, 0, 0]; forces.set(node, [f[0] + v[0], f[1] + v[1], f[2] + v[2]]) }
-  if (!supports.length) return []
+  const rows = floorLoadRows(model, child).rows
+  for (const a of rows) floorRowNodal(model, a, add)
+  const calls: Call[] = [...forces].sort(([p], [q]) => p - q).map(([node, v]) => ({ fn: 'load', args: [node, ...Array.from({ length: ndf }, (_, i) => (i < 3 ? round(v[i]) : 0))] }))
+  if (calls.length) calls[0].comment = `WARNING: Carapace-only floor load (${rows[0]?.continuity ?? 'simple'} one-way spans${isFloorAreaLoad(child) ? `, joist floor ${child.args.floor}` : ''}) written as its reactions on the support walls' top nodes.`
+  return calls
+}
+
+/** One transfer row's reactions, added onto its support walls' top nodes. */
+function floorRowNodal(model: Model, a: FloorLoadArgs, add: (node: number, v: V3) => void) {
+  const supports = [...a.supports].sort((p, q) => p.s - q.s)
+  if (!supports.length) return
   const levels = [...new Set(supports.map((s) => s.s))]
   // Share of a load at `s` taken by each support level (lever rule within its span).
   const share = (s: number): [number, number][] => {
@@ -233,7 +242,4 @@ export function floorLoadNodal(model: Model, child: LoadAssignment): Call[] {
       for (const [level, r] of share(load.s)) for (const sup of supports) if (sup.s === level) onWall(sup, load.p * r, load.t, load.t, true)
     }
   }
-  const calls: Call[] = [...forces].sort(([p], [q]) => p - q).map(([node, v]) => ({ fn: 'load', args: [node, ...Array.from({ length: ndf }, (_, i) => (i < 3 ? round(v[i]) : 0))] }))
-  if (calls.length) calls[0].comment = `WARNING: Carapace-only floor load (${a.continuity} one-way spans) written as its reactions on the support walls' top nodes.`
-  return calls
 }

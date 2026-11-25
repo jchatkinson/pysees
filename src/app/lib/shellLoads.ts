@@ -1,11 +1,12 @@
 import type { ElementEntity, NodeEntity, PatternEntity, SectionEntity } from '@/app/types/model'
 import { isShell } from '@/app/lib/commands/tables'
 import { eleLoadKind, shellFrame } from '@/app/lib/shells'
+import { isFloorAreaLoad, isJoistFloor, type FloorAreaLoadArgs } from '@/app/lib/floors'
 
 type Vec3 = [number, number, number]
 
 /** One pattern's load on a shell, as a global force per area: a pressure (along the shell normal) or a self-weight (density × thickness × acceleration). */
-export interface ShellLoadPart { patternId: number; kind: 'pressure' | 'selfWeight'; vector: Vec3 }
+export interface ShellLoadPart { patternId: number; kind: 'pressure' | 'selfWeight' | 'floor'; vector: Vec3 }
 export interface ShellAreaLoad { parts: ShellLoadPart[]; /** Global force per area, every part summed. */ total: Vec3; magnitude: number }
 
 /** The area load every visible pattern puts on each shell, by element tag. A self-weight on a section without `rho` and `h` counts as zero. */
@@ -28,6 +29,17 @@ export function shellAreaLoads(patterns: PatternEntity[], hiddenPatterns: number
   for (const p of patterns) {
     if (hiddenPatterns.includes(p.id)) continue
     for (const c of p.children) {
+      // A joist floor's area load (downward) counts like a pressure on the floor's outline.
+      if (isFloorAreaLoad(c)) {
+        const a = c.args as unknown as FloorAreaLoadArgs, ele = elements.get(a.floor)
+        if (!ele || !isJoistFloor(ele.eleType)) continue
+        const w = a.loads.reduce((sum, l) => sum + l.w, 0), load = out.get(a.floor) ?? { parts: [], total: [0, 0, 0], magnitude: 0 }
+        load.parts.push({ patternId: p.id, kind: 'floor', vector: [0, 0, -w] })
+        load.total[2] -= w
+        load.magnitude = Math.hypot(...load.total)
+        out.set(a.floor, load)
+        continue
+      }
       if (c.kind !== 'eleLoad') continue
       const kind = eleLoadKind(c.args)
       if (kind !== 'pressure' && kind !== 'selfWeight') continue

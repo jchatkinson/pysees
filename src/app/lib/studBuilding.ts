@@ -27,6 +27,36 @@ export const PIER_QUANTITIES: StudWallQuantity[] = ['q', 'gamma', 'momentBase', 
 export const WALL_BASE_COMPONENTS: StudWallBaseComponent[] = ['shear', 'axial', 'moment']
 /** A stud wall's recorded columns, in order: its base reaction (shear, axial, moment), then each pier's quantities as `p<n>.<quantity>`.
  * The compiler records exactly this list per `studWall` element and the results table reads it back by label. */
+/** A stud-wall framing member's recorded axial force (tension positive): `stud` full height (bottom and top differ by the sheathing's shear
+ * lag), `jack` at an opening edge (to the head), `cripple` over a header (bottom = top). `x` along the wall. */
+export interface WallMemberForce { kind: 'stud' | 'jack' | 'cripple'; x: number; bottom: number; top: number }
+
+/** Columns of a wall's member forces (Carapace's `memberForce` bulk recorder): the counts of studs, jacks and cripples, then x / bottom / top
+ * per member. The layout fixes how many: full-height studs (not strictly inside an opening), two jacks per opening, a cripple per stud inside one. */
+export function studWallMemberLabels(layout: WallLayoutSpec): string[] {
+  const tol = 1e-9 * layout.length, openings = layout.openings ?? []
+  const inside = layout.studs.filter((s) => openings.some((o) => s.x > o.x0 + tol && s.x < o.x1 - tol)).length
+  const n = layout.studs.length - inside + 2 * openings.length + inside
+  return ['members.studs', 'members.jacks', 'members.cripples', ...Array.from({ length: n }, (_, k) => [`m${k + 1}.x`, `m${k + 1}.bottom`, `m${k + 1}.top`]).flat()]
+}
+
+/** A wall's members from its recorded row (`labels` its studWall columns, `at(label)` the value), or [] when not recorded. */
+export function readWallMembers(labels: string[], at: (k: number) => number): WallMemberForce[] {
+  const c = labels.indexOf('members.studs')
+  if (c < 0) return []
+  const counts = [at(c), at(c + 1), at(c + 2)]
+  if (!counts.every((v) => Number.isInteger(v) && v >= 0)) return []
+  const out: WallMemberForce[] = []
+  counts.forEach((count, kind) => {
+    for (let k = 0; k < count; k++) {
+      const o = c + 3 + 3 * out.length
+      if (o + 2 >= labels.length) return
+      out.push({ kind: (['stud', 'jack', 'cripple'] as const)[kind], x: at(o), bottom: at(o + 1), top: at(o + 2) })
+    }
+  })
+  return out
+}
+
 export function studWallRecorders(layout: WallLayoutSpec, elementIndex: number): { labels: string[]; specs: RecorderSpecWire[] } {
   const labels: string[] = [], specs: RecorderSpecWire[] = []
   for (const component of WALL_BASE_COMPONENTS) { labels.push(component); specs.push({ response: 'studWallBase', elementKind: 'studWall', elementIndex, component }) }

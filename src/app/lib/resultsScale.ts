@@ -35,6 +35,8 @@ export interface ModelMetrics {
   diagonal: number
   /** Every element is a truss — whose recorded force is global-frame, so axial force is |(Ni,Vi)| (2D) or |(Fxi,Fyi,Fzi)| (3D), not Ni. */
   trussOnly: boolean
+  /** Typical gap between a stud wall's members (the median stud spacing), 0 without walls: the member view's bar size. */
+  memberSpacing: number
 }
 
 export function modelMetrics(model: Model): ModelMetrics {
@@ -47,13 +49,22 @@ export function modelMetrics(model: Model): ModelMetrics {
   }
   const diagonal = model.nodes.size ? Math.hypot(max[0] - min[0], max[1] - min[1], max[2] - min[2]) : 0
   const trussOnly = model.elements.size > 0 && [...model.elements.values()].every((el) => /^truss$/i.test(el.eleType))
-  return { ndm: model.config?.ndm === 3 ? 3 : 2, diagonal, trussOnly }
+  const gaps = [...model.elements.values()].filter((e) => e.eleType === 'studWall').flatMap((e) => {
+    const xs = ((e.args.layout as { studs?: { x: number }[] } | undefined)?.studs ?? []).map((s) => s.x).sort((a, b) => a - b)
+    return xs.slice(1).map((x, i) => x - xs[i]).filter((g) => g > 0)
+  }).sort((a, b) => a - b)
+  return { ndm: model.config?.ndm === 3 ? 3 : 2, diagonal, trussOnly, memberSpacing: gaps.length ? gaps[Math.floor(gaps.length / 2)] : 0 }
 }
 
 const WALL_PEAKS = { axial: /chord(Left|Right)$/, shear: /^shear$/, moment: /moment(Base|Top)$/ }
 
 /** Scale (world units per result unit) that draws the run's peak value at a readable size. */
-export function autoScale(key: Exclude<ScaleKey, 'mode'>, extents: RunExtents | null, metrics: ModelMetrics): number {
+export function autoScale(key: Exclude<ScaleKey, 'mode'>, extents: RunExtents | null, metrics: ModelMetrics, walls: 'piers' | 'members' = 'piers'): number {
+  // Stud-wall members side by side: the largest member force spans just under half a stud spacing, so neighbours don't overlap.
+  if (key === 'axial' && walls === 'members' && metrics.memberSpacing > 0) {
+    const peak = Math.max(0, ...Object.entries(extents?.studWall ?? {}).filter(([l]) => /^m\d+\.(bottom|top)$/.test(l)).map(([, v]) => Math.abs(v)))
+    if (peak > 0) return (0.45 * metrics.memberSpacing) / peak
+  }
   const { kind, labels } = PEAK_LABELS[metrics.ndm][key]
   let peak = Math.max(0, ...labels.map((l) => extents?.[kind][l] ?? 0))
   if (key === 'axial' && metrics.trussOnly) {

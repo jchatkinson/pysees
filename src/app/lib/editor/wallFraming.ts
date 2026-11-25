@@ -9,7 +9,7 @@ import { sizeOf, type WallFraming } from '@/app/lib/lumber'
  */
 export type FramingPart = 'stud' | 'plate' | 'header' | 'rim' | 'subfloor' | 'sheathing'
 /** Wall-local box: x along the wall (0..L), y up from the bottom (0..H), z through the thickness (0 = centre plane, +z = sheathed face). */
-export interface FramingBox { part: FramingPart; x0: number; x1: number; y0: number; y1: number; z0: number; z1: number }
+export interface FramingBox { part: FramingPart; x0: number; x1: number; y0: number; y1: number; z0: number; z1: number; /** The recorded framing member it draws (`WallMemberForce`): kind and position. */ member?: { kind: 'stud' | 'jack' | 'cripple'; x: number } }
 
 const MM: Record<LengthUnit, number> = { mm: 1, cm: 0.1, m: 1e-3, in: 1 / 25.4, ft: 1 / 304.8 }
 
@@ -30,7 +30,7 @@ export function wallFraming(layout: WallLayoutSpec, L: number, H: number, unit: 
   const k = MM[unit], stud = framing && sizeOf(framing.stud), b = (stud?.b ?? 38) * k, d = (stud?.d ?? 140) * k, t = d / 2, gap = 3 * k
   const Hf = Math.min(layout.height, H), plateTop = Hf - (framing?.topPlies ?? 2) * b, base = (framing?.bottomPlies ?? 1) * b
   const out: FramingBox[] = []
-  const box = (part: FramingPart, x0: number, x1: number, y0: number, y1: number, z0 = -t, z1 = t) => { if (x1 - x0 > 1e-9 && y1 - y0 > 1e-9) out.push({ part, x0, x1, y0, y1, z0, z1 }) }
+  const box = (part: FramingPart, x0: number, x1: number, y0: number, y1: number, z0 = -t, z1 = t, member?: FramingBox['member']) => { if (x1 - x0 > 1e-9 && y1 - y0 > 1e-9) out.push({ part, x0, x1, y0, y1, z0, z1, ...(member ? { member } : {}) }) }
   const eas = layout.studs.map((s) => s.ea).sort((p, q) => p - q), single = eas[Math.floor(eas.length / 2)] || 1
   // Openings in order along the wall, each with its framing (by its index in the layout).
   const openings = (layout.openings ?? []).map((o, i) => ({ ...o, f: framing?.openings[i] })).sort((p, q) => p.x0 - q.x0)
@@ -55,14 +55,14 @@ export function wallFraming(layout: WallLayoutSpec, L: number, H: number, unit: 
 
   for (const s of layout.studs) {
     const o = inside(s.x)
-    if (!o) { const [a, c] = span(s.x, posts(s.x, s.ea) * b); box('stud', a, c, base, plateTop); continue }
-    const [a, c] = span(s.x, b) // cripples above the header and below the sill
-    box('stud', a, c, header(o), plateTop)
+    if (!o) { const [a, c] = span(s.x, posts(s.x, s.ea) * b); box('stud', a, c, base, plateTop, -t, t, { kind: 'stud', x: s.x }); continue }
+    const [a, c] = span(s.x, b) // cripples above the header (recorded) and below the sill (not modelled in Carapace)
+    box('stud', a, c, header(o), plateTop, -t, t, { kind: 'cripple', x: s.x })
     if (!o.door) box('stud', a, c, base, sill(o) - b)
   }
   for (const o of openings) {
     const j = jacks(o), a = o.x0 + b / 2, c = o.x1 - b / 2
-    box('stud', a, a + j, base, o.headHeight); box('stud', c - j, c, base, o.headHeight)
+    box('stud', a, a + j, base, o.headHeight, -t, t, { kind: 'jack', x: o.x0 }); box('stud', c - j, c, base, o.headHeight, -t, t, { kind: 'jack', x: o.x1 })
     box('header', a, c, o.headHeight, header(o))
     if (!o.door) box('plate', a + j, c - j, sill(o) - b, sill(o))
   }

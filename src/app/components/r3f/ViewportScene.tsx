@@ -10,7 +10,7 @@ import { NodesLayer } from './Nodes'
 import { ElementsLayer } from './Elements'
 import { SupportsLayer } from './Supports'
 import { ConstraintsLayer } from './Constraints'
-import { WallDetailLayer } from './WallDetail'
+import { FloorJoistLayer, WallDetailLayer } from './WallDetail'
 import { ZeroLengthsLayer } from './ZeroLengths'
 import { LoadsLayer } from './Loads'
 import { batchesLoads, LABEL_LIMIT, loadGlyphCount } from './utils'
@@ -302,7 +302,7 @@ export const ViewportScene = forwardRef<ViewportSceneRef, object>(function Viewp
         showElementIds={viewSettings.showElementIds}
         extruded={extruded}
       />
-      {extruded && !deformedShown && <ExtrudedLayer index={sceneIndex} elements={elements} />}
+      {extruded && !deformedShown && <ExtrudedLayer index={sceneIndex} elements={elements} buffers={displayBuffers} />}
       <NodesLayer
         index={sceneIndex}
         buffers={displayBuffers}
@@ -314,6 +314,7 @@ export const ViewportScene = forwardRef<ViewportSceneRef, object>(function Viewp
         <ZeroLengthsLayer index={sceneIndex} buffers={displayBuffers} elements={model.elements} ndm={model.config?.ndm === 2 ? 2 : 3} />
       )}
       {viewSettings.showElements && (!extruded || deformedShown) && <WallDetailLayer index={sceneIndex} buffers={displayBuffers} elements={model.elements} />}
+      {viewSettings.showElements && !extruded && !deformedShown && <FloorJoistLayer index={sceneIndex} elements={model.elements} model={model} />}
       <ToolLayer mode={mode} nodes={nodes} elements={elements} ndm={ndm} />
       {showReactions && <ReactionsLayer index={sceneIndex} fixes={fixes} />}
       {viewSettings.showSupports && (

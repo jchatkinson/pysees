@@ -102,6 +102,7 @@ export const COMMANDS = {
   drawAllStories: { id: 'drawAllStories', label: 'All stories', icon: Layers3, tip: 'Draw on every story at once (plan views)', visible: only3d, isActive: (s) => s.drawAllStories, run: (s) => s.setDrawAllStories(!s.drawAllStories) },
   toolShell: tool('shell', 'Shells', SquareStack, 'Shells: click a grid cell in a plan (floor) or a panel in an elevation (wall)', (s) => only3d(s) && s.gridlines.length > 0 && (currentView(s).kind === 'plan' || (currentView(s).kind === 'elevation' && (currentView(s) as { gridId: number | null }).gridId !== null))),
   toolStudWall: tool('studWall', 'Stud wall', BrickWall, 'Stud walls (Carapace-only): click points in a plan; each wall spans the story below', (s) => only3d(s) && currentView(s).kind === 'plan' && (currentView(s) as { level: number }).level >= 0),
+  toolFloor: tool('floor', 'Joist floor', Rows3, 'Joist floors (Carapace-only): click the outline in a plan; joists carry gravity one way to the stud walls under them', (s) => only3d(s) && currentView(s).kind === 'plan' && (currentView(s) as { level: number }).level >= 0),
   toolSupport: tool('support', 'Support', Anchor, 'Assign a support to the clicked node'),
   view3d: { id: 'view3d', label: '3D', icon: Box, tip: '3D view', isActive: (s) => currentView(s).kind === '3d', run: (s) => s.setViewMode({ kind: '3d' }) },
   viewPlan: {
@@ -161,7 +162,7 @@ export const RIBBON_TABS: RibbonTabDef[] = [
   { id: 'file', label: 'File', groups: [{ label: 'Project', custom: 'file' }] },
   { id: 'model', label: 'Model', groups: [
     { label: 'History', commands: ['undo', 'redo'] },
-    { label: 'Draw', commands: ['toolSelect', 'toolFrame', 'toolBeam', 'toolColumn', 'toolShell', 'toolStudWall', 'toolSupport', 'drawAllStories'] },
+    { label: 'Draw', commands: ['toolSelect', 'toolFrame', 'toolBeam', 'toolColumn', 'toolShell', 'toolStudWall', 'toolFloor', 'toolSupport', 'drawAllStories'] },
     { label: 'View', commands: ['view3d', 'viewPlan', 'viewElevation', 'showExtruded'], custom: 'stories' },
     { label: 'Select', commands: ['selectAll', 'clearSelection', 'deleteSelection'] },
     { label: 'Define', commands: ['gridsLevels', 'units'] },

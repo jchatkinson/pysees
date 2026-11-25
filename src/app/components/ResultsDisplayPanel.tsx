@@ -49,6 +49,7 @@ export function ResultsDisplayPanel() {
   const is3d = model.config?.ndm === 3
   const availableResultTypes = RESULT_TYPES
   const hasShells = useMemo(() => [...model.elements.values()].some((e) => isShell(e.eleType)), [model.elements])
+  const hasStudWalls = useMemo(() => [...model.elements.values()].some((e) => e.eleType === 'studWall'), [model.elements])
   const contourRange = useAppStore((s) => s.contourRange)
 
   const [extents, setExtents] = useState<{ runId: string; value: RunExtents } | null>(null)
@@ -94,7 +95,7 @@ export function ResultsDisplayPanel() {
   const runExtents = extents && extents.runId === rv.runId ? extents.value : null
   // A contour is drawn on the deformed shape, so it shares that scale.
   const scaleKey: ScaleKey | null = rv.type === 'none' ? null : rv.type === 'contour' ? 'deformed' : rv.type
-  const auto = !scaleKey ? 1 : scaleKey === 'mode' ? autoModeScale(modalStage && mode ? modeTranslationPeak(modalStage, mode) : 0, metrics) : autoScale(scaleKey, runExtents, metrics)
+  const auto = !scaleKey ? 1 : scaleKey === 'mode' ? autoModeScale(modalStage && mode ? modeTranslationPeak(modalStage, mode) : 0, metrics) : autoScale(scaleKey, runExtents, metrics, rv.wallResults)
   const manual = scaleKey ? rv.scales[scaleKey] : null
   const scale = manual ?? auto
   const plotOpen = useAppStore((s) => s.plotView.open)
@@ -159,6 +160,16 @@ export function ResultsDisplayPanel() {
               <SelectContent>{availableResultTypes.filter((t) => (!t.only3d || is3d) && (t.id !== 'contour' || hasShells) && (t.id === 'none' || (t.id === 'mode' ? isModalCase : !isModalCase))).map((t) => <SelectItem key={t.id} value={t.id}>{(is3d && t.label3d) || t.label}</SelectItem>)}</SelectContent>
             </Select>
           </div>
+
+          {hasStudWalls && rv.type === 'axial' && (
+            <div className="grid gap-1">
+              <Label className="text-[11px]">Stud walls</Label>
+              <Select items={[{ value: 'piers', label: 'Piers (chord forces)' }, { value: 'members', label: 'Members (studs, posts, jacks, cripples)' }]} value={rv.wallResults} onValueChange={(v) => set({ wallResults: v === 'members' ? 'members' : 'piers' })}>
+                <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+                <SelectContent><SelectItem value="piers">Piers (chord forces)</SelectItem><SelectItem value="members">Members (studs, posts, jacks, cripples)</SelectItem></SelectContent>
+              </Select>
+            </div>
+          )}
 
           {rv.type === 'contour' && (
             <div className="grid gap-1.5">

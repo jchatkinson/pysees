@@ -125,7 +125,7 @@ export type RecorderSpecWire =
   /** A whole node or element table (or the `rows` of it, in that order) per step, as one flat Float64Array: row, then Gauss point, then component. */
   | { response: 'bulk'; table: 'nodes' | 'elements'; quantity: BulkQuantity; elementKind?: ElementKind; rows?: number[] }
 /** `nodes`: displacement, reaction, velocity, acceleration (ndf each). `elements`: endForce (the elementForce components), load (wx, wy(, wz)), stress / strain (shell resultants per Gauss point). */
-export type BulkQuantity = 'displacement' | 'reaction' | 'velocity' | 'acceleration' | 'endForce' | 'load' | 'stress' | 'strain'
+export type BulkQuantity = 'displacement' | 'reaction' | 'velocity' | 'acceleration' | 'endForce' | 'load' | 'stress' | 'strain' | 'memberForce'
 export interface SequenceSpec { stages: StageSpec[]; recorders: RecorderSpecWire[] }
 
 export interface BuildingSpec { storeys: StoreySpec[]; foundationAnchorage: AnchorageSpec; diaphragm: DiaphragmKind; combination?: [number, number, number, number, number, number, number, number] }

@@ -4,7 +4,7 @@ import { join } from 'node:path'
 import * as wasm from '@/app/carapace/wasm/carapace_wasm.js'
 import { modelFromWrites } from '@/app/lib/commands/testkit'
 import { runCarapace, type CarapaceRun } from '@/app/lib/commands/carapaceRunner'
-import { studBuildingSpec, wallPiers } from '@/app/lib/studBuilding'
+import { readWallMembers, studBuildingSpec, studWallMemberLabels, wallPiers } from '@/app/lib/studBuilding'
 import { drawStudWall, expansionToModel, rebuildStudWall, studWallArgs, studWallTemplateOf, unanchoredPierEnds } from '@/app/lib/studWalls'
 import { DrawBatch } from '@/app/lib/editor/draw'
 import { assignDiaphragms } from '@/app/lib/editor/edit'
@@ -14,6 +14,7 @@ import { serializeProject } from '@/app/lib/project/serialize'
 import { buildSceneIndex } from '@/app/components/r3f/sceneIndex'
 import { fillDiagram } from '@/app/components/r3f/diagrams'
 import { createExtremaAccumulator } from '@/app/lib/resultsExtrema'
+import { floorTakedown } from '@/app/lib/floors'
 import type { RunLayout } from '@/app/lib/resultsStorage/stepFrames'
 import { applyFraming, guessFraming, lumberScale } from '@/app/lib/lumber'
 import { parseProject } from '@/app/lib/project/parse'
@@ -26,7 +27,7 @@ import { wallLoadArgs } from '@/app/lib/shells'
 import { validateSchemaResult } from '@/app/lib/commandSchemas'
 import { assignFlexibleDiaphragms, removeFlexibleDiaphragms } from '@/app/lib/diaphragms'
 import type { BuildingSpec } from '@/app/types/carapaceInputV1'
-import type { Model, StudBuildingParams } from '@/app/types/model'
+import type { LoadAssignment, Model, StudBuildingParams } from '@/app/types/model'
 
 wasm.initSync({ module: readFileSync(join(process.cwd(), 'src/app/carapace/wasm/carapace_wasm_bg.wasm')) })
 
@@ -328,13 +329,69 @@ describe('stud-wall building template', () => {
     expect(moment.labels[0].value).toBe(v('momentBase'))
     expect(moment.fillVertices).toBeGreaterThan(0)
     expect(fillDiagram(index, layout, row, 'torsion', 1e-3, out).fillVertices).toBe(0)
+    // Members view: one bar per member (six vertices), and each wall labels at most its largest tension and compression.
+    const memberCount = index.studWalls.reduce((n, w) => { const pl = studWall.get(index.elementIds[w.e])!; return n + readWallMembers(pl.labels, (k) => row[pl.offset + k]).length }, 0)
+    const memberBars = fillDiagram(index, layout, row, 'axial', 1e-3, out, 'members')
+    expect(memberCount).toBeGreaterThan(0)
+    expect(memberBars.fillVertices).toBe(6 * memberCount)
+    expect(memberBars.labels.length).toBeLessThanOrEqual(2 * index.studWalls.length)
+    const accM = createExtremaAccumulator(index, layout, 'axial', 'mxx' as never, 'members')
+    accM.add({ step: 9, pseudoTime: 1, row })
+    const all = index.studWalls.flatMap((w) => { const pl = studWall.get(index.elementIds[w.e])!; return readWallMembers(pl.labels, (k) => row[pl.offset + k]).flatMap((m) => [m.bottom, m.top]) })
+    expect(accM.result()!.min.value).toBe(Math.min(...all))
     // The extrema box reads the same pier values.
     const acc = createExtremaAccumulator(index, layout, 'axial', 'mxx' as never)
     acc.add({ step: 9, pseudoTime: 1, row })
     const chords = index.wallPiers.flatMap((p) => { const pl = studWall.get(index.elementIds[p.e])!; return ['chordLeft', 'chordRight'].map((q) => row[pl.offset + pl.labels.indexOf(`p${p.pier}.${q}`)]) })
     expect(acc.result()!.max.value).toBe(Math.max(...chords))
+    // Member forces: every wall's studs (at their bottom) and jacks carry its base reaction (tension positive, base axial gravity positive).
+    for (const p of run.compile.recorderPlans.filter((q) => q.kind === 'studWall')) {
+      const members = readWallMembers(p.componentLayout, (k) => run.columns[p.columnOffset + k].at(-1)!)
+      const layout = studWallArgs(model.elements.get(p.targetTag)!.args).layout
+      expect(members.length * 3 + 3).toBe(studWallMemberLabels(layout).length)
+      expect(members.filter((m) => m.kind === 'jack')).toHaveLength(2 * (layout.openings ?? []).length)
+      const intoBase = members.filter((m) => m.kind !== 'cripple').reduce((sum, m) => sum + m.bottom, 0)
+      const axial = run.columns[p.columnOffset + p.componentLayout.indexOf('axial')].at(-1)!
+      expect(intoBase).toBeCloseTo(-axial, 6)
+    }
     // Without a recorder block the compiler says why nothing shows.
     expect(runCarapace(model, { commands: history.commands.slice(1), cursor: history.commands.length - 2 }).compile.diagnostics).toEqual(expect.arrayContaining([expect.objectContaining({ severity: 'warning', message: expect.stringContaining('Whole Model Recorder') })]))
+  })
+
+  // The template's floors are joist floors (outline on the bearing walls' top corners, joists square to them) whose area loads give the
+  // same wall takedown as the explicit one-way rows Carapace's building expansion writes.
+  it('turns the template floors into joist floors with the same takedown', () => {
+    const params = { storeys: 2, combination: '1.0D', factors: [1, 0, 0, 0, 0, 0, 0, 0], lateralShear: 0 }
+    const { model, history } = make(params)
+    const floors = [...model.elements.values()].filter((e) => e.eleType === 'joistFloor')
+    expect(floors).toHaveLength(2)
+    for (const f of floors) { expect(f.nodes).toHaveLength(4); expect(Math.abs(Number(f.args.angle) % 180)).toBeCloseTo(90, 9) }
+    // The same building with the expansion's explicit rows in place of the floor loads.
+    const { spec } = studBuildingSpec(params)
+    const { input } = wasm.expandBuilding(spec as never, 'z')
+    const explicit = new Map<number, LoadAssignment[]>()
+    for (const f of input.floorLoads ?? []) {
+      const { pattern, supports, ...rest } = f
+      explicit.set(pattern + 1, [...(explicit.get(pattern + 1) ?? []), { kind: 'floorLoad', args: { ...rest, supports: supports.map((x) => ({ ...x, wall: x.wall.index + 1 })) } as unknown as Record<string, unknown> }])
+    }
+    const legacy = { ...model, elements: new Map([...model.elements].filter(([, e]) => e.eleType !== 'joistFloor')), patterns: new Map([...model.patterns].map(([id, p]) => [id, { ...p, children: [...p.children.filter((c) => c.kind !== 'floorLoad'), ...(explicit.get(id) ?? [])] }])) }
+    const a = runCarapace(model, history), b = runCarapace(legacy, history)
+    expect(a.compile.diagnostics.filter((d) => d.severity !== 'info')).toEqual([])
+    expect(a.error).toBeFalsy(); expect(b.error).toBeFalsy()
+    for (const e of model.elements.values()) if (e.eleType === 'studWall') expect(last(a, e.id, 'axial')).toBeCloseTo(last(b, e.id, 'axial'), 3)
+    expect(exportScript(model, history)).toMatch(/WARNING: Carapace-only floor load \(simple one-way spans, joist floor \d+\)/)
+    // The card's takedown equals Carapace: the top storey's walls carry exactly the roof floor's reactions (dead load only, factor 1).
+    const roof = floors.reduce((hi, f) => (Number(model.nodes.get(f.nodes[0])!.coords[2]) > Number(model.nodes.get(hi.nodes[0])!.coords[2]) ? f : hi))
+    const dead = [...model.patterns.values()].find((p) => p.name === 'Dead')!
+    const w = dead.children.filter((c) => c.kind === 'floorLoad' && c.args.floor === roof.id).reduce((sum, c) => sum + (c.args.loads as { w: number }[]).reduce((t, l) => t + l.w, 0), 0)
+    const takedown = floorTakedown(model, roof.id, new Map([[dead.id, w * Number(dead.args.fact ?? 1)]]))
+    expect(takedown.size).toBeGreaterThan(0)
+    for (const [wall, m] of takedown) expect(Math.abs(last(a, wall, 'axial'))).toBeCloseTo(m.get(dead.id)!, 3)
+    // A floor outline node that lands on no wall (drawn in open plan) is a free node: it must not stop the run.
+    const f0 = floors[0], extra = Math.max(...model.nodes.keys()) + 1, c = model.nodes.get(f0.nodes[0])!.coords
+    const loose = { ...model, nodes: new Map(model.nodes).set(extra, { id: extra, coords: [c[0] - 500, c[1] - 500, c[2]] }), elements: new Map(model.elements).set(f0.id, { ...f0, nodes: [extra, ...f0.nodes.slice(1)] }) }
+    const run = runCarapace(loose, history)
+    expect(run.error).toBeFalsy()
   })
 
   // Lumber framing: sizes set the EAs on rebuild, and the framing survives a saved project.

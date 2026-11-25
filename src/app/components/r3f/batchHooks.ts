@@ -20,10 +20,12 @@ export function useCameraChange() {
   }
 }
 
-/** One fat-line draw for a buffer of `capacity` segments (start xyz, end xyz), rewritten through `write`. A new buffer comes with new `lines`. */
-export function useSegmentLines(capacity: number, color: string, widthPx: number) {
+/** One fat-line draw for a buffer of `capacity` segments (start xyz, end xyz), rewritten through `write`. A new buffer comes with new `lines`.
+ * `behind` is for detail lines lying in another object's plane (joists on a floor, studs on a wall): drawn first and without writing depth,
+ * so a coincident outline or diaphragm line always wins instead of flickering against them. */
+export function useSegmentLines(capacity: number, color: string, widthPx: number, behind = false) {
   const size = useThree((s) => s.size)
-  const material = useMemo(() => new LineMaterial({ color: color as never, linewidth: widthPx }), [color, widthPx])
+  const material = useMemo(() => new LineMaterial({ color: color as never, linewidth: widthPx, depthWrite: !behind }), [color, widthPx, behind])
   const { lines, positions } = useMemo(() => {
     const positions = new Float32Array(Math.max(1, capacity) * 6)
     const geometry = new LineSegmentsGeometry()
@@ -31,8 +33,9 @@ export function useSegmentLines(capacity: number, color: string, widthPx: number
     const lines = new LineSegments2(geometry, material)
     lines.frustumCulled = false
     lines.raycast = () => {}
+    if (behind) lines.renderOrder = -2
     return { lines, positions }
-  }, [capacity, material])
+  }, [capacity, material, behind])
   useEffect(() => { material.resolution.set(size.width, size.height) }, [material, size])
   useEffect(() => () => lines.geometry.dispose(), [lines])
   useEffect(() => () => material.dispose(), [material])

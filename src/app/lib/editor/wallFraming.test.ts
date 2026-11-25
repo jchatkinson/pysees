@@ -54,4 +54,11 @@ describe('wallFraming', () => {
     expect(of(boxes, 'plate').some((b) => b.y1 === 1000)).toBe(true)
     expect(of(boxes, 'rim')[0]).toMatchObject({ z0: 44.5 - 32, z1: 44.5 })
   })
+  it('tags the boxes that draw recorded members (studs, jacks, cripples over a header)', () => {
+    const studs = [0, 400, 1000, 1200, 1400, 2000, 3600].map((x) => ({ x, ea }))
+    const boxes = wallFraming(layout({ studs, openings: [{ x0: 1000, x1: 1400, headHeight: 2000, headerEi: 1, jackEa: ea, door: false }] }), 3600, 2400, 'mm')
+    const tagged = boxes.filter((b) => b.member).map((b) => `${b.member!.kind}@${b.member!.x}`)
+    expect(tagged.sort()).toEqual(['cripple@1200', 'jack@1000', 'jack@1400', 'stud@0', 'stud@1000', 'stud@1400', 'stud@2000', 'stud@3600', 'stud@400'].sort())
+    expect(boxes.filter((b) => !b.member && b.part === 'stud')).toHaveLength(1) // the cripple below the sill has no recorded force
+  })
 })

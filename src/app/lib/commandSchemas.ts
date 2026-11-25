@@ -655,10 +655,13 @@ export function validateSchemaResult(result: SchemaResult, model: Model, ctx: Sc
   if (write.kind === 'fix' && !model.nodes.has(write.entity.nodeId)) return `Node ${write.entity.nodeId} does not exist.`
   if (write.kind === 'mass' && !model.nodes.has(write.entity.nodeId)) return `Node ${write.entity.nodeId} does not exist.`
   if (write.kind === 'element') {
-    // A stud wall (Carapace-only) connects its 4 corners and one node per chord station; a flexible diaphragm every grid point.
+    // A stud wall (Carapace-only) connects its 4 corners and one node per chord station; a flexible diaphragm every grid point;
     const stations = write.entity.eleType === 'studWall' ? (write.entity.args.stations as unknown[] | undefined) : undefined
     const grid = write.entity.eleType === 'diaphragm' ? (write.entity.args.layout as { u?: unknown[]; v?: unknown[] } | undefined) : undefined
-    const count = stations ? 4 + stations.length : grid ? (grid.u?.length ?? 0) * (grid.v?.length ?? 0) : elementNodeCount(elementByType(write.entity.eleType))
+    // A joist floor's outline takes any number (three or more) of distinct nodes.
+    const floor = write.entity.eleType === 'joistFloor'
+    if (floor && write.entity.nodes.length < 3) return 'A joist floor needs at least three nodes.'
+    const count = floor ? write.entity.nodes.length : stations ? 4 + stations.length : grid ? (grid.u?.length ?? 0) * (grid.v?.length ?? 0) : elementNodeCount(elementByType(write.entity.eleType))
     if (write.entity.nodes.length !== count) return `${write.entity.eleType} connects ${count} nodes.`
     if (new Set(write.entity.nodes).size !== count) return 'Element nodes must be distinct.'
     if (isShell(write.entity.eleType)) {

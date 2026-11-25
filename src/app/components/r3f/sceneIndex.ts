@@ -6,6 +6,7 @@ import { toVec3 } from './utils'
 import { isStudWall, studWallArgs } from '@/app/lib/studWalls'
 import { wallPiers } from '@/app/lib/studBuilding'
 import { diaphragmArgs, diaphragmOutline, isDiaphragm } from '@/app/lib/diaphragms'
+import { isJoistFloor } from '@/app/lib/floors'
 
 /** A diaphragm's four corner nodes, counter-clockwise. */
 function diaphragmCorners(el: ElementEntity): number[] {
@@ -31,8 +32,8 @@ export const segmentsFor = (kind: ElementKind) => (kind === 'beam' || kind === '
  * positions in the sorted-by-id lists below; results data and instance buffers are indexed by them.
  */
 /** `wall` is a Carapace stud wall: its closed outline through the corners and chord stations, filled like a shell; `diaphragm` a
- * flexible diaphragm's boundary through its edge grid nodes. */
-export type ElementKind = 'beam' | 'truss' | 'shell' | 'wall' | 'diaphragm' | 'other'
+ * flexible diaphragm's boundary through its edge grid nodes; `floor` a joist floor's plan polygon (any shape). */
+export type ElementKind = 'beam' | 'truss' | 'shell' | 'wall' | 'diaphragm' | 'floor' | 'other'
 
 export interface SceneIndex {
   /** Model dimension: 2D elements live in the XY plane. */
@@ -58,10 +59,13 @@ export interface SceneIndex {
   /** Stud-wall piers, which carry the wall's recorded forces (`p<pier>.<quantity>` columns): the wall's element row, its corner node rows
    * (bottom start, bottom end, top end, top start), the pier's ends as fractions of the wall length, its width (model length) and number. */
   wallPiers: { e: number; corners: [number, number, number, number]; u0: number; u1: number; width: number; pier: number }[]
+  /** Stud walls, for member results: element row, corner rows, length, framing top as a fraction of the corner height (below a floor
+   * zone), and each opening's edges and head (wall-local length). */
+  studWalls: { e: number; corners: [number, number, number, number]; length: number; framing: number; height: number; openings: { x0: number; x1: number; head: number }[] }[]
 }
 
 /** Line spans of an element: a chain of `n - 1`, or for a shell the closed outline of `n`. */
-export const isClosed = (kind: ElementKind) => kind === 'shell' || kind === 'wall' || kind === 'diaphragm'
+export const isClosed = (kind: ElementKind) => kind === 'shell' || kind === 'wall' || kind === 'diaphragm' || kind === 'floor'
 export const spanCount = (kind: ElementKind, nodeCount: number) => (isClosed(kind) ? nodeCount : nodeCount - 1)
 /** The node rows at the ends of span `span`; a shell's last span closes back to its first node. */
 export const spanEnds = (rows: number[], span: number): [number, number] => [rows[span], rows[(span + 1) % rows.length]]
@@ -88,12 +92,13 @@ export function buildSceneIndex(
   const edge = (a: number, b: number) => Math.min(a, b) * nodeIds.length + Math.max(a, b)
   let segmentCount = 0
   const wallPierList: SceneIndex['wallPiers'] = []
+  const studWallList: SceneIndex['studWalls'] = []
   for (const el of [...elements.values()].sort((a, b) => a.id - b.id)) {
-    const wall = isStudWall(el.eleType), diaphragm = isDiaphragm(el.eleType)
+    const wall = isStudWall(el.eleType), diaphragm = isDiaphragm(el.eleType), floor = isJoistFloor(el.eleType)
     const outline = wall ? wallOutline(el) : diaphragm ? diaphragmOutline(el.nodes, diaphragmArgs(el.args).layout) : el.nodes
     const rows = outline.map((id) => nodeIndex.get(id)).filter((r): r is number => r !== undefined)
-    if (rows.length < 2 || ((wall || diaphragm || isShell(el.eleType)) && (rows.length !== outline.length || rows.length < 3))) continue
-    const kind: ElementKind = wall ? 'wall' : diaphragm ? 'diaphragm' : isShell(el.eleType) ? 'shell' : /BeamColumn$/i.test(el.eleType) ? 'beam' : /^truss$/i.test(el.eleType) ? 'truss' : 'other'
+    if (rows.length < 2 || ((wall || diaphragm || floor || isShell(el.eleType)) && (rows.length !== outline.length || rows.length < 3))) continue
+    const kind: ElementKind = wall ? 'wall' : diaphragm ? 'diaphragm' : floor ? 'floor' : isShell(el.eleType) ? 'shell' : /BeamColumn$/i.test(el.eleType) ? 'beam' : /^truss$/i.test(el.eleType) ? 'truss' : 'other'
     elementIds.push(el.id)
     elementNodes.push(rows)
     elementKind.push(kind)
@@ -112,13 +117,18 @@ export function buildSceneIndex(
     if (wall) {
       const { layout } = studWallArgs(el.args)
       const corners = el.nodes.slice(0, 4).map((id) => nodeIndex.get(id)!) as [number, number, number, number]
+      if (layout?.length > 0) {
+        const c = (r: number) => [nodeCoords[r * 3], nodeCoords[r * 3 + 1], nodeCoords[r * 3 + 2]]
+        const H = Math.hypot(...c(corners[3]).map((v, k) => v - c(corners[0])[k])) || layout.height
+        studWallList.push({ e: elementIds.length - 1, corners, length: layout.length, framing: Math.min(1, layout.height / H), height: H, openings: (layout.openings ?? []).map((o) => ({ x0: o.x0, x1: o.x1, head: o.headHeight })) })
+      }
       if (layout?.length > 0) wallPiers(layout).forEach((p, i) => wallPierList.push({ e: elementIds.length - 1, corners, u0: p.start / layout.length, u1: p.end / layout.length, width: p.width, pier: i + 1 }))
     }
     segmentCount += mine.length * segmentsFor(kind)
   }
   starts.push(segmentCount)
 
-  return hideFromDevTools({ ndm, nodeIds, nodeIndex, nodeCoords, elementIds, elementNodes, elementKind, elementFrames: Float32Array.from(frames), elementSpans: spans, segmentsPerSpan: SEGMENTS_PER_SPAN, elementSegmentStart: Uint32Array.from(starts), segmentCount, wallPiers: wallPierList })
+  return hideFromDevTools({ ndm, nodeIds, nodeIndex, nodeCoords, elementIds, elementNodes, elementKind, elementFrames: Float32Array.from(frames), elementSpans: spans, segmentsPerSpan: SEGMENTS_PER_SPAN, elementSegmentStart: Uint32Array.from(starts), segmentCount, wallPiers: wallPierList, studWalls: studWallList })
 }
 
 /**

@@ -8,7 +8,8 @@ import { isFrameTemplate } from '@/app/lib/editor/draw'
 import { useUnits } from '@/app/lib/units/useUnits'
 import type { Category } from '@/app/lib/units/units'
 import { isStudWall, studWallArgs, studWallTemplateOf, type StudWallTemplate } from '@/app/lib/studWalls'
-import { CUSTOM, framingStiffness, GRADE_ITEMS, lumberScale, sizeOf, STUD_ITEMS, type WallFraming } from '@/app/lib/lumber'
+import { CUSTOM, framingStiffness, GRADE_ITEMS, HEADER_ITEMS, lumberScale, sizeOf, STUD_ITEMS, type WallFraming } from '@/app/lib/lumber'
+import { isJoistFloor, joistFloorArgs, type JoistFloorArgs } from '@/app/lib/floors'
 
 const HINTS: Record<Exclude<ToolId, 'select'>, string> = {
   frame: 'Click points to draw members. Right-click or Enter ends the chain; Esc leaves the tool. Shift locks to an axis.',
@@ -16,9 +17,10 @@ const HINTS: Record<Exclude<ToolId, 'select'>, string> = {
   quickColumn: 'Plan: click a grid intersection (column from the story below). Elevation: click a bay between levels.',
   shell: 'Plan: click a grid cell for a floor. Elevation: click a panel between grids and levels for a wall. Each side is split into the divisions below.',
   studWall: 'Plan: click points to draw stud walls along them, each spanning the story below this level. Right-click or Enter ends the chain. Pier ends are held down to a wall below or, on the lowest story, to the ground. Add new walls to the diaphragm afterwards (select the top nodes).',
+  floor: 'Plan: click the floor outline point by point (any shape) at this level; click the first point, right-click or Enter to close it. Joists run in the set direction at the set spacing and carry gravity to the stud walls under them; give the floor its loads in its properties.',
   support: 'Click a node to give it this support.',
 }
-const TITLES: Record<Exclude<ToolId, 'select'>, string> = { frame: 'Draw frame', quickBeam: 'Quick beams', quickColumn: 'Quick columns', shell: 'Shells', studWall: 'Stud walls', support: 'Supports' }
+const TITLES: Record<Exclude<ToolId, 'select'>, string> = { frame: 'Draw frame', quickBeam: 'Quick beams', quickColumn: 'Quick columns', shell: 'Shells', studWall: 'Stud walls', floor: 'Joist floors', support: 'Supports' }
 
 type NewKind = 'ElasticBeamColumn' | 'DispBeamColumn' | 'Truss'
 const ELASTIC_FIELDS: { key: string; cat: Category; only3d?: boolean }[] = [
@@ -139,6 +141,43 @@ function ShellOptions() {
 }
 
 /** The stud-wall tool's wall type: like an existing wall (its spacing, EAs, chords, sheathing, floor zone and hold-down), or a new one. */
+/** The floor tool's framing: like an existing floor, or set here (direction, spacing, joist, spans). */
+function FloorOptions() {
+  const model = useAppStore((s) => s.model)
+  const template = useAppStore((s) => s.floorTemplate)
+  const setTemplate = useAppStore((s) => s.setFloorTemplate)
+  const units = useUnits()
+  const floors = useMemo(() => [...model.elements.values()].filter((e) => isJoistFloor(e.eleType)).sort((a, b) => a.id - b.id), [model])
+  const fallback = useMemo((): JoistFloorArgs => {
+    const mm = lumberScale(model.config?.units, 2400).mm, imperial = ['in', 'ft'].includes(model.config?.units?.length ?? '')
+    return { angle: 0, spacing: Number((406 * mm).toPrecision(6)), joist: { grade: imperial ? 'nds-spf' : 'o86-spf', size: '2x10', plies: 1 }, continuity: 'simple', subfloor: Number((19 * mm).toPrecision(6)) }
+  }, [model.config?.units])
+  useEffect(() => { if (!template) { const f = floors[0]; const { label: _label, ...rest } = f ? joistFloorArgs(f.args) : fallback; void _label; setTemplate(rest) } }, [template, floors, fallback, setTemplate])
+  const [spacing, setSpacing] = useState<string | null>(null)
+  if (!template) return null
+  const set = (patch: Partial<JoistFloorArgs>) => setTemplate({ ...template, ...patch })
+  const pick = (value: string, onChange: (v: string) => void, options: { value: string; label: string }[]) => (
+    <Select items={options} value={value} onValueChange={(v) => v && onChange(v)}>
+      <SelectTrigger size="sm" className="h-6 w-full text-xs"><SelectValue /></SelectTrigger>
+      <SelectContent>{options.map((o) => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}</SelectContent>
+    </Select>
+  )
+  const label = (text: string, child: React.ReactNode) => <label className="grid gap-0.5"><span className="text-[11px] text-muted-foreground">{text}</span>{child}</label>
+  return (
+    <div className="grid gap-1.5">
+      {floors.length > 0 && pick('', (v) => { const f = floors.find((x) => String(x.id) === v); if (f) { const { label: _l, ...rest } = joistFloorArgs(f.args); void _l; setTemplate(rest) } }, floors.map((f) => ({ value: String(f.id), label: `Like floor ${f.id}${joistFloorArgs(f.args).label ? ` (${joistFloorArgs(f.args).label})` : ''}` })))}
+      <div className="grid grid-cols-2 gap-1">
+        {label('Joist direction (° from X)', <Input className="h-6 text-xs" type="number" step={15} value={template.angle} onChange={(e) => Number.isFinite(Number(e.target.value)) && set({ angle: Number(e.target.value) })} />)}
+        {label('Spacing', <Input className="h-6 text-xs" value={spacing ?? String(Number(units.toDisplay('length', template.spacing).toPrecision(6)))} placeholder={units.active ? units.symbol('length') : ''}
+          onChange={(e) => { setSpacing(e.target.value); const v = units.parse('length', e.target.value); if (v && v > 0) set({ spacing: v }) }} onBlur={() => setSpacing(null)} />)}
+        {label('Joist', pick(template.joist.size, (v) => set({ joist: { ...template.joist, size: v } }), HEADER_ITEMS))}
+        {label('Spans', pick(template.continuity, (v) => set({ continuity: v === 'continuous' ? 'continuous' : 'simple' }), [{ value: 'simple', label: 'Simple' }, { value: 'continuous', label: 'Continuous' }]))}
+      </div>
+      {label('Grade', pick(template.joist.grade, (v) => set({ joist: { ...template.joist, grade: v } }), GRADE_ITEMS))}
+    </div>
+  )
+}
+
 function WallOptions() {
   const model = useAppStore((s) => s.model)
   const template = useAppStore((s) => s.wallTemplate)
@@ -242,7 +281,7 @@ export function DrawOptions() {
   }, [props, template, model])
 
   // Start drawing with the most used property when nothing is chosen yet.
-  useEffect(() => { if (tool !== 'select' && tool !== 'support' && tool !== 'shell' && tool !== 'studWall' && !template && props[0]) setTemplate({ eleType: props[0].eleType, args: props[0].args }) }, [tool, template, props, setTemplate])
+  useEffect(() => { if (tool !== 'select' && tool !== 'support' && tool !== 'shell' && tool !== 'studWall' && tool !== 'floor' && !template && props[0]) setTemplate({ eleType: props[0].eleType, args: props[0].args }) }, [tool, template, props, setTemplate])
 
   if (tool === 'select') return null
   const pick = (key: string | null) => {
@@ -256,7 +295,7 @@ export function DrawOptions() {
       {tool === 'frame' && <p className="mb-1.5 text-[11px] leading-snug text-muted-foreground">After the first point, type a length and press Enter to place the next point towards the cursor.</p>}
       {toolInput && <div className="mb-1.5 rounded-sm bg-muted px-1.5 py-0.5 font-mono">Length: {toolInput}<span className="animate-pulse">▌</span></div>}
       {allStories && tool !== 'support' && <div className="mb-1.5 text-[11px] font-medium text-primary">Drawing on all stories</div>}
-      {tool === 'shell' ? <ShellOptions /> : tool === 'studWall' ? <WallOptions /> : tool === 'support' ? (
+      {tool === 'shell' ? <ShellOptions /> : tool === 'studWall' ? <WallOptions /> : tool === 'floor' ? <FloorOptions /> : tool === 'support' ? (
         <Select items={[{ value: 'fixed', label: 'Fixed' }, { value: 'pinned', label: 'Pinned' }, { value: 'roller', label: 'Roller (vertical)' }]} value={preset} onValueChange={(v) => v && setPreset(v as typeof preset)}>
           <SelectTrigger size="sm" className="h-7 w-full text-xs"><SelectValue /></SelectTrigger>
           <SelectContent>

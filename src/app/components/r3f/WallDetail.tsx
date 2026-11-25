@@ -1,6 +1,7 @@
 import { useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
-import type { ElementEntity } from '@/app/types/model'
+import type { ElementEntity, Model } from '@/app/types/model'
+import { floorJoists } from '@/app/lib/floors'
 import { studWallArgs } from '@/app/lib/studWalls'
 import type { DisplayBuffers } from './displayBuffers'
 import type { SceneIndex } from './sceneIndex'
@@ -39,7 +40,7 @@ export function WallDetailLayer({ index, buffers, elements }: { index: SceneInde
     return out
   }, [index, elements])
   const counts = useMemo(() => ({ studs: walls.reduce((n, w) => n + w.studs.length, 0), openings: walls.reduce((n, w) => n + w.openings.length, 0) }), [walls])
-  const studs = useSegmentLines(counts.studs, '#94a3b8', 1)
+  const studs = useSegmentLines(counts.studs, '#94a3b8', 1, true)
   const openings = useSegmentLines(counts.openings, '#334155', 1.5)
   const seen = useRef<{ lines: object; buffers: object; version: number; walls: object } | null>(null)
   useFrame(() => {
@@ -58,4 +59,28 @@ export function WallDetailLayer({ index, buffers, elements }: { index: SceneInde
     openings.write(fill('openings'))
   })
   return <>{counts.studs > 0 && <primitive object={studs.lines} />}{counts.openings > 0 && <primitive object={openings.lines} />}</>
+}
+
+/**
+ * Joist floors' joist lines on the floor plane (undeformed): one per joist across the outline, so the span direction reads in the line
+ * view. Hidden on displaced shapes, where the floor outline itself follows its nodes.
+ */
+export function FloorJoistLayer({ index, elements, model }: { index: SceneIndex; elements: Map<number, ElementEntity>; model: Model }) {
+  const segments = useMemo(() => {
+    const out: number[] = []
+    index.elementIds.forEach((id, e) => {
+      if (index.elementKind[e] !== 'floor') return
+      const el = elements.get(id), j = el && floorJoists(model, el)
+      if (j) for (const [p, q] of j.lines) out.push(p[0], p[1], j.z, q[0], q[1], j.z)
+    })
+    return out
+  }, [index, elements, model])
+  const joists = useSegmentLines(segments.length / 6, '#a16207', 1, true)
+  const seen = useRef<{ lines: object; segments: number[] } | null>(null)
+  useFrame(() => {
+    if (seen.current?.lines === joists.lines && seen.current.segments === segments) return
+    seen.current = { lines: joists.lines, segments }
+    joists.write((buf) => buf.set(segments))
+  })
+  return segments.length > 0 ? <primitive object={joists.lines} /> : null
 }

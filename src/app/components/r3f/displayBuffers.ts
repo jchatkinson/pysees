@@ -1,4 +1,5 @@
 import { hideFromDevTools, type SceneIndex } from './sceneIndex'
+import type { WallMemberForce } from '@/app/lib/studBuilding'
 
 export interface NodeLabel {
   position: [number, number, number]
@@ -48,6 +49,10 @@ export class DisplayBuffers {
   diagramActive = false
   diagramVersion = 0
 
+  /** Stud-wall member forces at the shown step (axial view, members mode), by wall element id; the extruded view colours the framing by them. */
+  wallMembers: Map<number, WallMemberForce[]> | null = null
+  wallMembersVersion = 0
+
   private readonly undeformed: Float32Array
   /** Called after every change, so an on-demand canvas draws the new contents. */
   onChange: (() => void) | null = null
@@ -57,10 +62,12 @@ export class DisplayBuffers {
     this.nodePositions = new Float32Array(index.nodeCoords)
     this.contourColors = new Float32Array(index.nodeIds.length * 3)
     this.deformedSegments = new Float32Array(index.segmentCount * 6)
-    this.diagramFill = new Float32Array(index.segmentCount * 18)
-    this.diagramFillColor = new Float32Array(index.segmentCount * 18)
-    // One outline segment per fill segment, plus two closing ties per element.
-    this.diagramLines = new Float32Array((index.segmentCount + 2 * index.elementIds.length) * 6)
+    // Stud walls add bars of their own (a pier's or every member's): room for 64 per wall beyond the line segments.
+    const extra = 64 * index.studWalls.length
+    this.diagramFill = new Float32Array((index.segmentCount + extra) * 18)
+    this.diagramFillColor = new Float32Array((index.segmentCount + extra) * 18)
+    // One outline segment per fill segment, plus two closing ties per element (three per wall bar).
+    this.diagramLines = new Float32Array((index.segmentCount + 2 * index.elementIds.length + 3 * extra) * 6)
     hideFromDevTools(this)
   }
 
@@ -91,6 +98,13 @@ export class DisplayBuffers {
     this.diagramLabels = result.labels
     this.diagramActive = true
     this.diagramVersion++
+    this.onChange?.()
+  }
+
+  publishWallMembers(members: Map<number, WallMemberForce[]> | null): void {
+    if (!members && !this.wallMembers) return
+    this.wallMembers = members
+    this.wallMembersVersion++
     this.onChange?.()
   }
 

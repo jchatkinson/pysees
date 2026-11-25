@@ -8,6 +8,7 @@ import { studBuildingSpec, wallPiers } from '@/app/lib/studBuilding'
 import { ModelDraft } from '@/app/lib/modelWrite'
 import { wallLoadArgs } from '@/app/lib/shells'
 import { applyFraming, guessFraming, lumberScale, type WallFraming } from '@/app/lib/lumber'
+import type { FloorAreaLoadArgs, JoistFloorArgs } from '@/app/lib/floors'
 
 /** A `studWall` element's args: its layout and, for each node after the four corners, the chord and wall-local x of that station. */
 export interface StudWallArgs { label?: string; layout: WallLayoutSpec; stations: { chord: WallChordSpec; x: number }[]; /** Members as lumber (PySees only; the layout's EA / EI are computed from it). */ framing?: WallFraming }
@@ -105,8 +106,31 @@ export function expansionToModel(input: WasmInput, map: Expansion['map'], p: Stu
     if (load.kind !== 'wallLoad' || el.elementKind[i] !== 'studWall') return
     writes.push({ kind: 'patternChild', patternId: pat + 1, child: { kind: 'eleLoad', args: wallLoadArgs([wallId(el.elementIndex[i])], load.load) } })
   })
+  // Floors: one joist floor per set of bearing walls (a storey's floor), its outline the hull of those walls' top corners (their own
+  // nodes), joists square to the walls; each pattern's area loads become a floor load on it. Anything else stays an explicit row.
+  const floorIds = new Map<string, number>()
+  let nextFloor = zlBase + (z?.nodeI.length ?? 0)
   for (const f of input.floorLoads ?? []) {
     const { pattern, supports, ...rest } = f
+    const walls = [...new Set(supports.map((s) => s.wall.index))].sort((a, b) => a - b)
+    const tops = walls.flatMap((row) => { const c = input.studWalls?.[row]?.corners; return c ? [c[3], c[2]] : [] })
+    if (rest.loads.every((l) => l.kind === 'area' && !l.region) && tops.length >= 4) {
+      const key = walls.join(',')
+      let id = floorIds.get(key)
+      if (id === undefined) {
+        id = nextFloor++
+        floorIds.set(key, id)
+        const pt = (i: number) => [coords[3 * i], coords[3 * i + 1]]
+        const [a, b] = [pt(tops[0]), pt(tops[1])]
+        const angle = Number(((Math.atan2(b[1] - a[1], b[0] - a[0]) * 180) / Math.PI + 90).toFixed(9))
+        const level = map.storeys.findIndex((st) => st.walls.some((w) => walls.includes(w.element)))
+        const args: JoistFloorArgs = { label: `S${level + 1} floor`, angle, spacing: p.studSpacing, joist: { grade: 'o86-spf', size: '2x10', plies: 1 }, continuity: rest.continuity, subfloor: Math.max(0, p.floorDepth - 235) }
+        writes.push({ kind: 'element', entity: { id, eleType: 'joistFloor', nodes: convexHull([...new Set(tops)], pt).map(nodeId), args: args as unknown as Record<string, unknown> } })
+      }
+      const load: FloorAreaLoadArgs = { floor: id, loads: rest.loads.map((l) => ({ kind: 'area' as const, w: (l as { w: number }).w })) }
+      writes.push({ kind: 'patternChild', patternId: pattern + 1, child: { kind: 'floorLoad', args: load as unknown as Record<string, unknown> } })
+      continue
+    }
     const args: FloorLoadArgs = { ...rest, supports: supports.map((s) => ({ ...s, wall: wallId(s.wall.index) })) }
     writes.push({ kind: 'patternChild', patternId: pattern + 1, child: { kind: 'floorLoad', args: args as unknown as Record<string, unknown> } })
   }
@@ -120,6 +144,14 @@ export function expansionToModel(input: WasmInput, map: Expansion['map'], p: Stu
     { id: 3, label: '1', start: [0, 0], end: [0, p.width] }, { id: 4, label: '2', start: [p.length, 0], end: [p.length, p.width] },
   ]
   return { writes, analysisCommands, levels, gridlines }
+}
+
+/** Indices of the convex hull of `ids` (by their plan point), counter-clockwise. */
+function convexHull(ids: number[], pt: (i: number) => number[]): number[] {
+  const sorted = [...ids].sort((a, b) => pt(a)[0] - pt(b)[0] || pt(a)[1] - pt(b)[1])
+  const cross = (o: number, a: number, b: number) => (pt(a)[0] - pt(o)[0]) * (pt(b)[1] - pt(o)[1]) - (pt(a)[1] - pt(o)[1]) * (pt(b)[0] - pt(o)[0])
+  const half = (list: number[]) => { const h: number[] = []; for (const i of list) { while (h.length >= 2 && cross(h[h.length - 2], h[h.length - 1], i) <= 0) h.pop(); h.push(i) } h.pop(); return h }
+  return [...half(sorted), ...half([...sorted].reverse())]
 }
 
 // ── Editing a wall ───────────────────────────────────────────────────────────

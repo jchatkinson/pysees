@@ -11,6 +11,7 @@ import { readShellModifiers, sectionNeedsShear, shellModifiersExport, type Shell
 import { isStudWall } from '@/app/lib/studWalls'
 import { floorLoadNodal, studWallExport, wallLoadNodal } from '@/app/lib/studWallExport'
 import { isDiaphragm } from '@/app/lib/diaphragms'
+import { isJoistFloor } from '@/app/lib/floors'
 
 /** `E' = E f` and `Ep_modifier = m / f` for modifiers OpenSees can represent; otherwise the reason it cannot. */
 function foldShellModifiers(args: Record<string, unknown>, modifiers: ShellModifiers, needsShear: boolean): { args: Record<string, unknown>; reason?: undefined } | { args?: undefined; reason: string } {
@@ -199,7 +200,8 @@ export function encodeModel(model: Model, deferredPatterns: ReadonlySet<number> 
   for (const bi of byId(model.beamIntegrations)) calls.push(schemaCall('beamIntegration', bi.intType, bi.args, ctx))
   const studWalls = studWallExport(model)
   for (const e of byId(model.elements)) {
-    if (isStudWall(e.eleType) || isDiaphragm(e.eleType)) {
+    if (isStudWall(e.eleType) || isDiaphragm(e.eleType) || isJoistFloor(e.eleType)) {
+      // A joist floor has no OpenSees counterpart (its loads are exported as wall reactions); a project keeps it in a generated block.
       const shells = studWalls?.walls.get(e.id) ?? []
       calls.push(...(annotate ? generated({ kind: 'carapaceOnly', writes: [{ kind: 'element', entity: e }] }, shells) : shells))
       continue

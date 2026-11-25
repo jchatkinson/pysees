@@ -9,9 +9,10 @@ import { withLumpedBeamMass } from '@/app/lib/beamMass'
 import { pathSeries } from '@/app/lib/groundMotion'
 import { eleLoadKind, wallLoadSpec } from '@/app/lib/shells'
 import { diaphragmArgs, isDiaphragm } from '@/app/lib/diaphragms'
+import { floorLoadRows, isJoistFloor } from '@/app/lib/floors'
 import { isShell } from '@/app/lib/commands/tables'
-import { studWallRecorders } from '@/app/lib/studBuilding'
-import { isStudWall, studWallArgs, studWallFrame, studWallLayoutProblems, unanchoredPierEnds, type FloorLoadArgs } from '@/app/lib/studWalls'
+import { studWallMemberLabels, studWallRecorders } from '@/app/lib/studBuilding'
+import { isStudWall, studWallArgs, studWallFrame, studWallLayoutProblems, unanchoredPierEnds } from '@/app/lib/studWalls'
 import { rowLayout, type RowLayout } from '@/app/lib/resultsStorage/recorderRows'
 
 export interface CompileInputV1Result {
@@ -323,6 +324,9 @@ export function compileInputV1(model: Model, analysisHistory: AnalysisHistory): 
       const free = unanchoredPierEnds(model, ele)
       if (free.length) diagnostics.push({ severity: 'warning', message: `${ctx}: no hold-down at pier end${free.length > 1 ? 's' : ''} x = ${free.map((x) => Number(x.toPrecision(6))).join(', ')} (nothing but the wall uses the bottom node there)`, commandIndex: -1 })
       elementRefs.set(ele.id, { kind: 'studWall', index: studWalls.push(row) - 1 })
+    } else if (isJoistFloor(ele.eleType)) {
+      // Load-only: a joist floor has no stiffness; its floor loads become transfer rows below.
+      if (ele.nodes.length < 3) diagnostics.push({ severity: 'error', message: `Joist floor ${ele.id}: needs at least three nodes`, commandIndex: -1 })
     } else if (isDiaphragm(ele.eleType)) {
       const ctx = `Diaphragm ${ele.id}`
       const { layout } = diaphragmArgs(ele.args)
@@ -490,13 +494,16 @@ export function compileInputV1(model: Model, analysisHistory: AnalysisHistory): 
   for (const id of patternIds) {
     for (const child of model.patterns.get(id)!.children) {
       if (child.kind !== 'floorLoad') continue
-      const a = child.args as unknown as FloorLoadArgs
-      const supports = a.supports.map((sup) => {
-        const ref = elementRefs.get(sup.wall)
-        if (ref?.kind !== 'studWall') diagnostics.push({ severity: 'error', message: `Floor load in pattern ${id}: support ${sup.wall} is not a stud wall`, commandIndex: -1 })
-        return { ...sup, wall: { kind: 'studWall' as const, index: ref?.index ?? NO_INDEX } }
-      })
-      floorLoads.push({ bounds: a.bounds, continuity: a.continuity, loads: a.loads as W.FloorTransferLoadSpec[], pattern: patternIndex.get(id)!, supports })
+      const { rows, problems } = floorLoadRows(model, child)
+      for (const p of problems) diagnostics.push({ severity: 'warning', message: `Floor load in pattern ${id}: ${p}`, commandIndex: -1 })
+      for (const a of rows) {
+        const supports = a.supports.map((sup) => {
+          const ref = elementRefs.get(sup.wall)
+          if (ref?.kind !== 'studWall') diagnostics.push({ severity: 'error', message: `Floor load in pattern ${id}: support ${sup.wall} is not a stud wall`, commandIndex: -1 })
+          return { ...sup, wall: { kind: 'studWall' as const, index: ref?.index ?? NO_INDEX } }
+        })
+        floorLoads.push({ bounds: a.bounds, continuity: a.continuity, loads: a.loads as W.FloorTransferLoadSpec[], pattern: patternIndex.get(id)!, supports })
+      }
     }
   }
   if ((nodalLoads.node.length || elementLoads.pattern.length || floorLoads.length) && sequence.stages.length === 0) {
@@ -597,8 +604,11 @@ export function compileInputV1(model: Model, analysisHistory: AnalysisHistory): 
     const ref = elementRefs.get(ele.id)
     if (ref?.kind !== 'studWall') continue
     const { labels, specs } = studWallRecorders(studWalls[ref.index].layout, ref.index)
-    const at = plan('studWall', ele.id, labels)
+    // Then its framing members' forces (one bulk recorder per wall: walls differ in member count).
+    const members = studWallMemberLabels(studWalls[ref.index].layout)
+    const at = plan('studWall', ele.id, [...labels, ...members])
     specs.forEach((spec, k) => { recorders.push(spec); columns.push([at + k]) })
+    bulk({ table: 'elements', elementKind: 'studWall', quantity: 'memberForce', rows: [ref.index] }, [at + labels.length], members.length)
   }
 
   if (diagnostics.some((d) => d.severity === 'error')) return { input: null, diagnostics, recordedNodeTags: [], dofsPerNode: 0, recorderPlans: [], nodeTags: [], rowLayout: rowLayout(0, []) }

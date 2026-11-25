@@ -802,7 +802,7 @@ export interface Expansion {
  * `embeddedBars`, one value per segment); `axialForce` and `ruptured` are
  * [`EmbeddedBarQuantity`]'s and belong to `embeddedBars` only.
  */
-export type BulkQuantity = "strain" | "stress" | "principalStrain" | "principalStress" | "kc2" | "axialForce" | "ruptured" | "displacement" | "reaction" | "deformation" | "force" | "velocity" | "acceleration" | "endForce" | "load";
+export type BulkQuantity = "strain" | "stress" | "principalStrain" | "principalStress" | "kc2" | "axialForce" | "ruptured" | "displacement" | "reaction" | "deformation" | "force" | "velocity" | "acceleration" | "endForce" | "load" | "memberForce";
 
 /**
  * What a [`RecorderSpec::EmbeddedBar`] reads.

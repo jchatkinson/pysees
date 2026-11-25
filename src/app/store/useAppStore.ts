@@ -24,7 +24,7 @@ import type { ViewMode } from '@/app/lib/editor/viewSlice'
 import type { DrawTemplate } from '@/app/lib/editor/properties'
 
 export type EditDialogKind = 'move' | 'copy' | 'mirror' | 'divide' | 'nodalLoad' | 'memberLoad'
-export type ToolId = 'select' | 'frame' | 'quickBeam' | 'quickColumn' | 'shell' | 'studWall' | 'support'
+export type ToolId = 'select' | 'frame' | 'quickBeam' | 'quickColumn' | 'shell' | 'studWall' | 'floor' | 'support'
 
 /** Suits both forces and displacements in most structural problems. */
 export const DEFAULT_ZERO_TOLERANCE = 1e-6
@@ -238,6 +238,9 @@ export interface AppStore {
   /** What the stud-wall tool draws (Carapace-only): a layout recipe and hold-down material. */
   wallTemplate: StudWallTemplate | null
   setWallTemplate: (t: StudWallTemplate | null) => void
+  /** What the floor tool draws (a joist floor's framing). */
+  floorTemplate: import('@/app/lib/floors').JoistFloorArgs | null
+  setFloorTemplate: (t: import('@/app/lib/floors').JoistFloorArgs | null) => void
   /** In a plan, draw tools place the same members on every story (ETABS "All Stories") instead of only the shown one. */
   drawAllStories: boolean
   setDrawAllStories: (on: boolean) => void
@@ -508,7 +511,7 @@ export const useAppStore = create<AppStore>((set, get) => {
       nextGridlineId: gridlines.reduce((max, g) => Math.max(max, g.id + 1), 1),
       levels,
       nextLevelId: levels.reduce((max, l) => Math.max(max, l.id + 1), 1),
-      selectedModelEntity: null, selectedNodeIds: [], selectedElementIds: [], viewMode: { kind: '3d' }, isolated: null, activeTool: 'select', drawTemplate: null, shellTemplate: null, wallTemplate: null,
+      selectedModelEntity: null, selectedNodeIds: [], selectedElementIds: [], viewMode: { kind: '3d' }, isolated: null, activeTool: 'select', drawTemplate: null, shellTemplate: null, wallTemplate: null, floorTemplate: null,
       selectedAnalysisIndex: null,
       analysisInsertionIndex: null,
       resultsView: DEFAULT_RESULTS_VIEW,
@@ -542,7 +545,7 @@ export const useAppStore = create<AppStore>((set, get) => {
       hiddenLoadPatterns: project.display.hiddenLoadPatterns,
       resultsView: { ...DEFAULT_RESULTS_VIEW, ...keep<ResultsView>(project.display.resultsView, RESULTS_PREF_KEYS) },
       plotView: { ...DEFAULT_PLOT_VIEW, ...keep<PlotView>(project.display.plotView, PLOT_PREF_KEYS) },
-      selectedModelEntity: null, selectedAnalysisIndex: null, analysisInsertionIndex: null, selectedNodeIds: [], selectedElementIds: [], viewMode: { kind: '3d' }, isolated: null, activeTool: 'select', drawTemplate: null, shellTemplate: null, wallTemplate: null, nodePickMode: 'none', pendingNodePick: null,
+      selectedModelEntity: null, selectedAnalysisIndex: null, analysisInsertionIndex: null, selectedNodeIds: [], selectedElementIds: [], viewMode: { kind: '3d' }, isolated: null, activeTool: 'select', drawTemplate: null, shellTemplate: null, wallTemplate: null, floorTemplate: null, nodePickMode: 'none', pendingNodePick: null,
       results: null, projectFileName: fileName ?? s.projectFileName,
     }))
   },
@@ -562,7 +565,7 @@ export const useAppStore = create<AppStore>((set, get) => {
       selectedModelEntity: null,
       selectedAnalysisIndex: null,
       analysisInsertionIndex: null,
-      selectedNodeIds: [], selectedElementIds: [], viewMode: { kind: '3d' }, isolated: null, activeTool: 'select', drawTemplate: null, shellTemplate: null, wallTemplate: null,
+      selectedNodeIds: [], selectedElementIds: [], viewMode: { kind: '3d' }, isolated: null, activeTool: 'select', drawTemplate: null, shellTemplate: null, wallTemplate: null, floorTemplate: null,
       nodePickMode: 'none',
       pendingNodePick: null,
       results: null,
@@ -734,6 +737,8 @@ export const useAppStore = create<AppStore>((set, get) => {
   setShellTemplate: (shellTemplate) => set({ shellTemplate }),
   wallTemplate: null,
   setWallTemplate: (wallTemplate) => set({ wallTemplate }),
+  floorTemplate: null,
+  setFloorTemplate: (floorTemplate) => set({ floorTemplate }),
   setShellDivisions: (shellDivisions) => set({ shellDivisions: Math.max(1, Math.min(50, Math.round(shellDivisions) || 1)) }),
   setDrawAllStories: (drawAllStories) => set({ drawAllStories }),
   toolInput: '',
