@@ -3,6 +3,7 @@
 // that doc's delivery plan: exercised here with synthetic blocks, not yet wired to a real
 // analysis worker.
 import type { ModalStageResult, JointDisplacementRow, RecorderKind, RunExtents, RecorderMetadata, ResultBlock, ResultSample, RunMetadata, RunStatus, StageMetadata } from '@/app/types/resultsStorage'
+import { recorderTagOf } from './recorderRows'
 
 const DB_NAME = 'pysees-results'
 // v2: responseBlocks dropped recorderId from its key — one dense row per chunk covering every
@@ -259,7 +260,7 @@ export async function queryJointDisplacements(runId: string, kind: RecorderKind 
             stageIndex: block.stageIndex,
             step,
             pseudoTime,
-            node: recorder.recorderId.replace(/^[a-z]+:/, ''),
+            node: recorderTagOf(recorder.recorderId),
             components: Array.from(view.subarray(offset + nodeOffset, offset + nodeOffset + recorder.componentLayout.length)),
           })
         }

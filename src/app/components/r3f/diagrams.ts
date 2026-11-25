@@ -139,5 +139,51 @@ export function fillDiagram(index: SceneIndex, layout: RunLayout, row: Float64Ar
     labels.push({ position: off(base(n), values[n]) as [number, number, number], value: values[n] })
   })
 
+  // Stud walls, in their own plane (offset along the wall), from each pier's recorded results:
+  //   axial:  the chord (end-post) forces, tension positive, as a bar up each end post offset into the pier;
+  //   shear:  the pier shear q × width, constant up the pier's centre line;
+  //   moment: the in-plane pier moment, linear from its base to its top value.
+  // Carapace records chord forces at the base, so axial bars are constant over the height. Out-of-plane kinds (Vz, My, T) don't apply.
+  if (kind === 'axial' || kind === 'shear' || kind === 'moment') for (const w of index.wallPiers) {
+    const entry = layout.columns.studWall.get(index.elementIds[w.e])
+    if (!entry) continue
+    const get = (q: string) => { const k = entry.labels.indexOf(`p${w.pier}.${q}`); return k < 0 ? NaN : row[entry.offset + k] }
+    const [r0, r1, r2, r3] = w.corners.map((r) => r * 3)
+    const len = Math.hypot(c[r1] - c[r0], c[r1 + 1] - c[r0 + 1], c[r1 + 2] - c[r0 + 2]) || 1
+    const ex = [0, 1, 2].map((i) => (c[r1 + i] - c[r0 + i]) / len)
+    // A bar at fraction u of the length from its bottom to its top value, offset along the wall by value (`side` flips it); `inward`
+    // draws |value| on that side whatever the sign (the colour still carries it).
+    const bar = (u: number, bottomValue: number, topValue: number, side: 1 | -1, inward = false) => {
+      if (!Number.isFinite(bottomValue) || !Number.isFinite(topValue) || fv + 36 > out.fill.length || lv + 18 > out.lines.length) return
+      const at = (rA: number, rB: number) => [0, 1, 2].map((i) => c[rA + i] + u * (c[rB + i] - c[rA + i]))
+      const bottom = at(r0, r1), top = at(r3, r2)
+      const off = (p: number[], v: number) => p.map((x, i) => x + ex[i] * side * (inward ? Math.abs(v) : v) * scale)
+      const ob = off(bottom, bottomValue), ot = off(top, topValue)
+      if (bottomValue * topValue >= 0) {
+        const rgb = bottomValue + topValue >= 0 ? POSITIVE_RGB : NEGATIVE_RGB
+        vertex(bottom, rgb); vertex(ob, rgb); vertex(top, rgb)
+        vertex(ob, rgb); vertex(ot, rgb); vertex(top, rgb)
+      } else {
+        const t = bottomValue / (bottomValue - topValue), cz = bottom.map((x, i) => x + t * (top[i] - x))
+        vertex(bottom, bottomValue >= 0 ? POSITIVE_RGB : NEGATIVE_RGB); vertex(ob, bottomValue >= 0 ? POSITIVE_RGB : NEGATIVE_RGB); vertex(cz, bottomValue >= 0 ? POSITIVE_RGB : NEGATIVE_RGB)
+        vertex(cz, topValue >= 0 ? POSITIVE_RGB : NEGATIVE_RGB); vertex(ot, topValue >= 0 ? POSITIVE_RGB : NEGATIVE_RGB); vertex(top, topValue >= 0 ? POSITIVE_RGB : NEGATIVE_RGB)
+      }
+      segment(bottom, ob); segment(ob, ot); segment(ot, top)
+      labels.push({ position: ob as [number, number, number], value: bottomValue })
+      if (topValue !== bottomValue) labels.push({ position: ot as [number, number, number], value: topValue })
+    }
+    const mid = (w.u0 + w.u1) / 2
+    if (kind === 'axial') {
+      // Tension or compression, the bar points into the pier; its colour carries the sign.
+      bar(w.u0, get('chordLeft'), get('chordLeft'), 1, true)
+      bar(w.u1, get('chordRight'), get('chordRight'), -1, true)
+    } else if (kind === 'shear') {
+      const v = get('q') * w.width
+      bar(mid, v, v, 1)
+    } else {
+      bar(mid, get('momentBase'), get('momentTop'), 1)
+    }
+  }
+
   return { fillVertices: fv / 3, lineSegments: lv / 6, labels }
 }

@@ -11,6 +11,10 @@ import { assignDiaphragms } from '@/app/lib/editor/edit'
 import { compileInputV1 } from '@/app/lib/carapace/compileInputV1'
 import { exportScript } from '@/app/lib/exportScript'
 import { serializeProject } from '@/app/lib/project/serialize'
+import { buildSceneIndex } from '@/app/components/r3f/sceneIndex'
+import { fillDiagram } from '@/app/components/r3f/diagrams'
+import { createExtremaAccumulator } from '@/app/lib/resultsExtrema'
+import type { RunLayout } from '@/app/lib/resultsStorage/stepFrames'
 import { applyFraming, guessFraming, lumberScale } from '@/app/lib/lumber'
 import { parseProject } from '@/app/lib/project/parse'
 import { captureProject } from '@/app/lib/project/types'
@@ -282,6 +286,55 @@ describe('stud-wall building template', () => {
     expect(shear('S1 left') + shear('S1 right') + shear('S1 mid')).toBeCloseTo(p.lateralShear, 0)
     expect(shear('S1 mid')).toBeGreaterThan(0.25 * p.lateralShear)
     expect(shear('S2 mid')).toBeGreaterThan(0.25 * shear('S1 mid'))
+  })
+
+  // The template records the whole model, so a run has a deformed shape, reactions and link forces to show (stud walls add their own resultants).
+  it('records displacements, reactions and forces in the template run', () => {
+    const { model, history } = make({ storeys: 2 })
+    expect(history.commands[0]).toMatchObject({ blockId: 'whole-model-recorder' })
+    const run = runCarapace(model, history)
+    expect(run.error).toBeFalsy()
+    expect(run.compile.diagnostics.filter((d) => d.severity !== 'info')).toEqual([])
+    const kinds = new Set(run.compile.recorderPlans.map((p) => p.kind))
+    for (const k of ['disp', 'reaction', 'force', 'studWall'] as const) expect(kinds.has(k), k).toBe(true)
+    const roof = Math.max(...[...model.nodes.values()].map((n) => n.coords[2]))
+    const top = run.compile.recorderPlans.find((p) => p.kind === 'disp' && model.nodes.get(p.targetTag)!.coords[2] === roof)!
+    expect(Math.abs(run.columns[top.columnOffset + top.componentLayout.indexOf('dz')].at(-1)!)).toBeGreaterThan(0)
+    // Every wall's base rides on the floor below: tied nodes move together in both plan directions (no wall left behind out of plane).
+    const disp = (n: number, l: string) => { const p = run.compile.recorderPlans.find((q) => q.kind === 'disp' && q.targetTag === n)!; return run.columns[p.columnOffset + p.componentLayout.indexOf(l)].at(-1)! }
+    const ties = [...model.mpConstraints.values()].filter((c) => c.kind === 'equalDOF')
+    expect(ties.length).toBeGreaterThan(0)
+    for (const c of ties) {
+      expect(c.args.dofs).toEqual([1, 2])
+      for (const l of ['dx', 'dy']) expect(disp(Number(c.args.cNodeTag), l)).toBeCloseTo(disp(Number(c.args.rNodeTag), l), 9)
+    }
+    // The axial diagram draws each pier's chord force on its wall, labelled with the recorded value.
+    const index = buildSceneIndex(model.nodes, model.elements, model.geomTransfs, 3)
+    expect(index.wallPiers.length).toBe([...model.elements.values()].filter((e) => e.eleType === 'studWall').reduce((n, e) => n + wallPiers(studWallArgs(e.args).layout).length, 0))
+    const row = Float64Array.from(run.columns.map((col) => col.at(-1)!))
+    const studWall = new Map(run.compile.recorderPlans.filter((p) => p.kind === 'studWall').map((p) => [p.targetTag, { offset: p.columnOffset, labels: p.componentLayout }]))
+    const layout = { columns: { disp: new Map(), vel: new Map(), accel: new Map(), reaction: new Map(), force: new Map(), shell: new Map(), studWall } } as unknown as RunLayout
+    const n = index.segmentCount * 18
+    const out = { fill: new Float32Array(n), fillColor: new Float32Array(n), lines: new Float32Array((index.segmentCount + 2 * index.elementIds.length) * 6) }
+    const w = index.wallPiers[0], plan = studWall.get(index.elementIds[w.e])!
+    const v = (q: string) => row[plan.offset + plan.labels.indexOf(`p${w.pier}.${q}`)]
+    const axial = fillDiagram(index, layout, row, 'axial', 1e-3, out)
+    expect(axial.fillVertices).toBe(2 * 6 * index.wallPiers.length)
+    expect(axial.labels.slice(0, 2).map((l) => l.value)).toEqual([v('chordLeft'), v('chordRight')])
+    // Shear: q × width per pier; moment: base to top.
+    const shear = fillDiagram(index, layout, row, 'shear', 1e-3, out)
+    expect(shear.labels[0].value).toBeCloseTo(v('q') * w.width, 6)
+    const moment = fillDiagram(index, layout, row, 'moment', 1e-6, out)
+    expect(moment.labels[0].value).toBe(v('momentBase'))
+    expect(moment.fillVertices).toBeGreaterThan(0)
+    expect(fillDiagram(index, layout, row, 'torsion', 1e-3, out).fillVertices).toBe(0)
+    // The extrema box reads the same pier values.
+    const acc = createExtremaAccumulator(index, layout, 'axial', 'mxx' as never)
+    acc.add({ step: 9, pseudoTime: 1, row })
+    const chords = index.wallPiers.flatMap((p) => { const pl = studWall.get(index.elementIds[p.e])!; return ['chordLeft', 'chordRight'].map((q) => row[pl.offset + pl.labels.indexOf(`p${p.pier}.${q}`)]) })
+    expect(acc.result()!.max.value).toBe(Math.max(...chords))
+    // Without a recorder block the compiler says why nothing shows.
+    expect(runCarapace(model, { commands: history.commands.slice(1), cursor: history.commands.length - 2 }).compile.diagnostics).toEqual(expect.arrayContaining([expect.objectContaining({ severity: 'warning', message: expect.stringContaining('Whole Model Recorder') })]))
   })
 
   // Lumber framing: sizes set the EAs on rebuild, and the framing survives a saved project.

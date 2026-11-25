@@ -1,6 +1,6 @@
-import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef } from 'react'
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useThree } from '@react-three/fiber'
-import { OrbitControls, OrthographicCamera } from '@react-three/drei'
+import { OrbitControls } from '@react-three/drei'
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib'
 import { Box3, MOUSE, OrthographicCamera as OrthographicCameraImpl, PerspectiveCamera, Vector3 } from 'three'
 import { useAppStore } from '@/app/store/useAppStore'
@@ -60,7 +60,6 @@ export const ViewportScene = forwardRef<ViewportSceneRef, object>(function Viewp
   // Displaced shapes stay as lines; the extruded members are the undeformed model.
   const deformedShown = useAppStore((s) => (s.resultsView.type === 'deformed' || s.resultsView.type === 'mode' || (s.resultsView.type === 'contour' && s.resultsView.contourDeformed)) && s.resultsView.runId !== null)
   const showReactions = useAppStore((s) => s.resultsView.showReactions && s.resultsView.runId !== null)
-  const clearSceneSelection = useAppStore((s) => s.clearSceneSelection)
 
   const controlsRef = useRef<OrbitControlsImpl | null>(null)
   const { camera, size, invalidate } = useThree()
@@ -105,6 +104,25 @@ export const ViewportScene = forwardRef<ViewportSceneRef, object>(function Viewp
   const isOrtho = mode.kind !== '3d' || orthographic
   const view = useMemo(() => viewCamera(mode, gridlines, ndm), [mode, gridlines, ndm])
   const viewKey = `${JSON.stringify(mode)}|${isOrtho}`
+  // The default camera, set here rather than by drei's <OrthographicCamera makeDefault>, which on unmount restores whichever camera
+  // was the default when it rendered (after plan → 3D ortho → perspective, that was the plan camera, +Y up). The Canvas's own
+  // perspective camera is kept for 3D; each orthographic view gets a fresh camera built with its own up (OrbitControls reads `up`
+  // once, when it is created for a camera).
+  const setThree = useThree((s) => s.set)
+  const [perspective] = useState(() => camera)
+  const orthoUp = (view?.up ?? (ndm === 3 ? [0, 0, 1] : [0, 1, 0])).join(',')
+  const ortho = useMemo(() => {
+    if (!isOrtho) return null
+    const c = new OrthographicCameraImpl()
+    c.up.set(...(orthoUp.split(',').map(Number) as [number, number, number]))
+    return Object.assign(c, { manual: true }) // R3F leaves a manual camera's frustum to us (below)
+    // viewKey: a new camera for every view.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOrtho, orthoUp, viewKey])
+  useLayoutEffect(() => {
+    if (ortho) { Object.assign(ortho, { left: size.width / -2, right: size.width / 2, top: size.height / 2, bottom: size.height / -2 }); ortho.updateProjectionMatrix() }
+    setThree({ camera: ortho ?? perspective })
+  }, [ortho, perspective, size, setThree])
 
   // Expose selectInRect to the parent (Viewport.tsx) via ref
   useImperativeHandle(ref, () => ({
@@ -260,7 +278,6 @@ export const ViewportScene = forwardRef<ViewportSceneRef, object>(function Viewp
   return (
     <>
       <SceneHelpers showGrid={viewSettings.showGrid} ndm={model.config?.ndm ?? 3} />
-      {isOrtho && <OrthographicCamera key={`camera|${viewKey}`} makeDefault up={view?.up ?? (ndm === 3 ? [0, 0, 1] : [0, 1, 0])} />}
       <GridlinesLayer
         gridlines={gridlines}
         showGridlines={viewSettings.showGridlines}
@@ -328,13 +345,6 @@ export const ViewportScene = forwardRef<ViewportSceneRef, object>(function Viewp
         minDistance={0.5}
         maxDistance={maxDistance}
       />
-      {/* Deselect all when clicking empty canvas space (only when not in a pick mode) */}
-      <mesh
-        visible={false}
-        onClick={() => { if (nodePickMode === 'none') clearSceneSelection() }}
-      >
-        <planeGeometry args={[10000, 10000]} />
-      </mesh>
     </>
   )
 })

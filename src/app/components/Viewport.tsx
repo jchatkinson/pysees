@@ -114,6 +114,8 @@ export function Viewport() {
           gl={{ antialias: true }}
           // Draw only when something changed (camera, store, results); an idle model costs nothing.
           frameloop="demand"
+          // A click that hits nothing pickable clears the selection, in any view (an invisible catcher plane can't face every camera).
+          onPointerMissed={(e) => { if (e.type !== 'click') return; const s = useAppStore.getState(); if (s.nodePickMode === 'none') s.clearSceneSelection() }}
           // A lost GL context (driver reset, too many contexts) shows a notice; when the browser restores it, rebuild the scene.
           onCreated={({ gl }) => {
             // Only the live canvas counts: a replaced one is force-lost as it unmounts.

@@ -4,6 +4,7 @@ import { shellFrame } from '@/app/lib/shells'
 import { isShell } from '@/app/lib/commands/tables'
 import { toVec3 } from './utils'
 import { isStudWall, studWallArgs } from '@/app/lib/studWalls'
+import { wallPiers } from '@/app/lib/studBuilding'
 import { diaphragmArgs, diaphragmOutline, isDiaphragm } from '@/app/lib/diaphragms'
 
 /** A diaphragm's four corner nodes, counter-clockwise. */
@@ -54,6 +55,9 @@ export interface SceneIndex {
   /** Per element: first segment index in the line buffer (`segmentsFor` its kind per span); `elementSegmentStart[elementIds.length]` is the total. */
   elementSegmentStart: Uint32Array
   segmentCount: number
+  /** Stud-wall piers, which carry the wall's recorded forces (`p<pier>.<quantity>` columns): the wall's element row, its corner node rows
+   * (bottom start, bottom end, top end, top start), the pier's ends as fractions of the wall length, its width (model length) and number. */
+  wallPiers: { e: number; corners: [number, number, number, number]; u0: number; u1: number; width: number; pier: number }[]
 }
 
 /** Line spans of an element: a chain of `n - 1`, or for a shell the closed outline of `n`. */
@@ -83,6 +87,7 @@ export function buildSceneIndex(
   const drawn = new Set<number>()
   const edge = (a: number, b: number) => Math.min(a, b) * nodeIds.length + Math.max(a, b)
   let segmentCount = 0
+  const wallPierList: SceneIndex['wallPiers'] = []
   for (const el of [...elements.values()].sort((a, b) => a.id - b.id)) {
     const wall = isStudWall(el.eleType), diaphragm = isDiaphragm(el.eleType)
     const outline = wall ? wallOutline(el) : diaphragm ? diaphragmOutline(el.nodes, diaphragmArgs(el.args).layout) : el.nodes
@@ -104,11 +109,16 @@ export function buildSceneIndex(
       mine.push(span)
     }
     spans.push(mine)
+    if (wall) {
+      const { layout } = studWallArgs(el.args)
+      const corners = el.nodes.slice(0, 4).map((id) => nodeIndex.get(id)!) as [number, number, number, number]
+      if (layout?.length > 0) wallPiers(layout).forEach((p, i) => wallPierList.push({ e: elementIds.length - 1, corners, u0: p.start / layout.length, u1: p.end / layout.length, width: p.width, pier: i + 1 }))
+    }
     segmentCount += mine.length * segmentsFor(kind)
   }
   starts.push(segmentCount)
 
-  return hideFromDevTools({ ndm, nodeIds, nodeIndex, nodeCoords, elementIds, elementNodes, elementKind, elementFrames: Float32Array.from(frames), elementSpans: spans, segmentsPerSpan: SEGMENTS_PER_SPAN, elementSegmentStart: Uint32Array.from(starts), segmentCount })
+  return hideFromDevTools({ ndm, nodeIds, nodeIndex, nodeCoords, elementIds, elementNodes, elementKind, elementFrames: Float32Array.from(frames), elementSpans: spans, segmentsPerSpan: SEGMENTS_PER_SPAN, elementSegmentStart: Uint32Array.from(starts), segmentCount, wallPiers: wallPierList })
 }
 
 /**

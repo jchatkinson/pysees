@@ -59,6 +59,14 @@ export function createExtremaAccumulator(index: SceneIndex, layout: RunLayout, t
             }
           }
         })
+        // Stud-wall piers, as the diagrams draw them: chord forces, pier shear q × width, pier moments at base and top.
+        if (type === 'axial' || type === 'shear' || type === 'moment') for (const w of index.wallPiers) {
+          const id = index.elementIds[w.e], entry = layout.columns.studWall.get(id)
+          if (!entry) continue
+          const get = (q: string) => { const k = entry.labels.indexOf(`p${w.pier}.${q}`); return k < 0 ? NaN : row[entry.offset + k] }
+          const values = type === 'axial' ? [get('chordLeft'), get('chordRight')] : type === 'shear' ? [get('q') * w.width] : [get('momentBase'), get('momentTop')]
+          for (const v of values) observe(v, frame, 'Element', id)
+        }
       }
     },
     result: () => extrema,

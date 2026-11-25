@@ -50,6 +50,8 @@ export function modelMetrics(model: Model): ModelMetrics {
   return { ndm: model.config?.ndm === 3 ? 3 : 2, diagonal, trussOnly }
 }
 
+const WALL_PEAKS = { axial: /chord(Left|Right)$/, shear: /^shear$/, moment: /moment(Base|Top)$/ }
+
 /** Scale (world units per result unit) that draws the run's peak value at a readable size. */
 export function autoScale(key: Exclude<ScaleKey, 'mode'>, extents: RunExtents | null, metrics: ModelMetrics): number {
   const { kind, labels } = PEAK_LABELS[metrics.ndm][key]
@@ -58,6 +60,10 @@ export function autoScale(key: Exclude<ScaleKey, 'mode'>, extents: RunExtents | 
     const globals = metrics.ndm === 3 ? ['Fxi', 'Fyi', 'Fzi'] : ['Vi', 'Vj']
     peak = Math.hypot(peak, ...globals.map((l) => extents?.force[l] ?? 0))
   }
+  // Stud-wall chord forces draw in the axial view too.
+  // Stud-wall piers draw in the axial (chord forces), shear (bounded by the wall's base shear) and moment views.
+  const wall = WALL_PEAKS[key as keyof typeof WALL_PEAKS]
+  if (wall) peak = Math.max(peak, ...Object.entries(extents?.studWall ?? {}).filter(([l]) => wall.test(l)).map(([, v]) => Math.abs(v)))
   const reference = key === 'deformed' ? metrics.diagonal * DEFORMED_FRACTION : metrics.diagonal * DIAGRAM_FRACTION
   return peak > 0 && reference > 0 ? reference / peak : 1
 }

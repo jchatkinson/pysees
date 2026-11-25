@@ -69,7 +69,10 @@ export function expansionToModel(input: WasmInput, map: Expansion['map'], p: Stu
   let mpId = 0
   const eq = input.equalDofs
   eq?.retained.forEach((r, row) => {
-    const dofs = eq.dofs.filter(([i]) => i === row).map(([, d]) => d + 1)
+    let dofs = eq.dofs.filter(([i]) => i === row).map(([, d]) => d + 1)
+    // A wall's bottom sits on the floor below: tie both plan translations, not just the one along the wall. The other has no stiffness
+    // in the wall, so the results don't change, but untied Carapace leaves it at zero and the deformed wall's base stays behind.
+    if (dofs.length === 1 && (dofs[0] === 1 || dofs[0] === 2)) dofs = [1, 2]
     writes.push({ kind: 'mpConstraint', entity: { id: ++mpId, kind: 'equalDOF', args: { rNodeTag: nodeId(r), cNodeTag: nodeId(eq.constrained[row]), dofs } } })
   })
   const rd = input.rigidDiaphragms
@@ -108,7 +111,8 @@ export function expansionToModel(input: WasmInput, map: Expansion['map'], p: Stu
     writes.push({ kind: 'patternChild', patternId: pattern + 1, child: { kind: 'floorLoad', args: args as unknown as Record<string, unknown> } })
   }
 
-  const analysisCommands: AnalysisCommand[] = [{ type: 'ANALYSIS_BLOCK', blockId: 'run-gravity-analysis', params: { patterns: patternIds, steps: p.steps, holdLoads: 'Yes', algorithm: 'Newton', tol: 1e-7, maxIter: 100 } }]
+  // Record the whole model (displacements, reactions, element forces) as every template does, so the run has results to show.
+  const analysisCommands: AnalysisCommand[] = [{ type: 'ANALYSIS_BLOCK', blockId: 'whole-model-recorder', params: { directory: 'out' } }, { type: 'ANALYSIS_BLOCK', blockId: 'run-gravity-analysis', params: { patterns: patternIds, steps: p.steps, holdLoads: 'Yes', algorithm: 'Newton', tol: 1e-7, maxIter: 100 } }]
   const storey = p.wallHeight + p.floorDepth
   const levels: LevelEntity[] = Array.from({ length: p.storeys }, (_, i) => ({ id: i + 1, label: i === p.storeys - 1 ? 'Roof' : `Floor ${i + 2}`, height: storey * (i + 1) }))
   const gridlines: GridlineEntity[] = [
@@ -304,7 +308,7 @@ export function drawStudWall(batch: { model: Model; writeRaw: (w: ModelWrite) =>
   batch.writeRaw({ kind: 'element', entity: { id, eleType: 'studWall', nodes: [...corners, ...stationNodes], args: args as unknown as Record<string, unknown> } })
   if (t.anchorage === undefined || !batch.model.materials.has(t.anchorage)) return id
   const bottomAt = (x: number) => (x <= 1e-9 * L ? corners[0] : x >= L - 1e-9 * L ? corners[1] : stationNodes[stations.findIndex((s) => s.chord === 'bottom' && Math.abs(s.x - x) <= 1e-9 * L)])
-  const planDofs = [1, 2].filter((d) => Math.abs(ex[d - 1]) > 1e-9)
+  const planDofs = [1, 2] // both plan translations: the wall's base moves with the floor (see expansionToModel)
   let stiff: number | undefined
   for (const x of ends) {
     const node = bottomAt(x), p = at(x, z0)

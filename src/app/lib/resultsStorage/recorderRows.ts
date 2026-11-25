@@ -53,3 +53,7 @@ export function recorderRows(out: RecorderOutput, layout: RowLayout, stages: Sta
   }
   return { stageIndex, count, data }
 }
+
+/** The target tag in a stored recorder id (`recorderIdFor`): a bare node tag for displacements, else `<kind>:<tag>`, where the kind may be
+ * camel-cased (`studWall:5`). */
+export const recorderTagOf = (recorderId: string) => recorderId.replace(/^[A-Za-z]+:/, '')

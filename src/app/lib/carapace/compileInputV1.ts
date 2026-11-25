@@ -559,13 +559,15 @@ export function compileInputV1(model: Model, analysisHistory: AnalysisHistory): 
   const nodeBulk = (quantity: W.BulkQuantity, kind: RecorderPlanKind, tags: number[], labels: string[]) =>
     bulk({ table: 'nodes', quantity, rows: tags.map((tag) => resolveNode(tag, `${kind} recorder for node ${tag}`)) }, tags.map((tag) => plan(kind, tag, labels)), dofsPerNode)
   nodeBulk('displacement', 'disp', recordedNodeTags, dispLabels)
+  if (stages.length && !recordedNodeTags.length) diagnostics.push({ severity: 'warning', message: 'The analysis records no node displacements, so there is no deformed shape or result diagram to show. Add a "Whole Model Recorder" block before the analysis.', commandIndex: -1 })
   // Only supported nodes (an sp/fix constraint) carry a reaction; elsewhere it is just a free DOF's residual.
   nodeBulk('reaction', 'reaction', recordedReactionTags.filter((tag) => model.fixes.get(tag)?.dofs.length), reactionLabels)
   // Per element table: rows and first columns of the end forces, of the loads (loaded frame elements, right after their end forces) and of shell resultants.
   const groups = new Map<W.ElementKind, Record<'force' | 'load' | 'shell', { rows: number[]; at: number[] }>>()
   const group = (kind: W.ElementKind) => groups.get(kind) ?? groups.set(kind, { force: { rows: [], at: [] }, load: { rows: [], at: [] }, shell: { rows: [], at: [] } }).get(kind)!
-  // An element the compiler skipped already produced its own "not yet supported" warning.
-  const recordedRefs = recordedElementTags.flatMap((tag) => { const ref = elementRefs.get(tag); return ref ? [{ tag, ...ref }] : [] })
+  // An element the compiler skipped already produced its own "not yet supported" warning. Stud walls and diaphragms have no end forces
+  // (walls record their own resultants below).
+  const recordedRefs = recordedElementTags.flatMap((tag) => { const ref = elementRefs.get(tag); return ref && ref.kind !== 'studWall' && ref.kind !== 'diaphragm' ? [{ tag, ...ref }] : [] })
   for (const { tag, kind, index } of recordedRefs) {
     const loaded = loadedElementTags.has(tag) && kind !== 'shell3' && kind !== 'shell4'
     const labels = forceLabels(kind)
