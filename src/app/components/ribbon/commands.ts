@@ -2,7 +2,7 @@ import type { LucideIcon } from 'lucide-react'
 import {
   Undo2, Redo2, SquareDashedMousePointer, SquareDashed, Grid3x3, Ruler, ZoomIn, ZoomOut, Maximize2, CircleDot, Minus, Anchor, ArrowDown, ArrowDownToLine, Hash, Tag, Tags,
   Grid2x2, Layers, Rows3, Box, LayoutGrid, Building2, Square, ChevronUp, ChevronDown, Ghost, CircleOff, Spline, MoveHorizontal, Activity, RotateCw, Waves, Palette,
-  BarChart3, ChartLine, Sigma, Trash2, Layers3, Cuboid, SquareStack, Focus, Eye, Command, Move, Copy, FlipHorizontal2, Scissors, Merge, ArrowDownToDot, ArrowDownWideNarrow, MousePointer2, PenLine, GripHorizontal, Columns2,
+  BarChart3, ChartLine, Sigma, Trash2, Layers3, Cuboid, SquareStack, Focus, Eye, Command, Move, Copy, FlipHorizontal2, Scissors, Merge, ArrowDownToDot, ArrowDownWideNarrow, MousePointer2, PenLine, GripHorizontal, Columns2, BrickWall,
 } from 'lucide-react'
 import { useAppStore, type AppStore } from '@/app/store/useAppStore'
 import { stepView, validViewMode } from '@/app/lib/editor/viewCamera'
@@ -102,6 +102,7 @@ export const COMMANDS = {
   toolColumn: tool('quickColumn', 'Columns', Columns2, 'Quick columns: click a grid intersection (plan) or a bay (elevation)', (s) => quickOk(s, 'quickColumn')),
   drawAllStories: { id: 'drawAllStories', label: 'All stories', icon: Layers3, tip: 'Draw on every story at once (plan views)', visible: only3d, isActive: (s) => s.drawAllStories, run: (s) => s.setDrawAllStories(!s.drawAllStories) },
   toolShell: tool('shell', 'Shells', SquareStack, 'Shells: click a grid cell in a plan (floor) or a panel in an elevation (wall)', (s) => only3d(s) && s.gridlines.length > 0 && (currentView(s).kind === 'plan' || (currentView(s).kind === 'elevation' && (currentView(s) as { gridId: number | null }).gridId !== null))),
+  toolStudWall: tool('studWall', 'Stud wall', BrickWall, 'Stud walls (Carapace-only): click points in a plan; each wall spans the story below', (s) => only3d(s) && currentView(s).kind === 'plan' && (currentView(s) as { level: number }).level >= 0),
   toolSupport: tool('support', 'Support', Anchor, 'Assign a support to the clicked node'),
   view3d: { id: 'view3d', label: '3D', icon: Box, tip: '3D view', isActive: (s) => currentView(s).kind === '3d', run: (s) => s.setViewMode({ kind: '3d' }) },
   viewPlan: {
@@ -161,7 +162,7 @@ export const RIBBON_TABS: RibbonTabDef[] = [
   { id: 'file', label: 'File', groups: [{ label: 'Project', custom: 'file' }] },
   { id: 'model', label: 'Model', groups: [
     { label: 'History', commands: ['undo', 'redo'] },
-    { label: 'Draw', commands: ['toolSelect', 'toolFrame', 'toolBeam', 'toolColumn', 'toolShell', 'toolSupport', 'drawAllStories'] },
+    { label: 'Draw', commands: ['toolSelect', 'toolFrame', 'toolBeam', 'toolColumn', 'toolShell', 'toolStudWall', 'toolSupport', 'drawAllStories'] },
     { label: 'View', commands: ['view3d', 'viewPlan', 'viewElevation', 'showExtruded'], custom: 'stories' },
     { label: 'Select', commands: ['selectAll', 'clearSelection', 'deleteSelection'] },
     { label: 'Define', commands: ['gridsLevels', 'units'] },

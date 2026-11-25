@@ -7,10 +7,11 @@ import { compileAnalysisSequence, type CompileDiagnostic } from '@/app/lib/compi
 import { orientProblem, readOrient } from '@/app/lib/orient'
 import { withLumpedBeamMass } from '@/app/lib/beamMass'
 import { pathSeries } from '@/app/lib/groundMotion'
-import { eleLoadKind } from '@/app/lib/shells'
+import { eleLoadKind, wallLoadSpec } from '@/app/lib/shells'
+import { diaphragmArgs, isDiaphragm } from '@/app/lib/diaphragms'
 import { isShell } from '@/app/lib/commands/tables'
 import { studWallRecorders } from '@/app/lib/studBuilding'
-import { isStudWall, studWallArgs, type FloorLoadArgs } from '@/app/lib/studWalls'
+import { isStudWall, studWallArgs, studWallFrame, studWallLayoutProblems, unanchoredPierEnds, type FloorLoadArgs } from '@/app/lib/studWalls'
 import { rowLayout, type RowLayout } from '@/app/lib/resultsStorage/recorderRows'
 
 export interface CompileInputV1Result {
@@ -189,6 +190,7 @@ export function compileInputV1(model: Model, analysisHistory: AnalysisHistory): 
   const shell3s: W.Shell3Table = { nodeIds: [], section: [] }
   const shell4s: W.Shell4Table = { nodeIds: [], section: [] }
   const studWalls: W.StudWallTable = []
+  const diaphragms: W.DiaphragmSpec[] = []
   const resolveSection = (secTag: number, context: string): number => {
     const idx = sectionIndex.get(secTag)
     if (idx === undefined) {
@@ -316,7 +318,20 @@ export function compileInputV1(model: Model, analysisHistory: AnalysisHistory): 
       const ctx = `Stud wall ${ele.id}`
       const row = compileStudWall(ele, ndm, (id) => resolveNode(id, ctx), diagnostics)
       if (!row) continue
+      const frame = studWallFrame(model, ele)
+      if (frame) for (const p of studWallLayoutProblems(row.layout, frame.L)) diagnostics.push({ severity: 'error', message: `${ctx}: ${p}`, commandIndex: -1 })
+      const free = unanchoredPierEnds(model, ele)
+      if (free.length) diagnostics.push({ severity: 'warning', message: `${ctx}: no hold-down at pier end${free.length > 1 ? 's' : ''} x = ${free.map((x) => Number(x.toPrecision(6))).join(', ')} (nothing but the wall uses the bottom node there)`, commandIndex: -1 })
       elementRefs.set(ele.id, { kind: 'studWall', index: studWalls.push(row) - 1 })
+    } else if (isDiaphragm(ele.eleType)) {
+      const ctx = `Diaphragm ${ele.id}`
+      const { layout } = diaphragmArgs(ele.args)
+      const nu = layout?.u?.length ?? 0, nv = layout?.v?.length ?? 0
+      if (ndm !== 3) { diagnostics.push({ severity: 'error', message: `${ctx}: diaphragms need a 3D model`, commandIndex: -1 }); continue }
+      if (nu < 2 || nv < 2 || ele.nodes.length !== nu * nv || layout.bays.length !== (nu - 1) * (nv - 1) || layout.eaU.length !== nv || layout.eaV.length !== nu) {
+        diagnostics.push({ severity: 'error', message: `${ctx}: its layout does not match its ${ele.nodes.length} nodes`, commandIndex: -1 }); continue
+      }
+      elementRefs.set(ele.id, { kind: 'diaphragm', index: diaphragms.push({ nodes: ele.nodes.map((id) => resolveNode(id, ctx)), layout: { u: layout.u, v: layout.v, level: layout.level, bays: layout.bays.map((b) => b ?? undefined), eaU: layout.eaU, eaV: layout.eaV } }) - 1 })
     } else if (ele.eleType === 'zeroLengthSection') {
       const secIdx = resolveSection(Number(ele.args.secTag), `ZeroLengthSection ${ele.id}`)
       zeroLengthSections.nodeI.push(resolveNode(ele.nodes[0], `ZeroLengthSection ${ele.id}`))
@@ -414,6 +429,16 @@ export function compileInputV1(model: Model, analysisHistory: AnalysisHistory): 
       if (child.kind !== 'eleLoad') continue
       const a = child.args as { eleTags?: number[]; wx?: number; wy?: number; wz?: number; pressure?: number; bx?: number; by?: number; bz?: number }
       const loadKind = eleLoadKind(child.args)
+      if (loadKind === 'wall') {
+        // Carapace groups a pattern's wall loads on one wall into one load case of that wall.
+        const load: W.ElementLoadSpec = { kind: 'wallLoad', load: wallLoadSpec(child.args) }
+        for (const tag of a.eleTags ?? []) {
+          const ref = elementRefs.get(tag)
+          if (ref?.kind !== 'studWall') { diagnostics.push({ severity: 'error', message: `Wall load in pattern ${id}: element ${tag} is not a stud wall`, commandIndex: -1 }); continue }
+          elementLoads.pattern.push(pIdx); elementLoads.elementKind.push('studWall'); elementLoads.elementIndex.push(ref.index); elementLoads.load.push(load); elementLoads.stage.push(stage)
+        }
+        continue
+      }
       if (loadKind !== 'beam') {
         const spec: W.ElementLoadSpec = loadKind === 'pressure' ? { kind: 'shellPressure', pressure: Number(a.pressure) || 0 } : { kind: 'shellBody', bx: Number(a.bx) || 0, by: Number(a.by) || 0, bz: Number(a.bz) || 0 }
         for (const tag of a.eleTags ?? []) {
@@ -592,6 +617,7 @@ export function compileInputV1(model: Model, analysisHistory: AnalysisHistory): 
     nodalLoads,
     elementLoads,
     ...(studWalls.length ? { studWalls } : {}),
+    ...(diaphragms.length ? { diaphragms } : {}),
     ...(floorLoads.length ? { floorLoads } : {}),
     sequence: { stages, recorders },
   }

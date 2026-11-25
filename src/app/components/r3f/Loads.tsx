@@ -8,7 +8,7 @@ import { rampColor } from '@/app/lib/shellContour'
 import { useUnits } from '@/app/lib/units/useUnits'
 import { useAppStore } from '@/app/store/useAppStore'
 import { memberFrame } from '@/app/lib/memberFrame'
-import { eleLoadKind } from '@/app/lib/shells'
+import { eleLoadKind, wallLoadSpec } from '@/app/lib/shells'
 import { isShell } from '@/app/lib/commands/tables'
 import { areaLoadText, batchesLoads, formatLoadValue, patternColor, toVec3 } from './utils'
 import { worldUnitsPerPixel } from './screenScale'
@@ -230,6 +230,34 @@ export function LoadsLayer({ patterns, nodeMap, elementMap, geomTransfs, section
         return w.length() < 1e-12 ? [] : [{ pid: p.id, a, b, w, label }]
       })
     })) : []
+    // Stud-wall loads (Carapace-only) sit on the wall's top row: a line load as a member-load box (drawn at its mean), a point as an arrow.
+    const wallPoints: (NodalArrow & { color: string })[] = []
+    if (showElement) for (const p of visible) for (const c of p.children) {
+      if (c.kind !== 'eleLoad' || eleLoadKind(c.args) !== 'wall') continue
+      const w = wallLoadSpec(c.args)
+      for (const tag of (c.args.eleTags as number[] | undefined) ?? []) {
+        const ele = elementMap.get(tag)
+        const [p0, p1, , p3] = (ele?.nodes.slice(0, 4) ?? []).map((n) => nodeMap.get(n))
+        if (!p0 || !p1 || !p3) continue
+        const o = new Vector3(...toVec3(p0.coords)), ex = new Vector3(...toVec3(p1.coords)).sub(o), ey = new Vector3(...toVec3(p3.coords)).sub(o)
+        const L = ex.length()
+        if (L < 1e-12) continue
+        ex.normalize()
+        const top = (x: number) => o.clone().add(ey).addScaledVector(ex, x)
+        const vec = (along: number, up: number) => ex.clone().multiplyScalar(along).addScaledVector(ey.clone().normalize(), up)
+        if (w.kind === 'topPoint') {
+          const dir = vec(w.fx, w.fy)
+          if (dir.length() < 1e-12) continue
+          const label = showValues ? [['fx', w.fx], ['fy', w.fy]].filter(([, v]) => v).map(([n, v]) => `${n}: ${formatLoadValue(Number(v))}`).join('  ') : undefined
+          wallPoints.push({ at: top(w.x).toArray(), dir: dir.toArray(), label, color: colorOf(p.id) })
+        } else {
+          const mean = vec((w.wx0 + w.wx1) / 2, (w.wy0 + w.wy1) / 2)
+          if (mean.length() < 1e-12 || w.x1 === w.x0) continue
+          const range = (n: string, a: number, b: number) => (a || b ? `${n}: ${formatLoadValue(a)}${a === b ? '' : ` → ${formatLoadValue(b)}`}` : '')
+          memberLoads.push({ pid: p.id, a: top(w.x0), b: top(w.x1), w: mean, label: [range('wx', w.wx0, w.wx1), range('wy', w.wy0, w.wy1)].filter(Boolean).join('  ') })
+        }
+      }
+    }
     const maxW = memberLoads.reduce((m, l) => Math.max(m, l.w.length()), 0)
     const ratioFor = (l: MemberLoad) => Math.max(MIN_LEN_RATIO, l.w.length() / maxW)
     const refPoint = new Vector3()
@@ -248,7 +276,8 @@ export function LoadsLayer({ patterns, nodeMap, elementMap, geomTransfs, section
     if (memberLoads.length) for (const e of elementMap.values()) {
       if (isShell(e.eleType)) continue
       const n1 = nodeMap.get(e.nodes[0]), n2 = nodeMap.get(e.nodes[1])
-      if (n1 && n2) minLen = Math.min(minLen, Math.hypot(...[0, 1, 2].map((k) => (n2.coords[k] ?? 0) - (n1.coords[k] ?? 0))))
+      const d = n1 && n2 ? Math.hypot(...[0, 1, 2].map((k) => (n2.coords[k] ?? 0) - (n1.coords[k] ?? 0))) : 0
+      if (d > 1e-12) minLen = Math.min(minLen, d) // zero-length springs would collapse every box
     }
     const maxUnit = Number.isFinite(minLen) && stacked > 0 ? (MAX_STACK_FRACTION * minLen) / stacked : Infinity
 
@@ -263,6 +292,7 @@ export function LoadsLayer({ patterns, nodeMap, elementMap, geomTransfs, section
       nodal.push({ at: toVec3(node.coords), dir: [v[0] ?? 0, v[1] ?? 0, v[2] ?? 0], label, color: colorOf(p.id) })
     }
 
+    nodal.push(...wallPoints)
     // Past GLYPH_LIMIT arrows the value labels are dropped (the viewport names them as hidden).
     if (batchesLoads(nodal.length)) for (const n of nodal) n.label = undefined
     const colors = [...new Set([...memberLoads.map((l) => colorOf(l.pid)), ...nodal.map((n) => n.color)])]

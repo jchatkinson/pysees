@@ -1,6 +1,8 @@
 import type { ElementEntity, LoadAssignment, Model } from '@/app/types/model'
 import type { Call } from '@/app/lib/commands/tokens'
 import { isStudWall, studWallArgs, type FloorLoadArgs } from '@/app/lib/studWalls'
+import { wallLoadSpec } from '@/app/lib/shells'
+import { diaphragmArgs, isDiaphragm } from '@/app/lib/diaphragms'
 
 // Stud walls and floor loads are Carapace-only. OpenSees export approximates them (docs/editor-plan.md, section 5):
 // - each wall is a mesh of ShellMITC4s with an ElasticMembranePlateSection whose shear stiffness matches the sheathing
@@ -33,7 +35,7 @@ function topNodes(e: ElementEntity, L: number): { x: number; node: number }[] {
 }
 
 export interface StudWallExport {
-  /** Per stud-wall element id: the section, extra nodes and shells that stand in for it. */
+  /** Per stud-wall or diaphragm element id: the section, extra nodes and shells that stand in for it. */
   walls: Map<number, Call[]>
   /** Per node: DOFs (1-based) to fix because nothing stiffens them in the shell model. */
   fixes: Map<number, number[]>
@@ -42,7 +44,8 @@ export interface StudWallExport {
 /** The OpenSees stand-in for every stud wall in the model, or `null` when it has none. Tags continue after the model's own. */
 export function studWallExport(model: Model): StudWallExport | null {
   const walls = [...model.elements.values()].filter((e) => isStudWall(e.eleType)).sort((a, b) => a.id - b.id)
-  if (!walls.length) return null
+  const diaphragms = [...model.elements.values()].filter((e) => isDiaphragm(e.eleType)).sort((a, b) => a.id - b.id)
+  if (!walls.length && !diaphragms.length) return null
   let nodeTag = Math.max(0, ...model.nodes.keys()), eleTag = Math.max(0, ...model.elements.keys()), secTag = Math.max(0, ...model.sections.keys())
   const out: StudWallExport = { walls: new Map(), fixes: new Map() }
   const stiff = new Map<number, Set<number>>() // node -> DOFs some element stiffens
@@ -81,10 +84,34 @@ export function studWallExport(model: Model): StudWallExport | null {
     }
     out.walls.set(e.id, calls)
   }
+  // A flexible diaphragm: one ShellMITC4 per sheathed bay on its own grid nodes, the membrane matching the bay's shear stiffness.
+  for (const e of diaphragms) {
+    const { layout } = diaphragmArgs(e.args)
+    const nu = layout.u.length, nv = layout.v.length
+    const span = Math.min(...layout.u.slice(1).map((x, i) => x - layout.u[i]), ...layout.v.slice(1).map((y, j) => y - layout.v[j]))
+    const t = span / 20
+    const sections = new Map<string, number>()
+    const calls: Call[] = []
+    for (let j = 0; j + 1 < nv; j++) for (let i = 0; i + 1 < nu; i++) {
+      const law = layout.bays[i + j * (nu - 1)]
+      if (!law) continue
+      const ga = law.kind === 'linear' ? law.ga : law.bv
+      let sec = sections.get(String(ga))
+      if (sec === undefined) {
+        sec = ++secTag; sections.set(String(ga), sec)
+        const E = 2 * (1 + NU) * ga / t
+        calls.push({ fn: 'section', args: ['ElasticMembranePlateSection', sec, round(E), NU, round(t), 0], comment: `WARNING: flexible diaphragm ${e.id} is Carapace-only; exported as elastic shells matching the sheathing shear stiffness (G t = ${round(ga)}). Chord axial stiffness, nail slip and openings' framing are not represented.` })
+      }
+      const quad = [e.nodes[i + j * nu], e.nodes[i + 1 + j * nu], e.nodes[i + 1 + (j + 1) * nu], e.nodes[i + (j + 1) * nu]]
+      quad.forEach((n) => mark(n, [1, 2, 3, 4, 5, 6]))
+      calls.push({ fn: 'element', args: ['ShellMITC4', ++eleTag, ...quad, sec] })
+    }
+    out.walls.set(e.id, calls)
+  }
   // What else stiffens a node: other elements on all their DOFs (zero-lengths only on their directions), and constraints, which make a
   // constrained DOF follow its retained node (both ends count as stiffened, as the tie carries the stiffness across).
   for (const e of model.elements.values()) {
-    if (isStudWall(e.eleType)) continue
+    if (isStudWall(e.eleType) || isDiaphragm(e.eleType)) continue
     const dofs = e.eleType === 'zeroLength' && Array.isArray(e.args.dir) ? (e.args.dir as number[]).map(Number) : [1, 2, 3, 4, 5, 6]
     e.nodes.forEach((n) => mark(n, dofs))
   }
@@ -100,6 +127,55 @@ export function studWallExport(model: Model): StudWallExport | null {
     if (free.length && free.length < 6) out.fixes.set(id, free)
   }
   return out
+}
+
+/** Spreads a load on a wall's top row onto its top nodes (linear hat functions between them): a point at `x0` (`x1` null) of local
+ * components `w0` (along, up), or a line load from `x0` to `x1` varying linearly from `w0` to `w1` per unit length. */
+function spreadOnTop(model: Model, e: ElementEntity, add: (node: number, v: V3) => void, x0: number, x1: number | null, w0: [number, number], w1: [number, number]) {
+  const f = wallFrame(model, e)
+  if (!f) return
+  const glob = (w: [number, number]): V3 => [0, 1, 2].map((k) => f.ex[k] * w[0] + f.ey[k] * w[1]) as V3
+  const tops = topNodes(e, f.L)
+  if (x1 === null) {
+    for (let k = 0; k + 1 < tops.length; k++) {
+      const p = tops[k], n = tops[k + 1], dx = n.x - p.x
+      if (dx <= 0 || x0 < p.x || x0 > n.x) continue
+      const r = (x0 - p.x) / dx, g = glob(w0)
+      add(p.node, g.map((v) => v * (1 - r)) as V3); add(n.node, g.map((v) => v * r) as V3)
+      return
+    }
+    return
+  }
+  const xa = Math.min(x0, x1), xb = Math.max(x0, x1)
+  const w = (x: number): [number, number] => { const r = x1 === x0 ? 0 : (x - x0) / (x1 - x0); return [w0[0] + (w1[0] - w0[0]) * r, w0[1] + (w1[1] - w0[1]) * r] }
+  for (let k = 0; k + 1 < tops.length; k++) {
+    const p = tops[k], n = tops[k + 1], dx = n.x - p.x
+    const u = Math.max(xa, p.x), v = Math.min(xb, n.x)
+    if (dx <= 0 || v <= u) continue
+    // Two-point Gauss: exact for a linear load times a linear shape function.
+    for (const s of [-1, 1]) {
+      const x = (u + v) / 2 + s * (v - u) / (2 * Math.sqrt(3)), r = (x - p.x) / dx, g = glob(w(x)).map((c) => c * (v - u) / 2) as V3
+      add(p.node, g.map((c) => c * (1 - r)) as V3); add(n.node, g.map((c) => c * r) as V3)
+    }
+  }
+}
+
+/** A Carapace-only wall load (`eleLoad` of a wall type) as nodal loads on each wall's top nodes. */
+export function wallLoadNodal(model: Model, child: LoadAssignment): Call[] {
+  const a = child.args as { eleTags?: number[] }
+  const w = wallLoadSpec(child.args)
+  const ndf = model.config?.ndf ?? 6
+  const forces = new Map<number, V3>()
+  const add = (node: number, v: V3) => { const f = forces.get(node) ?? [0, 0, 0]; forces.set(node, [f[0] + v[0], f[1] + v[1], f[2] + v[2]]) }
+  for (const tag of a.eleTags ?? []) {
+    const e = model.elements.get(tag)
+    if (!e || !isStudWall(e.eleType)) continue
+    if (w.kind === 'topPoint') spreadOnTop(model, e, add, w.x, null, [w.fx, w.fy], [w.fx, w.fy])
+    else spreadOnTop(model, e, add, w.x0, w.x1, [w.wx0, w.wy0], [w.wx1, w.wy1])
+  }
+  const calls: Call[] = [...forces].sort(([p], [q]) => p - q).map(([node, v]) => ({ fn: 'load', args: [node, ...Array.from({ length: ndf }, (_, i) => (i < Math.min(3, ndf) ? round(v[i]) : 0))] }))
+  if (calls.length) calls[0].comment = `WARNING: Carapace-only wall load (${w.kind === 'topPoint' ? 'top point' : 'top line'}) on wall${(a.eleTags ?? []).length > 1 ? 's' : ''} ${(a.eleTags ?? []).join(', ')} written as nodal loads on the top nodes.`
+  return calls
 }
 
 /** A floor load's reactions as nodal loads on its support walls' top nodes, in the floor's pattern. One-way spans between the supports
@@ -135,31 +211,14 @@ export function floorLoadNodal(model: Model, child: LoadAssignment): Call[] {
     }
     return out
   }
-  // A load along a support's line (per unit t over [t0, t1], or a point at t) onto that wall's top nodes (hat functions).
+  // A load along a support's line (per unit t over [t0, t1], or a point at t) onto that wall's top nodes.
   const onWall = (sup: FloorLoadArgs['supports'][number], q: number, t0: number, t1: number, point = false) => {
     const e = model.elements.get(sup.wall)
-    const f = e && wallFrame(model, e)
-    if (!e || !f) return
+    if (!e) return
     const lo = Math.max(t0, sup.t0), hi = Math.min(t1, sup.t1)
     if (point ? t0 < sup.t0 || t0 > sup.t1 : hi <= lo) return
     const toX = (t: number) => sup.xAtT0 + (sup.reversed ? -1 : 1) * (t - sup.t0)
-    const down = f.ey.map((v) => -v) as V3
-    const tops = topNodes(e, f.L)
-    const xa = Math.min(toX(lo), toX(hi)), xb = Math.max(toX(lo), toX(hi))
-    for (let k = 0; k + 1 < tops.length; k++) {
-      const p = tops[k], n = tops[k + 1], dx = n.x - p.x
-      if (dx <= 0) continue
-      if (point) {
-        if (xa < p.x || xa > n.x) continue
-        const r = (xa - p.x) / dx
-        add(p.node, down.map((v) => v * q * (1 - r)) as V3); add(n.node, down.map((v) => v * q * r) as V3)
-        return
-      }
-      const u = Math.max(xa, p.x), v = Math.min(xb, n.x)
-      if (v <= u) continue
-      const toN = q * ((v - p.x) ** 2 - (u - p.x) ** 2) / (2 * dx)
-      add(n.node, down.map((c) => c * toN) as V3); add(p.node, down.map((c) => c * (q * (v - u) - toN)) as V3)
-    }
+    spreadOnTop(model, e, add, toX(lo), point ? null : toX(hi), [0, -q], [0, -q])
   }
   const [b0, b1, b2, b3] = a.bounds
   for (const load of a.loads) {

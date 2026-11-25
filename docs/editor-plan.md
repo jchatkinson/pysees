@@ -165,11 +165,30 @@ done. PySees status:
   the studs; anchorage → `Elastic` (tension / initial bearing stiffness); a floor load → its one-way reactions as nodal loads on the support
   walls' top nodes; DOFs nothing stiffens in the shell model are fixed. Project files keep the authored items in generated blocks.
 - Constraints (`equalDOF` / `rigidDiaphragm`) compile through the mpConstraints work, and exports with constraints use `constraints('Transformation')`; the exported building runs in real OpenSees (`studBuilding.test.ts`).
-- **Not yet:** a wall layout editor and drawing tool, flexible-diaphragm elements (`diaphragms` table; the template's flexible option
-  works because the expansion loads the walls directly), `wallLoad` element loads.
 - Since then: studs and openings (outline and diagonals, to the head height) draw on the wall face, placed bilinearly between the corners
   so they follow the deformed shape (`r3f/WallDetail.tsx`); the plot picker has a Stud wall quantity (base shear / axial / moment and
   pier quantities, by element id) and a "Stud wall base shear" preset.
+- **Done (P1–P3 complete):**
+  - **Wall loads.** `eleLoad` types "Wall top point" / "Wall top line" (local x along the wall, y up; `wallLoadSpec` in `lib/shells.ts`)
+    compile to `wallLoad` element loads; OpenSees export spreads them onto the wall's top nodes (`wallLoadNodal`, generated block in projects);
+    drawn on the top row (line loads as boxes at their mean). The template keeps any `wallLoad` rows of the expansion.
+  - **Layout editor.** Selecting a wall opens `StudWallCard`: stud positions (or a regular spacing), stud / end-post EA, openings (door,
+    edges, head, header EI, jack EA), chords, sheathing law, floor-zone Ga and rim EA. Apply calls `rebuildStudWall`: top stations at every
+    stud and pier end, bottom stations at pier ends plus any existing one something else uses; stations at an unchanged x keep their node,
+    new ones get new nodes, dropped ones are deleted unless used elsewhere. Studs are added at opening edges. The compiler reports layout
+    problems (`studWallLayoutProblems`) as errors and pier ends without a hold-down (`unanchoredPierEnds`) as warnings.
+  - **Flexible diaphragms** (`lib/diaphragms.ts`, element `diaphragm`, Carapace's `diaphragms` table): the selection pane's Diaphragm
+    section assigns rigid or flexible per level. Flexible: a grid through every X and Y of the level's selected nodes (missing points get
+    new nodes with their out-of-plane DOFs fixed), one linear Ga for every bay, chord EA on the boundary lines and interior EA inside;
+    a selected node coincident with a grid node (another wall's corner) is tied to it by an X/Y `equalDOF`. A replaced rigid diaphragm's
+    master loads move onto the grid (`gridLoads`: forces bilinear, the moment as a corner couple). Drawn as a filled boundary; OpenSees
+    export writes one elastic `ShellMITC4` per bay (G t = Ga) with a warning. Remove drops the element, its ties and its unused grid nodes.
+  - **Drawing tool** (Draw → Stud wall, plan views): click points to draw walls spanning the story below the plan's level, of a wall
+    type taken from an existing wall (`studWallTemplateOf`) or entered as a new one (with a new `Anchorage` material). Each wall gets its
+    own nodes (`drawStudWall`); pier ends are held down to a stud wall's top node right below (anchorage zeroLength + equalDOF along the
+    wall) or, on the lowest level, to a new fixed ground node. New walls join a diaphragm when their top nodes are (re)assigned.
+- **Not yet:** per-bay sheathing / openings in the flexible diaphragm form; drawing openings directly; an edit that also moves a rigid
+  master's loads when a rigid diaphragm is re-assigned (the selection pane builds a new master).
 
 ## 6. Phasing
 
@@ -188,7 +207,7 @@ done. PySees status:
    merge coincident nodes; nodal and uniform member loads assigned to a Plain pattern; shell tool (plan cells / elevation panels meshed
    into divisions, new elastic plate sections). Rigid diaphragms: the selection pane assigns one per level (3D), retained at a
    centroid node with its out-of-plane DOFs fixed, skipping nodes supported in plane; constraints draw as light spokes with the supports. Select-by lists beyond the selection pane's "by property" are not done.
-6. **Stud walls as elements** (section 5).
+6. **Stud walls as elements** (done; section 5).
 7. **Polish** (partly done): command palette (Ctrl/⌘+K, header search) and "Isolate" / "Show all" (show selection only, filtered like
    plans so hidden objects can't be picked) instead of a clipping section box. Not done: extruded deformed shape, end releases.
 8. **Performance audit** (first pass done). Measured on a 15-story 8×8-bay frame (1296 nodes, 3375 elements, a load on every beam):

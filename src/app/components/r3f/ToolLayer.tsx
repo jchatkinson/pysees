@@ -12,6 +12,7 @@ import { templateKey, templateOf } from '@/app/lib/editor/properties'
 import { bayAt, bayLines, cellAt, meshQuad, gridPoints, inGridSlab, pickSnap, snapPoints, workElevations, type Screen, type SnapPoint } from '@/app/lib/editor/snap'
 import { levelElevations } from '@/app/lib/levels'
 import { ScreenSize } from './ScreenSize'
+import { drawStudWall } from '@/app/lib/studWalls'
 
 const SNAP_PX = 12
 type Hover = { point: P3 | null; snap: SnapPoint | null; bay: [P3, P3] | null; cell?: P3[] | null }
@@ -139,13 +140,19 @@ export function ToolLayer({ mode, nodes, elements, ndm }: { mode: ViewMode; node
         if (cell && t) commit((b, at) => { for (const q of meshQuad(cell, s.shellDivisions, s.shellDivisions)) b.shell(t, q.map(at)) })
         return
       }
-      if (!template) return
-      if (tool === 'quickBeam' || tool === 'quickColumn') { const bay = h.bay; if (bay) commit((b, at) => { b.member(template, at(bay[0]), at(bay[1]), transfType()) }); return }
+      if (!template && tool !== 'studWall') return
+      if (template && (tool === 'quickBeam' || tool === 'quickColumn')) { const bay = h.bay; if (bay) commit((b, at) => { b.member(template, at(bay[0]), at(bay[1]), transfType()) }); return }
       if (!h.point) return
       place(h.point)
     }
     const place = (p: P3) => {
-      if (start && template) { const a = start; commit((b, at) => { b.member(template, at(a), at(p), transfType()) }) }
+      if (start && tool === 'studWall') {
+        // A wall spans the shown story: from the level below (the base under the first story) up to the plan's level.
+        const s = useAppStore.getState(), t = s.wallTemplate, a = start
+        if (!t || mode.kind !== 'plan' || mode.level < 0) return
+        const below = [0, ...levelElevations(s.levels)][mode.level]
+        commit((b, at) => { const A = at(a), B = at(p); drawStudWall(b, A, B, at([a[0], a[1], below])[2], A[2], t) })
+      } else if (start && template) { const a = start; commit((b, at) => { b.member(template, at(a), at(p), transfType()) }) }
       setStart(p)
     }
     const onContext = (e: MouseEvent) => { if (start) { e.preventDefault(); setStart(null) } }
@@ -154,7 +161,7 @@ export function ToolLayer({ mode, nodes, elements, ndm }: { mode: ViewMode; node
       if (e.key === 'Shift') shift.current = e.type === 'keydown'
       if (e.type !== 'keydown' || shouldIgnoreHotkeys(e.target)) return
       const s = useAppStore.getState()
-      const typing = tool === 'frame' && start && !e.ctrlKey && !e.metaKey && !e.altKey
+      const typing = (tool === 'frame' || tool === 'studWall') && start && !e.ctrlKey && !e.metaKey && !e.altKey
       const consume = () => { e.preventDefault(); e.stopImmediatePropagation() }
       if (typing && /^[0-9.,'"a-zA-Z ]$/.test(e.key) && (s.toolInput !== '' || /[0-9.]/.test(e.key))) { consume(); s.setToolInput(s.toolInput + e.key); return }
       if (typing && e.key === 'Backspace' && s.toolInput) { consume(); s.setToolInput(s.toolInput.slice(0, -1)); return }

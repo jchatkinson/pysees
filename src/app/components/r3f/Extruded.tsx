@@ -5,6 +5,9 @@ import { useAppStore } from '@/app/store/useAppStore'
 import type { ElementEntity, Model } from '@/app/types/model'
 import type { SectionOutline } from '@/app/lib/sections/types'
 import { memberShape, shellThickness } from '@/app/lib/editor/memberShape'
+import { framingUnit, wallFraming, type FramingPart } from '@/app/lib/editor/wallFraming'
+import { studWallArgs } from '@/app/lib/studWalls'
+import { guessFraming, lumberScale } from '@/app/lib/lumber'
 import type { SceneIndex } from './sceneIndex'
 
 const REAL = new Color('#94a3b8')
@@ -83,9 +86,60 @@ function ShellSlabs({ index, elements, model, selected, onPick }: { index: Scene
   return <mesh geometry={geometry} material={material} onClick={(e) => { if (e.faceIndex == null) return; e.stopPropagation(); onPick(owner[e.faceIndex], e.nativeEvent.shiftKey || e.nativeEvent.ctrlKey || e.nativeEvent.metaKey) }} />
 }
 
+const WOOD: Record<FramingPart, Color> = { stud: new Color('#d9bf91'), plate: new Color('#cfb07c'), header: new Color('#c49a5e'), rim: new Color('#c49a5e'), subfloor: new Color('#b98f55'), sheathing: new Color('#c8a463') }
+
+/** Stud walls as their framing (studs, plates, jacks, headers, sills, rim and subfloor) with the sheathing as a see-through skin over
+ * one face; one merged mesh for the lumber and one for the sheathing, picked per triangle. */
+function StudWalls({ index, elements, model, selected, onPick }: { index: SceneIndex; elements: Map<number, ElementEntity>; model: Model; selected: Set<number>; onPick: (id: number, additive: boolean) => void }) {
+  const meshes = useMemo(() => {
+    const solid = { pos: [] as number[], col: [] as number[], owner: [] as number[] }, skin = { pos: [] as number[], col: [] as number[], owner: [] as number[] }
+    const c = index.nodeCoords, at = (r: number) => [c[r * 3], c[r * 3 + 1], c[r * 3 + 2]]
+    index.elementIds.forEach((id, e) => {
+      if (index.elementKind[e] !== 'wall') return
+      const el = elements.get(id), rows = el?.nodes.slice(0, 4).map((n) => index.nodeIndex.get(n))
+      if (!el || !rows || rows.some((r) => r === undefined)) return
+      const [p0, p1, , p3] = (rows as number[]).map(at)
+      const dx = p1.map((v, k) => v - p0[k]), dy = p3.map((v, k) => v - p0[k]), L = Math.hypot(...dx), H = Math.hypot(...dy)
+      if (!(L > 0 && H > 0)) return
+      const ex = dx.map((v) => v / L), ey = dy.map((v) => v / H)
+      const ez = [ex[1] * ey[2] - ex[2] * ey[1], ex[2] * ey[0] - ex[0] * ey[2], ex[0] * ey[1] - ex[1] * ey[0]]
+      const { layout, framing } = studWallArgs(el.args)
+      const units = model.config?.units
+      const pick = selected.has(id)
+      for (const f of wallFraming(layout, L, H, framingUnit(units?.length, H), framing ?? guessFraming(layout, lumberScale(units, H), !units || !['in', 'ft'].includes(units.length)))) {
+        const buf = f.part === 'sheathing' ? skin : solid, col = pick ? SELECTED : WOOD[f.part]
+        const v = (x: number, y: number, z: number) => [0, 1, 2].map((k) => p0[k] + ex[k] * x + ey[k] * y + ez[k] * z)
+        const q = [0, 1, 2, 3, 4, 5, 6, 7].map((i) => v(i & 1 ? f.x1 : f.x0, i & 2 ? f.y1 : f.y0, i & 4 ? f.z1 : f.z0))
+        for (const [a, b, d, g] of [[0, 2, 3, 1], [4, 5, 7, 6], [0, 1, 5, 4], [2, 6, 7, 3], [0, 4, 6, 2], [1, 3, 7, 5]]) {
+          buf.pos.push(...q[a], ...q[b], ...q[d], ...q[a], ...q[d], ...q[g])
+          for (let k = 0; k < 6; k++) buf.col.push(col.r, col.g, col.b)
+          buf.owner.push(id, id)
+        }
+      }
+    })
+    return [solid, skin].map(({ pos, col, owner }) => {
+      const g = new BufferGeometry()
+      g.setAttribute('position', new BufferAttribute(new Float32Array(pos), 3))
+      g.setAttribute('color', new BufferAttribute(new Float32Array(col), 3))
+      g.computeVertexNormals()
+      return { geometry: g, owner }
+    })
+  }, [index, elements, model, selected])
+  const materials = useMemo(() => [new MeshStandardMaterial({ vertexColors: true, roughness: 0.9 }), new MeshStandardMaterial({ vertexColors: true, side: DoubleSide, transparent: true, opacity: 0.35, depthWrite: false, roughness: 0.95 })], [])
+  useEffect(() => () => { for (const m of meshes) m.geometry.dispose() }, [meshes])
+  useEffect(() => () => { for (const m of materials) m.dispose() }, [materials])
+  return (
+    <>
+      {meshes.map(({ geometry, owner }, i) => owner.length > 0 && (
+        <mesh key={i} geometry={geometry} material={materials[i]} renderOrder={i} onClick={(e) => { if (e.faceIndex == null) return; e.stopPropagation(); onPick(owner[e.faceIndex], e.nativeEvent.shiftKey || e.nativeEvent.ctrlKey || e.nativeEvent.metaKey) }} />
+      ))}
+    </>
+  )
+}
+
 /**
  * The extruded view: members drawn at their section's real outline (fiber sections) or a nominal square of their area (elastic members,
- * trusses), swept along their local axes; shells at their thickness. Fiber detail stays in the properties panel.
+ * trusses), swept along their local axes; shells at their thickness; stud walls as their framing. Fiber detail stays in the properties panel.
  */
 export function ExtrudedLayer({ index, elements }: { index: SceneIndex; elements: Map<number, ElementEntity> }) {
   const model = useAppStore((s) => s.model)
@@ -128,6 +182,7 @@ export function ExtrudedLayer({ index, elements }: { index: SceneIndex; elements
     <>
       {groups.map((g) => <MemberGroup key={g.key} group={g} material={material} selected={selected} onPick={selectElementFromScene} />)}
       <ShellSlabs index={index} elements={elements} model={model} selected={selected} onPick={selectElementFromScene} />
+      <StudWalls index={index} elements={elements} model={model} selected={selected} onPick={selectElementFromScene} />
     </>
   )
 }

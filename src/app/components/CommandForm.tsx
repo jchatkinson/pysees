@@ -23,7 +23,8 @@ import { ANALYSIS_BLOCKS, blockAsSchema } from '@/app/lib/analysisBlocks'
 import { useHotkeyRegistry } from '@/app/lib/hotkeys'
 import { SelectionPanel } from '@/app/components/SelectionPanel'
 import { MemberSectionCard } from '@/app/components/MemberSectionCard'
-import { AnchorageCard, StudWallCard } from '@/app/components/StudWallCard'
+import { AnchorageCard, DiaphragmCard, StudWallCard } from '@/app/components/StudWallCard'
+import { isDiaphragm } from '@/app/lib/diaphragms'
 import { isStudWall } from '@/app/lib/studWalls'
 import type { ElementEntity, MaterialEntity } from '@/app/types/model'
 import { CircleHelp } from 'lucide-react'
@@ -345,11 +346,12 @@ export function CommandForm() {
     const schema = fn ? getSchemaForFn(fn, ctx.ndm) : null
     const studWall = selectedModelEntity.kind === 'element' && isStudWall((entity as ElementEntity | undefined)?.eleType ?? '')
     const anchorage = selectedModelEntity.kind === 'material' && (entity as MaterialEntity | undefined)?.matType === 'Anchorage'
-    if (entity && (studWall || anchorage)) {
+    const diaphragm = selectedModelEntity.kind === 'element' && isDiaphragm((entity as ElementEntity | undefined)?.eleType ?? '')
+    if (entity && (studWall || anchorage || diaphragm)) {
       return (
         <div className="flex flex-col h-full min-h-0">
-          <div className="border-t p-3 grid gap-3">
-            {studWall ? <StudWallCard element={entity as ElementEntity} /> : <AnchorageCard material={entity as MaterialEntity} />}
+          <div className="border-t p-3 grid gap-3 flex-1 min-h-0 overflow-y-auto content-start">
+            {studWall ? <StudWallCard element={entity as ElementEntity} /> : diaphragm ? <DiaphragmCard element={entity as ElementEntity} /> : <AnchorageCard material={entity as MaterialEntity} />}
             <Button variant="destructive" size="sm" onClick={() => { setPendingModelDelete(selectedModelEntity); setDeleteDialogOpen(true) }}>Delete</Button>
           </div>
           <DeleteDialogs

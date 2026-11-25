@@ -6,10 +6,11 @@ import type { GeneratedArgDef } from '@/app/generated/commandSchemas.generated'
 import { domainForFn, PATTERN_CHILD_FNS, SECTION_CHILD_FNS, type CommandDomain } from '@/app/lib/commandDomain'
 import type { ModelWrite } from '@/app/lib/modelWrite'
 import { orientProblem } from '@/app/lib/orient'
+import { isStudWall } from '@/app/lib/studWalls'
 import { encodeArgs } from '@/app/lib/commands/grammar'
 import { elementArgs, elementByType, elementNodeCount, isShell } from '@/app/lib/commands/tables'
 import { pyLiteral } from '@/app/lib/commands/print'
-import { ELE_LOAD_TYPES, eleLoadKind } from '@/app/lib/shells'
+import { ELE_LOAD_TYPES, eleLoadKind, wallLoadArgs, wallLoadSpec } from '@/app/lib/shells'
 import { tagQuantities, USAGE_KEY, type MaterialUsage } from '@/app/lib/units/quantities'
 
 export type SchemaResult =
@@ -286,13 +287,28 @@ const PATTERN_CHILD_SCHEMAS: CommandSchema[] = [
           { kind: 'float', name: 'by', label: 'by (global Y)', defaultValue: 0 },
           { kind: 'float', name: 'bz', label: 'bz (global Z)', defaultValue: 0 },
         ],
+        [ELE_LOAD_TYPES[3]]: [
+          { kind: 'float', name: 'x', label: 'x (along the wall)', defaultValue: 0, description: 'Carapace-only stud-wall load on the top row, at wall-local x from the start corner.' },
+          { kind: 'float', name: 'fx', label: 'fx (along the wall)', defaultValue: 0 },
+          { kind: 'float', name: 'fy', label: 'fy (up the wall)', defaultValue: 0, description: 'Negative is down.' },
+        ],
+        [ELE_LOAD_TYPES[4]]: [
+          { kind: 'float', name: 'x0', label: 'x0', defaultValue: 0, description: 'Carapace-only stud-wall load along the top row from x0 to x1, varying linearly.' },
+          { kind: 'float', name: 'x1', label: 'x1', defaultValue: 0 },
+          { kind: 'float', name: 'wx0', label: 'wx at x0 (along)', defaultValue: 0 },
+          { kind: 'float', name: 'wx1', label: 'wx at x1 (along)', defaultValue: 0 },
+          { kind: 'float', name: 'wy0', label: 'wy at x0 (up)', defaultValue: 0, description: 'Negative is down.' },
+          { kind: 'float', name: 'wy1', label: 'wy at x1 (up)', defaultValue: 0 },
+        ],
       } },
     ],
     optional: [],
     create: (values) => {
       const loadType = String(values.loadType ?? ELE_LOAD_TYPES[0])
       const eleTags = ints(values.eleTags)
-      const args: Record<string, unknown> = loadType === ELE_LOAD_TYPES[1]
+      const args: Record<string, unknown> = loadType === ELE_LOAD_TYPES[3] || loadType === ELE_LOAD_TYPES[4]
+        ? wallLoadArgs(eleTags, wallLoadSpec({ ...values, loadType }))
+        : loadType === ELE_LOAD_TYPES[1]
         ? { eleTags, loadType, pressure: num(values.pressure) }
         : loadType === ELE_LOAD_TYPES[2]
           ? { eleTags, loadType, bx: num(values.bx), by: num(values.by), bz: num(values.bz) }
@@ -639,9 +655,10 @@ export function validateSchemaResult(result: SchemaResult, model: Model, ctx: Sc
   if (write.kind === 'fix' && !model.nodes.has(write.entity.nodeId)) return `Node ${write.entity.nodeId} does not exist.`
   if (write.kind === 'mass' && !model.nodes.has(write.entity.nodeId)) return `Node ${write.entity.nodeId} does not exist.`
   if (write.kind === 'element') {
-    // A stud wall (Carapace-only) connects its 4 corners and one node per chord station.
+    // A stud wall (Carapace-only) connects its 4 corners and one node per chord station; a flexible diaphragm every grid point.
     const stations = write.entity.eleType === 'studWall' ? (write.entity.args.stations as unknown[] | undefined) : undefined
-    const count = stations ? 4 + stations.length : elementNodeCount(elementByType(write.entity.eleType))
+    const grid = write.entity.eleType === 'diaphragm' ? (write.entity.args.layout as { u?: unknown[]; v?: unknown[] } | undefined) : undefined
+    const count = stations ? 4 + stations.length : grid ? (grid.u?.length ?? 0) * (grid.v?.length ?? 0) : elementNodeCount(elementByType(write.entity.eleType))
     if (write.entity.nodes.length !== count) return `${write.entity.eleType} connects ${count} nodes.`
     if (new Set(write.entity.nodes).size !== count) return 'Element nodes must be distinct.'
     if (isShell(write.entity.eleType)) {
@@ -676,8 +693,11 @@ export function validateSchemaResult(result: SchemaResult, model: Model, ctx: Sc
     const tags = (write.child.args.eleTags as number[] | undefined) ?? []
     const missing = tags.find((tag) => !model.elements.has(tag))
     if (missing !== undefined) return `Element ${missing} does not exist.`
+    const kind = eleLoadKind(write.child.args)
+    const walls = tags.filter((tag) => isStudWall(model.elements.get(tag)!.eleType)).length
+    if (kind === 'wall' ? walls < tags.length : walls > 0) return kind === 'wall' ? 'Wall loads apply to stud walls only.' : 'Stud walls take wall loads (Wall top point / Wall top line) only.'
     const shells = tags.filter((tag) => isShell(model.elements.get(tag)!.eleType)).length
-    if (eleLoadKind(write.child.args) === 'beam' ? shells > 0 : shells < tags.length) return eleLoadKind(write.child.args) === 'beam' ? 'A uniform beam load does not apply to shell elements.' : 'Shell pressure and self-weight apply to shell elements only.'
+    if (kind !== 'wall' && (kind === 'beam' ? shells > 0 : shells < tags.length)) return kind === 'beam' ? 'A uniform beam load does not apply to shell elements.' : 'Shell pressure and self-weight apply to shell elements only.'
   }
   if (write.kind === 'sectionChild' && !model.sections.has(write.sectionId)) return `Section ${write.sectionId} does not exist.`
   // Fibers, patches, layers and trusses take stress-strain laws; a force-deformation (spring) material never mixes in.

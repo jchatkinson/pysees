@@ -30,7 +30,7 @@ export function shellAreaLoads(patterns: PatternEntity[], hiddenPatterns: number
     for (const c of p.children) {
       if (c.kind !== 'eleLoad') continue
       const kind = eleLoadKind(c.args)
-      if (kind === 'beam') continue
+      if (kind !== 'pressure' && kind !== 'selfWeight') continue
       const a = c.args as { eleTags?: number[]; pressure?: number; bx?: number; by?: number; bz?: number }
       for (const tag of a.eleTags ?? []) {
         const ele = elements.get(tag)

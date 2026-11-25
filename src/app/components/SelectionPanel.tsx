@@ -6,6 +6,9 @@ import { deleteEntity } from '@/app/lib/modelWrite'
 import { deriveProperties, templateKey, templateOf } from '@/app/lib/editor/properties'
 import { DrawBatch, isFrameTemplate, supportDofs, transfTypeFor } from '@/app/lib/editor/draw'
 import { assignDiaphragms, removeDiaphragms } from '@/app/lib/editor/edit'
+import { assignFlexibleDiaphragms, isDiaphragm, removeFlexibleDiaphragms } from '@/app/lib/diaphragms'
+import { Input } from '@/app/components/ui/input'
+import { useUnits } from '@/app/lib/units/useUnits'
 
 const Section = ({ title, children }: { title: string; children: React.ReactNode }) => (
   <div className="grid gap-1.5 border-b px-3 py-2">
@@ -25,6 +28,7 @@ export function SelectionPanel() {
   const setSceneSelection = useAppStore((s) => s.setSceneSelection)
   const writeModelEntities = useAppStore((s) => s.writeModelEntities)
   const editModel = useAppStore((s) => s.editModel)
+  const units = useUnits()
   const deleteSelection = useAppStore((s) => s.deleteSelection)
   const clear = useAppStore((s) => s.clearSceneSelection)
   const [assignKey, setAssignKey] = useState('')
@@ -56,9 +60,21 @@ export function SelectionPanel() {
     const ids = new Set(nodeIds)
     return [...model.mpConstraints.values()].filter((c) => c.kind === 'rigidDiaphragm' && [c.args.rNodeTag, ...((c.args.cNodeTags as unknown[]) ?? [])].some((n) => ids.has(Number(n)))).length
   }, [model, nodeIds])
+  const inFlexible = useMemo(() => [...model.elements.values()].filter((e) => isDiaphragm(e.eleType) && e.nodes.some((n) => nodeIds.includes(n))).length, [model, nodeIds])
   const [diaphragmNote, setDiaphragmNote] = useState('')
+  const [diaphragmKind, setDiaphragmKind] = useState<'rigid' | 'flexible'>('rigid')
+  const [flex, setFlex] = useState({ ga: '', chordEa: '', interiorEa: '' })
+  const flexValues = { ga: units.parse('forcePerLength', flex.ga), chordEa: units.parse('force', flex.chordEa), interiorEa: units.parse('force', flex.interiorEa) }
+  const flexOk = (flexValues.ga ?? 0) > 0 && (flexValues.chordEa ?? -1) >= 0 && (flexValues.interiorEa ?? -1) >= 0
   const addDiaphragms = () => {
-    const r = assignDiaphragms(model, nodeIds)
+    if (diaphragmKind === 'flexible') {
+      if (!flexOk) return
+      const r = assignFlexibleDiaphragms(model, nodeIds, { law: { kind: 'linear', ga: flexValues.ga! }, chordEa: flexValues.chordEa!, interiorEa: flexValues.interiorEa! })
+      editModel(() => r.model)
+      setDiaphragmNote(`${r.diaphragms} flexible diaphragm${r.diaphragms === 1 ? '' : 's'} assigned${r.skipped ? `; ${r.skipped} node${r.skipped === 1 ? '' : 's'} left out (a level needs two distinct X and Y)` : ''}. Carapace-only.`)
+      return
+    }
+    const r = assignDiaphragms(removeFlexibleDiaphragms(model, nodeIds), nodeIds)
     editModel(() => r.model)
     setDiaphragmNote(`${r.diaphragms} diaphragm${r.diaphragms === 1 ? '' : 's'} assigned${r.skipped ? `; ${r.skipped} node${r.skipped === 1 ? '' : 's'} left out (supported in plane, or alone on a level)` : ''}.`)
   }
@@ -110,10 +126,24 @@ export function SelectionPanel() {
         </Section>
       )}
       {ndm === 3 && nodeIds.length > 1 && (
-        <Section title={`Rigid diaphragm${inDiaphragm ? ` (${inDiaphragm} touched)` : ''}`}>
+        <Section title={`Diaphragm${inDiaphragm + inFlexible ? ` (${inDiaphragm + inFlexible} touched)` : ''}`}>
+          <Select items={[{ value: 'rigid', label: 'Rigid (constraint)' }, { value: 'flexible', label: 'Flexible (Carapace-only)' }]} value={diaphragmKind} onValueChange={(v) => v && setDiaphragmKind(v as typeof diaphragmKind)}>
+            <SelectTrigger size="sm" className="h-7 w-full text-xs"><SelectValue /></SelectTrigger>
+            <SelectContent><SelectItem value="rigid">Rigid (constraint)</SelectItem><SelectItem value="flexible">Flexible (Carapace-only)</SelectItem></SelectContent>
+          </Select>
+          {diaphragmKind === 'flexible' && (
+            <div className="grid grid-cols-3 gap-1">
+              {([['ga', 'Sheathing Ga', 'forcePerLength'], ['chordEa', 'Chord EA', 'force'], ['interiorEa', 'Interior EA', 'force']] as const).map(([k, label, cat]) => (
+                <label key={k} className="grid gap-0.5"><span className="text-[11px] text-muted-foreground">{label}</span>
+                  <Input className="h-6 text-xs" value={flex[k]} placeholder={units.active ? units.symbol(cat) : ''} onChange={(e) => setFlex({ ...flex, [k]: e.target.value })} />
+                </label>
+              ))}
+            </div>
+          )}
           <div className="flex gap-1">
-            <Button size="sm" className="h-7 flex-1 text-xs" title="One diaphragm per level, retained at the centroid of that level's selected nodes" onClick={addDiaphragms}>Assign per level</Button>
-            <Button size="sm" variant="outline" className="h-7 text-xs" disabled={!inDiaphragm} onClick={() => { editModel((m) => removeDiaphragms(m, nodeIds)); setDiaphragmNote('') }}>Remove</Button>
+            <Button size="sm" className="h-7 flex-1 text-xs" disabled={diaphragmKind === 'flexible' && !flexOk}
+              title={diaphragmKind === 'rigid' ? "One diaphragm per level, retained at the centroid of that level's selected nodes" : "One grid per level through every X and Y of that level's selected nodes; missing grid points get new nodes"} onClick={addDiaphragms}>Assign per level</Button>
+            <Button size="sm" variant="outline" className="h-7 text-xs" disabled={!inDiaphragm && !inFlexible} onClick={() => { editModel((m) => removeFlexibleDiaphragms(removeDiaphragms(m, nodeIds), nodeIds)); setDiaphragmNote('') }}>Remove</Button>
           </div>
           {diaphragmNote && <p className="text-[11px] text-muted-foreground">{diaphragmNote}</p>}
         </Section>

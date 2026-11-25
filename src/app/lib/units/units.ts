@@ -27,6 +27,7 @@ export const CATEGORIES = {
   inertia: { label: 'Moment of inertia (L⁴)', dim: { L: 4, F: 0, T: 0 } },
   force: { label: 'Force', dim: { L: 0, F: 1, T: 0 } },
   moment: { label: 'Moment', dim: { L: 1, F: 1, T: 0 } },
+  rigidity: { label: 'Flexural rigidity (EI)', dim: { L: 2, F: 1, T: 0 } },
   forcePerLength: { label: 'Force / length (line load, stiffness)', dim: { L: -1, F: 1, T: 0 } },
   stress: { label: 'Stress, pressure', dim: { L: -2, F: 1, T: 0 } },
   unitWeight: { label: 'Unit weight', dim: { L: -3, F: 1, T: 0 } },
