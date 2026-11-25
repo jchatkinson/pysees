@@ -45,7 +45,7 @@ function applyGenerated(header: Rec, b: Builder) {
     if (!pattern) return skip(`pattern ${String(id)} is not defined before its shell loads`)
     if (!Array.isArray(header.children)) return skip('missing "children"')
     const children = [...pattern.children]
-    const items = (header.children as Rec[]).map((c) => (isRec(c) && Number.isInteger(c.index) && isRec(c.child) && ['load', 'eleLoad', 'sp'].includes(String(c.child.kind)) && isRec(c.child.args) ? { index: c.index as number, child: c.child as unknown as LoadAssignment } : skip('bad shell load entry')))
+    const items = (header.children as Rec[]).map((c) => (isRec(c) && Number.isInteger(c.index) && isRec(c.child) && ['load', 'eleLoad', 'sp', 'floorLoad'].includes(String(c.child.kind)) && isRec(c.child.args) ? { index: c.index as number, child: c.child as unknown as LoadAssignment } : skip('bad shell load entry')))
     for (const { index, child } of items.sort((x, y) => x.index - y.index)) children.splice(Math.max(0, Math.min(index, children.length)), 0, child)
     b.model = { ...b.model, patterns: new Map(b.model.patterns).set(pattern.id, { ...pattern, children }) }
     return
@@ -114,14 +114,12 @@ export function parseProject(text: string): ImportResult {
 
   const parsed = parsePython(out.join('\n'))
   const calls = parsed.calls
-  const parseDiagnostics = entities.some(({ data }) => data.kind === 'building') ? parsed.diagnostics.filter((d) => !d.message.startsWith('No "model" command found;')) : parsed.diagnostics
-  const built = buildModel(calls, 'py', parseDiagnostics, (index, b) => applyGenerated(blocks[index].header, b))
-  diagnostics.push(...built.diagnostics.filter((d) => !entities.some(({ data }) => data.kind === 'building') || !d.message.startsWith('No "model" command found;')))
+  const built = buildModel(calls, 'py', parsed.diagnostics, (index, b) => applyGenerated(blocks[index].header, b))
+  diagnostics.push(...built.diagnostics)
   if (diagnostics.some((d) => d.severity === 'error')) return { ...fail(), ndm: built.ndm, ndf: built.ndf }
 
   let model: Model = built.model
   const h = header!.data
-  if (entities.some(({ data }) => data.kind === 'building') && built.writes.length === 0 && h.ndm === 3 && h.ndf === 6) model = { ...model, config: { ndm: 3, ndf: 6 } }
   if (model.config?.ndm !== h.ndm || model.config?.ndf !== h.ndf) error(`The project header says ndm=${String(h.ndm)}, ndf=${String(h.ndf)} but the model command says ndm=${model.config?.ndm}, ndf=${model.config?.ndf}.`, header!.line)
 
   const units = parseBaseUnits(h.units)
@@ -148,11 +146,6 @@ export function parseProject(text: string): ImportResult {
       const element = isInt(data.id) ? model.elements.get(data.id) : undefined
       if (!element || element.eleType !== 'zeroLength' || !isRec(data.friction)) error(`Element annotation does not match a zeroLength element (id ${String(data.id)}).`, line)
       else model = { ...model, elements: new Map(model.elements).set(element.id, { ...element, args: { ...element.args, friction: data.friction } }) }
-    } else if (data.kind === 'building') {
-      const entity = data.entity
-      const hasTables = model.nodes.size || model.masses.size || model.materials.size || model.sections.size || model.geomTransfs.size || model.beamIntegrations.size || model.elements.size || model.fixes.size || model.mpConstraints.size || model.regions.size || model.timeSeries.size || model.patterns.size || model.misc.size
-      if (model.building || hasTables || !isRec(entity) || !isRec(entity.spec) || !Array.isArray(entity.spec.storeys) || !Number.isInteger(entity.steps) || (entity.steps as number) < 1) error('Building annotation is invalid or conflicts with another model.', line)
-      else model = { ...model, building: entity as unknown as NonNullable<Model['building']> }
     } else if (data.kind === 'material') {
       const material = isInt(data.id) ? model.materials.get(data.id) : undefined
       if (!material || material.kind !== 'uniaxial' || !(MATERIAL_USAGES as readonly unknown[]).includes(data.usage)) error(`Material annotation does not match a uniaxial material (id ${String(data.id)}).`, line)

@@ -1,6 +1,6 @@
 import { Fragment, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { BookOpen, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, ChevronsLeft, ChevronsRight, House, Palette, Pause, Play } from 'lucide-react'
+import { Search, BookOpen, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, ChevronsLeft, ChevronsRight, House, Palette, Pause, Play } from 'lucide-react'
 import { Button, buttonVariants } from '@/app/components/ui/button'
 import { Separator } from '@/app/components/ui/separator'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/app/components/ui/select'
@@ -11,7 +11,7 @@ import { useAppStore } from '@/app/store/useAppStore'
 import { useHotkeyRegistry, type HotkeyBinding } from '@/app/lib/hotkeys'
 import { useCurrentCase } from '@/app/lib/resultsStorage/useCases'
 import { cn } from '@/app/lib/utils'
-import { COMMANDS, RIBBON_TABS, currentView, parseHotkey, runCommand, type CommandId, type RibbonCommand, type RibbonGroupDef } from './commands'
+import { COMMANDS, RIBBON_TABS, currentView, formatHotkey, parseHotkey, runCommand, type CommandId, type RibbonCommand, type RibbonGroupDef } from './commands'
 import { FileGroup } from './FileGroup'
 import { RibbonAction, Tip } from './parts'
 
@@ -169,6 +169,9 @@ export function Ribbon() {
           {collapsed ? <ChevronDown className="size-3.5" /> : <ChevronUp className="size-3.5" />}
         </Button>
         <div className="ml-auto flex items-center gap-1">
+          <Button variant="outline" size="sm" className="h-6 w-48 justify-start px-2 text-xs text-muted-foreground" onClick={() => runCommand('palette')}>
+            <Search className="size-3.5" />Search commands<span className="ml-auto text-[10px] opacity-70">{formatHotkey('mod+k')}</span>
+          </Button>
           <Link to="/" className={buttonVariants({ variant: 'ghost', size: 'sm', className: 'h-6 px-2 text-xs' })}><House />Home</Link>
           <a href="/docs" target="_blank" rel="noreferrer" className={buttonVariants({ variant: 'ghost', size: 'sm', className: 'h-6 px-2 text-xs' })}><BookOpen />Docs</a>
         </div>

@@ -35,6 +35,9 @@ import frame3dImg from '@/app/assets/templates/frame3d.png'
 import plateImg from '@/app/assets/templates/plate.png'
 import precastWallImg from '@/app/assets/templates/precastWall.png'
 import { StudBuildingForm } from '@/app/components/StudBuildingForm'
+import { studBuildingModel } from '@/app/lib/studWalls'
+import { loadCarapaceWasm } from '@/app/lib/carapace/wasm'
+import type { StudBuildingParams } from '@/app/types/model'
 
 const NO_UNITS = 'none'
 
@@ -143,6 +146,17 @@ function InitDialog() {
   const [wallBoundaryRatio, setWallBoundaryRatio] = useState(PRECAST_WALL_DEFAULTS.boundaryRatio * 100)
   const [dowelEnd, setDowelEnd] = useState({ Fy: PRECAST_WALL_DEFAULTS.dowelEnd.Fy / 1e3, K: PRECAST_WALL_DEFAULTS.dowelEnd.K / 1e6, b: PRECAST_WALL_DEFAULTS.dowelEnd.b })
   const [dowelJoint, setDowelJoint] = useState({ Fy: PRECAST_WALL_DEFAULTS.dowelJoint.Fy / 1e3, K: PRECAST_WALL_DEFAULTS.dowelJoint.K / 1e6, b: PRECAST_WALL_DEFAULTS.dowelJoint.b })
+
+  const [studBusy, setStudBusy] = useState(false)
+  const [studError, setStudError] = useState('')
+  async function createStudBuilding(params: StudBuildingParams) {
+    setStudBusy(true); setStudError('')
+    try {
+      const wasm = await loadCarapaceWasm()
+      const t = studBuildingModel((spec, up) => wasm.expandBuilding(spec as never, up), params)
+      initModel(3, 6, { units: { length: 'mm', force: 'N', time: 's' }, unitPrefs: { force: 'kN', stress: 'MPa' }, writes: t.writes, analysisCommands: t.analysisCommands, levels: t.levels, gridlines: t.gridlines })
+    } catch (e) { setStudError(e instanceof Error ? e.message : typeof e === 'object' && e && 'reason' in e ? String((e as { reason: unknown }).reason) : String(e)) } finally { setStudBusy(false) }
+  }
 
   // Tower (the stress-test model)
   const [tower, setTower] = useState<TowerParams>(TOWER_DEFAULTS)
@@ -594,7 +608,7 @@ function InitDialog() {
               </div>
             )}
 
-            {choice === 'studBuilding' && <StudBuildingForm onCreate={(entity) => initModel(3, 6, { units: { length: 'mm', force: 'N', time: 's' }, unitPrefs: { force: 'kN', stress: 'MPa' }, writes: [{ kind: 'building', entity }] })} />}
+            {choice === 'studBuilding' && <>{studError && <p className="text-xs text-destructive">{studError}</p>}<StudBuildingForm busy={studBusy} onCreate={(params) => void createStudBuilding(params)} /></>}
 
             {choice !== 'studBuilding' && <div className="flex justify-end">
               {choice === 'load'

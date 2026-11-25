@@ -23,7 +23,9 @@ import { ANALYSIS_BLOCKS, blockAsSchema } from '@/app/lib/analysisBlocks'
 import { useHotkeyRegistry } from '@/app/lib/hotkeys'
 import { SelectionPanel } from '@/app/components/SelectionPanel'
 import { MemberSectionCard } from '@/app/components/MemberSectionCard'
-import type { ElementEntity } from '@/app/types/model'
+import { AnchorageCard, StudWallCard } from '@/app/components/StudWallCard'
+import { isStudWall } from '@/app/lib/studWalls'
+import type { ElementEntity, MaterialEntity } from '@/app/types/model'
 import { CircleHelp } from 'lucide-react'
 import { MaterialUsageField } from '@/app/components/MaterialUsageField'
 import { ShellModifiersField } from '@/app/components/ShellModifiersField'
@@ -341,6 +343,26 @@ export function CommandForm() {
     const entity = getModelEntity(model, selectedModelEntity.kind, selectedModelEntity.id)
     const fn = entity ? fnForModelEntity(selectedModelEntity.kind as never, entity) : null
     const schema = fn ? getSchemaForFn(fn, ctx.ndm) : null
+    const studWall = selectedModelEntity.kind === 'element' && isStudWall((entity as ElementEntity | undefined)?.eleType ?? '')
+    const anchorage = selectedModelEntity.kind === 'material' && (entity as MaterialEntity | undefined)?.matType === 'Anchorage'
+    if (entity && (studWall || anchorage)) {
+      return (
+        <div className="flex flex-col h-full min-h-0">
+          <div className="border-t p-3 grid gap-3">
+            {studWall ? <StudWallCard element={entity as ElementEntity} /> : <AnchorageCard material={entity as MaterialEntity} />}
+            <Button variant="destructive" size="sm" onClick={() => { setPendingModelDelete(selectedModelEntity); setDeleteDialogOpen(true) }}>Delete</Button>
+          </div>
+          <DeleteDialogs
+            deleteDialogOpen={deleteDialogOpen} setDeleteDialogOpen={setDeleteDialogOpen}
+            pendingModelDelete={pendingModelDelete} setPendingModelDelete={setPendingModelDelete}
+            pendingAnalysisDeleteIndex={pendingAnalysisDeleteIndex} setPendingAnalysisDeleteIndex={setPendingAnalysisDeleteIndex}
+            previewDeleteModelEntity={previewDeleteModelEntity} deleteModelEntity={deleteModelEntity}
+            deleteAnalysisCommandAt={deleteAnalysisCommandAt}
+            onModelDeleted={() => setSelectedModelEntity(null)} onAnalysisDeleted={() => setSelectedAnalysisIndex(null)}
+          />
+        </div>
+      )
+    }
     if (!entity || !schema) {
       return (
         <div className="flex flex-col h-full min-h-0">

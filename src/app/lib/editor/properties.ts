@@ -1,5 +1,6 @@
 import type { ElementEntity, Model } from '@/app/types/model'
 import { isShell } from '@/app/lib/commands/tables'
+import { isStudWall } from '@/app/lib/studWalls'
 import { SECTION_TEMPLATES } from '@/app/lib/sections/templates'
 
 /**
@@ -60,6 +61,7 @@ export function templateName(model: Model, t: DrawTemplate): string {
 export function deriveProperties(model: Model): DerivedProperty[] {
   const groups = new Map<string, DerivedProperty>()
   for (const e of [...model.elements.values()].sort((a, b) => a.id - b.id)) {
+    if (isStudWall(e.eleType)) continue // each wall has its own layout; not a property to draw with
     const t = templateOf(e)
     const key = templateKey(t)
     const g = groups.get(key)

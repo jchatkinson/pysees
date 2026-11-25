@@ -9,7 +9,6 @@ export interface FiberSectionItem { kind: 'fiber' | 'patch' | 'layer'; subType: 
 /** Present when a Fiber section's children were last (re)generated from the Section Editor's parametric templates — lets the dialog reopen straight into the template form. Cleared once a user hand-edits a child. */
 export interface SectionTemplateMeta { kind: import('@/app/lib/sections/types').SectionTemplateKind; params: Record<string, unknown> }
 export interface StudBuildingParams { storeys: number; length: number; width: number; wallHeight: number; floorDepth: number; studSpacing: number; windowWidth: number; windowHead: number; noWindows: boolean; sheathing: 'o86' | 'linear'; diaphragm: 'rigid' | 'flexible'; steps: number; lateralShear: number; lateralDirection: 'x' | 'z'; lateralType: 'wind' | 'earthquake'; eccentricity: number; holdDownStiffness: number; anchorageSlack: number; crushCapacity: number; bandGa: number; bearingStiffness: number; combination: string; factors: number[]; deadFloor: number; liveFloor: number; deadRoof: number; snow: number }
-export interface BuildingEntity { spec: import('@/app/types/carapaceInputV1').BuildingSpec; steps: number; template?: StudBuildingParams }
 export interface SectionEntity { id: number; secType: string; args: Record<string, unknown>; children: FiberSectionItem[]; template?: SectionTemplateMeta } // children only meaningful for 'Fiber'/'NDFiber' secType
 export interface GeomTransfEntity { id: number; transfType: string; args: Record<string, unknown> }
 export interface BeamIntegrationEntity { id: number; intType: string; args: Record<string, unknown> }
@@ -18,7 +17,8 @@ export interface FixEntity { nodeId: number; dofs: number[] }
 export interface MPConstraintEntity { id: number; kind: 'equalDOF' | 'equalDOF_Mixed' | 'rigidDiaphragm' | 'rigidLink'; args: Record<string, unknown> }
 export interface RegionEntity { id: number; args: Record<string, unknown> }
 export interface TimeSeriesEntity { id: number; tsType: string; args: Record<string, unknown> }
-export interface LoadAssignment { kind: 'load' | 'eleLoad' | 'sp'; args: Record<string, unknown> }
+/** `floorLoad` is Carapace-only: a one-way floor whose reactions load its support stud walls (`FloorLoadArgs` in `lib/studWalls.ts`). */
+export interface LoadAssignment { kind: 'load' | 'eleLoad' | 'sp' | 'floorLoad'; args: Record<string, unknown> }
 /** `name` is a UI-only alias for the OpenSees pattern tag (`id`); it never reaches the generated script except as a comment. */
 export interface PatternEntity { id: number; name?: string; patternType: string; args: Record<string, unknown>; children: LoadAssignment[] }
 /** Catch-all for model-domain OpenSeesPy functions without a dedicated typed map (frictionModel, block2D/3D, mesh, groundMotion, ...) */
@@ -39,7 +39,6 @@ export interface Model {
   timeSeries: Map<number, TimeSeriesEntity>
   patterns: Map<number, PatternEntity>
   misc: Map<number, MiscEntity>
-  building?: BuildingEntity
   nextIds: Record<ModelEntityKind, number>
 }
 
@@ -63,7 +62,6 @@ export function emptyModel(): Model {
     timeSeries: new Map(),
     patterns: new Map(),
     misc: new Map(),
-    building: undefined,
     nextIds: {
       node: 1, material: 1, section: 1, geomTransf: 1, beamIntegration: 1, element: 1,
       mpConstraint: 1, region: 1, timeSeries: 1, pattern: 1, misc: 1,

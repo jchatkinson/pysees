@@ -6,13 +6,14 @@ import { useAppStore } from '@/app/store/useAppStore'
 
 export function ActionBar() {
   const requestViewportAction = useAppStore((s) => s.requestViewportAction)
+  const status = useAppStore((s) => s.status)
   const orthographic = useAppStore((s) => s.orthographic)
   const setOrthographic = useAppStore((s) => s.setOrthographic)
   const viewMode = useAppStore((s) => s.viewMode)
 
   return (
     <footer className="h-9 border-t flex items-center px-3 gap-2 shrink-0 text-xs text-muted-foreground">
-      <span className="flex-1 truncate">Ready</span>
+      <span className="flex-1 truncate">{status || 'Ready'}</span>
       <Separator orientation="vertical" className="self-stretch" />
       <div className="flex items-center gap-0.5">
         <Tooltip>

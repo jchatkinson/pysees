@@ -37,7 +37,7 @@ export function FileGroup({ compact }: { compact: boolean }) {
         <RibbonAction compact={compact} label="Save" tip="Save the project (.py)" icon={Save} disabled={!model.config} onClick={() => downloadProject(useAppStore.getState(), projectFileName)} />
         <Separator orientation="vertical" className="mx-1 self-stretch" />
         <RibbonAction compact={compact} label="Import" tip="Import an OpenSees .tcl / .py script" icon={FileInput} onClick={() => fileInput.current?.click()} />
-        <RibbonAction compact={compact} label="Export .tcl" tip={model.building ? 'Export unavailable (Carapace only)' : 'Export an OpenSees .tcl script'} icon={FileOutput} disabled={!model.config || !!model.building} onClick={() => downloadScript(model, analysisHistory, 'tcl')} />
+        <RibbonAction compact={compact} label="Export .tcl" tip="Export an OpenSees .tcl script" icon={FileOutput} disabled={!model.config} onClick={() => downloadScript(model, analysisHistory, 'tcl')} />
       </div>
       <input ref={openInput} type="file" accept=".py,.txt" className="hidden" onChange={(e) => { void pickScript(e.target.files?.[0]); e.target.value = '' }} />
       <input ref={fileInput} type="file" accept=".tcl,.py,.txt" className="hidden" onChange={(e) => { void pickScript(e.target.files?.[0]); e.target.value = '' }} />

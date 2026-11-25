@@ -8,6 +8,8 @@ import { eleLoadKind, shellNodalAreas } from '@/app/lib/shells'
 import type { Vec3 } from '@/app/lib/memberFrame'
 import { directive } from '@/app/lib/project/annotations'
 import { readShellModifiers, sectionNeedsShear, shellModifiersExport, type ShellModifiers } from '@/app/lib/shellModifiers'
+import { isStudWall } from '@/app/lib/studWalls'
+import { floorLoadNodal, studWallExport } from '@/app/lib/studWallExport'
 
 /** `E' = E f` and `Ep_modifier = m / f` for modifiers OpenSees can represent; otherwise the reason it cannot. */
 function foldShellModifiers(args: Record<string, unknown>, modifiers: ShellModifiers, needsShear: boolean): { args: Record<string, unknown>; reason?: undefined } | { args?: undefined; reason: string } {
@@ -114,6 +116,12 @@ export function encodePattern(pattern: PatternEntity, ctx: SchemaContext, model?
   const authoredShell: { index: number; child: PatternEntity['children'][number] }[] = []
   const enclosed: Call[] = []
   call.body = pattern.children.flatMap((child, index): Call[] => {
+    // A floor load (Carapace-only) is written as its reactions on the support walls; a project keeps the authored load in the generated block.
+    if (child.kind === 'floorLoad') {
+      const nodal = model ? floorLoadNodal(model, child) : []
+      if (annotate) { authoredShell.push({ index, child }); enclosed.push(...nodal); return [] }
+      return nodal
+    }
     if (child.kind === 'eleLoad') {
       const kind = eleLoadKind(child.args)
       if (annotate && isShellExpanded(child, model)) {
@@ -156,6 +164,13 @@ export function encodeModel(model: Model, deferredPatterns: ReadonlySet<number> 
     else calls.push(call)
   }
   for (const m of byId(model.materials)) {
+    // Carapace's stud-wall hold-down: OpenSees gets an Elastic with the tension stiffness and the initial bearing stiffness in compression.
+    if (m.matType === 'Anchorage') {
+      const a = m.args, eneg = a.bearing === 'linear' ? Number(a.k) || 0 : 0.73 / 0.5 * (Number(a.qr) || 0)
+      const call: Call = { fn: 'uniaxialMaterial', args: ['Elastic', m.id, Number(a.tension) || 0, 0, eneg], comment: `WARNING: Anchorage material ${m.id} is Carapace-only; exported as Elastic (tension ${Number(a.tension) || 0}, compression ${eneg}) without slack or bearing crush.` }
+      calls.push(...(annotate ? generated({ kind: 'carapaceOnly', writes: [{ kind: 'material', entity: m }] }, [call]) : [call]))
+      continue
+    }
     const call = schemaCall(m.kind === 'nD' ? 'nDMaterial' : 'uniaxialMaterial', m.matType, m.args, ctx)
     if (annotate && m.usage) call.before = [directive('entity', { kind: 'material', id: m.id, usage: m.usage })]
     calls.push(call)
@@ -181,7 +196,13 @@ export function encodeModel(model: Model, deferredPatterns: ReadonlySet<number> 
   }
   for (const gt of byId(model.geomTransfs)) calls.push(schemaCall('geomTransf', gt.transfType, gt.args, ctx))
   for (const bi of byId(model.beamIntegrations)) calls.push(schemaCall('beamIntegration', bi.intType, bi.args, ctx))
+  const studWalls = studWallExport(model)
   for (const e of byId(model.elements)) {
+    if (isStudWall(e.eleType)) {
+      const shells = studWalls?.walls.get(e.id) ?? []
+      calls.push(...(annotate ? generated({ kind: 'carapaceOnly', writes: [{ kind: 'element', entity: e }] }, shells) : shells))
+      continue
+    }
     const spec = elementByType(e.eleType)
     if (!spec) { calls.push({ fn: 'element', args: [e.eleType, e.id, ...e.nodes] }); continue }
     const args: Tok[] = [spec.opsName, e.id, ...e.nodes, ...elementArgs(spec, ctx.ndm).map((k) => (e.args[k] as Tok | undefined) ?? 0)]
@@ -212,8 +233,17 @@ export function encodeModel(model: Model, deferredPatterns: ReadonlySet<number> 
     if (annotate) call.before = [directive('entity', { kind: 'mpConstraint', id: mp.id })]
     calls.push(call)
   }
-  for (const f of [...model.fixes.values()].sort((a, b) => a.nodeId - b.nodeId)) {
-    calls.push({ fn: 'fix', args: [f.nodeId, ...Array.from({ length: ctx.ndf }, (_, i) => (f.dofs.includes(i + 1) ? 1 : 0))] })
+  const fixNodes = [...new Set([...model.fixes.keys(), ...(studWalls?.fixes.keys() ?? [])])].sort((a, b) => a - b)
+  for (const id of fixNodes) {
+    const authored = model.fixes.get(id), extra = studWalls?.fixes.get(id) ?? []
+    const dofs = [...(authored?.dofs ?? []), ...extra]
+    const call: Call = { fn: 'fix', args: [id, ...Array.from({ length: ctx.ndf }, (_, i) => (dofs.includes(i + 1) ? 1 : 0))] }
+    // DOFs nothing stiffens once stud walls are shells (OpenSees would be singular); a project restores only the authored fix.
+    if (!extra.length) calls.push(call)
+    else {
+      call.comment = `Also fixes DOF ${extra.join(', ')}, which no element stiffens in the OpenSees stand-in for the stud walls.`
+      calls.push(...(annotate ? generated({ kind: 'carapaceOnly', writes: authored ? [{ kind: 'fix', entity: authored }] : [] }, [call]) : [call]))
+    }
   }
   for (const ts of byId(model.timeSeries)) calls.push(schemaCall('timeSeries', ts.tsType, ts.args, ctx))
   for (const p of byId(model.patterns)) if (!deferredPatterns.has(p.id)) calls.push(encodePattern(p, ctx, model, !!annotate))

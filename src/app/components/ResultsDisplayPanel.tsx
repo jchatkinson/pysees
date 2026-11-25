@@ -21,7 +21,7 @@ import type { ResultType, ScaleKey } from '@/app/types/resultsView'
 import { RAMP_CSS, SHELL_RESULTANTS, SHELL_RESULTANT_LABELS, type ShellResultant } from '@/app/lib/shellContour'
 import { isShell } from '@/app/lib/commands/tables'
 import type { StepFrame } from '@/app/lib/resultsStorage/stepFrames'
-import { BuildingResults } from '@/app/components/BuildingResults'
+import { StudWallResults } from '@/app/components/StudWallResults'
 
 /** `only3d` types exist only in a 3D model; the 2D labels of V and M drop their axis suffix. */
 const RESULT_TYPES: { id: ResultType; label: string; label3d?: string; only3d?: boolean }[] = [
@@ -47,7 +47,7 @@ export function ResultsDisplayPanel() {
   const set = useAppStore((s) => s.setResultsView)
   const model = useAppStore((s) => s.model)
   const is3d = model.config?.ndm === 3
-  const availableResultTypes = model.building ? RESULT_TYPES.filter((t) => t.id === 'none') : RESULT_TYPES
+  const availableResultTypes = RESULT_TYPES
   const hasShells = useMemo(() => [...model.elements.values()].some((e) => isShell(e.eleType)), [model.elements])
   const contourRange = useAppStore((s) => s.contourRange)
 
@@ -70,11 +70,10 @@ export function ResultsDisplayPanel() {
 
   // Keep the result type valid for the case: modes for a modal case, steps' results otherwise.
   useEffect(() => {
-    if (model.building && rv.type !== 'none') { set({ type: 'none' }); return }
     if (!current) return
     if (current.kind === 'modal' && rv.type !== 'mode' && rv.type !== 'none') set({ type: 'mode' })
     else if (current.kind !== 'modal' && rv.type === 'mode') set({ type: 'deformed' })
-  }, [current, rv.type, set, model.building])
+  }, [current, rv.type, set])
 
   useEffect(() => {
     if (!source || !series) return
@@ -121,7 +120,7 @@ export function ResultsDisplayPanel() {
       : { caseStage: stageIndex, playing: false, phase: 0, step: c.first + c.count - 1, stepFrac: 0, type: rv.type === 'mode' || rv.type === 'none' ? 'deformed' : rv.type })
   }
   const stepTime = time && time.runId === rv.runId && time.step === rv.step ? time.value : null
-  const buildingFrame = frame && frame.runId === rv.runId && frame.step === rv.step ? frame.value : null
+  const stepFrame = frame && frame.runId === rv.runId && frame.step === rv.step ? frame.value : null
 
   return (
     <>
@@ -142,7 +141,7 @@ export function ResultsDisplayPanel() {
           </div>
         </CardHeader>
         <CardContent className="grid gap-3 text-xs">
-          {model.building && source && buildingFrame && <BuildingResults entity={model.building} source={source} row={buildingFrame.row} />}
+          {source && stepFrame && <StudWallResults source={source} row={stepFrame.row} />}
           <div className="grid gap-1">
             <Label className="text-[11px]">Case</Label>
             <Select items={(cases ?? []).map((c) => ({ value: String(c.stageIndex), label: caseLabel(c) }))} value={current ? String(current.stageIndex) : ''} onValueChange={(v) => selectCase(Number(v))}>
@@ -155,7 +154,7 @@ export function ResultsDisplayPanel() {
 
           <div className="grid gap-1">
             <Label className="text-[11px]">Result</Label>
-            <Select items={availableResultTypes.map((t) => ({ value: t.id, label: (is3d && t.label3d) || t.label }))} value={model.building ? 'none' : rv.type} onValueChange={(v) => set({ type: v as ResultType, phase: 0 })}>
+            <Select items={availableResultTypes.map((t) => ({ value: t.id, label: (is3d && t.label3d) || t.label }))} value={rv.type} onValueChange={(v) => set({ type: v as ResultType, phase: 0 })}>
               <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
               <SelectContent>{availableResultTypes.filter((t) => (!t.only3d || is3d) && (t.id !== 'contour' || hasShells) && (t.id === 'none' || (t.id === 'mode' ? isModalCase : !isModalCase))).map((t) => <SelectItem key={t.id} value={t.id}>{(is3d && t.label3d) || t.label}</SelectItem>)}</SelectContent>
             </Select>

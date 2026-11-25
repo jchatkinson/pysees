@@ -9,7 +9,6 @@ import { captureProject, type ProjectDocument } from '@/app/lib/project/types'
 import { serializeProject } from '@/app/lib/project/serialize'
 import { isProjectText, parseProject } from '@/app/lib/project/parse'
 import { readScriptFile } from '@/app/lib/project/open'
-import { studBuildingTemplate } from '@/app/lib/studBuilding'
 
 const docOf = (f: { model: Fixture['model']; history: AnalysisHistory }, extra: Partial<Parameters<typeof captureProject>[0]> = {}): ProjectDocument => captureProject({
   model: f.model, analysisHistory: f.history, gridlines: [], levels: [], nextGridlineId: 1, nextLevelId: 1, savedPlots: [], nextSavedPlotId: 1, activeSavedPlotId: null,
@@ -43,12 +42,6 @@ const earthquakeFixture = (): Fixture => {
 }
 
 describe('save then open restores the authored project', () => {
-  it('round-trips a native stud-wall building entity', () => {
-    const model = modelFromWrites(3, 6, [{ kind: 'building', entity: studBuildingTemplate() }])
-    const doc = docOf({ model, history: emptyAnalysisHistory() })
-    expect(roundTrip(doc).project.model.building).toEqual(model.building)
-  })
-
   it.each([...ALL_FIXTURES(), shellPressureFixture(), earthquakeFixture()])('$name', (f) => {
     const doc = docOf(f)
     const { project } = roundTrip(doc)

@@ -3,16 +3,7 @@ import type { MaterialEntity } from '@/app/types/model'
 import type { CompileDiagnostic } from '@/app/lib/compileAnalysisSequence'
 import { compileMaterialWithDependencies } from '@/app/lib/carapace/compileInputV1'
 
-type Wasm = typeof import('@/app/carapace/wasm/carapace_wasm.js')
-
-let wasmModule: Promise<Wasm> | null = null
-function loadWasm(): Promise<Wasm> {
-  wasmModule ??= import('@/app/carapace/wasm/carapace_wasm.js').then(async (mod) => {
-    await mod.default()
-    return mod
-  })
-  return wasmModule
-}
+import { loadCarapaceWasm as loadWasm } from '@/app/lib/carapace/wasm'
 
 export interface MaterialPreviewPoint { eps: number; sig: number }
 

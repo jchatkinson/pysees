@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
-import { Html } from '@react-three/drei'
 import { BufferAttribute, BufferGeometry, Color, ShaderMaterial, Vector3 } from 'three'
 import type { Intersection, Points, Raycaster } from 'three'
 import { useAppStore } from '@/app/store/useAppStore'
 import type { DisplayBuffers, NodeLabel } from './displayBuffers'
 import type { SceneIndex } from './sceneIndex'
 import { LABEL_LIMIT } from './utils'
+import { ScreenLabels } from './ScreenLabels'
 
 /** Node marker (a small ✕) size in screen pixels, and when selected. */
 const NODE_PX = 7
@@ -16,20 +16,6 @@ export const NODE_HIT_RADIUS_PX = 8
 
 const COLOR_DEFAULT = new Color('#334155')
 const COLOR_SELECTED = new Color('#2563eb')
-
-const LABEL_STYLE: React.CSSProperties = {
-  fontSize: 9,
-  color: '#475569',
-  background: 'white',
-  border: '0.5px solid #cbd5e1',
-  borderRadius: 2,
-  padding: '0 3px',
-  lineHeight: '14px',
-  whiteSpace: 'nowrap',
-  userSelect: 'none',
-  pointerEvents: 'none',
-  transform: 'translate(4px, -16px)',
-}
 
 // A ✕ in each point sprite: the two diagonals of the point's square, about 1.5 px wide at any size.
 const VERTEX = `
@@ -140,36 +126,21 @@ function NodePoints({
   )
 }
 
-const VALUE_LABEL_STYLE: React.CSSProperties = {
-  ...LABEL_STYLE, lineHeight: '12px', whiteSpace: 'pre', transform: 'translate(8px, 6px)', background: 'rgba(255,255,255,0.9)',
-}
+// One DOM layer each (see `ScreenLabels`), not an <Html> per node: thousands of those each project themselves every frame.
+const ID_STYLE: Partial<CSSStyleDeclaration> = { fontSize: '9px', color: '#475569', background: 'white', border: '0.5px solid #cbd5e1', borderRadius: '2px', padding: '0 3px', lineHeight: '14px' }
+const VALUE_STYLE: Partial<CSSStyleDeclaration> = { ...ID_STYLE, lineHeight: '12px', background: 'rgba(255,255,255,0.9)' }
 
 /** Per-node displacement text for the deformed view, refreshed when ResultsDriver publishes a new step. */
 function NodeValueLabels({ buffers }: { buffers: DisplayBuffers }) {
   const [shown, setShown] = useState<{ version: number; labels: NodeLabel[] }>({ version: -1, labels: [] })
   useFrame(() => { if (shown.version !== buffers.version) setShown({ version: buffers.version, labels: buffers.active ? buffers.nodeLabels : [] }) })
-  return (
-    <>
-      {shown.labels.map((l, i) => <Html key={i} position={l.position} style={VALUE_LABEL_STYLE} zIndexRange={[10, 10]}>{l.text}</Html>)}
-    </>
-  )
+  const labels = useMemo(() => shown.labels.map((l) => ({ position: l.position as [number, number, number], text: l.text })), [shown])
+  return <ScreenLabels labels={labels} style={VALUE_STYLE} offset={[8, 6]} />
 }
 
 function NodeLabels({ index }: { index: SceneIndex }) {
-  return (
-    <>
-      {index.nodeIds.map((id, i) => (
-        <Html
-          key={id}
-          position={[index.nodeCoords[i * 3], index.nodeCoords[i * 3 + 1], index.nodeCoords[i * 3 + 2]]}
-          style={LABEL_STYLE}
-          zIndexRange={[10, 10]}
-        >
-          N{id}
-        </Html>
-      ))}
-    </>
-  )
+  const labels = useMemo(() => index.nodeIds.map((id, i) => ({ position: [index.nodeCoords[i * 3], index.nodeCoords[i * 3 + 1], index.nodeCoords[i * 3 + 2]] as [number, number, number], text: `N${id}` })), [index])
+  return <ScreenLabels labels={labels} style={ID_STYLE} />
 }
 
 export function NodesLayer({

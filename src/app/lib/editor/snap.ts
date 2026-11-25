@@ -127,3 +127,39 @@ export function inGridSlab(grids: GridlineEntity[], gridId: number, p: P3, eps: 
   const off = slab.normal.x * (p[0] - slab.origin.x) + slab.normal.y * (p[1] - slab.origin.y)
   return off >= -slab.below - eps && off <= slab.above + eps
 }
+
+/**
+ * The grid cell under a point, for shells: in a plan, the rectangle between the neighbouring X- and Y-parallel grids at the plan's level;
+ * in a grid elevation, the panel between the crossing grids either side and the levels above and below. Corners in drawing order, or null.
+ * Only axis-parallel grids bound plan cells.
+ */
+export function cellAt(mode: ViewMode, grids: GridlineEntity[], levels: LevelEntity[], q: P3): P3[] | null {
+  const around = (vs: number[], v: number) => {
+    const s = [...new Set(vs.map((x) => Number(x.toPrecision(12))))].sort((a, b) => a - b)
+    const i = s.findIndex((x, k) => k + 1 < s.length && v >= x && v <= s[k + 1])
+    return i < 0 ? null : [s[i], s[i + 1]] as const
+  }
+  if (mode.kind === 'plan') {
+    const z = planElevation(levels, mode.level)
+    const xs = grids.filter((g) => Math.abs((g.end[0] ?? 0) - (g.start[0] ?? 0)) < 1e-9).map((g) => g.start[0] ?? 0)
+    const ys = grids.filter((g) => Math.abs((g.end[1] ?? 0) - (g.start[1] ?? 0)) < 1e-9).map((g) => g.start[1] ?? 0)
+    const bx = around(xs, q[0]), by = around(ys, q[1])
+    return bx && by ? [[bx[0], by[0], z], [bx[1], by[0], z], [bx[1], by[1], z], [bx[0], by[1], z]] : null
+  }
+  if (mode.kind !== 'elevation' || mode.gridId === null) return null
+  const [line] = bayLines('beam', mode, grids, [{ id: 0, label: '', height: 0 }], 3)
+  if (!line) return null
+  const t = (q[0] - line.origin[0]) * line.dir[0] + (q[1] - line.origin[1]) * line.dir[1]
+  const bt = around(line.stops, t), bz = around([0, ...levelElevations(levels)], q[2])
+  if (!bt || !bz) return null
+  const at = (s: number, z: number): P3 => [line.origin[0] + s * line.dir[0], line.origin[1] + s * line.dir[1], z]
+  return [at(bt[0], bz[0]), at(bt[1], bz[0]), at(bt[1], bz[1]), at(bt[0], bz[1])]
+}
+
+/** Split a quad (corners in order) into an `nu` × `nv` grid of quads by bilinear interpolation. */
+export function meshQuad(c: P3[], nu: number, nv: number): P3[][] {
+  const at = (u: number, v: number): P3 => [0, 1, 2].map((k) => (1 - u) * (1 - v) * c[0][k] + u * (1 - v) * c[1][k] + u * v * c[2][k] + (1 - u) * v * c[3][k]) as P3
+  const out: P3[][] = []
+  for (let i = 0; i < nu; i++) for (let j = 0; j < nv; j++) out.push([at(i / nu, j / nv), at((i + 1) / nu, j / nv), at((i + 1) / nu, (j + 1) / nv), at(i / nu, (j + 1) / nv)])
+  return out
+}

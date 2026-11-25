@@ -49,7 +49,7 @@ export class DisplayBuffers {
   diagramVersion = 0
 
   private readonly undeformed: Float32Array
-  /** Called whenever any family changes: the canvas renders on demand, so the scene asks for a frame here. */
+  /** Called after every change, so an on-demand canvas draws the new contents. */
   onChange: (() => void) | null = null
 
   constructor(index: SceneIndex) {

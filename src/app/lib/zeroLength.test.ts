@@ -58,7 +58,7 @@ describe('zeroLength elements', () => {
     const errors = (zero: Record<string, unknown>) => compileInputV1(column(zero), push([1], 1)).diagnostics.filter((d) => d.severity === 'error').map((d) => d.message).join('; ')
     expect(errors({ mat: [1, 2], dir: [1] })).toMatch(/must pair up/)
     expect(errors({ mat: [1, 2], dir: [2, 2] })).toMatch(/direction 2 has more than one material/)
-    expect(errors({ mat: [1], dir: [4] })).toMatch(/direction 4 is not 1, 2 or 3/)
+    expect(errors({ mat: [1], dir: [4] })).toMatch(/direction 4 is not between 1 and 3 in a 2D model/)
   })
 
   describe.skipIf(!opensesAvailable)('against OpenSees', () => {

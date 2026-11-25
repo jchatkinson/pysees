@@ -1,11 +1,11 @@
 import { useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
-import { Line } from '@react-three/drei'
-import type { Group } from 'three'
+import { Vector3 } from 'three'
 import type { ElementEntity } from '@/app/types/model'
 import type { DisplayBuffers } from './displayBuffers'
 import type { SceneIndex } from './sceneIndex'
-import { ScreenSize } from './ScreenSize'
+import { worldUnitsPerPixel } from './screenScale'
+import { useCameraChange, useSegmentLines } from './batchHooks'
 import { buildGlyph, coupledDofs, isZeroLengthType, orientFrame } from './zeroLengthGlyph'
 
 const GLYPH_COLOR = '#4b5563'
@@ -21,36 +21,6 @@ interface GlyphSpec {
   orient: unknown
   section: boolean
   radius: number
-}
-
-function ZeroLengthGlyph({ spec, buffers }: { spec: GlyphSpec; buffers: DisplayBuffers }) {
-  const anchor = useRef<Group>(null)
-  const billboard = useRef<Group>(null)
-  const glyph = useMemo(
-    () => buildGlyph(spec.dofs, orientFrame(spec.orient), spec.ndm, spec.radius),
-    [spec.dofs, spec.orient, spec.ndm, spec.radius],
-  )
-  const width = spec.section ? 2.5 : 1.5
-
-  // Follow the displayed (possibly displaced) node; keep the ring facing the camera.
-  useFrame(({ camera }) => {
-    const g = anchor.current
-    if (g) g.position.fromArray(buffers.nodePositions, spec.nodeRow * 3)
-    if (billboard.current) billboard.current.quaternion.copy(camera.quaternion)
-  })
-
-  return (
-    <group ref={anchor}>
-      <ScreenSize>
-        <group ref={billboard}>
-          <Line points={glyph.ring} color={GLYPH_COLOR} lineWidth={width} />
-        </group>
-        {glyph.lines.map((points, i) => (
-          <Line key={i} points={points} color={GLYPH_COLOR} lineWidth={1.5} />
-        ))}
-      </ScreenSize>
-    </group>
-  )
 }
 
 /**
@@ -90,11 +60,40 @@ export function ZeroLengthsLayer({
     return out
   }, [index, elements, ndm])
 
-  return (
-    <>
-      {specs.map((spec) => (
-        <ZeroLengthGlyph key={spec.id} spec={spec} buffers={buffers} />
-      ))}
-    </>
-  )
+  // Segments in pixel units: rings in the billboard plane (turned to face the camera), stubs and arcs along the element's axes.
+  const geo = useMemo(() => specs.map((spec) => {
+    const glyph = buildGlyph(spec.dofs, orientFrame(spec.orient), spec.ndm, spec.radius)
+    const pairs = (pts: number[][]) => pts.slice(1).map((q, i) => [pts[i], q])
+    return { spec, ring: pairs(glyph.ring), lines: glyph.lines.flatMap(pairs) }
+  }), [specs])
+  const counts = useMemo(() => ({ thin: geo.reduce((n, g) => n + g.lines.length + (g.spec.section ? 0 : g.ring.length), 0), thick: geo.reduce((n, g) => n + (g.spec.section ? g.ring.length : 0), 0) }), [geo])
+  const thin = useSegmentLines(counts.thin, GLYPH_COLOR, 1.5)
+  const thick = useSegmentLines(counts.thick, GLYPH_COLOR, 2.5)
+  const changed = useCameraChange()
+  const seen = useRef<{ lines: object; version: number } | null>(null)
+  useFrame((state) => {
+    const fresh = seen.current?.lines !== thin.lines || seen.current?.version !== buffers.version
+    if (!changed(state, fresh)) return
+    seen.current = { lines: thin.lines, version: buffers.version }
+    const q = state.camera.quaternion, tmp = new Vector3(), v = new Vector3()
+    const put = (buf: Float32Array, o: number, at: Vector3, scale: number, p: number[], billboard: boolean) => {
+      v.set(p[0], p[1], p[2])
+      if (billboard) v.applyQuaternion(q)
+      buf[o] = at.x + v.x * scale; buf[o + 1] = at.y + v.y * scale; buf[o + 2] = at.z + v.z * scale
+    }
+    let ti = 0, ki = 0
+    // Both buffers are filled inside the nested writes, so each uploads once, after filling.
+    thin.write((tb) => thick.write((kb) => {
+      for (const { spec, ring, lines } of geo) {
+        tmp.fromArray(buffers.nodePositions, spec.nodeRow * 3)
+        const scale = worldUnitsPerPixel(state.camera, tmp, state.size.height)
+        for (const [a, b] of ring) {
+          const buf = spec.section ? kb : tb, o = (spec.section ? ki++ : ti++) * 6
+          put(buf, o, tmp, scale, a, true); put(buf, o + 3, tmp, scale, b, true)
+        }
+        for (const [a, b] of lines) { const o = ti++ * 6; put(tb, o, tmp, scale, a, false); put(tb, o + 3, tmp, scale, b, false) }
+      }
+    }))
+  })
+  return <>{counts.thin > 0 && <primitive object={thin.lines} />}{counts.thick > 0 && <primitive object={thick.lines} />}</>
 }

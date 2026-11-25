@@ -60,7 +60,7 @@ export type TimeSeriesSpec = { kind: 'constant' } | { kind: 'linear'; slope: num
 export interface LoadPatternTable { series: TimeSeriesSpec[]; scaleFactor: number[] }
 export interface NodalLoadTable { pattern: number[]; node: number[]; dof: number[]; value: number[]; stage: number[] }
 
-export type ElementKind = 'truss' | 'elasticBeamColumn2d' | 'elasticBeamColumn3d' | 'dispBeamColumn2d' | 'dispBeamColumn3d' | 'forceBeamColumn2d' | 'forceBeamColumn3d' | 'zeroLength' | 'zeroLengthSection' | 'tri3' | 'quad4' | 'shell3' | 'shell4'
+export type ElementKind = 'truss' | 'elasticBeamColumn2d' | 'elasticBeamColumn3d' | 'dispBeamColumn2d' | 'dispBeamColumn3d' | 'forceBeamColumn2d' | 'forceBeamColumn3d' | 'zeroLength' | 'zeroLengthSection' | 'tri3' | 'quad4' | 'shell3' | 'shell4' | 'studWall' | 'diaphragm'
 /** Uniform load per length in the element's local axes: `wx` along the member, `wy` (and, in 3D, `wz`) transverse.
  * Shells take a pressure per area along the local normal, or a body acceleration in global axes (force per area `rho h b`). */
 export type ElementLoadSpec = { kind: 'uniform'; wx: number; wy: number; wz?: number } | { kind: 'shellPressure'; pressure: number } | { kind: 'shellBody'; bx: number; by: number; bz: number }
@@ -71,6 +71,8 @@ export type MaterialSpec =
   | { kind: 'elasticPp'; e: number; eyp: number }
   | { kind: 'gap'; e: number; gap: number }
   | { kind: 'ent'; e: number }
+  /** Carapace-only stud-wall hold-down: tension stiffness after `slack`, compression through `bearing`. */
+  | { kind: 'anchorage'; tension: number; slack: number; bearing: AnchorageBearingSpec }
   | { kind: 'steel01'; fy: number; e0: number; b: number; a1: number; a2: number; a3: number; a4: number }
   | { kind: 'concrete01'; fpc: number; epsc0: number; fpcu: number; epscu: number }
   | { kind: 'steel02'; fy: number; e0: number; b: number; r0: number; cr1: number; cr2: number; a1: number; a2: number; a3: number; a4: number }
@@ -107,10 +109,10 @@ export type StageSpec =
   | { kind: 'transient'; id: string; steps: number; dt: number; damping: { alphaM: number; betaK: number; modalAnchors?: ModalDampingAnchors }; groundMotions: { direction: number; series: TimeSeriesSpec; scaleFactor: number }[]; algorithm: AlgorithmSpec; convergence?: ConvergenceSpec }
 /** Recorder channels stored by the browser results worker. Acceleration and velocity are relative to the ground. */
 export type RecorderSpecWire =
-  | { response: 'buildingWallPier'; storey: number; wall: string; pier: number; quantity: StudWallQuantity }
-  /** A named wall's total base reaction in its local axes: shear, axial (up positive: the gravity takedown is positive) and moment about the wall centre. */
-  | { response: 'buildingWallBase'; storey: number; wall: string; component: StudWallBaseComponent }
-  | { response: 'buildingStoreyDrift'; storey: number; component: BuildingDriftComponent }
+  /** One stud-wall pier quantity (shear flow, drift, base/top moment, chord forces); piers as `wallPiers` finds them. */
+  | { response: 'studWallPier'; elementKind: 'studWall'; elementIndex: number; pier: number; quantity: StudWallQuantity }
+  /** A wall's total base reaction in its local axes: shear, axial (up positive: the gravity takedown is positive) and moment about the wall centre. */
+  | { response: 'studWallBase'; elementKind: 'studWall'; elementIndex: number; component: StudWallBaseComponent }
   | { response: 'nodeDisp'; node: number; dof: number }
   | { response: 'nodeVel'; node: number; dof: number }
   | { response: 'nodeAccel'; node: number; dof: number }
@@ -133,7 +135,15 @@ export type AnchorageBearingSpec = { kind: 'linear'; k: number } | { kind: 'o86C
 export type DiaphragmKind = 'rigid' | 'flexible'
 export interface WallSpec { name: string; start: [number, number]; direction: [number, number]; layout: WallLayoutSpec; loads?: SlotWallLoad[] }
 export interface SlotWallLoad { slot: number; load: WallLoadSpec }
-export interface WallLayoutSpec { length: number; height: number; studs: WallStudSpec[]; topEa: number; topEi: number | undefined; topDistribution: ChordDistributionSpec; bottomEa: number; bottomEi: number; openings?: WallOpeningSpec[]; sheathing: WallSheathingSpec | undefined; foundation?: boolean }
+export interface WallLayoutSpec { length: number; height: number; studs: WallStudSpec[]; topEa: number; topEi: number | undefined; topDistribution: ChordDistributionSpec; bottomEa: number; bottomEi: number; openings?: WallOpeningSpec[]; sheathing: WallSheathingSpec | undefined; foundation?: boolean; floor?: FloorZoneSpec }
+/** Floor zone of depth `depth` above the framing: shear stiffness `ga`, rim `rimEa` added to the top chord. */
+export interface FloorZoneSpec { depth: number; ga: number; rimEa: number }
+/** One stud wall: corner nodes (bottom start, bottom end, top end, top start; local x = c0→c1, y = c0→c3) and its chord stations, all `nodes` indices. */
+export interface StudWallSpec { corners: [number, number, number, number]; stations: { chord: 'top' | 'bottom'; x: number; node: number }[]; layout: WallLayoutSpec }
+export type StudWallTable = StudWallSpec[]
+/** A one-way floor in a load pattern whose reactions load its support walls (`s` along the span, `t` across). */
+export interface FloorTransferSpec { bounds: [number, number, number, number]; continuity: FloorContinuitySpec; pattern: number; loads: FloorTransferLoadSpec[]; supports: { s: number; t0: number; t1: number; wall: { kind: 'studWall'; index: number }; xAtT0: number; reversed: boolean }[] }
+export type FloorTransferLoadSpec = { kind: 'area'; w: number; region: [number, number, number, number] | undefined } | { kind: 'line'; w: number; s: number; t0: number; t1: number } | { kind: 'lineAlong'; w: number; t: number; s0: number; s1: number } | { kind: 'point'; p: number; s: number; t: number }
 export interface WallStudSpec { x: number; ea: number }
 export interface WallOpeningSpec { x0: number; x1: number; headHeight: number; headerEi: number; jackEa: number; door: boolean }
 export type ChordDistributionSpec = 'beam' | 'direct'
@@ -147,7 +157,6 @@ export type FloorContinuitySpec = 'simple' | 'continuous'
 export type FloorLoadSpec = { kind: 'area'; slot: number; w: number; region?: [number, number, number, number] | null } | { kind: 'line'; slot: number; w: number; s: number; t0: number; t1: number } | { kind: 'lineAlong'; slot: number; w: number; t: number; s0: number; s1: number } | { kind: 'point'; slot: number; p: number; s: number; t: number }
 export interface LateralLoad { slot: number; fx: number; fz: number; at: [number, number] }
 export type StudWallQuantity = 'q' | 'gamma' | 'momentBase' | 'momentTop' | 'chordLeft' | 'chordRight'
-export type BuildingDriftComponent = 'x' | 'z' | 'rotation'
 export type StudWallBaseComponent = 'shear' | 'axial' | 'moment'
 
 export interface CarapaceInputV1 {
@@ -173,5 +182,7 @@ export interface CarapaceInputV1 {
   loadPatterns?: LoadPatternTable
   nodalLoads?: NodalLoadTable
   elementLoads?: ElementLoadTable
+  studWalls?: StudWallTable
+  floorLoads?: FloorTransferSpec[]
   sequence: SequenceSpec
 }

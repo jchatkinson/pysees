@@ -9,11 +9,13 @@ import { DrawBatch, storyMap, supportDofs, transfTypeFor, type P3 } from '@/app/
 import { useUnits } from '@/app/lib/units/useUnits'
 import { shouldIgnoreHotkeys } from '@/app/lib/hotkeys'
 import { templateKey, templateOf } from '@/app/lib/editor/properties'
-import { bayAt, bayLines, gridPoints, inGridSlab, pickSnap, snapPoints, workElevations, type Screen, type SnapPoint } from '@/app/lib/editor/snap'
+import { bayAt, bayLines, cellAt, meshQuad, gridPoints, inGridSlab, pickSnap, snapPoints, workElevations, type Screen, type SnapPoint } from '@/app/lib/editor/snap'
 import { levelElevations } from '@/app/lib/levels'
 import { ScreenSize } from './ScreenSize'
 
 const SNAP_PX = 12
+type Hover = { point: P3 | null; snap: SnapPoint | null; bay: [P3, P3] | null; cell?: P3[] | null }
+const NO_HOVER: Hover = { point: null, snap: null, bay: null }
 const PREVIEW = '#2563eb'
 const SNAP_COLOR: Record<SnapPoint['kind'], string> = { node: '#16a34a', grid: '#2563eb', mid: '#d97706' }
 
@@ -48,7 +50,7 @@ export function ToolLayer({ mode, nodes, elements, ndm }: { mode: ViewMode; node
   const levels = useAppStore((s) => s.levels)
   const grids = useAppStore((s) => s.gridlines)
   const { camera, gl, size } = useThree()
-  const [hover, setHover] = useState<{ point: P3 | null; snap: SnapPoint | null; bay: [P3, P3] | null }>({ point: null, snap: null, bay: null })
+  const [hover, setHover] = useState<Hover>(NO_HOVER)
   const [start, setStart] = useState<P3 | null>(null)
   const shift = useRef(false)
   const last = useRef<P3 | null>(null)
@@ -70,7 +72,7 @@ export function ToolLayer({ mode, nodes, elements, ndm }: { mode: ViewMode; node
   const columnLines = useMemo(() => bayLines('column', mode, grids, levels, ndm), [mode, grids, levels, ndm])
 
   const [seenTool, setSeenTool] = useState(tool)
-  if (seenTool !== tool) { setSeenTool(tool); setStart(null); setHover({ point: null, snap: null, bay: null }) }
+  if (seenTool !== tool) { setSeenTool(tool); setStart(null); setHover(NO_HOVER) }
   // A typed length belongs to the chain it was typed for.
   useEffect(() => { useAppStore.getState().setToolInput('') }, [start, tool])
 
@@ -81,7 +83,7 @@ export function ToolLayer({ mode, nodes, elements, ndm }: { mode: ViewMode; node
       const v = new Vector3(...p).project(camera)
       return v.z > 1 ? null : { x: (v.x + 1) * 0.5 * size.width, y: (1 - v.y) * 0.5 * size.height }
     }
-    const read = (e: PointerEvent | MouseEvent) => {
+    const read = (e: PointerEvent | MouseEvent): Hover => {
       const r = el.getBoundingClientRect()
       const cursor = { x: e.clientX - r.left, y: e.clientY - r.top }
       const ray = new Raycaster()
@@ -89,6 +91,7 @@ export function ToolLayer({ mode, nodes, elements, ndm }: { mode: ViewMode; node
       const hit = ray.ray.intersectPlane(plane, new Vector3())
       const onPlane: P3 | null = hit ? roundToIncrement([hit.x, hit.y, hit.z], plane.normal, increment) : null
       const s = useAppStore.getState()
+      if (tool === 'shell') return { point: null, snap: null, bay: null, cell: onPlane ? cellAt(mode, s.gridlines, s.levels, onPlane) : null }
       if (tool === 'quickBeam' || (tool === 'quickColumn' && mode.kind !== 'plan')) {
         return { point: null, snap: null, bay: onPlane ? bayAt(tool === 'quickBeam' ? beamLines : columnLines, onPlane, project, cursor, SNAP_PX) : null }
       }
@@ -131,6 +134,11 @@ export function ToolLayer({ mode, nodes, elements, ndm }: { mode: ViewMode; node
         if (h.snap?.nodeId !== undefined) { const id = h.snap.nodeId; commit((b) => b.support(id, supportDofs(preset, ndm, useAppStore.getState().model.config?.ndf ?? 6)), false) }
         return
       }
+      if (tool === 'shell') {
+        const s = useAppStore.getState(), cell = h.cell, t = s.shellTemplate
+        if (cell && t) commit((b, at) => { for (const q of meshQuad(cell, s.shellDivisions, s.shellDivisions)) b.shell(t, q.map(at)) })
+        return
+      }
       if (!template) return
       if (tool === 'quickBeam' || tool === 'quickColumn') { const bay = h.bay; if (bay) commit((b, at) => { b.member(template, at(bay[0]), at(bay[1]), transfType()) }); return }
       if (!h.point) return
@@ -166,7 +174,7 @@ export function ToolLayer({ mode, nodes, elements, ndm }: { mode: ViewMode; node
       if (start) setStart(null)
       else if (e.key === 'Escape') s.setActiveTool('select')
     }
-    const onLeave = () => setHover({ point: null, snap: null, bay: null })
+    const onLeave = () => setHover(NO_HOVER)
     el.addEventListener('pointermove', onMove)
     el.addEventListener('click', onClick)
     el.addEventListener('contextmenu', onContext)
@@ -189,6 +197,7 @@ export function ToolLayer({ mode, nodes, elements, ndm }: { mode: ViewMode; node
     <>
       {start && hover.point && <Line points={[start, hover.point]} color={PREVIEW} lineWidth={2} raycast={noRaycast} />}
       {start && <ScreenSize position={start}><mesh raycast={noRaycast}><boxGeometry args={[7, 7, 7]} /><meshBasicMaterial color={PREVIEW} /></mesh></ScreenSize>}
+      {hover.cell && <Line points={[...hover.cell, hover.cell[0]]} color={PREVIEW} lineWidth={3} transparent opacity={0.7} raycast={noRaycast} />}
       {hover.bay && <Line points={hover.bay} color={PREVIEW} lineWidth={4} transparent opacity={0.6} raycast={noRaycast} />}
       {hover.snap && (
         <ScreenSize position={hover.snap.p}>

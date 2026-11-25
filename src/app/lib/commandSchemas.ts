@@ -639,7 +639,9 @@ export function validateSchemaResult(result: SchemaResult, model: Model, ctx: Sc
   if (write.kind === 'fix' && !model.nodes.has(write.entity.nodeId)) return `Node ${write.entity.nodeId} does not exist.`
   if (write.kind === 'mass' && !model.nodes.has(write.entity.nodeId)) return `Node ${write.entity.nodeId} does not exist.`
   if (write.kind === 'element') {
-    const count = elementNodeCount(elementByType(write.entity.eleType))
+    // A stud wall (Carapace-only) connects its 4 corners and one node per chord station.
+    const stations = write.entity.eleType === 'studWall' ? (write.entity.args.stations as unknown[] | undefined) : undefined
+    const count = stations ? 4 + stations.length : elementNodeCount(elementByType(write.entity.eleType))
     if (write.entity.nodes.length !== count) return `${write.entity.eleType} connects ${count} nodes.`
     if (new Set(write.entity.nodes).size !== count) return 'Element nodes must be distinct.'
     if (isShell(write.entity.eleType)) {
