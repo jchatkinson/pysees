@@ -1,8 +1,19 @@
 import type { RecorderKind, RecorderMetadata, ResultBlock, RunMetadata, StageMetadata, StorageReply, StorageRequest } from '@/app/types/resultsStorage'
 
 let worker: Worker | null = null
+/** Requests awaiting a reply, by request id: one listener routes every reply, rather than one listener per request checking each. */
+const pending = new Map<string, { resolve: (reply: StorageReply) => void; reject: (error: Error) => void }>()
 function getWorker(): Worker {
-  if (!worker) worker = new Worker(new URL('@/app/workers/resultsStorageWorker.ts', import.meta.url), { type: 'module' })
+  if (!worker) {
+    worker = new Worker(new URL('@/app/workers/resultsStorageWorker.ts', import.meta.url), { type: 'module' })
+    worker.addEventListener('message', (e: MessageEvent<StorageReply>) => {
+      const reply = e.data, waiting = pending.get(reply.requestId)
+      if (!waiting) return
+      pending.delete(reply.requestId)
+      if (reply.type === 'storageError') waiting.reject(new Error(reply.detail))
+      else waiting.resolve(reply)
+    })
+  }
   return worker
 }
 
@@ -14,14 +25,7 @@ function nextRequestId(): string {
 function send<R extends StorageReply>(request: StorageRequest): Promise<R> {
   const w = getWorker()
   return new Promise((resolve, reject) => {
-    const onMessage = (e: MessageEvent<StorageReply>) => {
-      const reply = e.data
-      if (reply.requestId !== request.requestId) return
-      w.removeEventListener('message', onMessage)
-      if (reply.type === 'storageError') reject(new Error(reply.detail))
-      else resolve(reply as R)
-    }
-    w.addEventListener('message', onMessage)
+    pending.set(request.requestId, { resolve: (reply) => resolve(reply as R), reject })
     w.postMessage(request)
   })
 }

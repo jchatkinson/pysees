@@ -10,7 +10,10 @@ import { useAppStore } from '@/app/store/useAppStore'
 import type { AnalysisCommand } from '@/app/types/analysisCommands'
 import { domainForFn } from '@/app/lib/commandDomain'
 import { getAnalysisBlock, resolveAnalysisCommand } from '@/app/lib/analysisBlocks'
-import { queryResults } from '@/app/lib/resultsStorage/resultsStorageClient'
+import { useResultsSource } from '@/app/lib/resultsStorage/useResultsSource'
+
+/** Recorded nodes listed (with their last sample) under a finished run. */
+const PREVIEW_NODES = 100
 
 function cmdCategory(cmd: AnalysisCommand): string {
   if (cmd.type === 'ANALYSIS_BLOCK') return 'blocks'
@@ -105,31 +108,27 @@ export function AnalysisPanel() {
   const [diagnosticsOpen, setDiagnosticsOpen] = useState(false)
   const busy = carapaceRun.status === 'compiling' || carapaceRun.status === 'running'
 
-  // Last-sample preview, fetched on demand from the results-storage worker instead of kept in
-  // memory for the whole run (carapace/docs/results-storage-indexeddb.md's Stage 5) — only
-  // queried once the diagnostics list is actually opened, and only the one sample each node
-  // needs to show here. Every recorded node now carries its full displacement vector (no
-  // per-recorder DOF selection), so this is one vector per node, not one scalar per DOF.
+  // Last-sample preview of the first PREVIEW_NODES recorded nodes, read (once the list is opened) from the run's final step through
+  // the same cached step source the viewport uses: one block read, not one storage query per node.
   const [lastSamples, setLastSamples] = useState<Record<number, number[] | undefined>>({})
+  // Only once the run is done: the shared source caches the run's layout, and mid-run it has no steps yet.
+  const source = useResultsSource(diagnosticsOpen && carapaceRun.status === 'done' ? carapaceRun.runId : null)
+  const previewTags = useMemo(() => carapaceRun.result?.recordedNodeTags.slice(0, PREVIEW_NODES) ?? [], [carapaceRun.result])
   useEffect(() => {
-    if (!diagnosticsOpen || !carapaceRun.result || !carapaceRun.runId) return
-    const runId = carapaceRun.runId
-    const { sampleCount, recordedNodeTags } = carapaceRun.result
-    let cancelled = false
-    void (async () => {
-      if (sampleCount === 0) { if (!cancelled) setLastSamples({}); return }
+    const sampleCount = carapaceRun.result?.sampleCount ?? 0
+    if (!source || sampleCount === 0) return
+    let live = true
+    source.get(sampleCount - 1).then((frame) => {
+      if (!live || !frame) return
       const next: Record<number, number[] | undefined> = {}
-      await Promise.all(recordedNodeTags.map(async (nodeTag) => {
-        try {
-          const reply = await queryResults(runId, String(nodeTag), sampleCount - 1, 1)
-          const sample = reply.samples[0]
-          if (sample) next[nodeTag] = sample.components
-        } catch { /* best-effort preview; the run's own status already reports failures */ }
-      }))
-      if (!cancelled) setLastSamples(next)
-    })()
-    return () => { cancelled = true }
-  }, [diagnosticsOpen, carapaceRun.result, carapaceRun.runId])
+      for (const tag of previewTags) {
+        const entry = source.layout.columns.disp.get(tag)
+        if (entry) next[tag] = Array.from(frame.row.subarray(entry.offset, entry.offset + entry.labels.length))
+      }
+      setLastSamples(next)
+    }).catch(() => { /* best-effort preview; the run's own status already reports failures */ })
+    return () => { live = false }
+  }, [source, previewTags, carapaceRun.result])
 
   const isGroupCollapsed = (g: DisplayGroup) => {
     if (g.count <= 1) return false
@@ -307,7 +306,7 @@ export function AnalysisPanel() {
                   [{d.severity}] {d.message}
                 </p>
               ))}
-              {carapaceRun.result && carapaceRun.result.recordedNodeTags.map((nodeTag) => {
+              {carapaceRun.result && previewTags.map((nodeTag) => {
                 const last = lastSamples[nodeTag]
                 return (
                   <p key={`n${nodeTag}`} className="text-muted-foreground font-mono">
@@ -315,6 +314,9 @@ export function AnalysisPanel() {
                   </p>
                 )
               })}
+              {carapaceRun.result && carapaceRun.result.recordedNodeTags.length > PREVIEW_NODES && (
+                <p className="text-muted-foreground/60">… and {(carapaceRun.result.recordedNodeTags.length - PREVIEW_NODES).toLocaleString()} more node(s); see the Results tables.</p>
+              )}
             </div>
           )}
         </div>

@@ -5,7 +5,12 @@ import { StepFrameSource } from './stepFrames'
 let current: { runId: string; promise: Promise<StepFrameSource | null> } | null = null
 
 function sourceFor(runId: string): Promise<StepFrameSource | null> {
-  if (current?.runId !== runId) current = { runId, promise: StepFrameSource.open(runId) }
+  if (current?.runId !== runId) {
+    const entry = { runId, promise: StepFrameSource.open(runId) }
+    current = entry
+    // A run not stored yet is not remembered, so a later call retries.
+    entry.promise.then((source) => { if (!source && current === entry) current = null }, () => { if (current === entry) current = null })
+  }
   return current.promise
 }
 
