@@ -132,6 +132,8 @@ Viewport performance rules: the canvas renders on demand, so anything that chang
 `InstancedMesh` per layer recomputed on `useCameraChange()`, labels through `ScreenLabels`; never an `<Html>`, drei `<Line>` or
 `useFrame` per item, and never drei `<Text>` (its SDF generator loses the WebGL context).
 
+PDF underlays (`types/underlays.ts`, `lib/underlays/`, `components/r3f/Underlays.tsx`, `UnderlaysDialog`): drawing sheets drawn under a level's plan (layout, like grids: not in the model or undo). pdf.js is lazy-loaded; PDF bytes live in their own IndexedDB store keyed by SHA-256 and are never embedded in saved projects (the `layout` directive references them; a missing file shows a placeholder and a relink action). Plan: `docs/pdf-underlay-plan.md`.
+
 Results live in IndexedDB (`lib/resultsStorage`), read per step for display (`useResultsSource`,
 `stepFrames`); 2D models render in the XY plane.
 

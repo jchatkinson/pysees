@@ -258,6 +258,15 @@ export function unanchoredPierEnds(model: Model, e: ElementEntity): number[] {
 
 // ── Drawing walls ────────────────────────────────────────────────────────────
 
+/** A linear `Anchorage` (no slack) with this tension and bearing stiffness: an identical existing one, else a new one written to `batch`. */
+export function holdDownMaterial(batch: { model: Model; writeRaw: (w: ModelWrite) => void }, h: { tension: number; k: number }): number {
+  const found = [...batch.model.materials.values()].find((m) => m.matType === 'Anchorage' && m.args.tension === h.tension && Number(m.args.slack ?? 0) === 0 && m.args.bearing === 'linear' && m.args.k === h.k)
+  if (found) return found.id
+  const id = batch.model.nextIds.material
+  batch.writeRaw({ kind: 'material', entity: { id, kind: 'uniaxial', matType: 'Anchorage', args: { matTag: id, matType: 'Anchorage', tension: h.tension, slack: 0, bearing: 'linear', k: h.k }, usage: 'force-deformation' } })
+  return id
+}
+
 /** What the wall tool draws: a layout recipe (regular studs from the start corner) plus the hold-down material at pier ends. */
 export interface StudWallTemplate {
   spacing: number; studEa: number; endEa: number
@@ -265,8 +274,10 @@ export interface StudWallTemplate {
   law: WallShearLawSpec
   /** Floor zone at the top (depth taken out of the storey height), or none. */
   floor?: { depth: number; ga: number; rimEa: number }
-  /** `Anchorage` material id for hold-downs at pier ends; none leaves them unanchored. */
+  /** `Anchorage` material id for hold-downs at pier ends; none leaves them unanchored (unless `holdDown` is set). */
   anchorage?: number
+  /** A linear hold-down to use when `anchorage` isn't set: the first wall drawn makes the `Anchorage` material (or reuses an identical one). */
+  holdDown?: { tension: number; k: number }
   /** Members as lumber (no openings); when set, a drawn wall's EAs come from it. */
   framing?: WallFraming
 }
@@ -338,7 +349,8 @@ export function drawStudWall(batch: { model: Model; writeRaw: (w: ModelWrite) =>
   const id = batch.model.nextIds.element
   const args: StudWallArgs = { ...(label ? { label } : {}), layout, stations, ...(t.framing ? { framing: { ...t.framing, openings: [] } } : {}) }
   batch.writeRaw({ kind: 'element', entity: { id, eleType: 'studWall', nodes: [...corners, ...stationNodes], args: args as unknown as Record<string, unknown> } })
-  if (t.anchorage === undefined || !batch.model.materials.has(t.anchorage)) return id
+  const anchorage = t.anchorage ?? (t.holdDown && holdDownMaterial(batch, t.holdDown))
+  if (anchorage === undefined || !batch.model.materials.has(anchorage)) return id
   const bottomAt = (x: number) => (x <= 1e-9 * L ? corners[0] : x >= L - 1e-9 * L ? corners[1] : stationNodes[stations.findIndex((s) => s.chord === 'bottom' && Math.abs(s.x - x) <= 1e-9 * L)])
   const planDofs = [1, 2] // both plan translations: the wall's base moves with the floor (see expansionToModel)
   let stiff: number | undefined
@@ -346,7 +358,7 @@ export function drawStudWall(batch: { model: Model; writeRaw: (w: ModelWrite) =>
     const node = bottomAt(x), p = at(x, z0)
     const below = tops.find((q) => q.p.every((v, k) => Math.abs(v - (p[k] ?? 0)) <= tol))
     if (below) {
-      batch.writeRaw({ kind: 'element', entity: { id: batch.model.nextIds.element, eleType: 'zeroLength', nodes: [below.node, node], args: { mat: [t.anchorage], dir: [3] } } })
+      batch.writeRaw({ kind: 'element', entity: { id: batch.model.nextIds.element, eleType: 'zeroLength', nodes: [below.node, node], args: { mat: [anchorage], dir: [3] } } })
       batch.writeRaw({ kind: 'mpConstraint', entity: { id: batch.model.nextIds.mpConstraint, kind: 'equalDOF', args: { rNodeTag: below.node, cNodeTag: node, dofs: planDofs } } })
     } else if (z0 <= lowest + tol) {
       if (stiff === undefined) {
@@ -355,7 +367,7 @@ export function drawStudWall(batch: { model: Model; writeRaw: (w: ModelWrite) =>
       }
       const ground = newNode(p)
       batch.writeRaw({ kind: 'fix', entity: { nodeId: ground, dofs: [1, 2, 3, 4, 5, 6] } })
-      batch.writeRaw({ kind: 'element', entity: { id: batch.model.nextIds.element, eleType: 'zeroLength', nodes: [ground, node], args: { mat: [stiff, stiff, t.anchorage], dir: [1, 2, 3] } } })
+      batch.writeRaw({ kind: 'element', entity: { id: batch.model.nextIds.element, eleType: 'zeroLength', nodes: [ground, node], args: { mat: [stiff, stiff, anchorage], dir: [1, 2, 3] } } })
     }
   }
   return id

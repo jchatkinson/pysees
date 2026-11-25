@@ -434,3 +434,18 @@ describe('stud-wall building template', () => {
     expect(out.ok).toBe(true)
   }, 120_000)
 })
+
+describe('drawing walls with a hold-down recipe', () => {
+  it('makes the Anchorage on the first wall and reuses it after', () => {
+    const model = modelFromWrites(3, 6, [])
+    const t = { spacing: 406, studEa: 1e6, endEa: 3e6, topEa: 2e6, topDistribution: 'beam' as const, bottomEa: 1e6, bottomEi: 1e9, law: { kind: 'linear' as const, ga: 2000 }, holdDown: { tension: 15000, k: 1e6 } }
+    const b = new DrawBatch(model)
+    drawStudWall(b, [0, 0], [4000, 0], 0, 2700, t)
+    drawStudWall(b, [0, 3000], [4000, 3000], 0, 2700, t)
+    const anchorages = [...b.model.materials.values()].filter((m) => m.matType === 'Anchorage')
+    expect(anchorages).toHaveLength(1)
+    expect(anchorages[0].args).toMatchObject({ tension: 15000, slack: 0, bearing: 'linear', k: 1e6 })
+    const holdDowns = [...b.model.elements.values()].filter((e) => e.eleType === 'zeroLength' && (e.args.mat as number[]).includes(anchorages[0].id))
+    expect(holdDowns.length).toBeGreaterThanOrEqual(4)
+  })
+})

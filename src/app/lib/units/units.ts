@@ -17,6 +17,8 @@ const LENGTHS: Record<LengthUnit, number> = { mm: 1e-3, cm: 1e-2, m: 1, in: 0.02
 const FORCES: Record<ForceUnit, number> = { N: 1, kN: 1e3, MN: 1e6, lbf: 4.4482216152605, kip: 4448.2216152605 }
 const TIMES: Record<TimeUnit, number> = { s: 1 }
 export const LENGTH_UNITS = Object.keys(LENGTHS) as LengthUnit[]
+/** Metres in one of `u`. */
+export const lengthSi = (u: LengthUnit) => LENGTHS[u]
 export const FORCE_UNITS = Object.keys(FORCES) as ForceUnit[]
 
 /** Categories a value can belong to. `none` is dimensionless. */

@@ -72,6 +72,16 @@ describe('save then open restores the authored project', () => {
     expect(project.analysis.commands).toHaveLength(5)
   })
 
+  it('keeps PDF underlays by reference, and rejects a malformed one', () => {
+    const underlay = { id: 4, name: 'S-201', file: 'ab'.repeat(32), fileName: 'S-201.pdf', page: 2, pageSize: [2592, 1728] as [number, number], level: 2, origin: [-1.5, 3] as [number, number], scale: 0.0127, rotation: 0.1, opacity: 0.6, knockout: true, visible: false, crop: [100, 80, 2400, 1600] as [number, number, number, number] }
+    const doc = docOf(earthquakeFixture(), { levels: [{ id: 2, label: 'L1', height: 3 }], nextLevelId: 3, underlays: [underlay], nextUnderlayId: 7 })
+    const { project, text } = roundTrip(doc)
+    expect(project.underlays).toEqual([underlay])
+    expect(project.nextUnderlayId).toBe(7)
+    expect(parseProject(text.replace('"knockout":true', '"knockout":"yes"')).diagnostics.some((d) => /Invalid underlay/.test(d.message))).toBe(true)
+    expect(serializeProject(docOf(earthquakeFixture()))).not.toContain('underlays')
+  })
+
   it('saves analysis commands through the cursor only', () => {
     const f = earthquakeFixture()
     const { project } = roundTrip(docOf({ model: f.model, history: { commands: [recorder, gravity, { ...gravity, params: { patterns: [1], steps: 9 } }], cursor: 1 } }))

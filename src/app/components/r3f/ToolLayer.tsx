@@ -14,6 +14,30 @@ import { levelElevations } from '@/app/lib/levels'
 import { ScreenSize } from './ScreenSize'
 import { drawStudWall } from '@/app/lib/studWalls'
 
+const PICK_SHEET = '#db2777'
+
+/** Picks so far for the underlay tool: sheet points in magenta, align targets in blue with a dashed line from their sheet point, a crop rectangle. */
+function UnderlayPickPreview({ hover, z }: { hover: P3 | null; z: number }) {
+  const pick = useAppStore((s) => s.underlayPick)
+  if (!pick) return null
+  const noRaycast = () => null
+  const pts: P3[] = pick.points.map((p) => [p[0], p[1], z])
+  const all = hover && pts.length < (pick.kind === 'align' ? 4 : 2) ? [...pts, hover] : pts
+  const isTarget = (i: number) => pick.kind === 'align' && i % 2 === 1
+  const lines: P3[][] = []
+  if (pick.kind === 'calibrate' && all.length >= 2) lines.push([all[0], all[1]])
+  if (pick.kind === 'align') for (let i = 1; i < all.length; i += 2) lines.push([all[i - 1], all[i]])
+  if (pick.kind === 'crop' && all.length >= 2) { const [a, b] = all; lines.push([a, [b[0], a[1], z], b, [a[0], b[1], z], a]) }
+  return (
+    <>
+      {lines.map((l, i) => <Line key={i} points={l} color={PICK_SHEET} lineWidth={2} dashed={pick.kind === 'align'} dashSize={6} gapSize={4} raycast={noRaycast} />)}
+      {pts.map((p, i) => (
+        <ScreenSize key={i} position={p}><mesh raycast={noRaycast}><boxGeometry args={[7, 7, 7]} /><meshBasicMaterial color={isTarget(i) ? PREVIEW : PICK_SHEET} /></mesh></ScreenSize>
+      ))}
+    </>
+  )
+}
+
 const SNAP_PX = 12
 type Hover = { point: P3 | null; snap: SnapPoint | null; bay: [P3, P3] | null; cell?: P3[] | null }
 const NO_HOVER: Hover = { point: null, snap: null, bay: null }
@@ -92,8 +116,14 @@ export function ToolLayer({ mode, nodes, elements, ndm }: { mode: ViewMode; node
       const ray = new Raycaster()
       ray.setFromCamera(new Vector2((cursor.x / r.width) * 2 - 1, -(cursor.y / r.height) * 2 + 1), camera)
       const hit = ray.ray.intersectPlane(plane, new Vector3())
-      const onPlane: P3 | null = hit ? roundToIncrement([hit.x, hit.y, hit.z], plane.normal, increment) : null
       const s = useAppStore.getState()
+      if (tool === 'underlay') {
+        // Points on the sheet are taken as clicked (no drawing increment); an align target snaps to grids and nodes.
+        const target = s.underlayPick?.kind === 'align' && s.underlayPick.points.length % 2 === 1
+        const snap = target ? pickSnap(snaps, project, cursor, SNAP_PX) : null
+        return { point: snap?.p ?? (hit ? [hit.x, hit.y, hit.z] : null), snap, bay: null }
+      }
+      const onPlane: P3 | null = hit ? roundToIncrement([hit.x, hit.y, hit.z], plane.normal, increment) : null
       if (tool === 'shell') return { point: null, snap: null, bay: null, cell: onPlane ? cellAt(mode, s.gridlines, s.levels, onPlane) : null }
       if (tool === 'quickBeam' || (tool === 'quickColumn' && mode.kind !== 'plan')) {
         return { point: null, snap: null, bay: onPlane ? bayAt(tool === 'quickBeam' ? beamLines : columnLines, onPlane, project, cursor, SNAP_PX) : null }
@@ -133,6 +163,7 @@ export function ToolLayer({ mode, nodes, elements, ndm }: { mode: ViewMode; node
     const onClick = (e: MouseEvent) => {
       if (e.button !== 0) return
       const h = read(e)
+      if (tool === 'underlay') { if (h.point) useAppStore.getState().addUnderlayPickPoint([h.point[0], h.point[1]]); return }
       if (tool === 'support') {
         if (h.snap?.nodeId !== undefined) { const id = h.snap.nodeId; commit((b) => b.support(id, supportDofs(preset, ndm, useAppStore.getState().model.config?.ndf ?? 6)), false) }
         return
@@ -180,8 +211,14 @@ export function ToolLayer({ mode, nodes, elements, ndm }: { mode: ViewMode; node
       if (e.key === 'Shift') shift.current = e.type === 'keydown'
       if (e.type !== 'keydown' || shouldIgnoreHotkeys(e.target)) return
       const s = useAppStore.getState()
-      const typing = (tool === 'frame' || tool === 'studWall') && start && !e.ctrlKey && !e.metaKey && !e.altKey
       const consume = () => { e.preventDefault(); e.stopImmediatePropagation() }
+      if (tool === 'underlay') {
+        if (e.key === 'Escape') s.setActiveTool('select')
+        // Enter after the first align pair moves the sheet without rotating it.
+        if (e.key === 'Enter' && s.underlayPick?.kind === 'align' && s.underlayPick.points.length === 2) { consume(); s.applyUnderlayPick() }
+        return
+      }
+      const typing = (tool === 'frame' || tool === 'studWall') && start && !e.ctrlKey && !e.metaKey && !e.altKey
       if (typing && /^[0-9.,'"a-zA-Z ]$/.test(e.key) && (s.toolInput !== '' || /[0-9.]/.test(e.key))) { consume(); s.setToolInput(s.toolInput + e.key); return }
       if (typing && e.key === 'Backspace' && s.toolInput) { consume(); s.setToolInput(s.toolInput.slice(0, -1)); return }
       if (e.key === 'Enter' && typing && s.toolInput) {
@@ -227,6 +264,7 @@ export function ToolLayer({ mode, nodes, elements, ndm }: { mode: ViewMode; node
   const noRaycast = () => null
   return (
     <>
+      {tool === 'underlay' && <UnderlayPickPreview hover={hover.point} z={plane.normal.z ? -plane.constant / plane.normal.z : 0} />}
       {start && hover.point && <Line points={[start, hover.point]} color={PREVIEW} lineWidth={2} raycast={noRaycast} />}
       {poly.length >= 2 && <Line points={poly} color={PREVIEW} lineWidth={2} raycast={noRaycast} />}
       {poly.length >= 2 && hover.point && <Line points={[hover.point, poly[0]]} color={PREVIEW} lineWidth={1} dashed dashSize={6} gapSize={4} transparent opacity={0.6} raycast={noRaycast} />}

@@ -5,7 +5,7 @@ import { Input } from '@/app/components/ui/input'
 import { Label } from '@/app/components/ui/label'
 import { Button } from '@/app/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/app/components/ui/tooltip'
-import { ArrowLeft, Building2, FilePlus, FolderOpen, House } from 'lucide-react'
+import { ArrowLeft, FilePlus, FolderOpen } from 'lucide-react'
 import { useAppStore } from '@/app/store/useAppStore'
 import { UNIT_PRESETS, type BaseUnits, type UnitPrefs } from '@/app/lib/units/units'
 import { canImport, readScriptFile } from '@/app/lib/project/open'
@@ -34,14 +34,18 @@ import frame2dImg from '@/app/assets/templates/frame2d.png'
 import frame3dImg from '@/app/assets/templates/frame3d.png'
 import plateImg from '@/app/assets/templates/plate.png'
 import precastWallImg from '@/app/assets/templates/precastWall.png'
+import gridImg from '@/app/assets/templates/grid.png'
+import towerImg from '@/app/assets/templates/tower.png'
+import studBuildingImg from '@/app/assets/templates/studBuilding.png'
 import { StudBuildingForm } from '@/app/components/StudBuildingForm'
+import { GridTemplateForm } from '@/app/components/GridTemplateForm'
 import { studBuildingModel } from '@/app/lib/studWalls'
 import { loadCarapaceWasm } from '@/app/lib/carapace/wasm'
 import type { StudBuildingParams } from '@/app/types/model'
 
 const NO_UNITS = 'none'
 
-type Choice = 'new' | 'load' | 'momentCurvature' | 'cantilever' | 'frame' | 'frame3d' | 'plate' | 'precastWall' | 'tower' | 'studBuilding'
+type Choice = 'new' | 'load' | 'grid' | 'momentCurvature' | 'cantilever' | 'frame' | 'frame3d' | 'plate' | 'precastWall' | 'tower' | 'studBuilding'
 
 interface CardProps {
   title: string
@@ -214,6 +218,7 @@ function InitDialog() {
   const step2Title: Record<Choice, string> = {
     load: 'Open Project',
     new: 'New Model',
+    grid: 'Grid only',
     momentCurvature: 'Moment-Curvature',
     cantilever: 'Cantilever Column',
     frame: '2D Frame',
@@ -243,6 +248,7 @@ function InitDialog() {
             </div>
             <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide pt-1">Templates</p>
             <div className="grid grid-cols-3 gap-2">
+              <Card title="Grid only" description="An empty model on grid lines and story levels you set up, ready to draw on." image={gridImg} onClick={() => select('grid')} />
               <Card
                 title="Moment-Curvature"
                 description="Two-node zerolength with fiber section (300×500mm, 4 Ø20 bars)."
@@ -279,8 +285,8 @@ function InitDialog() {
                 image={precastWallImg}
                 onClick={() => select('precastWall')}
               />
-              <Card title="Tower" description="Large flat-slab building: frame plus meshed shell slabs at every level. A stress test." icon={<Building2 />} onClick={() => select('tower')} />
-              <Card title="Stud-wall building" description="Multistorey light-frame box with floors, openings, anchorage and lateral loads." icon={<House />} onClick={() => select('studBuilding')} />
+              <Card title="Tower" description="Large flat-slab building: frame plus meshed shell slabs at every level. A stress test." image={towerImg} onClick={() => select('tower')} />
+              <Card title="Stud-wall building" description="Multistorey light-frame box with floors, openings, anchorage and lateral loads." image={studBuildingImg} onClick={() => select('studBuilding')} />
             </div>
           </>
         )}
@@ -608,9 +614,11 @@ function InitDialog() {
               </div>
             )}
 
+            {choice === 'grid' && <GridTemplateForm />}
+
             {choice === 'studBuilding' && <>{studError && <p className="text-xs text-destructive">{studError}</p>}<StudBuildingForm busy={studBusy} onCreate={(params) => void createStudBuilding(params)} /></>}
 
-            {choice !== 'studBuilding' && <div className="flex justify-end">
+            {choice !== 'studBuilding' && choice !== 'grid' && <div className="flex justify-end">
               {choice === 'load'
                 ? <Button disabled={!preview || !canImport(preview.result)} onClick={handleLoad}>Open</Button>
                 : <Button onClick={handleCreate}>Create Model</Button>}

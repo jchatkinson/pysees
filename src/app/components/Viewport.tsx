@@ -11,7 +11,6 @@ import { ResultsDisplayPanel } from './ResultsDisplayPanel'
 import { PlotOverlay } from './plot/PlotOverlay'
 import { viewLabel } from '@/app/lib/editor/viewSlice'
 import { currentView } from './ribbon/commands'
-import { DrawOptions } from './DrawOptions'
 
 type MarqueeRect = { x1: number; y1: number; x2: number; y2: number }
 
@@ -154,7 +153,6 @@ export function Viewport() {
           </div>
         </div>
       )}
-      {hasConfig && <DrawOptions />}
       {hasConfig && <ShellLoadLegend />}
       {!hasConfig && (
         <div className="absolute inset-0 grid place-items-center pointer-events-none">

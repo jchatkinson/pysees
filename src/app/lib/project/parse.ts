@@ -174,6 +174,11 @@ export function parseProject(text: string): ImportResult {
   const levels = (Array.isArray(layout.levels) ? layout.levels : []) as Rec[]
   if (!gridlines.every((g) => isRec(g) && isInt(g.id) && typeof g.label === 'string' && Array.isArray(g.start) && Array.isArray(g.end))) error('Invalid grid line in the "layout" annotation.', single.layout?.line)
   if (!levels.every((l) => isRec(l) && isInt(l.id) && typeof l.label === 'string' && isNum(l.height))) error('Invalid level in the "layout" annotation.', single.layout?.line)
+  const underlays = (Array.isArray(layout.underlays) ? layout.underlays : []) as Rec[]
+  const pair = (v: unknown) => Array.isArray(v) && v.length === 2 && v.every(isNum)
+  if (!underlays.every((u) => isRec(u) && isInt(u.id) && typeof u.name === 'string' && typeof u.file === 'string' && typeof u.fileName === 'string' && isInt(u.page) && pair(u.pageSize)
+    && (u.level === null || isInt(u.level)) && pair(u.origin) && isNum(u.scale) && isNum(u.rotation) && isNum(u.opacity) && typeof u.knockout === 'boolean' && typeof u.visible === 'boolean'
+    && (u.crop === undefined || (Array.isArray(u.crop) && u.crop.length === 4 && u.crop.every(isNum))))) error('Invalid underlay in the "layout" annotation.', single.layout?.line)
   const report = single.report?.data ?? {}
   const savedPlots = (Array.isArray(report.savedPlots) ? report.savedPlots : []) as Rec[]
   if (!savedPlots.every((p) => isRec(p) && p.kind === 'plot' && isInt(p.id) && typeof p.name === 'string' && isRec(p.config) && Array.isArray(p.config.series))) error('Invalid saved plot in the "report" annotation.', single.report?.line)
@@ -184,6 +189,7 @@ export function parseProject(text: string): ImportResult {
   const project: ProjectDocument = {
     model, analysis: { ...emptyAnalysisHistory(), commands, cursor: commands.length - 1 },
     gridlines: gridlines as never, levels: levels as never, nextGridlineId: nextId(layout.nextGridlineId, gridlines), nextLevelId: nextId(layout.nextLevelId, levels),
+    underlays: underlays as never, nextUnderlayId: nextId(layout.nextUnderlayId, underlays),
     savedPlots: savedPlots as never, nextSavedPlotId: nextId(report.nextSavedPlotId, savedPlots),
     activeSavedPlotId: isInt(report.activeSavedPlotId) && savedPlots.some((p) => p.id === report.activeSavedPlotId) ? report.activeSavedPlotId : null,
     display: {
@@ -193,6 +199,6 @@ export function parseProject(text: string): ImportResult {
       resultsView: isRec(display.resultsView) ? display.resultsView : {}, plotView: isRec(display.plotView) ? display.plotView : {},
     },
   }
-  const counts = { ...built.counts, ...(commands.length ? { 'Analysis commands': commands.length } : {}), ...(gridlines.length ? { 'Grid lines': gridlines.length } : {}), ...(levels.length ? { Levels: levels.length } : {}), ...(savedPlots.length ? { 'Saved plots': savedPlots.length } : {}) }
+  const counts = { ...built.counts, ...(commands.length ? { 'Analysis commands': commands.length } : {}), ...(gridlines.length ? { 'Grid lines': gridlines.length } : {}), ...(levels.length ? { Levels: levels.length } : {}), ...(underlays.length ? { Underlays: underlays.length } : {}), ...(savedPlots.length ? { 'Saved plots': savedPlots.length } : {}) }
   return { ...built, model, diagnostics, counts, writes: built.writes, project }
 }

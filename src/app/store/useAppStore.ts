@@ -6,6 +6,8 @@ import type { Model, ResultsState } from '@/app/types/model'
 import { emptyModel } from '@/app/types/model'
 import type { GridlineEntity } from '@/app/types/gridlines'
 import type { LevelEntity } from '@/app/types/levels'
+import type { UnderlayEntity } from '@/app/types/underlays'
+import { aligned, calibrated, cropFrom } from '@/app/lib/underlays/transform'
 import { validateUniaxialMaterialValues } from '@/app/lib/commandSchemas'
 import { applyModelWrite, applyModelWrites, deleteEntity, previewDeleteEntity, removeModelChild, type ModelDeletableKind, type ModelWrite } from '@/app/lib/modelWrite'
 import { runMaterialPreview as runCarapaceMaterialPreview } from '@/app/lib/carapace/materialPreview'
@@ -24,7 +26,9 @@ import type { ViewMode } from '@/app/lib/editor/viewSlice'
 import type { DrawTemplate } from '@/app/lib/editor/properties'
 
 export type EditDialogKind = 'move' | 'copy' | 'mirror' | 'divide' | 'nodalLoad' | 'memberLoad'
-export type ToolId = 'select' | 'frame' | 'quickBeam' | 'quickColumn' | 'shell' | 'studWall' | 'floor' | 'support'
+export type ToolId = 'select' | 'frame' | 'quickBeam' | 'quickColumn' | 'shell' | 'studWall' | 'floor' | 'support' | 'underlay'
+/** Points picked in the viewport to calibrate, align or crop an underlay (world X–Y on its level). Align alternates sheet point, target point. */
+export interface UnderlayPick { id: number; kind: 'calibrate' | 'align' | 'crop'; points: [number, number][]; keepScale: boolean }
 
 /** Suits both forces and displacements in most structural problems. */
 export const DEFAULT_ZERO_TOLERANCE = 1e-6
@@ -84,6 +88,23 @@ export interface AppStore {
   updateLevel: (id: number, patch: Partial<Omit<LevelEntity, 'id'>>) => void
   removeLevel: (id: number) => void
   moveLevel: (id: number, direction: 'up' | 'down') => void
+  /** PDF drawing sheets drawn under a level's plan (layout, like grids: not in the model or its undo history). */
+  underlays: UnderlayEntity[]
+  nextUnderlayId: number
+  addUnderlay: (entity: Omit<UnderlayEntity, 'id'>) => void
+  updateUnderlay: (id: number, patch: Partial<Omit<UnderlayEntity, 'id'>>) => void
+  removeUnderlay: (id: number) => void
+  underlaysDialogOpen: boolean
+  setUnderlaysDialogOpen: (open: boolean) => void
+  /** The underlay tool's picks (`activeTool === 'underlay'`). */
+  underlayPick: UnderlayPick | null
+  /** Closes the dialog, shows the underlay's plan and starts picking. */
+  startUnderlayPick: (id: number, kind: UnderlayPick['kind']) => void
+  /** Adds a pick; align (four points) and crop (two) apply themselves when complete. */
+  addUnderlayPickPoint: (p: [number, number]) => void
+  setUnderlayPickKeepScale: (keepScale: boolean) => void
+  /** Applies the picks: calibrate with the real `distance` between its two points; align with one pair moves the sheet only. */
+  applyUnderlayPick: (distance?: number) => void
   results: ResultsState | null
   materialPreview: {
     running: boolean
@@ -150,6 +171,10 @@ export interface AppStore {
     showStoryAbove: boolean
     /** Draw members at their section shape and shells at their thickness (`ExtrudedLayer`). */
     extruded: boolean
+    /** PDF underlays in the plan of their level. */
+    showUnderlays: boolean
+    /** Underlays also in the 3D view, at their level. */
+    showUnderlays3D: boolean
   }
   /** Pattern tags whose loads are hidden in the viewport; a pattern is shown unless listed, so new patterns appear by default. */
   hiddenLoadPatterns: number[]
@@ -344,6 +369,47 @@ export const useAppStore = create<AppStore>((set, get) => {
     ;[next[index], next[target]] = [next[target], next[index]]
     return { levels: next }
   }),
+  underlays: [],
+  nextUnderlayId: 1,
+  addUnderlay: (entity) => set((s) => ({ underlays: [...s.underlays, { ...entity, id: s.nextUnderlayId }], nextUnderlayId: s.nextUnderlayId + 1 })),
+  updateUnderlay: (id, patch) => set((s) => ({ underlays: s.underlays.map((u) => (u.id === id ? { ...u, ...patch } : u)) })),
+  removeUnderlay: (id) => set((s) => ({ underlays: s.underlays.filter((u) => u.id !== id) })),
+  underlaysDialogOpen: false,
+  setUnderlaysDialogOpen: (open) => set({ underlaysDialogOpen: open }),
+  underlayPick: null,
+  startUnderlayPick: (id, kind) => set((s) => {
+    const u = s.underlays.find((x) => x.id === id)
+    if (!u) return s
+    const ndm = s.model.config?.ndm === 2 ? 2 : 3
+    const index = u.level === null ? -1 : s.levels.findIndex((l) => l.id === u.level)
+    if (ndm === 3 && index === -1 && u.level !== null) return { status: `${u.name} is on a deleted level: choose a level first.` }
+    return {
+      underlayPick: { id, kind, points: [], keepScale: false }, activeTool: 'underlay', activeRightPanel: 'command', underlaysDialogOpen: false, selectedNodeIds: [], selectedElementIds: [],
+      ...(ndm === 3 ? { viewMode: { kind: 'plan', level: index } as ViewMode } : {}),
+      ...(u.visible ? {} : { underlays: s.underlays.map((x) => (x.id === id ? { ...x, visible: true } : x)) }),
+    }
+  }),
+  addUnderlayPickPoint: (p) => {
+    const pick = get().underlayPick
+    if (!pick) return
+    const points = [...pick.points, p]
+    const full = pick.kind === 'calibrate' ? 2 : pick.kind === 'crop' ? 2 : 4
+    if (points.length > full) return
+    set({ underlayPick: { ...pick, points } })
+    if (pick.kind !== 'calibrate' && points.length === full) get().applyUnderlayPick()
+  },
+  setUnderlayPickKeepScale: (keepScale) => set((s) => (s.underlayPick ? { underlayPick: { ...s.underlayPick, keepScale } } : s)),
+  applyUnderlayPick: (distance) => set((s) => {
+    const pick = s.underlayPick, u = s.underlays.find((x) => x.id === pick?.id)
+    if (!pick || !u) return { underlayPick: null, activeTool: 'select' }
+    const [a, b, c, d] = pick.points
+    let patch: Partial<UnderlayEntity> | null = null, done = ''
+    if (pick.kind === 'calibrate' && a && b && distance !== undefined) { patch = calibrated(u, a, b, distance); done = 'scale calibrated' }
+    if (pick.kind === 'align' && a && b) { patch = aligned(u, a, b, c && d ? c : undefined, c && d ? d : undefined, pick.keepScale); done = c && d ? 'aligned' : 'moved' }
+    if (pick.kind === 'crop' && a && b) { const crop = cropFrom(u, u.pageSize, a, b); patch = crop && { crop }; done = 'cropped' }
+    if (!patch) return { status: 'The picked points coincide: pick again.', underlayPick: { ...pick, points: [] } }
+    return { underlays: s.underlays.map((x) => (x.id === u.id ? { ...x, ...patch } : x)), underlayPick: null, activeTool: 'select', status: `${u.name}: ${done}.` }
+  }),
   results: null,
   materialPreview: { running: false, jobId: null, points: [], error: null, panelOpen: false, protocol: [...DEFAULT_STRAIN_PROTOCOL], inputMaterial: null },
   activePanel: 'model',
@@ -452,6 +518,8 @@ export const useAppStore = create<AppStore>((set, get) => {
     showLevels: true,
     showStoryAbove: true,
     extruded: false,
+    showUnderlays: true,
+    showUnderlays3D: false,
   },
   hiddenLoadPatterns: [],
   toggleLoadPatternVisible: (id) => set((s) => ({ hiddenLoadPatterns: s.hiddenLoadPatterns.includes(id) ? s.hiddenLoadPatterns.filter((x) => x !== id) : [...s.hiddenLoadPatterns, id] })),
@@ -511,7 +579,8 @@ export const useAppStore = create<AppStore>((set, get) => {
       nextGridlineId: gridlines.reduce((max, g) => Math.max(max, g.id + 1), 1),
       levels,
       nextLevelId: levels.reduce((max, l) => Math.max(max, l.id + 1), 1),
-      selectedModelEntity: null, selectedNodeIds: [], selectedElementIds: [], viewMode: { kind: '3d' }, isolated: null, activeTool: 'select', drawTemplate: null, shellTemplate: null, wallTemplate: null, floorTemplate: null,
+      underlays: [], nextUnderlayId: 1,
+      selectedModelEntity: null, selectedNodeIds: [], selectedElementIds: [], viewMode: { kind: '3d' }, isolated: null, activeTool: 'select', underlayPick: null, drawTemplate: null, shellTemplate: null, wallTemplate: null, floorTemplate: null,
       selectedAnalysisIndex: null,
       analysisInsertionIndex: null,
       resultsView: DEFAULT_RESULTS_VIEW,
@@ -539,13 +608,14 @@ export const useAppStore = create<AppStore>((set, get) => {
       model: project.model, modelPast: [], modelFuture: [],
       analysisHistory: { commands: project.analysis.commands, cursor: project.analysis.commands.length - 1 },
       gridlines: project.gridlines, nextGridlineId: project.nextGridlineId, levels: project.levels, nextLevelId: project.nextLevelId,
+      underlays: project.underlays, nextUnderlayId: project.nextUnderlayId,
       savedPlots: project.savedPlots, nextSavedPlotId: project.nextSavedPlotId, activeSavedPlotId: project.activeSavedPlotId,
       viewSettings: { ...s.viewSettings, ...Object.fromEntries(Object.entries(project.display.viewSettings).filter(([k]) => k in s.viewSettings)) },
       unitPrefs: project.display.unitPrefs,
       hiddenLoadPatterns: project.display.hiddenLoadPatterns,
       resultsView: { ...DEFAULT_RESULTS_VIEW, ...keep<ResultsView>(project.display.resultsView, RESULTS_PREF_KEYS) },
       plotView: { ...DEFAULT_PLOT_VIEW, ...keep<PlotView>(project.display.plotView, PLOT_PREF_KEYS) },
-      selectedModelEntity: null, selectedAnalysisIndex: null, analysisInsertionIndex: null, selectedNodeIds: [], selectedElementIds: [], viewMode: { kind: '3d' }, isolated: null, activeTool: 'select', drawTemplate: null, shellTemplate: null, wallTemplate: null, floorTemplate: null, nodePickMode: 'none', pendingNodePick: null,
+      selectedModelEntity: null, selectedAnalysisIndex: null, analysisInsertionIndex: null, selectedNodeIds: [], selectedElementIds: [], viewMode: { kind: '3d' }, isolated: null, activeTool: 'select', underlayPick: null, drawTemplate: null, shellTemplate: null, wallTemplate: null, floorTemplate: null, nodePickMode: 'none', pendingNodePick: null,
       results: null, projectFileName: fileName ?? s.projectFileName,
     }))
   },
@@ -562,10 +632,11 @@ export const useAppStore = create<AppStore>((set, get) => {
       nextGridlineId: 1,
       levels: [],
       nextLevelId: 1,
+      underlays: [], nextUnderlayId: 1,
       selectedModelEntity: null,
       selectedAnalysisIndex: null,
       analysisInsertionIndex: null,
-      selectedNodeIds: [], selectedElementIds: [], viewMode: { kind: '3d' }, isolated: null, activeTool: 'select', drawTemplate: null, shellTemplate: null, wallTemplate: null, floorTemplate: null,
+      selectedNodeIds: [], selectedElementIds: [], viewMode: { kind: '3d' }, isolated: null, activeTool: 'select', underlayPick: null, drawTemplate: null, shellTemplate: null, wallTemplate: null, floorTemplate: null,
       nodePickMode: 'none',
       pendingNodePick: null,
       results: null,
@@ -727,7 +798,7 @@ export const useAppStore = create<AppStore>((set, get) => {
   paletteOpen: false,
   setPaletteOpen: (paletteOpen) => set({ paletteOpen }),
   activeTool: 'select',
-  setActiveTool: (activeTool) => set((s) => ({ activeTool, ...(activeTool !== 'select' ? { selectedNodeIds: [], selectedElementIds: [], ...followSelection(s, [], []) } : {}) })),
+  setActiveTool: (activeTool) => set((s) => ({ activeTool, ...(activeTool !== 'select' ? { activeRightPanel: 'command' as const } : {}), ...(activeTool !== 'underlay' ? { underlayPick: null } : {}), ...(activeTool !== 'select' ? { selectedNodeIds: [], selectedElementIds: [], ...followSelection(s, [], []) } : {}) })),
   drawTemplate: null,
   setDrawTemplate: (drawTemplate) => set({ drawTemplate }),
   supportPreset: 'fixed',

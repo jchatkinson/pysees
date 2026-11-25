@@ -6,10 +6,11 @@ import { useAppStore, type ToolId } from '@/app/store/useAppStore'
 import { deriveProperties, sectionName, templateKey, templateName, type DrawTemplate } from '@/app/lib/editor/properties'
 import { isFrameTemplate } from '@/app/lib/editor/draw'
 import { useUnits } from '@/app/lib/units/useUnits'
-import type { Category } from '@/app/lib/units/units'
+import type { BaseUnits, Category } from '@/app/lib/units/units'
 import { isStudWall, studWallArgs, studWallTemplateOf, type StudWallTemplate } from '@/app/lib/studWalls'
 import { CUSTOM, framingStiffness, GRADE_ITEMS, HEADER_ITEMS, lumberScale, sizeOf, STUD_ITEMS, type WallFraming } from '@/app/lib/lumber'
 import { isJoistFloor, joistFloorArgs, type JoistFloorArgs } from '@/app/lib/floors'
+import { UnderlayPickPanel } from './UnderlayPickPanel'
 
 const HINTS: Record<Exclude<ToolId, 'select'>, string> = {
   frame: 'Click points to draw members. Right-click or Enter ends the chain; Esc leaves the tool. Shift locks to an axis.',
@@ -19,8 +20,9 @@ const HINTS: Record<Exclude<ToolId, 'select'>, string> = {
   studWall: 'Plan: click points to draw stud walls along them, each spanning the story below this level. Right-click or Enter ends the chain. Pier ends are held down to a wall below or, on the lowest story, to the ground. Add new walls to the diaphragm afterwards (select the top nodes).',
   floor: 'Plan: click the floor outline point by point (any shape) at this level; click the first point, right-click or Enter to close it. Joists run in the set direction at the set spacing and carry gravity to the stud walls under them; give the floor its loads in its properties.',
   support: 'Click a node to give it this support.',
+  underlay: 'Pick points on the PDF underlay.',
 }
-const TITLES: Record<Exclude<ToolId, 'select'>, string> = { frame: 'Draw frame', quickBeam: 'Quick beams', quickColumn: 'Quick columns', shell: 'Shells', studWall: 'Stud walls', floor: 'Joist floors', support: 'Supports' }
+const TITLES: Record<Exclude<ToolId, 'select'>, string> = { frame: 'Draw frame', quickBeam: 'Quick beams', quickColumn: 'Quick columns', shell: 'Shells', studWall: 'Stud walls', floor: 'Joist floors', support: 'Supports', underlay: 'Underlay' }
 
 type NewKind = 'ElasticBeamColumn' | 'DispBeamColumn' | 'Truss'
 const ELASTIC_FIELDS: { key: string; cat: Category; only3d?: boolean }[] = [
@@ -140,7 +142,6 @@ function ShellOptions() {
   )
 }
 
-/** The stud-wall tool's wall type: like an existing wall (its spacing, EAs, chords, sheathing, floor zone and hold-down), or a new one. */
 /** The floor tool's framing: like an existing floor, or set here (direction, spacing, joist, spans). */
 function FloorOptions() {
   const model = useAppStore((s) => s.model)
@@ -178,90 +179,120 @@ function FloorOptions() {
   )
 }
 
+type WallField = 'spacing' | 'ga' | 'depth' | 'floorGa' | 'tension' | 'bearing'
+const WALL_FIELDS: [WallField, string, Category, boolean?][] = [
+  ['spacing', 'Stud spacing', 'length'], ['ga', 'Sheathing Ga', 'forcePerLength'], ['depth', 'Floor depth', 'length', true], ['floorGa', 'Floor Ga', 'forcePerLength', true],
+  ['tension', 'Hold-down k', 'forcePerLength'], ['bearing', 'Bearing k', 'forcePerLength'],
+]
+interface WallLumber { grade: string; e?: number; stud: string; endPlies: number; topPlies: number; bottomPlies: number }
+
+/**
+ * A starting wall in model units: 2x6 studs at 16 in (406 mm), 3-ply end posts, double top plate, Ga 2 kN/mm (about 7/16 in OSB), a 254 mm
+ * floor zone with the stud-building template's band Ga, and its hold-down (15 kN/mm, bearing 1000 kN/mm).
+ */
+function defaultWall(units: BaseUnits | undefined): { values: Record<WallField, number>; lumber: WallLumber } {
+  const s = lumberScale(units, 2400), fpl = s.mm * s.mpa // N/mm in model force per length
+  const imperial = ['in', 'ft'].includes(units?.length ?? '')
+  return {
+    values: { spacing: (imperial ? 16 * 25.4 : 406) * s.mm, ga: 2000 * fpl, depth: 254 * s.mm, floorGa: 10000 * fpl, tension: 15000 * fpl, bearing: 1e6 * fpl },
+    lumber: { grade: imperial ? 'nds-spf' : 'o86-spf', stud: '2x6', endPlies: 3, topPlies: 2, bottomPlies: 1 },
+  }
+}
+
+/** The tool's wall template from field values; null when a member stiffness comes out non-positive. */
+function wallTemplateFrom(v: Record<WallField, number>, l: WallLumber, units: BaseUnits | undefined): StudWallTemplate | null {
+  const depth = v.depth > 0 ? v.depth : 0
+  const custom = l.grade === CUSTOM ? { e: l.e ?? NaN } : {}
+  const framing: WallFraming = {
+    grade: l.grade, ...custom, stud: l.stud, endPlies: l.endPlies, topPlies: l.topPlies, bottomPlies: l.bottomPlies,
+    headerGrade: l.grade, ...(l.grade === CUSTOM ? { headerE: l.e ?? NaN } : {}), openings: [], ...(depth ? { rim: { size: 'rim32', plies: 1, grade: l.grade, ...custom } } : {}),
+  }
+  // A unitless model is taken as N–mm here; drawing re-derives from the storey height.
+  const k = framingStiffness(framing, lumberScale(units, 2400), depth || undefined)
+  if (![k.studEa, k.endEa, k.topEa, k.bottomEa].every((x) => x > 0)) return null
+  return {
+    spacing: v.spacing, studEa: k.studEa, endEa: k.endEa, topEa: k.topEa, topEi: k.topEi, topDistribution: 'beam', bottomEa: k.bottomEa, bottomEi: k.bottomEi,
+    law: { kind: 'linear', ga: v.ga }, ...(depth ? { floor: { depth, ga: v.floorGa, rimEa: k.rimEa ?? 0 } } : {}), holdDown: { tension: v.tension, k: v.bearing }, framing,
+  }
+}
+
+/** The stud-wall tool's wall type: like an existing wall, the default wall, or one edited here (every field starts at the default). */
 function WallOptions() {
   const model = useAppStore((s) => s.model)
   const template = useAppStore((s) => s.wallTemplate)
   const setTemplate = useAppStore((s) => s.setWallTemplate)
-  const writeModelEntities = useAppStore((s) => s.writeModelEntities)
   const units = useUnits()
-  const [creating, setCreating] = useState(false)
-  const [text, setText] = useState<Record<string, string>>({})
+  const base = model.config?.units
+  const defaults = useMemo(() => defaultWall(base), [base])
+  const defaultTemplate = useMemo(() => wallTemplateFrom(defaults.values, defaults.lumber, base), [defaults, base])
+  const [editing, setEditing] = useState(false)
+  const show = (cat: Category, v: number) => String(Number(units.toDisplay(cat, v).toPrecision(4)))
+  const [text, setText] = useState<Record<string, string>>(() => ({
+    ...Object.fromEntries(WALL_FIELDS.map(([k, , cat]) => [k, show(cat, defaults.values[k])])),
+    grade: defaults.lumber.grade, stud: defaults.lumber.stud, endPlies: String(defaults.lumber.endPlies), topPlies: String(defaults.lumber.topPlies), bottomPlies: String(defaults.lumber.bottomPlies), e: '',
+  }))
   const types = useMemo(() => {
     const seen = new Map<string, { label: string; t: StudWallTemplate }>()
+    if (defaultTemplate) seen.set(JSON.stringify(defaultTemplate), { label: 'Default wall', t: defaultTemplate })
     for (const e of [...model.elements.values()].sort((a, b) => a.id - b.id)) {
       if (!isStudWall(e.eleType)) continue
       const t = studWallTemplateOf(model, e)
       if (t && !seen.has(JSON.stringify(t))) seen.set(JSON.stringify(t), { label: `Like wall ${e.id}${studWallArgs(e.args).label ? ` (${studWallArgs(e.args).label})` : ''}`, t })
     }
     return [...seen].map(([value, { label, t }]) => ({ value, label, t }))
-  }, [model])
-  useEffect(() => { if (!template && types[0]) setTemplate(types[0].t) }, [template, types, setTemplate])
+  }, [model, defaultTemplate])
+  // Draw right away: like the last wall drawn in the model, else the default wall.
+  useEffect(() => { if (!template && types.length) setTemplate(types[types.length - 1].t) }, [template, types, setTemplate])
   const key = template ? JSON.stringify(template) : ''
-  const items = types.some((i) => i.value === key) || !template ? types : [{ value: key, label: 'New wall type', t: template }, ...types]
+  const items = types.some((i) => i.value === key) || !template ? types : [{ value: key, label: 'Edited wall type', t: template }, ...types]
   const len = (v: number) => `${Number(units.toDisplay('length', v).toPrecision(4))}${units.symbol('length') ? ` ${units.symbol('length')}` : ''}`
-  const FIELDS: [string, string, Category, boolean?][] = [
-    ['spacing', 'Stud spacing', 'length'], ['ga', 'Sheathing Ga', 'forcePerLength'], ['depth', 'Floor depth', 'length', true], ['floorGa', 'Floor Ga', 'forcePerLength', true],
-    ['tension', 'Hold-down k', 'forcePerLength'], ['bearing', 'Bearing k', 'forcePerLength'],
-  ]
-  // Members as lumber: grade (a custom one with its E), stud size, plies.
-  const lumber = { grade: text.grade ?? (units.active && ['in', 'ft'].includes(units.symbol('length')) ? 'nds-spf' : 'o86-spf'), stud: text.stud ?? '2x6', endPlies: text.endPlies ?? '3', topPlies: text.topPlies ?? '2', bottomPlies: text.bottomPlies ?? '1' }
-  const values = Object.fromEntries(FIELDS.map(([k, , cat]) => [k, units.parse(cat, text[k] ?? '')]))
-  const customE = units.parse('stress', text.e ?? '')
-  const depth = values.depth ?? 0
+
   const count = (v: string) => { const n = Number(v); return Number.isInteger(n) && n >= 1 ? n : NaN }
-  const framing: WallFraming = {
-    grade: lumber.grade, ...(lumber.grade === CUSTOM ? { e: customE ?? NaN } : {}), stud: lumber.stud, endPlies: count(lumber.endPlies), topPlies: count(lumber.topPlies), bottomPlies: count(lumber.bottomPlies),
-    headerGrade: lumber.grade, ...(lumber.grade === CUSTOM ? { headerE: customE ?? NaN } : {}), openings: [], ...(depth > 0 ? { rim: { size: 'rim32', plies: 1, grade: lumber.grade, ...(lumber.grade === CUSTOM ? { e: customE ?? NaN } : {}) } } : {}),
-  }
-  const k = framingStiffness(framing, lumberScale(model.config?.units, 2400) /* a unitless model is taken as N–mm here; drawing re-derives from the storey height */, depth > 0 ? depth : undefined)
+  const values = Object.fromEntries(WALL_FIELDS.map(([k, , cat]) => [k, units.parse(cat, text[k] ?? '') ?? (k === 'depth' && !text[k]?.trim() ? 0 : NaN)])) as Record<WallField, number>
+  const lumber: WallLumber = { grade: text.grade, e: units.parse('stress', text.e) ?? undefined, stud: text.stud, endPlies: count(text.endPlies), topPlies: count(text.topPlies), bottomPlies: count(text.bottomPlies) }
   // Required fields positive; the floor zone (depth blank or 0 = none) needs its Ga.
-  const ok = FIELDS.every(([key, , , optional]) => optional || (values[key] ?? 0) > 0) && (depth <= 0 || (values.floorGa ?? 0) > 0) && [k.studEa, k.endEa, k.topEa, k.bottomEa].every((v) => v > 0)
-  const create = () => {
-    if (!ok) return
-    const v = values as Record<string, number>
-    // The hold-down material: reuse an identical Anchorage, else a new one.
-    const args = { tension: v.tension, slack: 0, bearing: 'linear', k: v.bearing }
-    let anchorage = [...model.materials.values()].find((m) => m.matType === 'Anchorage' && m.args.tension === args.tension && m.args.slack === 0 && m.args.bearing === 'linear' && m.args.k === args.k)?.id
-    if (anchorage === undefined) { anchorage = model.nextIds.material; writeModelEntities([{ kind: 'material', entity: { id: anchorage, kind: 'uniaxial', matType: 'Anchorage', args: { matTag: anchorage, matType: 'Anchorage', ...args }, usage: 'force-deformation' } }]) }
-    setTemplate({ spacing: v.spacing, studEa: k.studEa, endEa: k.endEa, topEa: k.topEa, topEi: k.topEi, topDistribution: 'beam', bottomEa: k.bottomEa, bottomEi: k.bottomEi, law: { kind: 'linear', ga: v.ga }, ...(depth > 0 ? { floor: { depth, ga: v.floorGa, rimEa: k.rimEa ?? 0 } } : {}), anchorage, framing })
-    setCreating(false)
-  }
-  const select = (key: keyof typeof lumber, label: string, options: { value: string; label: string }[]) => (
-    <label key={key} className="col-span-2 grid gap-0.5"><span className="text-[11px] text-muted-foreground">{label}</span>
-      <Select items={options} value={lumber[key]} onValueChange={(val) => val && setText({ ...text, [key]: val })}>
+  const fieldsOk = WALL_FIELDS.every(([k, , , optional]) => (optional ? !(values[k] < 0) : values[k] > 0)) && (!(values.depth > 0) || values.floorGa > 0)
+  const edited = fieldsOk ? wallTemplateFrom(values, lumber, base) : null
+  const select = (k: 'grade' | 'stud', label: string, options: { value: string; label: string }[]) => (
+    <label key={k} className="col-span-2 grid gap-0.5"><span className="text-[11px] text-muted-foreground">{label}</span>
+      <Select items={options} value={text[k]} onValueChange={(val) => val && setText({ ...text, [k]: val })}>
         <SelectTrigger size="sm" className="h-6 w-full text-xs"><SelectValue /></SelectTrigger>
         <SelectContent>{options.map((o) => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}</SelectContent>
       </Select>
     </label>
   )
+  const holdDown = template?.anchorage !== undefined ? `hold-downs with material ${template.anchorage}` : template?.holdDown ? `hold-downs ${show('forcePerLength', template.holdDown.tension)}${units.active ? ` ${units.symbol('forcePerLength')}` : ''}` : 'no hold-downs'
   return (
     <div className="grid gap-1.5">
       <Select items={items.map(({ value, label }) => ({ value, label }))} value={key} onValueChange={(val) => { const i = items.find((x) => x.value === val); if (i) setTemplate(i.t) }}>
-        <SelectTrigger size="sm" className="h-7 w-full text-xs"><SelectValue placeholder={items.length ? 'Wall type' : 'No stud walls yet'} /></SelectTrigger>
+        <SelectTrigger size="sm" className="h-7 w-full text-xs"><SelectValue placeholder="Wall type" /></SelectTrigger>
         <SelectContent>{items.map((i) => <SelectItem key={i.value} value={i.value}>{i.label}</SelectItem>)}</SelectContent>
       </Select>
-      {template && <p className="text-[11px] text-muted-foreground">{template.framing ? `${sizeOf(template.framing.stud)?.label.split(' ·')[0] ?? ''} studs` : 'Studs'} at {len(template.spacing)}{template.floor ? `, floor zone ${len(template.floor.depth)}` : ''}, sheathing {template.law.kind === 'o86' ? 'CSA O86' : 'linear'}, {template.anchorage !== undefined ? `hold-downs with material ${template.anchorage}` : 'no hold-downs'}. Openings: edit the wall afterwards.</p>}
-      {creating ? (
+      {template && <p className="text-[11px] text-muted-foreground">{template.framing ? `${sizeOf(template.framing.stud)?.label.split(' ·')[0] ?? ''} studs` : 'Studs'} at {len(template.spacing)}{template.floor ? `, floor zone ${len(template.floor.depth)}` : ''}, sheathing {template.law.kind === 'o86' ? 'CSA O86' : 'linear'}, {holdDown}. Openings: edit the wall afterwards.</p>}
+      {editing ? (
         <div className="grid grid-cols-2 gap-1 border-t pt-1.5">
           {select('grade', 'Species and grade', GRADE_ITEMS)}
-          {lumber.grade === CUSTOM && <label className="col-span-2 grid gap-0.5"><span className="text-[11px] text-muted-foreground">E</span><Input className="h-6 text-xs" value={text.e ?? ''} placeholder={units.active ? units.symbol('stress') : ''} onChange={(e) => setText({ ...text, e: e.target.value })} /></label>}
+          {text.grade === CUSTOM && <label className="col-span-2 grid gap-0.5"><span className="text-[11px] text-muted-foreground">E</span><Input className="h-6 text-xs" value={text.e} placeholder={units.active ? units.symbol('stress') : ''} onChange={(e) => setText({ ...text, e: e.target.value })} /></label>}
           {select('stud', 'Stud size', STUD_ITEMS)}
-          {([['endPlies', 'End post plies'], ['topPlies', 'Top plates'], ['bottomPlies', 'Bottom plates']] as const).map(([key, label]) => (
-            <label key={key} className="grid gap-0.5"><span className="text-[11px] text-muted-foreground">{label}</span>
-              <Input className="h-6 text-xs" type="number" min={1} step={1} value={lumber[key]} onChange={(e) => setText({ ...text, [key]: e.target.value })} />
-            </label>
-          ))}
-          {FIELDS.map(([k, label, cat]) => (
+          {([['endPlies', 'End post plies'], ['topPlies', 'Top plates'], ['bottomPlies', 'Bottom plates']] as const).map(([k, label]) => (
             <label key={k} className="grid gap-0.5"><span className="text-[11px] text-muted-foreground">{label}</span>
-              <Input className="h-6 text-xs" value={text[k] ?? ''} placeholder={units.active ? units.symbol(cat) : ''} onChange={(e) => setText({ ...text, [k]: e.target.value })} />
+              <Input className="h-6 text-xs" type="number" min={1} step={1} value={text[k]} onChange={(e) => setText({ ...text, [k]: e.target.value })} />
             </label>
           ))}
-          <Button size="sm" className="col-span-2 h-6 text-xs" disabled={!ok} onClick={create}>Draw with this</Button>
+          {WALL_FIELDS.map(([k, label, cat]) => (
+            <label key={k} className="grid gap-0.5"><span className="text-[11px] text-muted-foreground">{label}{units.active ? ` (${units.symbol(cat)})` : ''}</span>
+              <Input className="h-6 text-xs" value={text[k]} aria-invalid={k === 'depth' ? values[k] < 0 || Number.isNaN(values[k]) : !(values[k] > 0)} onChange={(e) => setText({ ...text, [k]: e.target.value })} />
+            </label>
+          ))}
+          <Button size="sm" className="col-span-2 h-6 text-xs" disabled={!edited} onClick={() => { if (edited) { setTemplate(edited); setEditing(false) } }}>Draw with this</Button>
         </div>
-      ) : <Button size="sm" variant="outline" className="h-6 text-xs" onClick={() => setCreating(true)}>New wall type…</Button>}
+      ) : <Button size="sm" variant="outline" className="h-6 text-xs" onClick={() => setEditing(true)}>Edit wall type…</Button>}
     </div>
   )
 }
+
+/** The right panel's body while a draw tool is active (in place of the command form). */
+const DRAW_PANEL = 'h-full overflow-y-auto p-3 text-xs'
 
 export function DrawOptions() {
   const tool = useAppStore((s) => s.activeTool)
@@ -281,15 +312,16 @@ export function DrawOptions() {
   }, [props, template, model])
 
   // Start drawing with the most used property when nothing is chosen yet.
-  useEffect(() => { if (tool !== 'select' && tool !== 'support' && tool !== 'shell' && tool !== 'studWall' && tool !== 'floor' && !template && props[0]) setTemplate({ eleType: props[0].eleType, args: props[0].args }) }, [tool, template, props, setTemplate])
+  useEffect(() => { if (tool !== 'select' && tool !== 'support' && tool !== 'shell' && tool !== 'studWall' && tool !== 'floor' && tool !== 'underlay' && !template && props[0]) setTemplate({ eleType: props[0].eleType, args: props[0].args }) }, [tool, template, props, setTemplate])
 
   if (tool === 'select') return null
+  if (tool === 'underlay') return <UnderlayPickPanel />
   const pick = (key: string | null) => {
     const p = props.find((x) => x.key === key)
     if (p) setTemplate({ eleType: p.eleType, args: p.args })
   }
   return (
-    <div className="absolute left-2 top-9 z-30 w-64 rounded-sm border bg-background/95 p-2 text-xs shadow" data-hotkeys-ignore="true">
+    <div className={DRAW_PANEL} data-hotkeys-ignore="true">
       <div className="font-medium">{TITLES[tool]}</div>
       <p className="mb-1.5 text-[11px] leading-snug text-muted-foreground">{HINTS[tool]}</p>
       {tool === 'frame' && <p className="mb-1.5 text-[11px] leading-snug text-muted-foreground">After the first point, type a length and press Enter to place the next point towards the cursor.</p>}

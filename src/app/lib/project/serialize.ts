@@ -9,7 +9,7 @@ export function serializeProject(doc: ProjectDocument): string {
   const commands = doc.analysis.commands.slice(0, doc.analysis.cursor + 1)
   const header = [
     directive('project', { version: PROJECT_VERSION, ndm: model.config?.ndm, ndf: model.config?.ndf, units: model.config?.units, nextIds: model.nextIds }),
-    directive('layout', { gridlines: doc.gridlines, levels: doc.levels, nextGridlineId: doc.nextGridlineId, nextLevelId: doc.nextLevelId }),
+    directive('layout', { gridlines: doc.gridlines, levels: doc.levels, nextGridlineId: doc.nextGridlineId, nextLevelId: doc.nextLevelId, ...(doc.underlays.length ? { underlays: doc.underlays, nextUnderlayId: doc.nextUnderlayId } : {}) }),
     directive('report', { savedPlots: doc.savedPlots, nextSavedPlotId: doc.nextSavedPlotId, activeSavedPlotId: doc.activeSavedPlotId }),
     directive('display', doc.display),
   ]

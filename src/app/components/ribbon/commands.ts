@@ -2,7 +2,7 @@ import type { LucideIcon } from 'lucide-react'
 import {
   Undo2, Redo2, SquareDashedMousePointer, SquareDashed, Grid3x3, Ruler, ZoomIn, ZoomOut, Maximize2, CircleDot, Minus, Anchor, ArrowDown, ArrowDownToLine, Hash, Tag, Tags,
   Grid2x2, Layers, Rows3, Box, LayoutGrid, Building2, Square, ChevronUp, ChevronDown, Ghost, CircleOff, Spline, MoveHorizontal, Activity, RotateCw, Waves, Palette,
-  BarChart3, ChartLine, Sigma, Trash2, Layers3, Cuboid, SquareStack, Focus, Eye, Command, Move, Copy, FlipHorizontal2, Scissors, Merge, ArrowDownToDot, ArrowDownWideNarrow, MousePointer2, PenLine, GripHorizontal, Columns2, BrickWall } from 'lucide-react'
+  BarChart3, ChartLine, Sigma, Trash2, Layers3, Cuboid, SquareStack, Focus, Eye, Command, Move, Copy, FlipHorizontal2, Scissors, Merge, ArrowDownToDot, ArrowDownWideNarrow, MousePointer2, PenLine, GripHorizontal, Columns2, BrickWall, FileImage, Image } from 'lucide-react'
 import { useAppStore, type AppStore } from '@/app/store/useAppStore'
 import { stepView, validViewMode } from '@/app/lib/editor/viewCamera'
 import type { ViewMode } from '@/app/lib/editor/viewSlice'
@@ -78,6 +78,7 @@ export const COMMANDS = {
   showAll: { id: 'showAll', label: 'Show all', icon: Eye, tip: 'Show every object again', enabled: (s) => s.isolated !== null, run: (s) => s.setIsolated(null) },
   palette: { id: 'palette', label: 'Commands', icon: Command, tip: 'Search all commands', hotkey: ['mod+k'], run: (s) => s.setPaletteOpen(true) },
   clearSelection: { id: 'clearSelection', label: 'Clear', icon: SquareDashed, tip: 'Clear the selection', hotkey: ['escape'], enabled: (s) => s.selectedNodeIds.length + s.selectedElementIds.length > 0, run: (s) => s.clearSceneSelection() },
+  underlays: { id: 'underlays', label: 'Underlays', icon: FileImage, tip: 'PDF drawing sheets under a story plan', enabled: hasModel, run: (s) => s.setUnderlaysDialogOpen(true) },
   gridsLevels: { id: 'gridsLevels', label: 'Grids & levels', icon: Grid3x3, tip: 'Edit grid lines and story levels', run: (s) => s.setGridlinesDialogOpen(true) },
   units: { id: 'units', label: 'Units', icon: Ruler, tip: 'Model and display units', enabled: hasModel, run: (s) => s.setUnitsDialogOpen(true) },
 
@@ -135,6 +136,8 @@ export const COMMANDS = {
   showGrid: viewToggle('showGrid', 'Ground', Grid2x2, 'Ground grid'),
   showGridlines: viewToggle('showGridlines', 'Grids', Rows3, 'Grid lines'),
   showLevels: viewToggle('showLevels', 'Levels', Layers, 'Story levels'),
+  showUnderlays: viewToggle('showUnderlays', 'Sheets', Image, 'PDF underlays in their level\'s plan'),
+  showUnderlays3D: { ...viewToggle('showUnderlays3D', 'Sheets 3D', FileImage, 'PDF underlays in the 3D view too'), visible: only3d },
 
   resultNone: resultType('none', 'None', CircleOff, 'Show no results'),
   resultDeformed: resultType('deformed', 'Deformed', Spline, 'Deformed shape'),
@@ -165,7 +168,7 @@ export const RIBBON_TABS: RibbonTabDef[] = [
     { label: 'Draw', commands: ['toolSelect', 'toolFrame', 'toolBeam', 'toolColumn', 'toolShell', 'toolStudWall', 'toolFloor', 'toolSupport', 'drawAllStories'] },
     { label: 'View', commands: ['view3d', 'viewPlan', 'viewElevation', 'showExtruded'], custom: 'stories' },
     { label: 'Select', commands: ['selectAll', 'clearSelection', 'deleteSelection'] },
-    { label: 'Define', commands: ['gridsLevels', 'units'] },
+    { label: 'Define', commands: ['gridsLevels', 'underlays', 'units'] },
   ] },
   { id: 'edit', label: 'Edit', groups: [
     { label: 'History', commands: ['undo', 'redo'] },
@@ -182,7 +185,7 @@ export const RIBBON_TABS: RibbonTabDef[] = [
     { label: 'Isolate', commands: ['isolate', 'showAll'] },
     { label: 'Loads', commands: ['showNodalLoads', 'showElementLoads', 'showLoadValues'], custom: 'loadPatterns' },
     { label: 'Labels', commands: ['showNodeIds', 'showElementIds'] },
-    { label: 'Reference', commands: ['showGrid', 'showGridlines', 'showLevels'] },
+    { label: 'Reference', commands: ['showGrid', 'showGridlines', 'showLevels', 'showUnderlays', 'showUnderlays3D'] },
   ] },
   { id: 'results', label: 'Results', groups: [
     { label: 'Show', commands: ['resultNone', 'resultDeformed', 'resultAxial', 'resultShear', 'resultShearZ', 'resultMoment', 'resultMomentY', 'resultTorsion', 'resultContour', 'resultMode'] },

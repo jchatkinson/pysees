@@ -16,6 +16,7 @@ import { LoadsLayer } from './Loads'
 import { batchesLoads, LABEL_LIMIT, loadGlyphCount } from './utils'
 import { GridlinesLayer } from './Gridlines'
 import { LevelsLayer } from './Levels'
+import { UnderlaysLayer } from './Underlays'
 import { levelElevations } from '@/app/lib/levels'
 import { buildSceneIndex, isClosed } from './sceneIndex'
 import { DisplayBuffers } from './displayBuffers'
@@ -49,6 +50,7 @@ export const ViewportScene = forwardRef<ViewportSceneRef, object>(function Viewp
   const model = useAppStore((s) => s.model)
   const gridlines = useAppStore((s) => s.gridlines)
   const levels = useAppStore((s) => s.levels)
+  const underlays = useAppStore((s) => s.underlays)
   const hiddenLoadPatterns = useAppStore((s) => s.hiddenLoadPatterns)
   const viewportAction = useAppStore((s) => s.viewportAction)
   const viewSettings = useAppStore((s) => s.viewSettings)
@@ -171,9 +173,16 @@ export const ViewportScene = forwardRef<ViewportSceneRef, object>(function Viewp
   const bounds = useMemo(() => {
     const box = new Box3()
     for (const node of model.nodes.values()) box.expandByPoint(new Vector3(...toVec3(node.coords)))
-    if (model.nodes.size === 0) for (const g of gridlines) { box.expandByPoint(new Vector3(...toVec3(g.start))); box.expandByPoint(new Vector3(...toVec3(g.end))) }
+    // An empty model (a grid template) frames its grids, up to the top level.
+    if (model.nodes.size === 0) {
+      const top = levelElevations(levels).at(-1) ?? 0
+      for (const g of gridlines) for (const p of [g.start, g.end]) {
+        box.expandByPoint(new Vector3(...toVec3(p)))
+        if (top) box.expandByPoint(ndm === 3 ? new Vector3(p[0] ?? 0, p[1] ?? 0, top) : new Vector3(p[0] ?? 0, top, 0))
+      }
+    }
     return box
-  }, [model.nodes, gridlines])
+  }, [model.nodes, gridlines, levels, ndm])
   // What a plan or elevation frames: the slice, plus the grids in a plan; the whole model when the slice is empty.
   const viewBounds = useMemo(() => {
     if (!slice) return bounds
@@ -278,6 +287,7 @@ export const ViewportScene = forwardRef<ViewportSceneRef, object>(function Viewp
   return (
     <>
       <SceneHelpers showGrid={viewSettings.showGrid} ndm={model.config?.ndm ?? 3} />
+      {viewSettings.showUnderlays && <UnderlaysLayer underlays={underlays} levels={levels} mode={mode} ndm={ndm} show3D={viewSettings.showUnderlays3D} />}
       <GridlinesLayer
         gridlines={gridlines}
         showGridlines={viewSettings.showGridlines}
