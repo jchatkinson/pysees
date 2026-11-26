@@ -135,11 +135,13 @@ export type AnchorageBearingSpec = { kind: 'linear'; k: number } | { kind: 'o86C
 export type DiaphragmKind = 'rigid' | 'flexible'
 export interface WallSpec { name: string; start: [number, number]; direction: [number, number]; layout: WallLayoutSpec; loads?: SlotWallLoad[] }
 export interface SlotWallLoad { slot: number; load: WallLoadSpec }
-export interface WallLayoutSpec { length: number; height: number; studs: WallStudSpec[]; topEa: number; topEi: number | undefined; topDistribution: ChordDistributionSpec; bottomEa: number; bottomEi: number; openings?: WallOpeningSpec[]; sheathing: WallSheathingSpec | undefined; foundation?: boolean; floor?: FloorZoneSpec }
+export interface WallLayoutSpec { length: number; height: number; studs: WallStudSpec[]; topEa: number; topEi: number | undefined; topDistribution: ChordDistributionSpec; bottomEa: number; bottomEi: number; openings?: WallOpeningSpec[]; sheathing: WallSheathingSpec | undefined; foundation?: boolean; bearing?: WallBearingSpec; floor?: FloorZoneSpec }
+/** The wall bears on its `base` stations through the plate sandwich: `kv` / `kh` per bearing position, the hold-down law at pier ends (Carapace `docs/stud-wall-bearing.md`). */
+export interface WallBearingSpec { kv: number; kh: number; holdDown?: AnchorageSpec }
 /** Floor zone of depth `depth` above the framing: shear stiffness `ga`, rim `rimEa` added to the top chord. */
 export interface FloorZoneSpec { depth: number; ga: number; rimEa: number }
 /** One stud wall: corner nodes (bottom start, bottom end, top end, top start; local x = c0→c1, y = c0→c3) and its chord stations, all `nodes` indices. */
-export interface StudWallSpec { corners: [number, number, number, number]; stations: { chord: 'top' | 'bottom'; x: number; node: number }[]; layout: WallLayoutSpec }
+export interface StudWallSpec { corners: [number, number, number, number]; stations: { chord: 'top' | 'bottom' | 'base'; x: number; node: number }[]; layout: WallLayoutSpec }
 export type StudWallTable = StudWallSpec[]
 /** A flexible diaphragm (3D): grid nodes `i + j * u.length` (`nodes` indices) and their layout; see `lib/diaphragms.ts`. */
 export interface DiaphragmSpec { nodes: number[]; layout: { u: number[]; v: number[]; level: number; bays: (WallShearLawSpec | undefined)[]; eaU: number[]; eaV: number[] } }

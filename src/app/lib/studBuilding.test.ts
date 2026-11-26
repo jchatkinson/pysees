@@ -436,16 +436,46 @@ describe('stud-wall building template', () => {
 })
 
 describe('drawing walls with a hold-down recipe', () => {
-  it('makes the Anchorage on the first wall and reuses it after', () => {
-    const model = modelFromWrites(3, 6, [])
-    const t = { spacing: 406, studEa: 1e6, endEa: 3e6, topEa: 2e6, topDistribution: 'beam' as const, bottomEa: 1e6, bottomEi: 1e9, law: { kind: 'linear' as const, ga: 2000 }, holdDown: { tension: 15000, k: 1e6 } }
-    const b = new DrawBatch(model)
-    drawStudWall(b, [0, 0], [4000, 0], 0, 2700, t)
-    drawStudWall(b, [0, 3000], [4000, 3000], 0, 2700, t)
-    const anchorages = [...b.model.materials.values()].filter((m) => m.matType === 'Anchorage')
-    expect(anchorages).toHaveLength(1)
-    expect(anchorages[0].args).toMatchObject({ tension: 15000, slack: 0, bearing: 'linear', k: 1e6 })
-    const holdDowns = [...b.model.elements.values()].filter((e) => e.eleType === 'zeroLength' && (e.args.mat as number[]).includes(anchorages[0].id))
-    expect(holdDowns.length).toBeGreaterThanOrEqual(4)
+  const t = { spacing: 406, studEa: 1e6, endEa: 3e6, topEa: 2e6, topEi: 1e9, topDistribution: 'beam' as const, bottomEa: 1e6, bottomEi: 1e9, law: { kind: 'linear' as const, ga: 2000 }, holdDown: { tension: 15000, k: 1e6 } }
+
+  it('makes bearing walls: the hold-down in the layout, supports at the ends on the ground, no links', () => {
+    const b = new DrawBatch(modelFromWrites(3, 6, []))
+    const id = drawStudWall(b, [0, 0], [4000, 0], 0, 2700, t)!
+    drawStudWall(b, [4000, 0], [4000, 3000], 0, 2700, t)
+    const l = studWallArgs(b.model.elements.get(id)!.args).layout
+    expect(l.bearing).toEqual({ kv: 1e6, kh: 1e6, holdDown: { tension: 15000, slack: 0, bearing: { kind: 'linear', k: 1e6 } } })
+    expect([...b.model.elements.values()].filter((e) => e.eleType === 'zeroLength')).toEqual([])
+    expect(b.model.mpConstraints.size).toBe(0)
+    // Three supports: the corner at (4000, 0) is shared.
+    expect(b.model.fixes.size).toBe(3)
+    expect(unanchoredPierEnds(b.model, b.model.elements.get(id)!)).toEqual([])
   })
+
+  it('stands a wall above on the wall below with studs that do not line up, and carries the load down', () => {
+    const b = new DrawBatch(modelFromWrites(3, 6, []))
+    const real = { ...t, studEa: 5e7, endEa: 1.5e8, topEa: 1e8, bottomEa: 5e7 } // 2x6 SPF EAs (N): the studs barely shorten
+    const lower = drawStudWall(b, [0, 0], [4000, 0], 0, 2700, real)!
+    const upper = drawStudWall(b, [0, 0], [4000, 0], 2700, 5400, { ...real, spacing: 300 })!
+    const p = b.model.nextIds.pattern
+    b.writeRaw({ kind: 'timeSeries', entity: { id: 1, tsType: 'Linear', args: { type: 'Linear', tag: 1, factor: 1 } } })
+    b.writeRaw({ kind: 'pattern', entity: { id: p, patternType: 'Plain', args: { type: 'Plain', patternTag: p, tsTag: 1, fact: 1 }, children: [] } })
+    b.writeRaw({ kind: 'patternChild', patternId: p, child: { kind: 'eleLoad', args: wallLoadArgs([upper], { kind: 'topLine', x0: 0, x1: 4000, wx0: 0, wx1: 0, wy0: -5, wy1: -5 }) } })
+    const model = b.model
+    const top = (id: number) => { const e = model.elements.get(id)!; return e.nodes[3] }
+    expect(top(lower)).toBeDefined()
+    const history = { commands: [{ type: 'ANALYSIS_BLOCK' as const, blockId: 'whole-model-recorder', params: { directory: 'out' } }, { type: 'ANALYSIS_BLOCK' as const, blockId: 'run-gravity-analysis', params: { patterns: [p], steps: 1, holdLoads: 'Yes', algorithm: 'Newton', tol: 1e-9, maxIter: 50 } }], cursor: 1 }
+    const run = runCarapace(model, history)
+    expect(run.compile.diagnostics.filter((d) => d.severity !== 'info')).toEqual([])
+    expect(run.error).toBeFalsy()
+    const row = run.compile.input!.studWalls![1]
+    // The upper wall stands on every top node of the lower one.
+    expect(row.stations.filter((s) => s.chord === 'base')).toHaveLength(studWallArgs(model.elements.get(lower)!.args).stations.filter((s) => s.chord === 'top').length + 2)
+    const reactions = run.compile.recorderPlans.filter((q) => q.kind === 'reaction' && model.fixes.has(q.targetTag))
+    const sum = reactions.reduce((s, q) => s + (run.columns[q.columnOffset + 2].at(-1) ?? 0), 0)
+    expect(sum / (5 * 4000)).toBeCloseTo(1, 6)
+    // The upper wall's top barely moves: it is carried along its length, not only at its ends.
+    const disp = run.compile.recorderPlans.filter((q) => q.kind === 'disp')
+    const uz = disp.map((q) => run.columns[q.columnOffset + 2].at(-1) ?? 0)
+    expect(Math.min(...uz)).toBeGreaterThan(-1)
+  }, 60_000)
 })

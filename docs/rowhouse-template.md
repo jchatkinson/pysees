@@ -28,9 +28,12 @@ grids don't sit on the walls, so they are fitted to the wall centrelines instead
   Ga 1000 N/mm, it is not a shear wall). South-wall openings have (3) 2x12 headers (S102), others (2) 2x10 (L1).
 - Second floor, 9 walls: the south walls stand 610 mm south of the walls below, on the cantilever, and the side walls run out to them;
   grid 3 is unit 1's east wall (to C − 610), the party wall and B–A.
-- Walls are drawn with `drawStudWall` (openings and lumber framing). Main-floor walls get extra studs wherever something lands on them (a
-  second-floor pier end, a beam or joist end, a floor-zone corner), so every pier end above has a node to be held down to. Hold-downs are
-  linear `Anchorage` (15 kN/mm tension, 1e6 bearing).
+- Walls are drawn with `drawStudWall` (openings and lumber framing) and **bear** on what is below them (Carapace `bearing`,
+  `../carapace/docs/stud-wall-bearing.md`): every stud bears through the plate sandwich (1e6 N/mm per stud, vertically and along the
+  wall) on the surface interpolated between the nodes under the wall, so studs need not line up with the studs below; the hold-down
+  (linear, 15 kN/mm tension, 1e6 bearing) is inside the wall at each pier end. The nodes under a wall are found at compile time
+  (`wallBaseNodes`: wall tops, beam and joist nodes, supports); main-floor walls stand on supports at their ends. Main-floor walls still get
+  extra studs wherever something lands on them (a second-floor pier end, a beam or joist end, a floor-zone corner).
 - Second floor framing (S102), as `ElasticBeamColumn` members at the floor plus joist floors:
   - (5) 2x12 D.Fir beam at y = 3140 from the west wall to the interior wall; (3) 2x12 header at y = 2440 across the stair void's south end
     (interior wall to party wall). Split where joists land.

@@ -1,6 +1,6 @@
 import type { ElementEntity, LoadAssignment, Model } from '@/app/types/model'
 import type { Call } from '@/app/lib/commands/tokens'
-import { isStudWall, studWallArgs, type FloorLoadArgs } from '@/app/lib/studWalls'
+import { isStudWall, studWallArgs, wallBaseNodes, type FloorLoadArgs } from '@/app/lib/studWalls'
 import { wallLoadSpec } from '@/app/lib/shells'
 import { diaphragmArgs, isDiaphragm } from '@/app/lib/diaphragms'
 import { floorLoadRows, isFloorAreaLoad, isJoistFloor } from '@/app/lib/floors'
@@ -61,8 +61,11 @@ export function studWallExport(model: Model): StudWallExport | null {
     const t = f.H / 20, G = ga / t, E = 2 * (1 + NU) * G
     const studEa = layout.studs.reduce((s, st) => s + st.ea, 0)
     const openings = layout.openings ?? []
-    // Mesh lines: stations, studs at openings and opening edges across; the base, opening heads, framing top and wall top up.
-    const xs = [...new Set([0, f.L, ...a.stations.map((s) => s.x), ...openings.flatMap((o) => [o.x0, o.x1])].map(round))].filter((x) => x >= 0 && x <= f.L).sort((p, q) => p - q)
+    // A bearing wall is tied to the nodes it stands on (within its length), rigidly: no bearing or hold-down flexibility.
+    // One node per position: a wall node can be constrained only once.
+    const base = layout.bearing ? wallBaseNodes(model, e).nodes.filter((b, i, all) => b.x >= 0 && b.x <= f.L && (i === 0 || all[i - 1].x !== b.x)) : []
+    // Mesh lines: stations, studs at openings, opening edges and base nodes across; the base, opening heads, framing top and wall top up.
+    const xs = [...new Set([0, f.L, ...a.stations.map((s) => s.x), ...openings.flatMap((o) => [o.x0, o.x1]), ...base.map((b) => b.x)].map(round))].filter((x) => x >= 0 && x <= f.L).sort((p, q) => p - q)
     const ys = [...new Set([0, f.H, layout.height / 2, layout.height, ...openings.map((o) => o.headHeight)].map(round))].filter((y) => y >= 0 && y <= f.H).sort((p, q) => p - q)
     const known = new Map<string, number>()
     const key = (x: number, y: number) => `${round(x)}|${round(y)}`
@@ -82,6 +85,12 @@ export function studWallExport(model: Model): StudWallExport | null {
       const quad = [node(xs[i], ys[j]), node(xs[i + 1], ys[j]), node(xs[i + 1], ys[j + 1]), node(xs[i], ys[j + 1])]
       quad.forEach((n) => mark(n, [1, 2, 3, 4, 5, 6]))
       calls.push({ fn: 'element', args: ['ShellMITC4', ++eleTag, ...quad, sec] })
+    }
+    for (const b of base) {
+      const n = known.get(key(b.x, 0))
+      if (n === undefined) continue // under a door
+      calls.push({ fn: 'equalDOF', args: [b.node, n, 1, 2, 3], ...(b === base[0] ? { comment: `stud wall ${e.id} bears on the nodes below it: tied rigidly (its bearing springs and hold-downs are Carapace-only)` } : {}) })
+      mark(b.node, [1, 2, 3])
     }
     out.walls.set(e.id, calls)
   }

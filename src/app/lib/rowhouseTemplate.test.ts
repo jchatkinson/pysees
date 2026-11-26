@@ -71,6 +71,15 @@ describe('BC Rowhouse template', () => {
     expect(Math.abs(sum(2, n - 1))).toBeLessThan(1e-3)
     expect(Math.abs(sum(3, n - 1)) / gravity).toBeCloseTo(1, 6)
     expect(Math.abs(sum(1, n - 1))).toBeCloseTo(L.eqFloor + L.eqRoof, -1)
+    // The grid 3 party walls bear along their length on what is below them (offset studs included), so their tops hardly sag under
+    // gravity: about 0.6 mm upstairs (178 mm when the upper wall stood only on its two pier ends).
+    for (const label of ['S1 Party wall', 'S2 Party wall']) {
+      const e = [...model.elements.values()].find((x) => studWallArgs(x.args).label === label)!
+      const tops = [e.nodes[2], e.nodes[3], ...studWallArgs(e.args).stations.flatMap((st, i) => (st.chord === 'top' ? [e.nodes[4 + i]] : []))]
+      const uz = run.compile.recorderPlans.filter((p) => p.kind === 'disp' && tops.includes(p.targetTag)).map((p) => run.columns[p.columnOffset + 2][4])
+      expect(uz.length, label).toBe(tops.length)
+      expect(Math.min(...uz), label).toBeGreaterThan(-1)
+    }
   }, 120_000)
 
   it('exports a script with the Carapace-only parts approximated and flagged', () => {

@@ -12,7 +12,7 @@ import { diaphragmArgs, isDiaphragm } from '@/app/lib/diaphragms'
 import { floorLoadRows, isJoistFloor } from '@/app/lib/floors'
 import { isShell } from '@/app/lib/commands/tables'
 import { studWallMemberLabels, studWallRecorders } from '@/app/lib/studBuilding'
-import { isStudWall, studWallArgs, studWallFrame, studWallLayoutProblems, unanchoredPierEnds } from '@/app/lib/studWalls'
+import { isStudWall, studWallArgs, studWallFrame, studWallLayoutProblems, unanchoredPierEnds, wallBaseNodes } from '@/app/lib/studWalls'
 import { rowLayout, type RowLayout } from '@/app/lib/resultsStorage/recorderRows'
 
 export interface CompileInputV1Result {
@@ -319,6 +319,14 @@ export function compileInputV1(model: Model, analysisHistory: AnalysisHistory): 
       const ctx = `Stud wall ${ele.id}`
       const row = compileStudWall(ele, ndm, (id) => resolveNode(id, ctx), diagnostics)
       if (!row) continue
+      if (row.layout.bearing) {
+        // A bearing wall stands on the nodes found under it now, never stored (Carapace `docs/stud-wall-bearing.md`).
+        const base = wallBaseNodes(model, ele)
+        if (base.error) { diagnostics.push({ severity: 'error', message: `${ctx}: ${base.error}`, commandIndex: -1 }); continue }
+        const round = (x: number) => Number(x.toPrecision(6))
+        if (base.gaps.length) diagnostics.push({ severity: 'warning', message: `${ctx}${studWallArgs(ele.args).label ? ` (${studWallArgs(ele.args).label})` : ''}: studs over ${base.gaps.map(([a, b]) => `x = ${round(a)}–${round(b)}`).join(', ')} have nothing directly below; their load is shared between the nodes either side as if the floor spanned there`, commandIndex: -1 })
+        row.stations.push(...base.nodes.map((b) => ({ chord: 'base' as const, x: b.x, node: resolveNode(b.node, ctx) })))
+      }
       const frame = studWallFrame(model, ele)
       if (frame) for (const p of studWallLayoutProblems(row.layout, frame.L)) diagnostics.push({ severity: 'error', message: `${ctx}: ${p}`, commandIndex: -1 })
       const free = unanchoredPierEnds(model, ele)

@@ -797,6 +797,16 @@ export interface Expansion {
 }
 
 /**
+ * The wall bears on its `base` stations through the plate sandwich: `kv` / `kh` per bearing position and the
+ * pier-end hold-down law (stud-wall tables only; the building generates its own links).
+ */
+export interface WallBearingSpec {
+    kv: number;
+    kh: number;
+    holdDown?: AnchorageSpec;
+}
+
+/**
  * What a [`RecorderSpec::Bulk`] reads. `strain`/`stress`/`principalStrain`/`principalStress`/`kc2`
  * mean the same as [`GaussQuantity`] (on `triangles`/`quads`; `strain` and `stress` also on
  * `embeddedBars`, one value per segment); `axialForce` and `ruptured` are
@@ -1543,6 +1553,10 @@ export interface WallLayoutSpec {
     sheathing: WallSheathingSpec | undefined;
     foundation?: boolean;
     /**
+     * Bearing on base stations (stud-wall tables only; rejected in a building).
+     */
+    bearing?: WallBearingSpec;
+    /**
      * Floor zone above the framing (stud-wall tables only; a building takes it from its storey).
      */
     floor?: FloorZoneSpec;
@@ -1683,7 +1697,7 @@ export type TransformSpec = "linear" | "pDelta" | "corotational";
 
 export type WallBayQuantity = "q" | "gamma";
 
-export type WallChordSpec = "top" | "bottom";
+export type WallChordSpec = "top" | "bottom" | "base";
 
 export type WallLoadSpec = { kind: "topPoint"; x: number; fx: number; fy: number } | { kind: "topLine"; x0: number; x1: number; wx0: number; wx1: number; wy0: number; wy1: number };
 

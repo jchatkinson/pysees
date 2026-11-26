@@ -221,7 +221,8 @@ export function rebuildStudWall(model: Model, id: number, layout: WallLayoutSpec
   const inner = (xs: number[]) => [...xs].sort((p, q) => p - q).filter((x, i, s) => x > tol && x < L - tol && (i === 0 || x - s[i - 1] > tol))
   const old = a.stations.map((s, i) => ({ ...s, node: e.nodes[4 + i] }))
   const tops = inner([...layout.studs.map((s) => s.x), ...pierEnds(layout)])
-  const bottoms = inner([...pierEnds(layout), ...old.filter((s) => s.chord === 'bottom' && usedElsewhere(model, s.node, id)).map((s) => s.x)])
+  // A bearing wall's pier ends are held down inside the element: bottom stations only where something else still uses one.
+  const bottoms = inner([...(layout.bearing ? [] : pierEnds(layout)), ...old.filter((s) => s.chord === 'bottom' && usedElsewhere(model, s.node, id)).map((s) => s.x)])
   const draft = new ModelDraft(model)
   let m = model
   const added: number[] = []
@@ -247,10 +248,63 @@ export function rebuildStudWall(model: Model, id: number, layout: WallLayoutSpec
   return { model: m, kept, added }
 }
 
+/**
+ * What a bearing wall (`layout.bearing`) stands on, found from the model each time it is compiled or exported (docs: Carapace
+ * `docs/stud-wall-bearing.md`): the nodes on its bottom line (plan offset and elevation within tolerance, any x) that are supports
+ * (a fix restraining the vertical), the top row of another stud wall (corners and top stations) or a node of a beam-column or truss. It keeps
+ * those within the wall and the nearest one beyond each end. `error` when an end has nothing at or beyond it; `gaps` lists spans between
+ * consecutive base positions longer than three stud spaces with a stud or jack inside, unless both ends are supports (the bearing treats
+ * the sandwich as rigid across them).
+ */
+export function wallBaseNodes(model: Model, e: ElementEntity): { nodes: { x: number; node: number }[]; error?: string; gaps: [number, number][] } {
+  const f = studWallFrame(model, e)
+  const a = studWallArgs(e.args)
+  if (!f || !a.layout) return { nodes: [], error: 'has missing corner nodes', gaps: [] }
+  const tol = 1e-6 * Math.max(1, f.L, f.H)
+  const own = new Set(e.nodes)
+  const candidates = new Set<number>(), fixed = new Set<number>()
+  for (const [id, fix] of model.fixes) if (fix.dofs.includes(3)) { candidates.add(id); fixed.add(id) }
+  for (const w of model.elements.values()) {
+    if (w.id === e.id) continue
+    if (isStudWall(w.eleType)) { const wa = studWallArgs(w.args); [w.nodes[2], w.nodes[3], ...wa.stations.flatMap((s, i) => (s.chord === 'top' ? [w.nodes[4 + i]] : []))].forEach((n) => candidates.add(n)) }
+    else if (/BeamColumn$/i.test(w.eleType) || /^truss$/i.test(w.eleType)) w.nodes.forEach((n) => candidates.add(n))
+  }
+  const on: { x: number; node: number }[] = []
+  for (const id of candidates) {
+    const c = model.nodes.get(id)?.coords
+    if (!c || own.has(id)) continue
+    const r = xyz(c).map((v, k) => v - f.o[k])
+    const x = r[0] * f.ex[0] + r[1] * f.ex[1] + r[2] * f.ex[2], y = r[0] * f.ey[0] + r[1] * f.ey[1] + r[2] * f.ey[2]
+    const off = Math.hypot(...r.map((v, k) => v - f.ex[k] * x - f.ey[k] * y))
+    if (Math.abs(y) <= tol && off <= tol) on.push({ x: Math.abs(x) <= tol ? 0 : Math.abs(x - f.L) <= tol ? f.L : x, node: id })
+  }
+  on.sort((p, q) => p.x - q.x || p.node - q.node)
+  const inside = on.filter((p) => p.x >= -tol && p.x <= f.L + tol)
+  const before = on.filter((p) => p.x < -tol), after = on.filter((p) => p.x > f.L + tol)
+  const nodes = [...(inside.some((p) => p.x <= tol) || !before.length ? [] : before.filter((p) => p.x === before[before.length - 1].x)), ...inside, ...(inside.some((p) => p.x >= f.L - tol) || !after.length ? [] : after.filter((p) => p.x === after[0].x))]
+  const where = a.label ? ` (${a.label})` : ''
+  if (!nodes.length || nodes[0].x > tol || nodes[nodes.length - 1].x < f.L - tol) {
+    const span = nodes.length ? `x = ${Number(nodes[0].x.toPrecision(6))} to ${Number(nodes[nodes.length - 1].x.toPrecision(6))}` : 'nowhere'
+    return { nodes, error: `stands on nothing along part of its length${where}: a support, the top of a wall or a beam is under it only ${span} of 0 to ${Number(f.L.toPrecision(6))}`, gaps: [] }
+  }
+  const xs = [...new Set(a.layout.studs.map((s) => s.x))].sort((p, q) => p - q)
+  const spaces = xs.slice(1).map((x, i) => x - xs[i]).sort((p, q) => p - q)
+  const typical = spaces[Math.floor(spaces.length / 2)] ?? f.L
+  const bearing = [...xs.filter((x) => !(a.layout.openings ?? []).some((o) => x > o.x0 && x < o.x1)), ...(a.layout.openings ?? []).flatMap((o) => [o.x0, o.x1])]
+  const gaps: [number, number][] = []
+  for (let i = 0; i + 1 < nodes.length; i++) {
+    const [x0, x1] = [nodes[i].x, nodes[i + 1].x]
+    // Between two supports the ground is rigid, so the interpolation is exact.
+    const support = (x: number) => nodes.some((n) => Math.abs(n.x - x) <= tol && fixed.has(n.node))
+    if (x1 - x0 > 3 * typical + tol && !(support(x0) && support(x1)) && bearing.some((x) => x > x0 + tol && x < x1 - tol)) gaps.push([x0, x1])
+  }
+  return { nodes, gaps }
+}
+
 /** Pier ends of a wall with no hold-down: the bottom node there (a corner or a station) is used by nothing but the wall, so uplift is free. */
 export function unanchoredPierEnds(model: Model, e: ElementEntity): number[] {
   const f = studWallFrame(model, e)
-  if (!f) return []
+  if (!f || studWallArgs(e.args).layout?.bearing?.holdDown) return []
   const a = studWallArgs(e.args), tol = 1e-9 * f.L
   const bottomAt = (x: number) => (Math.abs(x) <= tol ? e.nodes[0] : Math.abs(x - f.L) <= tol ? e.nodes[1] : e.nodes[4 + a.stations.findIndex((s) => s.chord === 'bottom' && Math.abs(s.x - x) <= tol)])
   return pierEnds(a.layout).filter((x) => { const n = bottomAt(x); return n === undefined || !usedElsewhere(model, n, e.id) })
@@ -279,7 +333,8 @@ export interface StudWallTemplate {
   floor?: { depth: number; ga: number; rimEa: number }
   /** `Anchorage` material id for hold-downs at pier ends; none leaves them unanchored (unless `holdDown` is set). */
   anchorage?: number
-  /** A linear hold-down to use when `anchorage` isn't set: the first wall drawn makes the `Anchorage` material (or reuses an identical one). */
+  /** A linear hold-down (tension stiffness, bearing stiffness `k`) when `anchorage` isn't set: the wall then bears on whatever is below it
+   * (`layout.bearing`: `k` per stud vertically and along the wall, the hold-down at pier ends, all inside the element; no links). */
   holdDown?: { tension: number; k: number }
   /** Members as lumber (no openings); when set, a drawn wall's EAs come from it. */
   framing?: WallFraming
@@ -294,16 +349,19 @@ export function studWallTemplateOf(model: Model, e: ElementEntity): StudWallTemp
   const spacing = [...gaps.reduce((m, g) => m.set(g, (m.get(g) ?? 0) + 1), new Map<number, number>())].sort((a, b) => b[1] - a[1])[0]?.[0] ?? l.length
   const interior = l.studs.filter((s) => s.x > 0 && s.x < l.length)
   const studEa = [...interior.reduce((m, s) => m.set(s.ea, (m.get(s.ea) ?? 0) + 1), new Map<number, number>())].sort((a, b) => b[1] - a[1])[0]?.[0] ?? l.studs[0].ea
-  // The hold-down: an Anchorage material on a zero-length at one of the wall's bottom nodes.
+  // The hold-down: the wall's own bearing law, else an Anchorage material on a zero-length at one of the wall's bottom nodes.
   let anchorage: number | undefined
+  const hd = l.bearing?.holdDown
+  const holdDown = hd && hd.bearing.kind === 'linear' ? { tension: hd.tension, k: hd.bearing.k } : undefined
   for (const z of model.elements.values()) {
+    if (holdDown) break
     if (z.eleType !== 'zeroLength' || !z.nodes.some((n) => n === e.nodes[0] || n === e.nodes[1])) continue
     anchorage = ((z.args.mat as number[] | undefined) ?? []).map(Number).find((m) => model.materials.get(m)?.matType === 'Anchorage')
     if (anchorage !== undefined) break
   }
   return {
     spacing, studEa, endEa: l.studs.find((s) => s.x === 0)?.ea ?? studEa, topEa: l.topEa, topEi: l.topEi, topDistribution: l.topDistribution, bottomEa: l.bottomEa, bottomEi: l.bottomEi,
-    law: l.sheathing?.law ?? { kind: 'linear', ga: 1 }, floor: l.floor ? { ...l.floor } : undefined, anchorage,
+    law: l.sheathing?.law ?? { kind: 'linear', ga: 1 }, floor: l.floor ? { ...l.floor } : undefined, anchorage, ...(holdDown ? { holdDown } : {}),
     framing: { ...(studWallArgs(e.args).framing ?? guessFraming(l, lumberScale(model.config?.units, l.height), model.config?.units ? !['in', 'ft'].includes(model.config.units.length) : true)), openings: [] },
   }
 }
@@ -320,10 +378,12 @@ export function templateLayout(t: StudWallTemplate, length: number, height: numb
 }
 
 /**
- * Draw one stud wall in plan from `a` to `b` (z ignored), spanning `z0` to `z1`: its own corner and station nodes (walls never share nodes;
- * they are joined by links), and at each pier end a hold-down: to the top node of a stud wall (or a beam-column's node) right below (a zero-length with the anchorage
- * material vertically and an equalDOF along the wall, as Carapace's building expansion does) or, on the lowest level, to a new fixed ground
- * node (anchorage vertically, stiff elastic in plan). Returns the wall's id, or null when it has no length or height.
+ * Draw one stud wall in plan from `a` to `b` (z ignored), spanning `z0` to `z1`, on its own corner and station nodes (walls never share nodes).
+ * With a `holdDown` (and no `anchorage` material) the wall bears on what is below it: `layout.bearing` holds the stud bearing and the
+ * hold-down law, the compiler finds the nodes it stands on (`wallBaseNodes`), and on the lowest level the wall gets supports at its two ends.
+ * With an `anchorage` material it is linked as before: at each pier end a zero-length with the anchorage vertically and an equalDOF along
+ * the wall to the top node of a stud wall (or a beam-column's node) right below, or on the lowest level to a new fixed ground node.
+ * Returns the wall's id, or null when it has no length or height.
  * `extra` adds openings (framed from the template's lumber, which it then needs) and studs at given x, e.g. under the pier ends of a wall above.
  */
 export function drawStudWall(batch: { model: Model; writeRaw: (w: ModelWrite) => void }, a: number[], b: number[], z0: number, z1: number, t: StudWallTemplate, label?: string, extra?: { openings?: DrawnOpening[]; studs?: number[] }): number | null {
@@ -340,7 +400,10 @@ export function drawStudWall(batch: { model: Model; writeRaw: (w: ModelWrite) =>
     plain.openings = ops.map((o) => ({ x0: o.x0, x1: o.x1, headHeight: o.head, headerEi: 0, jackEa: 0, door: o.door }))
   }
   const framing = t.framing && { ...t.framing, openings: ops.map((o): OpeningFraming => ({ header: o.header ?? '2x10', headerPlies: o.headerPlies ?? 2, jackPlies: o.jackPlies ?? 2, ...(o.sill !== undefined && !o.door ? { sill: o.sill } : {}) })) }
-  const layout = framing ? applyFraming(plain, framing, lumberScale(batch.model.config?.units, Htop)) : plain
+  const framed = framing ? applyFraming(plain, framing, lumberScale(batch.model.config?.units, Htop)) : plain
+  // With a hold-down and no anchorage material, the wall bears on what is below it (Carapace `bearing`): no links, no pier-end stations.
+  const bearing = t.anchorage === undefined && t.holdDown
+  const layout: WallLayoutSpec = bearing ? { ...framed, bearing: { kv: bearing.k, kh: bearing.k, holdDown: { tension: bearing.tension, slack: 0, bearing: { kind: 'linear', k: bearing.k } } } } : framed
   const at = (x: number, z: number) => [a[0] + ex[0] * x, (a[1] ?? 0) + ex[1] * x, z].map((v) => Number(v.toPrecision(12)))
   const newNode = (p: number[]) => { const id = batch.model.nextIds.node; batch.writeRaw({ kind: 'node', entity: { id, coords: p } }); return id }
   // Top nodes of existing walls (and their planes), looked up before this wall adds its own; beam-column nodes too (a wall on a beam or
@@ -358,11 +421,22 @@ export function drawStudWall(batch: { model: Model; writeRaw: (w: ModelWrite) =>
   const corners = [newNode(at(0, z0)), newNode(at(L, z0)), newNode(at(L, z1)), newNode(at(0, z1))]
   const inner = (xs: number[]) => [...new Set(xs)].sort((p, q) => p - q).filter((x) => x > 1e-9 * L && x < L - 1e-9 * L)
   const ends = pierEnds(layout)
-  const stations = [...inner([...layout.studs.map((s) => s.x), ...ends]).map((x) => ({ chord: 'top' as const, x })), ...inner(ends).map((x) => ({ chord: 'bottom' as const, x }))]
+  const stations = [...inner([...layout.studs.map((s) => s.x), ...ends]).map((x) => ({ chord: 'top' as const, x })), ...(bearing ? [] : inner(ends).map((x) => ({ chord: 'bottom' as const, x })))]
   const stationNodes = stations.map((s) => newNode(at(s.x, s.chord === 'top' ? z1 : z0)))
   const id = batch.model.nextIds.element
   const args: StudWallArgs = { ...(label ? { label } : {}), layout, stations, ...(framing ? { framing } : {}) }
   batch.writeRaw({ kind: 'element', entity: { id, eleType: 'studWall', nodes: [...corners, ...stationNodes], args: args as unknown as Record<string, unknown> } })
+  if (bearing) {
+    // On the lowest level it stands on two supports at its ends (an existing support at the point is reused); above, on whatever the
+    // compiler finds under it (`wallBaseNodes`).
+    if (z0 > lowest + tol) return id
+    for (const x of [0, L]) {
+      const p = at(x, z0)
+      const found = [...batch.model.fixes.values()].find((f) => f.dofs.includes(3) && batch.model.nodes.get(f.nodeId)?.coords.every((v, k) => Math.abs(v - (p[k] ?? 0)) <= tol))
+      if (!found) batch.writeRaw({ kind: 'fix', entity: { nodeId: newNode(p), dofs: [1, 2, 3, 4, 5, 6] } })
+    }
+    return id
+  }
   const anchorage = t.anchorage ?? (t.holdDown && holdDownMaterial(batch, t.holdDown))
   if (anchorage === undefined || !batch.model.materials.has(anchorage)) return id
   const bottomAt = (x: number) => (x <= 1e-9 * L ? corners[0] : x >= L - 1e-9 * L ? corners[1] : stationNodes[stations.findIndex((s) => s.chord === 'bottom' && Math.abs(s.x - x) <= 1e-9 * L)])

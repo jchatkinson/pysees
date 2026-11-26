@@ -28,7 +28,9 @@ function ops(fn: string, args: PositionalArg[]): AnalysisCommand {
 }
 
 /** `Plain` cannot handle multi-point constraints; `Transformation` is what Carapace uses whenever the model has them. */
-const constraintsOp = (model: Model) => ops('constraints', [model.mpConstraints.size ? 'Transformation' : 'Plain'])
+const constraintsOp = (model: Model) => ops('constraints', [model.mpConstraints.size || hasBearingWall(model) ? 'Transformation' : 'Plain'])
+/** A bearing stud wall exports as shells tied to what it stands on by equalDOFs (`studWallExport`). */
+const hasBearingWall = (model: Model) => [...model.elements.values()].some((e) => e.eleType === 'studWall' && (e.args.layout as { bearing?: unknown } | undefined)?.bearing)
 
 const ALGORITHM_OPTIONS = ['Newton', 'ModifiedNewton', 'KrylovNewton', 'NewtonLineSearch', 'Linear']
 const ALGORITHM_KINDS: Record<string, AlgorithmKind> = {
