@@ -24,15 +24,18 @@ OpenSees is optional. Users who want to run their model in OpenSees can export i
 
 ## Features
 
-- Parametric model editing with undo/redo: nodes, materials, fiber sections, geometric transforms, elements, supports, load patterns, gridlines and levels, with starter templates.
+- Parametric model editing with undo/redo: nodes, materials, fiber sections, geometric transforms, elements, supports, load patterns, gridlines and levels, with starter templates (including the BC Rowhouse light-frame test case).
+- Ribbon toolbar and command palette; 3D, story plan and grid elevation views; drawing tools (frames, quick beams and columns, shells, stud walls, joist floors, supports); move, copy, mirror, divide and merge; isolate.
+- Light-frame wood in Carapace: stud walls with lumber framing, openings and hold-downs, flexible or rigid diaphragms, joist floors bearing on walls and beams.
+- PDF drawing sheets as plan underlays (calibrate, align, crop).
 - Schema-driven command forms for OpenSees command entry.
-- Analysis sequence builder (static stages today) compiled to Carapace input.
+- Analysis sequence builder (static, pushover, modal and earthquake stages) compiled to Carapace input.
 - In-browser analysis with progress and cancellation.
-- 3D viewport with nodes, elements, supports, load glyphs, deformed shape and element force diagrams, with step playback.
+- 3D viewport with nodes, elements, supports, load glyphs, deformed shape, element force diagrams, shell contours and reactions, with step playback; an extruded view of member sections, wall framing and floor joists; in-scene labels; fly mode.
 - Plot overlay and data tables for recorded channels.
 - Material Preview: chart the response of a uniaxial material under a monotonic, cyclic, or custom strain protocol, computed by Carapace.
-- Script export as OpenSeesPy or Tcl (`File > Export .py / .tcl`), checked against real OpenSees in the test suite.
-- Script import (`File > Import .tcl / .py…`): reads an OpenSees Tcl or OpenSeesPy script into an ordinary PySees model. The script is parsed, not executed.
+- Projects saved as annotated OpenSeesPy scripts (`File > Save`); Tcl export (`File > Export .tcl`), checked against real OpenSees in the test suite.
+- Script import (`File > Import`): reads an OpenSees Tcl or OpenSeesPy script into an ordinary PySees model. The script is parsed, not executed.
 
 ## Roadmap
 
@@ -41,7 +44,6 @@ OpenSees is optional. Users who want to run their model in OpenSees can export i
 3. Scripting workflow for parametric model generation (see `docs/SCRIPTINGPLAN.md`).
 4. Richer results: more force/stress views, reactions, time-history tools.
 5. Optional import of recorder output from external OpenSees runs.
-6. Shell stiffness modifiers (`f11 f22 f12 m11 m22 m12 v13 v23`) per section. Carapace-only: OpenSees has no equivalent, so export is exact only for uniform `f` and `m` and refused otherwise (see `docs/shell-plan.md`).
 
 ## Usage
 

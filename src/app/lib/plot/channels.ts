@@ -9,15 +9,18 @@ export interface KindTargets {
 }
 export type AvailableTargets = Record<ResponseKind, KindTargets>
 
-export const KIND_LABELS: Record<ResponseKind, string> = { disp: 'Node displacement', vel: 'Node velocity', accel: 'Node relative acceleration', reaction: 'Reaction', force: 'Element force' }
-export const TARGET_LABELS: Record<ResponseKind, string> = { disp: 'Node', vel: 'Node', accel: 'Node', reaction: 'Node', force: 'Element' }
+export const KIND_LABELS: Record<ResponseKind, string> = { disp: 'Node displacement', vel: 'Node velocity', accel: 'Node relative acceleration', reaction: 'Reaction', force: 'Element force', studWall: 'Stud wall' }
+export const TARGET_LABELS: Record<ResponseKind, string> = { disp: 'Node', vel: 'Node', accel: 'Node', reaction: 'Node', force: 'Element', studWall: 'Wall' }
+
+export const RESPONSE_KINDS = ['disp', 'vel', 'accel', 'reaction', 'force', 'studWall'] as const
 
 export function availableTargets(layout: RunLayout | null): AvailableTargets {
-  const out: AvailableTargets = { disp: { tags: [], components: [] }, vel: { tags: [], components: [] }, accel: { tags: [], components: [] }, reaction: { tags: [], components: [] }, force: { tags: [], components: [] } }
+  const out: AvailableTargets = { disp: { tags: [], components: [] }, vel: { tags: [], components: [] }, accel: { tags: [], components: [] }, reaction: { tags: [], components: [] }, force: { tags: [], components: [] }, studWall: { tags: [], components: [] } }
   if (!layout) return out
-  for (const kind of ['disp', 'vel', 'accel', 'reaction', 'force'] as const) {
+  for (const kind of RESPONSE_KINDS) {
     out[kind].tags = [...layout.columns[kind].keys()].sort((a, b) => a - b)
-    out[kind].components = [...(layout.columns[kind].values().next().value?.labels ?? [])]
+    // Walls differ in their piers, so their components are the union (a wall without one gives no data for it).
+    out[kind].components = kind === 'studWall' ? [...new Set([...layout.columns[kind].values()].flatMap((e) => e.labels))] : [...(layout.columns[kind].values().next().value?.labels ?? [])]
   }
   return out
 }
@@ -36,14 +39,14 @@ export function channelTerms(ch: Channel, layout: RunLayout): { column: number; 
   return terms
 }
 
-const SHORT_KIND: Record<ResponseKind, string> = { disp: 'N', vel: 'N', accel: 'N', reaction: 'N', force: 'E' }
+const SHORT_KIND: Record<ResponseKind, string> = { disp: 'N', vel: 'N', accel: 'N', reaction: 'N', force: 'E', studWall: 'W' }
 
 export function describeChannel(ch: Channel): string {
   if (ch.type === 'step') return 'Step'
   if (ch.type === 'time') return 'Pseudo-time'
   const tag = (t: number) => `${SHORT_KIND[ch.kind]}${t}`
   const base = ch.mode === 'single' ? `${ch.component} ${tag(ch.tags[0] ?? 0)}`
-    : ch.mode === 'sum' ? `Σ ${ch.component} (${ch.tags.length > 4 ? `${ch.tags.length} ${ch.kind === 'force' ? 'elements' : 'nodes'}` : ch.tags.map(tag).join(',')})`
+    : ch.mode === 'sum' ? `Σ ${ch.component} (${ch.tags.length > 4 ? `${ch.tags.length} ${ch.kind === 'force' ? 'elements' : ch.kind === 'studWall' ? 'walls' : 'nodes'}` : ch.tags.map(tag).join(',')})`
     : `${ch.component} ${tag(ch.tags[0] ?? 0)} − ${tag(ch.tags[1] ?? 0)}`
   return ch.scale === 1 ? base : ch.scale === -1 ? `−${base}` : `${Number(ch.scale.toPrecision(3))}×${ch.mode === 'single' ? base : `(${base})`}`
 }

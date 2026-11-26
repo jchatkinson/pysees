@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef } from 'react'
 import { useFrame, type ThreeEvent } from '@react-three/fiber'
-import { BufferAttribute, BufferGeometry, DoubleSide, Mesh, MeshBasicMaterial } from 'three'
+import { BufferAttribute, BufferGeometry, DoubleSide, Mesh, MeshBasicMaterial, ShapeUtils, Vector2 } from 'three'
 import { useAppStore } from '@/app/store/useAppStore'
 import type { DisplayBuffers } from './displayBuffers'
 import { isClosed, type SceneIndex } from './sceneIndex'
@@ -17,6 +17,12 @@ function triangulate(index: SceneIndex): { triangles: number[]; owner: number[] 
   const owner: number[] = []
   index.elementNodes.forEach((rows, e) => {
     if (!isClosed(index.elementKind[e])) return
+    // A floor may be concave: triangulate its plan outline (a fan only suits the convex shells, walls and diaphragms).
+    if (index.elementKind[e] === 'floor') {
+      const c = index.nodeCoords
+      for (const [i, j, k] of ShapeUtils.triangulateShape(rows.map((r) => new Vector2(c[r * 3], c[r * 3 + 1])), [])) { triangles.push(rows[i], rows[j], rows[k]); owner.push(e) }
+      return
+    }
     for (let k = 1; k + 1 < rows.length; k++) {
       triangles.push(rows[0], rows[k], rows[k + 1])
       owner.push(e)

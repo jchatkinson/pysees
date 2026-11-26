@@ -165,15 +165,45 @@ done. PySees status:
   the studs; anchorage → `Elastic` (tension / initial bearing stiffness); a floor load → its one-way reactions as nodal loads on the support
   walls' top nodes; DOFs nothing stiffens in the shell model are fixed. Project files keep the authored items in generated blocks.
 - Constraints (`equalDOF` / `rigidDiaphragm`) compile through the mpConstraints work, and exports with constraints use `constraints('Transformation')`; the exported building runs in real OpenSees (`studBuilding.test.ts`).
-- **Not yet:** a wall layout editor and drawing tool, flexible-diaphragm elements (`diaphragms` table; the template's flexible option
-  works because the expansion loads the walls directly), `wallLoad` element loads, openings and studs in the viewport outline,
-  stud-wall results in the plot channel picker.
+- Since then: studs and openings (outline and diagonals, to the head height) draw on the wall face, placed bilinearly between the corners
+  so they follow the deformed shape (`r3f/WallDetail.tsx`); the plot picker has a Stud wall quantity (base shear / axial / moment and
+  pier quantities, by element id) and a "Stud wall base shear" preset.
+- **Done (P1–P3 complete):**
+  - **Wall loads.** `eleLoad` types "Wall top point" / "Wall top line" (local x along the wall, y up; `wallLoadSpec` in `lib/shells.ts`)
+    compile to `wallLoad` element loads; OpenSees export spreads them onto the wall's top nodes (`wallLoadNodal`, generated block in projects);
+    drawn on the top row (line loads as boxes at their mean). The template keeps any `wallLoad` rows of the expansion.
+  - **Layout editor.** Selecting a wall opens `StudWallCard`: stud positions (or a regular spacing), stud / end-post EA, openings (door,
+    edges, head, header EI, jack EA), chords, sheathing law, floor-zone Ga and rim EA. Apply calls `rebuildStudWall`: top stations at every
+    stud and pier end, bottom stations at pier ends plus any existing one something else uses; stations at an unchanged x keep their node,
+    new ones get new nodes, dropped ones are deleted unless used elsewhere. Studs are added at opening edges. The compiler reports layout
+    problems (`studWallLayoutProblems`) as errors and pier ends without a hold-down (`unanchoredPierEnds`) as warnings.
+  - **Flexible diaphragms** (`lib/diaphragms.ts`, element `diaphragm`, Carapace's `diaphragms` table): the selection pane's Diaphragm
+    section assigns rigid or flexible per level. Flexible: a grid through every X and Y of the level's selected nodes (missing points get
+    new nodes with their out-of-plane DOFs fixed), one linear Ga for every bay, chord EA on the boundary lines and interior EA inside;
+    a selected node coincident with a grid node (another wall's corner) is tied to it by an X/Y `equalDOF`. A replaced rigid diaphragm's
+    master loads move onto the grid (`gridLoads`: forces bilinear, the moment as a corner couple). Drawn as a filled boundary; OpenSees
+    export writes one elastic `ShellMITC4` per bay (G t = Ga) with a warning. Remove drops the element, its ties and its unused grid nodes.
+  - **Drawing tool** (Draw → Stud wall, plan views): click points to draw walls spanning the story below the plan's level, of a wall
+    type taken from an existing wall (`studWallTemplateOf`) or entered as a new one (with a new `Anchorage` material). Each wall gets its
+    own nodes (`drawStudWall`); pier ends are held down to a stud wall's top node right below (anchorage zeroLength + equalDOF along the
+    wall) or, on the lowest level, to a new fixed ground node. New walls join a diaphragm when their top nodes are (re)assigned.
+- **Joist floors (F1 done):** `joistFloor` elements (any plan polygon; joist angle, spacing, lumber, simple/continuous spans, subfloor), area
+  loads per pattern in `FloorCard`, Floor draw tool (polygon in plans), template floors converted (same takedown as the explicit rows).
+  F2 done: extruded joists (at spacing, size, plies), rims on edges no wall carries (axis-aligned edges), see-through subfloor; joist
+  lines in the line view; floor loads in the area-load contour; takedown table in `FloorCard` (`floorTakedown`: simple by statics,
+  continuous by three moments; equals Carapace's wall axial). Next: F3 floor depth ↔ wall floor zone check, "diaphragm from floors";
+  rims on skew edges.
+- **Wall results (done):** Piers / Members switch in the axial view. Members: Carapace's `memberForce` bulk recorder (per wall: studs bottom/top,
+  jacks, cripples), bars per member, framing heat-coloured in the extruded view, member table, extrema and member-spacing auto scale.
+  Not done: header and plate shear / moment diagrams. Later (Carapace): bearing on beams/girders, joist stiffness, line/point floor loads.
+- **Not yet:** per-bay sheathing / openings in the flexible diaphragm form; drawing openings directly; an edit that also moves a rigid
+  master's loads when a rigid diaphragm is re-assigned (the selection pane builds a new master).
 
 ## 6. Phasing
 
 1. **Foundations** (done): : `writeModelEntities` batch + single undo step; selection set for nodes+elements with
    window/crossing on elements; `ribbonCommands.ts` + `Ribbon` shell with the existing View-menu toggles and zoom/fit moved in.
-2. **Views** (done except reactions; slices filter the model instead of using GPU clipping planes): ortho plan/elevation cameras, story/grid stepping, cutting planes with pick filtering, ghosting. Results ribbon tab
+2. **Views** (done; slices filter the model instead of using GPU clipping planes): ortho plan/elevation cameras, story/grid stepping, cutting planes with pick filtering, ghosting. Results ribbon tab
    (Show / Case / Labels) over the existing `resultsView`, plus reactions display.
 3. **Drawing** (done): tool framework, snapping (node → grid → midpoint, free points on a drawing increment), node merging, derived
    properties, frame / quick beams / quick columns / supports, typed lengths, all-stories drawing in plans, and the multi-selection pane
@@ -182,17 +212,17 @@ done. PySees status:
 4. **Extruded view** (done): instanced section sweeps for beams/columns/trusses (one `InstancedMesh` per distinct outline), shell slabs at
    their thickness, fiber detail (section preview) in the properties pane. Nominal √A squares for elastic members can dwarf real sections
    when a model uses very stiff elastic links (the precast-wall template's rigid arms); revisit if that's a problem.
-5. **Edit & assign** (done except diaphragms): Edit tab with move, copy/replicate, mirror, divide (element loads follow the parts) and
+5. **Edit & assign** (done): Edit tab with move, copy/replicate, mirror, divide (element loads follow the parts) and
    merge coincident nodes; nodal and uniform member loads assigned to a Plain pattern; shell tool (plan cells / elevation panels meshed
-   into divisions, new elastic plate sections). Rigid diaphragms wait on Carapace: its compiler ignores every mpConstraint today
-   (flagged separately). Select-by lists beyond the selection pane's "by property" are not done.
-6. **Stud walls as elements** (section 5).
+   into divisions, new elastic plate sections). Rigid diaphragms: the selection pane assigns one per level (3D), retained at a
+   centroid node with its out-of-plane DOFs fixed, skipping nodes supported in plane; constraints draw as light spokes with the supports. Select-by lists beyond the selection pane's "by property" are not done.
+6. **Stud walls as elements** (done; section 5).
 7. **Polish** (partly done): command palette (Ctrl/⌘+K, header search) and "Isolate" / "Show all" (show selection only, filtered like
    plans so hidden objects can't be picked) instead of a clipping section box. Not done: extruded deformed shape, end releases.
 8. **Performance audit** (first pass done). Measured on a 15-story 8×8-bay frame (1296 nodes, 3375 elements, a load on every beam):
    view toggles went from 9–17 s to ~1.3 s and heap from ~400 to ~170 MB. Changes: the canvas renders on demand (`frameloop="demand"`;
    store changes and `DisplayBuffers` invalidate); loads and supports are one fat-line draw per colour, rewritten only when the camera
-   moves (`batchHooks.ts`); id / value / load labels are one DOM layer each (`ScreenLabels`) instead of an `<Html>` per item; drei
+   moves (`batchHooks.ts`); id / value / load labels are one instanced draw each (`SceneLabels`, depth tested) instead of an `<Html>` per item; drei
    `<Text>` removed (it took the WebGL context down); a lost context shows a notice and rebuilds the scene on restore; Vite ignores
    `.claude/` so agent worktrees don't reload the app. Next: `three-mesh-bvh` picking and instanced node glyph scaling for 10k+ models,
    and profiling on real GPU hardware (this environment renders WebGL on the CPU through SwiftShader).

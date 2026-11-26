@@ -7,10 +7,12 @@ import { compileAnalysisSequence, type CompileDiagnostic } from '@/app/lib/compi
 import { orientProblem, readOrient } from '@/app/lib/orient'
 import { withLumpedBeamMass } from '@/app/lib/beamMass'
 import { pathSeries } from '@/app/lib/groundMotion'
-import { eleLoadKind } from '@/app/lib/shells'
+import { eleLoadKind, wallLoadSpec } from '@/app/lib/shells'
+import { diaphragmArgs, isDiaphragm } from '@/app/lib/diaphragms'
+import { floorLoadRows, isJoistFloor } from '@/app/lib/floors'
 import { isShell } from '@/app/lib/commands/tables'
-import { studWallRecorders } from '@/app/lib/studBuilding'
-import { isStudWall, studWallArgs, type FloorLoadArgs } from '@/app/lib/studWalls'
+import { studWallMemberLabels, studWallRecorders } from '@/app/lib/studBuilding'
+import { isStudWall, studWallArgs, studWallFrame, studWallLayoutProblems, unanchoredPierEnds, wallBaseNodes } from '@/app/lib/studWalls'
 import { rowLayout, type RowLayout } from '@/app/lib/resultsStorage/recorderRows'
 
 export interface CompileInputV1Result {
@@ -189,6 +191,9 @@ export function compileInputV1(model: Model, analysisHistory: AnalysisHistory): 
   const shell3s: W.Shell3Table = { nodeIds: [], section: [] }
   const shell4s: W.Shell4Table = { nodeIds: [], section: [] }
   const studWalls: W.StudWallTable = []
+  // A bearing wall's out-of-plane ties (each bottom node and the base nodes it interpolates), for `unheldWallNodes`.
+  const planTies = new Map<number, number[]>()
+  const diaphragms: W.DiaphragmSpec[] = []
   const resolveSection = (secTag: number, context: string): number => {
     const idx = sectionIndex.get(secTag)
     if (idx === undefined) {
@@ -316,7 +321,39 @@ export function compileInputV1(model: Model, analysisHistory: AnalysisHistory): 
       const ctx = `Stud wall ${ele.id}`
       const row = compileStudWall(ele, ndm, (id) => resolveNode(id, ctx), diagnostics)
       if (!row) continue
+      if (row.layout.bearing) {
+        // A bearing wall stands on the nodes found under it now, never stored (Carapace `docs/stud-wall-bearing.md`).
+        const base = wallBaseNodes(model, ele)
+        if (base.error) { diagnostics.push({ severity: 'error', message: `${ctx}: ${base.error}`, commandIndex: -1 }); continue }
+        const round = (x: number) => Number(x.toPrecision(6))
+        if (base.gaps.length) diagnostics.push({ severity: 'warning', message: `${ctx}${studWallArgs(ele.args).label ? ` (${studWallArgs(ele.args).label})` : ''}: studs over ${base.gaps.map(([a, b]) => `x = ${round(a)}–${round(b)}`).join(', ')} have nothing directly below; their load is shared between the nodes either side as if the floor spanned there`, commandIndex: -1 })
+        row.stations.push(...base.nodes.map((b) => ({ chord: 'base' as const, x: b.x, node: resolveNode(b.node, ctx) })))
+        // Carapace ties the bottom corners and stations to their interpolated base along the wall's normal (bearing D9).
+        const L = studWallFrame(model, ele)?.L ?? 0, tol = 1e-9 * Math.max(1, L)
+        const bottoms: [number, number][] = [[ele.nodes[0], 0], [ele.nodes[1], L], ...studWallArgs(ele.args).stations.flatMap((st, i): [number, number][] => (st.chord === 'bottom' ? [[ele.nodes[4 + i], st.x]] : []))]
+        for (const [n, x] of bottoms) {
+          const at = base.nodes.filter((b) => Math.abs(b.x - x) <= tol)
+          const below = base.nodes.filter((b) => b.x < x - tol).at(-1)?.x, above = base.nodes.find((b) => b.x > x + tol)?.x
+          planTies.set(n, (at.length ? at : base.nodes.filter((b) => b.x === below || b.x === above)).map((b) => b.node))
+        }
+      }
+      const frame = studWallFrame(model, ele)
+      if (frame) for (const p of studWallLayoutProblems(row.layout, frame.L)) diagnostics.push({ severity: 'error', message: `${ctx}: ${p}`, commandIndex: -1 })
+      const free = unanchoredPierEnds(model, ele)
+      if (free.length) diagnostics.push({ severity: 'warning', message: `${ctx}: no hold-down at pier end${free.length > 1 ? 's' : ''} x = ${free.map((x) => Number(x.toPrecision(6))).join(', ')} (nothing but the wall uses the bottom node there)`, commandIndex: -1 })
       elementRefs.set(ele.id, { kind: 'studWall', index: studWalls.push(row) - 1 })
+    } else if (isJoistFloor(ele.eleType)) {
+      // Load-only: a joist floor has no stiffness; its floor loads become transfer rows below.
+      if (ele.nodes.length < 3) diagnostics.push({ severity: 'error', message: `Joist floor ${ele.id}: needs at least three nodes`, commandIndex: -1 })
+    } else if (isDiaphragm(ele.eleType)) {
+      const ctx = `Diaphragm ${ele.id}`
+      const { layout } = diaphragmArgs(ele.args)
+      const nu = layout?.u?.length ?? 0, nv = layout?.v?.length ?? 0
+      if (ndm !== 3) { diagnostics.push({ severity: 'error', message: `${ctx}: diaphragms need a 3D model`, commandIndex: -1 }); continue }
+      if (nu < 2 || nv < 2 || ele.nodes.length !== nu * nv || layout.bays.length !== (nu - 1) * (nv - 1) || layout.eaU.length !== nv || layout.eaV.length !== nu) {
+        diagnostics.push({ severity: 'error', message: `${ctx}: its layout does not match its ${ele.nodes.length} nodes`, commandIndex: -1 }); continue
+      }
+      elementRefs.set(ele.id, { kind: 'diaphragm', index: diaphragms.push({ nodes: ele.nodes.map((id) => resolveNode(id, ctx)), layout: { u: layout.u, v: layout.v, level: layout.level, bays: layout.bays.map((b) => b ?? undefined), eaU: layout.eaU, eaV: layout.eaV } }) - 1 })
     } else if (ele.eleType === 'zeroLengthSection') {
       const secIdx = resolveSection(Number(ele.args.secTag), `ZeroLengthSection ${ele.id}`)
       zeroLengthSections.nodeI.push(resolveNode(ele.nodes[0], `ZeroLengthSection ${ele.id}`))
@@ -333,6 +370,10 @@ export function compileInputV1(model: Model, analysisHistory: AnalysisHistory): 
   }
 
   const constraintTables = compileConstraints(model, ndm, ndf, resolveNode, diagnostics)
+  if (ndm === 3) for (const { wall, axis, nodes } of unheldWallNodes(model, planTies)) {
+    const label = studWallArgs(wall.args).label
+    diagnostics.push({ severity: 'warning', message: `Stud wall ${wall.id}${label ? ` (${label})` : ''}: nothing holds node${nodes.length > 1 ? 's' : ''} ${nodes.join(', ')} along ${'XY'[axis]}, so ${nodes.length > 1 ? 'they stay' : 'it stays'} at zero that way (a wall is stiff only in its own plane: a diaphragm, a beam, a support or a wall standing across it holds the rest)`, commandIndex: -1 })
+  }
 
   // --- load patterns + nodal loads ---
   const patternIds = [...model.patterns.keys()].filter((id) => model.patterns.get(id)!.patternType === 'Plain').sort((a, b) => a - b)
@@ -414,6 +455,16 @@ export function compileInputV1(model: Model, analysisHistory: AnalysisHistory): 
       if (child.kind !== 'eleLoad') continue
       const a = child.args as { eleTags?: number[]; wx?: number; wy?: number; wz?: number; pressure?: number; bx?: number; by?: number; bz?: number }
       const loadKind = eleLoadKind(child.args)
+      if (loadKind === 'wall') {
+        // Carapace groups a pattern's wall loads on one wall into one load case of that wall.
+        const load: W.ElementLoadSpec = { kind: 'wallLoad', load: wallLoadSpec(child.args) }
+        for (const tag of a.eleTags ?? []) {
+          const ref = elementRefs.get(tag)
+          if (ref?.kind !== 'studWall') { diagnostics.push({ severity: 'error', message: `Wall load in pattern ${id}: element ${tag} is not a stud wall`, commandIndex: -1 }); continue }
+          elementLoads.pattern.push(pIdx); elementLoads.elementKind.push('studWall'); elementLoads.elementIndex.push(ref.index); elementLoads.load.push(load); elementLoads.stage.push(stage)
+        }
+        continue
+      }
       if (loadKind !== 'beam') {
         const spec: W.ElementLoadSpec = loadKind === 'pressure' ? { kind: 'shellPressure', pressure: Number(a.pressure) || 0 } : { kind: 'shellBody', bx: Number(a.bx) || 0, by: Number(a.by) || 0, bz: Number(a.bz) || 0 }
         for (const tag of a.eleTags ?? []) {
@@ -465,14 +516,39 @@ export function compileInputV1(model: Model, analysisHistory: AnalysisHistory): 
   for (const id of patternIds) {
     for (const child of model.patterns.get(id)!.children) {
       if (child.kind !== 'floorLoad') continue
-      const a = child.args as unknown as FloorLoadArgs
-      const supports = a.supports.map((sup) => {
-        const ref = elementRefs.get(sup.wall)
-        if (ref?.kind !== 'studWall') diagnostics.push({ severity: 'error', message: `Floor load in pattern ${id}: support ${sup.wall} is not a stud wall`, commandIndex: -1 })
-        return { ...sup, wall: { kind: 'studWall' as const, index: ref?.index ?? NO_INDEX } }
-      })
-      floorLoads.push({ bounds: a.bounds, continuity: a.continuity, loads: a.loads as W.FloorTransferLoadSpec[], pattern: patternIndex.get(id)!, supports })
+      const { rows, problems, wallLines, nodal } = floorLoadRows(model, child)
+      for (const p of problems) diagnostics.push({ severity: 'warning', message: `Floor load in pattern ${id}: ${p}`, commandIndex: -1 })
+      // Strips that bear on a beam are solved in PySees: their wall shares as top-line wall loads, their beam shares as nodal loads.
+      const pIdx = patternIndex.get(id)!, stage = claimedStage.get(id) ?? firstStaticWire
+      for (const l of wallLines) {
+        const ref = elementRefs.get(l.wall)
+        if (ref?.kind !== 'studWall') { diagnostics.push({ severity: 'error', message: `Floor load in pattern ${id}: support ${l.wall} is not a stud wall`, commandIndex: -1 }); continue }
+        elementLoads.pattern.push(pIdx); elementLoads.elementKind.push('studWall'); elementLoads.elementIndex.push(ref.index); elementLoads.stage.push(stage)
+        elementLoads.load.push({ kind: 'wallLoad', load: { kind: 'topLine', x0: l.x0, x1: l.x1, wx0: 0, wx1: 0, wy0: -l.q, wy1: -l.q } })
+      }
+      for (const n of nodal) {
+        nodalLoads.pattern.push(pIdx); nodalLoads.node.push(resolveNode(n.node, `Floor load in pattern ${id}`)); nodalLoads.dof.push(ndm - 1); nodalLoads.value.push(-n.fz); nodalLoads.stage.push(stage)
+      }
+      for (const a of rows) {
+        const supports = a.supports.map((sup) => {
+          const ref = elementRefs.get(sup.wall)
+          if (ref?.kind !== 'studWall') diagnostics.push({ severity: 'error', message: `Floor load in pattern ${id}: support ${sup.wall} is not a stud wall`, commandIndex: -1 })
+          return { ...sup, wall: { kind: 'studWall' as const, index: ref?.index ?? NO_INDEX } }
+        })
+        floorLoads.push({ bounds: a.bounds, continuity: a.continuity, loads: a.loads as W.FloorTransferLoadSpec[], pattern: patternIndex.get(id)!, supports })
+      }
     }
+  }
+  // Carapace replaces a nodal load given twice for one pattern, node and DOF (OpenSees adds them): sum the rows first.
+  {
+    const at = new Map<string, number>(), merged: W.NodalLoadTable = { pattern: [], node: [], dof: [], value: [], stage: [] }
+    nodalLoads.node.forEach((node, i) => {
+      const key = `${nodalLoads.pattern[i]}:${node}:${nodalLoads.dof[i]}:${nodalLoads.stage[i]}`, k = at.get(key)
+      if (k !== undefined) { merged.value[k] += nodalLoads.value[i]; return }
+      at.set(key, merged.node.length)
+      merged.pattern.push(nodalLoads.pattern[i]); merged.node.push(node); merged.dof.push(nodalLoads.dof[i]); merged.value.push(nodalLoads.value[i]); merged.stage.push(nodalLoads.stage[i])
+    })
+    Object.assign(nodalLoads, merged)
   }
   if ((nodalLoads.node.length || elementLoads.pattern.length || floorLoads.length) && sequence.stages.length === 0) {
     diagnostics.push({ severity: 'error', message: 'Model has loads but the analysis sequence has no stages', commandIndex: -1 })
@@ -534,13 +610,15 @@ export function compileInputV1(model: Model, analysisHistory: AnalysisHistory): 
   const nodeBulk = (quantity: W.BulkQuantity, kind: RecorderPlanKind, tags: number[], labels: string[]) =>
     bulk({ table: 'nodes', quantity, rows: tags.map((tag) => resolveNode(tag, `${kind} recorder for node ${tag}`)) }, tags.map((tag) => plan(kind, tag, labels)), dofsPerNode)
   nodeBulk('displacement', 'disp', recordedNodeTags, dispLabels)
+  if (stages.length && !recordedNodeTags.length) diagnostics.push({ severity: 'warning', message: 'The analysis records no node displacements, so there is no deformed shape or result diagram to show. Add a "Whole Model Recorder" block before the analysis.', commandIndex: -1 })
   // Only supported nodes (an sp/fix constraint) carry a reaction; elsewhere it is just a free DOF's residual.
   nodeBulk('reaction', 'reaction', recordedReactionTags.filter((tag) => model.fixes.get(tag)?.dofs.length), reactionLabels)
   // Per element table: rows and first columns of the end forces, of the loads (loaded frame elements, right after their end forces) and of shell resultants.
   const groups = new Map<W.ElementKind, Record<'force' | 'load' | 'shell', { rows: number[]; at: number[] }>>()
   const group = (kind: W.ElementKind) => groups.get(kind) ?? groups.set(kind, { force: { rows: [], at: [] }, load: { rows: [], at: [] }, shell: { rows: [], at: [] } }).get(kind)!
-  // An element the compiler skipped already produced its own "not yet supported" warning.
-  const recordedRefs = recordedElementTags.flatMap((tag) => { const ref = elementRefs.get(tag); return ref ? [{ tag, ...ref }] : [] })
+  // An element the compiler skipped already produced its own "not yet supported" warning. Stud walls and diaphragms have no end forces
+  // (walls record their own resultants below).
+  const recordedRefs = recordedElementTags.flatMap((tag) => { const ref = elementRefs.get(tag); return ref && ref.kind !== 'studWall' && ref.kind !== 'diaphragm' ? [{ tag, ...ref }] : [] })
   for (const { tag, kind, index } of recordedRefs) {
     const loaded = loadedElementTags.has(tag) && kind !== 'shell3' && kind !== 'shell4'
     const labels = forceLabels(kind)
@@ -570,8 +648,11 @@ export function compileInputV1(model: Model, analysisHistory: AnalysisHistory): 
     const ref = elementRefs.get(ele.id)
     if (ref?.kind !== 'studWall') continue
     const { labels, specs } = studWallRecorders(studWalls[ref.index].layout, ref.index)
-    const at = plan('studWall', ele.id, labels)
+    // Then its framing members' forces (one bulk recorder per wall: walls differ in member count).
+    const members = studWallMemberLabels(studWalls[ref.index].layout)
+    const at = plan('studWall', ele.id, [...labels, ...members])
     specs.forEach((spec, k) => { recorders.push(spec); columns.push([at + k]) })
+    bulk({ table: 'elements', elementKind: 'studWall', quantity: 'memberForce', rows: [ref.index] }, [at + labels.length], members.length)
   }
 
   if (diagnostics.some((d) => d.severity === 'error')) return { input: null, diagnostics, recordedNodeTags: [], dofsPerNode: 0, recorderPlans: [], nodeTags: [], rowLayout: rowLayout(0, []) }
@@ -592,6 +673,7 @@ export function compileInputV1(model: Model, analysisHistory: AnalysisHistory): 
     nodalLoads,
     elementLoads,
     ...(studWalls.length ? { studWalls } : {}),
+    ...(diaphragms.length ? { diaphragms } : {}),
     ...(floorLoads.length ? { floorLoads } : {}),
     sequence: { stages, recorders },
   }
@@ -599,6 +681,48 @@ export function compileInputV1(model: Model, analysisHistory: AnalysisHistory): 
 }
 
 /** Positive integers from a scalar or list arg (`dofs`, `cNodeTags`), or `null` when any entry is not one. */
+/**
+ * Stud-wall nodes whose horizontal translation (X or Y) no element, support or constraint holds. Carapace makes such a DOF no
+ * equation and leaves it at zero without a word, which reads as a wall coming loose from the floor. Mirrors its rules: a wall
+ * stiffens its own plane's translations; beams, trusses and shells every translation; a flexible diaphragm X and Y; a zero-length its
+ * material directions; supports, rigid diaphragms and equalDOFs the directions they fix or tie. A bearing wall's bottom node (`ties`:
+ * node → the base nodes it follows) is held along the wall's normal only where all of its base nodes are (Carapace bearing D9).
+ */
+function unheldWallNodes(model: Model, ties: Map<number, number[]>): { wall: ElementEntity; axis: 0 | 1; nodes: number[] }[] {
+  const held = new Map<number, Set<number>>()
+  const hold = (n: number, axes: number[]) => { const h = held.get(n) ?? new Set<number>(); axes.forEach((a) => h.add(a)); held.set(n, h) }
+  const walls: { wall: ElementEntity; normal: number[] }[] = []
+  for (const e of model.elements.values()) {
+    if (isStudWall(e.eleType)) {
+      const f = studWallFrame(model, e)
+      if (!f) continue
+      const plane = [0, 1, 2].filter((k) => Math.abs(f.ex[k]) > 1e-12 || Math.abs(f.ey[k]) > 1e-12)
+      const n = [f.ex[1] * f.ey[2] - f.ex[2] * f.ey[1], f.ex[2] * f.ey[0] - f.ex[0] * f.ey[2], f.ex[0] * f.ey[1] - f.ex[1] * f.ey[0]]
+      const normal = [0, 1, 2].filter((k) => Math.abs(n[k]) > 1e-12)
+      walls.push({ wall: e, normal })
+      for (const id of e.nodes) hold(id, plane)
+    } else if (e.eleType === 'zeroLength') e.nodes.forEach((id) => hold(id, (intList(e.args.dir) ?? []).map((d) => d - 1)))
+    else if (isDiaphragm(e.eleType)) e.nodes.forEach((id) => hold(id, [0, 1]))
+    else if (!isJoistFloor(e.eleType)) e.nodes.forEach((id) => hold(id, [0, 1, 2]))
+  }
+  for (const [id, f] of model.fixes) hold(id, f.dofs.map((d) => d - 1))
+  for (const c of model.mpConstraints.values()) {
+    if (c.kind === 'rigidDiaphragm') (intList(c.args.cNodeTags) ?? []).concat(Number(c.args.rNodeTag)).forEach((id) => hold(id, [0, 1, 2].filter((k) => k !== Number(c.args.perpDirn) - 1)))
+    else if (c.kind === 'equalDOF') hold(Number(c.args.cNodeTag), (intList(c.args.dofs) ?? []).map((d) => d - 1))
+    else if (c.kind === 'rigidLink') [Number(c.args.rNodeTag), Number(c.args.cNodeTag)].forEach((id) => hold(id, [0, 1, 2]))
+  }
+  for (let pass = 0; pass < 2; pass++) for (const { wall, normal } of walls) for (const id of wall.nodes) {
+    const bases = ties.get(id)
+    if (bases) hold(id, normal.filter((a) => bases.every((b) => held.get(b)?.has(a))))
+  }
+  const out: { wall: ElementEntity; axis: 0 | 1; nodes: number[] }[] = []
+  for (const { wall } of walls) for (const axis of [0, 1] as const) {
+    const nodes = [...new Set(wall.nodes)].filter((id) => !held.get(id)?.has(axis))
+    if (nodes.length) out.push({ wall, axis, nodes })
+  }
+  return out
+}
+
 function intList(raw: unknown): number[] | null {
   const list = (Array.isArray(raw) ? raw : raw === undefined || raw === '' ? [] : [raw]).map(Number)
   return list.every((v) => Number.isInteger(v) && v > 0) ? list : null

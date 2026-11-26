@@ -5,12 +5,26 @@ const dot = (a: Vec3, b: Vec3) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
 const cross = (a: Vec3, b: Vec3): Vec3 => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]]
 const unit = (a: Vec3): Vec3 => { const l = Math.hypot(...a); return l > 0 ? [a[0] / l, a[1] / l, a[2] / l] : a }
 
-/** The element-load forms the load form offers (`loadType`): a beam's uniform load, a shell pressure, a shell self-weight. */
-export const ELE_LOAD_TYPES = ['Beam uniform', 'Shell pressure', 'Shell self-weight'] as const
+/** The element-load forms the load form offers (`loadType`): a beam's uniform load, a shell pressure, a shell self-weight, and a
+ * Carapace-only stud-wall top load (a point, or a linearly varying line load, in the wall's local axes). */
+export const ELE_LOAD_TYPES = ['Beam uniform', 'Shell pressure', 'Shell self-weight', 'Wall top point', 'Wall top line'] as const
 
-/** The three `eleLoad` forms an element load can take. A pattern child carries `pressure` (shells), `bx/by/bz` (shell self-weight) or `wx/wy/wz` (beams). */
-export type EleLoadKind = 'beam' | 'pressure' | 'selfWeight'
-export const eleLoadKind = (args: Record<string, unknown>): EleLoadKind => (typeof args.pressure === 'number' ? 'pressure' : typeof args.bx === 'number' ? 'selfWeight' : 'beam')
+/** The forms an element load can take. A pattern child carries `pressure` (shells), `bx/by/bz` (shell self-weight), a wall `loadType`
+ * with `x fx fy` or `x0 x1 wx0 wx1 wy0 wy1` (stud walls, local axes, negative y is down) or `wx/wy/wz` (beams). */
+export type EleLoadKind = 'beam' | 'pressure' | 'selfWeight' | 'wall'
+export const eleLoadKind = (args: Record<string, unknown>): EleLoadKind => (args.loadType === ELE_LOAD_TYPES[3] || args.loadType === ELE_LOAD_TYPES[4] ? 'wall' : typeof args.pressure === 'number' ? 'pressure' : typeof args.bx === 'number' ? 'selfWeight' : 'beam')
+
+/** A stud-wall element load as Carapace's `WallLoadSpec` (`topPoint` / `topLine`). */
+export type WallLoad = { kind: 'topPoint'; x: number; fx: number; fy: number } | { kind: 'topLine'; x0: number; x1: number; wx0: number; wx1: number; wy0: number; wy1: number }
+export function wallLoadSpec(args: Record<string, unknown>): WallLoad {
+  const n = (k: string) => Number(args[k]) || 0
+  return args.loadType === ELE_LOAD_TYPES[3] ? { kind: 'topPoint', x: n('x'), fx: n('fx'), fy: n('fy') } : { kind: 'topLine', x0: n('x0'), x1: n('x1'), wx0: n('wx0'), wx1: n('wx1'), wy0: n('wy0'), wy1: n('wy1') }
+}
+/** `WallLoad` → `eleLoad` args. */
+export const wallLoadArgs = (eleTags: number[], w: WallLoad): Record<string, unknown> => {
+  const { kind, ...rest } = w
+  return { eleTags, loadType: kind === 'topPoint' ? ELE_LOAD_TYPES[3] : ELE_LOAD_TYPES[4], ...rest }
+}
 
 /** A shell's local axes: e1 from the edge midpoints, e2 its completion, e3 = e1 × e2, as Carapace and OpenSees' `ShellMITC4` define them (a triangle uses its first edge). */
 export function shellFrame(xyz: Vec3[]): { e1: Vec3; e2: Vec3; e3: Vec3 } | null {

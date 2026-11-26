@@ -2,16 +2,20 @@ import type { Model } from '@/app/types/model'
 import type { AnalysisHistory } from '@/app/types/analysisCommands'
 import type { GridlineEntity } from '@/app/types/gridlines'
 import type { LevelEntity } from '@/app/types/levels'
+import type { UnderlayEntity } from '@/app/types/underlays'
 import type { SavedPlot } from '@/app/types/savedPlot'
 import type { PlotView } from '@/app/types/plotView'
 import type { ResultsView } from '@/app/types/resultsView'
 import type { UnitPrefs } from '@/app/lib/units/units'
+import { DEFAULT_NUMBER_FORMAT, type NumberFormat } from '@/app/lib/formatResult'
 
 /** Display preferences worth keeping: nothing here depends on a run (no selection, step, playback or open panels). */
 export interface ProjectDisplay {
   viewSettings: Record<string, boolean>
   /** Display unit per category (by symbol). */
   unitPrefs: UnitPrefs
+  /** Significant figures for displayed results. */
+  numberFormat: NumberFormat
   hiddenLoadPatterns: number[]
   resultsView: Partial<ResultsView>
   plotView: Partial<PlotView>
@@ -26,6 +30,9 @@ export interface ProjectDocument {
   levels: LevelEntity[]
   nextGridlineId: number
   nextLevelId: number
+  /** PDF underlays by file hash; the PDFs themselves stay in the browser's underlay store. */
+  underlays: UnderlayEntity[]
+  nextUnderlayId: number
   savedPlots: SavedPlot[]
   nextSavedPlotId: number
   activeSavedPlotId: number | null
@@ -40,11 +47,14 @@ export interface ProjectSource {
   levels: LevelEntity[]
   nextGridlineId: number
   nextLevelId: number
+  underlays?: UnderlayEntity[]
+  nextUnderlayId?: number
   savedPlots: SavedPlot[]
   nextSavedPlotId: number
   activeSavedPlotId: number | null
   viewSettings: Record<string, boolean>
   unitPrefs: UnitPrefs
+  numberFormat?: NumberFormat
   hiddenLoadPatterns: number[]
   resultsView: ResultsView
   plotView: PlotView
@@ -65,7 +75,8 @@ export function captureProject(s: ProjectSource): ProjectDocument {
   return {
     model: s.model, analysis: { commands, cursor: commands.length - 1 },
     gridlines: s.gridlines, levels: s.levels, nextGridlineId: s.nextGridlineId, nextLevelId: s.nextLevelId,
+    underlays: s.underlays ?? [], nextUnderlayId: s.nextUnderlayId ?? 1,
     savedPlots: s.savedPlots, nextSavedPlotId: s.nextSavedPlotId, activeSavedPlotId: s.activeSavedPlotId,
-    display: { viewSettings: { ...s.viewSettings }, unitPrefs: { ...s.unitPrefs }, hiddenLoadPatterns: [...s.hiddenLoadPatterns], resultsView, plotView: { ...pick(s.plotView, PLOT_PREF_KEYS), open: false } },
+    display: { viewSettings: { ...s.viewSettings }, unitPrefs: { ...s.unitPrefs }, numberFormat: { ...(s.numberFormat ?? DEFAULT_NUMBER_FORMAT) }, hiddenLoadPatterns: [...s.hiddenLoadPatterns], resultsView, plotView: { ...pick(s.plotView, PLOT_PREF_KEYS), open: false } },
   }
 }

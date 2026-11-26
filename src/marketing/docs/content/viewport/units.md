@@ -1,7 +1,7 @@
 ---
 title: Units
 description: Base units, display units and typing values with units.
-order: 3
+order: 5
 keywords: kip kN mm inch ft stress conversion unitless
 ---
 
@@ -21,7 +21,7 @@ Presets: kip-in-s, kip-ft-s, lbf-in-s, lbf-ft-s, kN-m-s, kN-mm-s, N-m-s, N-mm-s.
 
 ![The Units dialog with preset buttons and one unit selector per quantity](/docs/units-dialog.png)
 
-Open **Edit > Units** to choose how each quantity is shown. There are categories for length, area, section modulus, inertia, force, moment, force per length, stress, unit weight, mass, density, time, velocity, acceleration and more.
+Open **Model > Units** to choose how each quantity is shown. There are categories for length, area, section modulus, inertia, force, moment, force per length, stress, unit weight, mass, density, time, velocity, acceleration and more.
 
 - A category you have not set follows the displayed length, force and time. For example kip and in give ksi for stress.
 - Press **Reset** to return to automatic.

@@ -158,7 +158,7 @@ export function nodeReferences(model: Model, nodeId: number) {
   const masses = model.masses.has(nodeId) ? [model.masses.get(nodeId)!] : []
   const mpConstraints = [...model.mpConstraints.values()].filter((c) => {
     const args = c.args as Record<string, unknown>
-    return args.rNodeTag === nodeId || args.cNodeTag === nodeId || (Array.isArray(args.nodeTags) && (args.nodeTags as number[]).includes(nodeId))
+    return args.rNodeTag === nodeId || args.cNodeTag === nodeId || [args.nodeTags, args.cNodeTags].some((l) => Array.isArray(l) && (l as number[]).includes(nodeId))
   })
   return { elements, fixes, masses, mpConstraints }
 }
@@ -171,7 +171,11 @@ export function deleteNodeCascade(model: Model, nodeId: number): Model {
   const elements = new Map(model.elements)
   for (const e of refs.elements) elements.delete(e.id)
   const mpConstraints = new Map(model.mpConstraints)
-  for (const c of refs.mpConstraints) mpConstraints.delete(c.id)
+  // A diaphragm loses just this constrained node; any other constraint on it goes.
+  for (const c of refs.mpConstraints) {
+    const rest = c.args.rNodeTag !== nodeId && Array.isArray(c.args.cNodeTags) ? (c.args.cNodeTags as number[]).filter((n) => n !== nodeId) : []
+    if (rest.length) mpConstraints.set(c.id, { ...c, args: { ...c.args, cNodeTags: rest } }); else mpConstraints.delete(c.id)
+  }
   return { ...model, nodes, fixes, masses, elements, mpConstraints }
 }
 

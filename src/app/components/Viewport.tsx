@@ -11,11 +11,21 @@ import { ResultsDisplayPanel } from './ResultsDisplayPanel'
 import { PlotOverlay } from './plot/PlotOverlay'
 import { viewLabel } from '@/app/lib/editor/viewSlice'
 import { currentView } from './ribbon/commands'
-import { DrawOptions } from './DrawOptions'
 
 type MarqueeRect = { x1: number; y1: number; x2: number; y2: number }
 
 /** Which view is shown ("Plan @ L3 (z = 9)"), in the viewport's top-left corner. */
+/** The fly-mode keys, while it is on. */
+function FlyHint() {
+  const on = useAppStore((s) => s.flyMode)
+  if (!on) return null
+  return (
+    <div className="absolute bottom-2 left-1/2 z-20 -translate-x-1/2 pointer-events-none rounded-sm border bg-background/90 px-2 py-1 text-xs text-muted-foreground whitespace-nowrap">
+      Fly: W A S D move · Q / E down, up · right-drag look · wheel forward · Shift fast · Alt slow · Esc done
+    </div>
+  )
+}
+
 function ViewLabel() {
   const mode = useAppStore(currentView)
   const levels = useAppStore((s) => s.levels)
@@ -114,6 +124,8 @@ export function Viewport() {
           gl={{ antialias: true }}
           // Draw only when something changed (camera, store, results); an idle model costs nothing.
           frameloop="demand"
+          // A click that hits nothing pickable clears the selection, in any view (an invisible catcher plane can't face every camera).
+          onPointerMissed={(e) => { if (e.type !== 'click') return; const s = useAppStore.getState(); if (s.nodePickMode === 'none') s.clearSceneSelection() }}
           // A lost GL context (driver reset, too many contexts) shows a notice; when the browser restores it, rebuild the scene.
           onCreated={({ gl }) => {
             // Only the live canvas counts: a replaced one is force-lost as it unmounts.
@@ -144,6 +156,7 @@ export function Viewport() {
       )}
 
       {hasConfig && <ViewLabel />}
+      {hasConfig && <FlyHint />}
       {contextLost && (
         <div className="absolute inset-0 z-50 grid place-items-center bg-background/70">
           <div className="grid gap-2 rounded-sm border bg-background p-3 text-xs shadow">
@@ -152,7 +165,6 @@ export function Viewport() {
           </div>
         </div>
       )}
-      {hasConfig && <DrawOptions />}
       {hasConfig && <ShellLoadLegend />}
       {!hasConfig && (
         <div className="absolute inset-0 grid place-items-center pointer-events-none">

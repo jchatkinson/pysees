@@ -5,7 +5,7 @@ import { Button } from '@/app/components/ui/button'
 import { Input } from '@/app/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/app/components/ui/select'
 import { useAppStore } from '@/app/store/useAppStore'
-import { formatResult } from '@/app/lib/formatResult'
+import { useResultFormat } from '@/app/lib/useResultFormat'
 import { DataTable } from '@/app/components/ui/data-table'
 import { columnFilterFn } from '@/app/components/ui/column-filter'
 import { modeFrequencyHz, modePeriod } from '@/app/lib/modal'
@@ -72,6 +72,7 @@ export function ResultsPanel() {
   const [caseFilter, setCaseFilter] = useState<string>('all')
 
   const zeroTolerance = useAppStore((s) => s.zeroTolerance)
+  const f = useResultFormat()
   const setZeroTolerance = useAppStore((s) => s.setZeroTolerance)
   const kind = KIND_BY_RESULT_TYPE[resultType as keyof typeof KIND_BY_RESULT_TYPE] ?? 'disp'
   const modalTable = isModalTable(resultType)
@@ -141,7 +142,7 @@ export function ResultsPanel() {
     const base: ColumnDef<DisplacementRow>[] = [
       { accessorKey: 'stageId', header: 'Case' },
       { accessorKey: 'step', header: 'Step' },
-      { accessorKey: 'pseudoTime', header: 'Time', cell: (c) => c.getValue<number>().toPrecision(5) },
+      { accessorKey: 'pseudoTime', header: 'Time', cell: (c) => f.value(c.getValue<number>(), 0, false) },
       { accessorKey: 'node', header: TARGET_HEADER[kind] },
     ]
     const dofCols: ColumnDef<DisplacementRow>[] = componentLabels.map((label, i) => ({
@@ -150,11 +151,11 @@ export function ResultsPanel() {
       accessorFn: (row) => row.values[i],
       cell: (c) => {
         const v = c.getValue<number | undefined>()
-        return v === undefined ? '' : formatResult(v, zeroTolerance)
+        return v === undefined ? '' : f.value(v, zeroTolerance)
       },
     }))
     return [...base, ...dofCols]
-  }, [componentLabels, kind, zeroTolerance])
+  }, [componentLabels, kind, zeroTolerance, f])
 
   const modalColumns = useMemo<ColumnDef<ModalRow>[]>(() => [
     { accessorKey: 'stageId', header: 'Case' },
@@ -164,9 +165,9 @@ export function ResultsPanel() {
       id: `v-${i}`,
       header: label,
       accessorFn: (row) => row.values[i],
-      cell: (c) => { const v = c.getValue<number | undefined>(); return v === undefined ? '' : formatResult(v, zeroTolerance) },
+      cell: (c) => { const v = c.getValue<number | undefined>(); return v === undefined ? '' : f.value(v, zeroTolerance) },
     })),
-  ], [resultType, zeroTolerance, modelNdm])
+  ], [resultType, zeroTolerance, modelNdm, f])
   const filteredModalRows = useMemo(() => (caseFilter === 'all' ? modalRows : modalRows.filter((r) => r.stageId === caseFilter)), [modalRows, caseFilter])
   const caseIds = useMemo(() => [...new Set((modalTable ? modalRows : rows).map((r) => r.stageId))], [modalTable, modalRows, rows])
   const modalTableInstance = useReactTable({

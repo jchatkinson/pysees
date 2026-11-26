@@ -32,7 +32,7 @@ A Plain pattern can name an existing time series or use one defined inline.
 
 ## Showing loads
 
-Use **View > Nodal Loads**, **Element Loads** and **Load Values**, and the **Load Patterns** submenu to hide individual patterns. Applied loads are hidden while results are shown.
+Use the **Loads** group on the View tab (**Nodal**, **Element**, **Values**) and its pattern picker to hide individual patterns. [Joist floors](/docs/model/joist-floors) take area loads per pattern on their card. Applied loads are hidden while results are shown.
 
 > [!NOTE]
 > Shell pressure has no OpenSees equivalent. Export expands it into per-node `load` commands.

@@ -14,6 +14,7 @@ import { useCurrentCase } from '@/app/lib/resultsStorage/useCases'
 import type { CaseInfo } from '@/app/lib/resultsStorage/stepFrames'
 import { usePlayback } from '@/app/lib/usePlayback'
 import { useModeAnimation } from '@/app/lib/useModeAnimation'
+import { useResultFormat } from '@/app/lib/useResultFormat'
 import { modeFrequencyHz, modePeriod, modeTimingText, modeTranslationPeak } from '@/app/lib/modal'
 import { autoModeScale, autoScale, modelMetrics } from '@/app/lib/resultsScale'
 import type { RunExtents } from '@/app/types/resultsStorage'
@@ -38,7 +39,8 @@ const RESULT_TYPES: { id: ResultType; label: string; label3d?: string; only3d?: 
 ]
 const DIRECTIONS = ['UX', 'UY', 'UZ']
 
-const fmt = (v: number) => (v === 0 ? '0' : Number(v.toPrecision(4)).toString())
+/** The scale field: an input, not a result, so it keeps a fixed 4 figures. */
+const fmtScale = (v: number) => (v === 0 ? '0' : Number(v.toPrecision(4)).toString())
 const caseLabel = (c: CaseInfo) => `${c.stageId} · ${c.kind === 'modal' ? 'modal' : `${Math.max(0, c.count - 1)} steps`}`
 
 /** ETABS-style "Display Results" panel docked in the viewport: case, step, result type and display settings. */
@@ -49,7 +51,11 @@ export function ResultsDisplayPanel() {
   const is3d = model.config?.ndm === 3
   const availableResultTypes = RESULT_TYPES
   const hasShells = useMemo(() => [...model.elements.values()].some((e) => isShell(e.eleType)), [model.elements])
+  const hasStudWalls = useMemo(() => [...model.elements.values()].some((e) => e.eleType === 'studWall'), [model.elements])
   const contourRange = useAppStore((s) => s.contourRange)
+  const rf = useResultFormat()
+  const fmt = (v: number) => rf.value(v, 0, false)
+  const digits = useAppStore((s) => s.numberFormat.digits)
 
   const [extents, setExtents] = useState<{ runId: string; value: RunExtents } | null>(null)
   const [time, setTime] = useState<{ runId: string; step: number; value: number } | null>(null)
@@ -94,7 +100,7 @@ export function ResultsDisplayPanel() {
   const runExtents = extents && extents.runId === rv.runId ? extents.value : null
   // A contour is drawn on the deformed shape, so it shares that scale.
   const scaleKey: ScaleKey | null = rv.type === 'none' ? null : rv.type === 'contour' ? 'deformed' : rv.type
-  const auto = !scaleKey ? 1 : scaleKey === 'mode' ? autoModeScale(modalStage && mode ? modeTranslationPeak(modalStage, mode) : 0, metrics) : autoScale(scaleKey, runExtents, metrics)
+  const auto = !scaleKey ? 1 : scaleKey === 'mode' ? autoModeScale(modalStage && mode ? modeTranslationPeak(modalStage, mode) : 0, metrics) : autoScale(scaleKey, runExtents, metrics, rv.wallResults)
   const manual = scaleKey ? rv.scales[scaleKey] : null
   const scale = manual ?? auto
   const plotOpen = useAppStore((s) => s.plotView.open)
@@ -126,7 +132,7 @@ export function ResultsDisplayPanel() {
     <>
     {rv.type === 'mode' && mode && modalStage && (
       <div className="pointer-events-none absolute bottom-3 left-3 z-40 rounded-md bg-background/85 px-3 py-1.5 text-sm shadow">
-        <span className="font-medium">Mode {Math.min(rv.mode, modalStage.modes.length - 1) + 1}</span> — {modeTimingText(mode)}
+        <span className="font-medium">Mode {Math.min(rv.mode, modalStage.modes.length - 1) + 1}</span> — {modeTimingText(mode, digits)}
       </div>
     )}
     <div className="absolute right-3 top-3 z-40 w-72 max-w-[calc(100%-1.5rem)]">
@@ -160,6 +166,16 @@ export function ResultsDisplayPanel() {
             </Select>
           </div>
 
+          {hasStudWalls && rv.type === 'axial' && (
+            <div className="grid gap-1">
+              <Label className="text-[11px]">Stud walls</Label>
+              <Select items={[{ value: 'piers', label: 'Piers (chord forces)' }, { value: 'members', label: 'Members (studs, posts, jacks, cripples)' }]} value={rv.wallResults} onValueChange={(v) => set({ wallResults: v === 'members' ? 'members' : 'piers' })}>
+                <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+                <SelectContent><SelectItem value="piers">Piers (chord forces)</SelectItem><SelectItem value="members">Members (studs, posts, jacks, cripples)</SelectItem></SelectContent>
+              </Select>
+            </div>
+          )}
+
           {rv.type === 'contour' && (
             <div className="grid gap-1.5">
               <Select items={SHELL_RESULTANTS.map((r) => ({ value: r, label: SHELL_RESULTANT_LABELS[r] }))} value={rv.contour} onValueChange={(v) => set({ contour: v as ShellResultant })}>
@@ -189,7 +205,7 @@ export function ResultsDisplayPanel() {
               </div>
               {mode && (
                 <div className="grid gap-0.5 rounded-md bg-muted/50 px-2 py-1.5 text-[11px]">
-                  <span className="font-medium">Mode {Math.min(rv.mode, modalStage.modes.length - 1) + 1}: {modeTimingText(mode)}</span>
+                  <span className="font-medium">Mode {Math.min(rv.mode, modalStage.modes.length - 1) + 1}: {modeTimingText(mode, digits)}</span>
                   <span className="text-muted-foreground">ω = {fmt(mode.frequency)} rad/s · mass ratio {mode.massRatio.map((r, d) => `${DIRECTIONS[d]} ${(r * 100).toFixed(1)}%`).join(' · ')}</span>
                 </div>
               )}
@@ -228,7 +244,7 @@ export function ResultsDisplayPanel() {
               <Label className="w-12 shrink-0 text-[11px]">Scale</Label>
               <Input
                 key={`${scaleKey}-${scale}`}
-                defaultValue={fmt(scale)}
+                defaultValue={fmtScale(scale)}
                 disabled={!scaleKey || (rv.type === 'contour' && !rv.contourDeformed)}
                 className="h-7 flex-1 text-xs"
                 onBlur={(e) => { const v = Number(e.target.value); if (Number.isFinite(v) && v > 0 && v !== scale) setScale(v) }}

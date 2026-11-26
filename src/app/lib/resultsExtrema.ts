@@ -3,13 +3,14 @@ import type { ResultType } from '@/app/types/resultsView'
 import type { SceneIndex } from '@/app/components/r3f/sceneIndex'
 import { sectionForces } from '@/app/components/r3f/diagrams'
 import { shellNodalValues, type ShellResultant } from './shellContour'
+import { readWallMembers } from './studBuilding'
 
 export interface ResultExtreme { value: number; step: number; time: number; target: 'Node' | 'Element'; id: number }
 export interface ResultExtrema { min: ResultExtreme; max: ResultExtreme }
 export type ExtremaResultType = Exclude<ResultType, 'none' | 'mode'>
 
 /** Same physical values and signs as the viewport, without its visual amplification. */
-export function createExtremaAccumulator(index: SceneIndex, layout: RunLayout, type: ExtremaResultType, contour: ShellResultant) {
+export function createExtremaAccumulator(index: SceneIndex, layout: RunLayout, type: ExtremaResultType, contour: ShellResultant, walls: 'piers' | 'members' = 'piers') {
   let extrema: ResultExtrema | null = null
   const contourValues = new Float32Array(index.nodeIds.length), counts = new Uint16Array(index.nodeIds.length)
   const observe = (value: number, frame: StepFrame, target: ResultExtreme['target'], id: number) => {
@@ -59,6 +60,18 @@ export function createExtremaAccumulator(index: SceneIndex, layout: RunLayout, t
             }
           }
         })
+        // Stud walls, as the diagrams draw them: every member's force at both ends (members mode), or the piers' chord forces, shear
+        // q × width and moments at base and top.
+        if (type === 'axial' && walls === 'members') for (const w of index.studWalls) {
+          const id = index.elementIds[w.e], entry = layout.columns.studWall.get(id)
+          if (entry) for (const m of readWallMembers(entry.labels, (k) => row[entry.offset + k])) { observe(m.bottom, frame, 'Element', id); observe(m.top, frame, 'Element', id) }
+        } else if (type === 'axial' || type === 'shear' || type === 'moment') for (const w of index.wallPiers) {
+          const id = index.elementIds[w.e], entry = layout.columns.studWall.get(id)
+          if (!entry) continue
+          const get = (q: string) => { const k = entry.labels.indexOf(`p${w.pier}.${q}`); return k < 0 ? NaN : row[entry.offset + k] }
+          const values = type === 'axial' ? [get('chordLeft'), get('chordRight')] : type === 'shear' ? [get('q') * w.width] : [get('momentBase'), get('momentTop')]
+          for (const v of values) observe(v, frame, 'Element', id)
+        }
       }
     },
     result: () => extrema,
@@ -66,8 +79,8 @@ export function createExtremaAccumulator(index: SceneIndex, layout: RunLayout, t
 }
 
 /** Scan a case through the bounded block cache; never retain the run's full dense result table. */
-export async function caseResultExtrema(source: { layout: RunLayout; get: (step: number) => Promise<StepFrame | null> }, index: SceneIndex, first: number, count: number, type: ExtremaResultType, contour: ShellResultant, signal?: AbortSignal): Promise<ResultExtrema | null> {
-  const accumulator = createExtremaAccumulator(index, source.layout, type, contour)
+export async function caseResultExtrema(source: { layout: RunLayout; get: (step: number) => Promise<StepFrame | null> }, index: SceneIndex, first: number, count: number, type: ExtremaResultType, contour: ShellResultant, signal?: AbortSignal, walls: 'piers' | 'members' = 'piers'): Promise<ResultExtrema | null> {
+  const accumulator = createExtremaAccumulator(index, source.layout, type, contour, walls)
   for (let step = first; step < first + count; step++) {
     if (signal?.aborted) return null
     const frame = await source.get(step)

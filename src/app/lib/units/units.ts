@@ -17,6 +17,8 @@ const LENGTHS: Record<LengthUnit, number> = { mm: 1e-3, cm: 1e-2, m: 1, in: 0.02
 const FORCES: Record<ForceUnit, number> = { N: 1, kN: 1e3, MN: 1e6, lbf: 4.4482216152605, kip: 4448.2216152605 }
 const TIMES: Record<TimeUnit, number> = { s: 1 }
 export const LENGTH_UNITS = Object.keys(LENGTHS) as LengthUnit[]
+/** Metres in one of `u`. */
+export const lengthSi = (u: LengthUnit) => LENGTHS[u]
 export const FORCE_UNITS = Object.keys(FORCES) as ForceUnit[]
 
 /** Categories a value can belong to. `none` is dimensionless. */
@@ -27,6 +29,7 @@ export const CATEGORIES = {
   inertia: { label: 'Moment of inertia (L⁴)', dim: { L: 4, F: 0, T: 0 } },
   force: { label: 'Force', dim: { L: 0, F: 1, T: 0 } },
   moment: { label: 'Moment', dim: { L: 1, F: 1, T: 0 } },
+  rigidity: { label: 'Flexural rigidity (EI)', dim: { L: 2, F: 1, T: 0 } },
   forcePerLength: { label: 'Force / length (line load, stiffness)', dim: { L: -1, F: 1, T: 0 } },
   stress: { label: 'Stress, pressure', dim: { L: -2, F: 1, T: 0 } },
   unitWeight: { label: 'Unit weight', dim: { L: -3, F: 1, T: 0 } },

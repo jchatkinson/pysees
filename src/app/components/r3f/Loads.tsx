@@ -1,19 +1,20 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { Html } from '@react-three/drei'
-import { BufferAttribute, BufferGeometry, DoubleSide, Vector3 } from 'three'
+import { BufferAttribute, BufferGeometry, DoubleSide, Vector3, ShapeUtils, Vector2 } from 'three'
 import type { ElementEntity, GeomTransfEntity, NodeEntity, PatternEntity, SectionEntity } from '@/app/types/model'
 import { alongTotal, loadDirection, shellAreaLoads, type ShellAreaLoad } from '@/app/lib/shellLoads'
+import { isJoistFloor } from '@/app/lib/floors'
 import { rampColor } from '@/app/lib/shellContour'
 import { useUnits } from '@/app/lib/units/useUnits'
 import { useAppStore } from '@/app/store/useAppStore'
 import { memberFrame } from '@/app/lib/memberFrame'
-import { eleLoadKind } from '@/app/lib/shells'
+import { eleLoadKind, wallLoadSpec } from '@/app/lib/shells'
 import { isShell } from '@/app/lib/commands/tables'
 import { areaLoadText, batchesLoads, formatLoadValue, patternColor, toVec3 } from './utils'
 import { worldUnitsPerPixel } from './screenScale'
 import { useCameraChange, useSegmentLines } from './batchHooks'
-import { ScreenLabels, type ScreenLabel } from './ScreenLabels'
+import { SceneLabels, type SceneLabel, type SceneLabelStyle } from './SceneLabels'
 
 /**
  * Applied loads, batched: per pattern colour, all nodal arrows are one fat-line draw and all member-load boxes another. Positions are
@@ -35,7 +36,7 @@ const ARROW_HEAD_MAX_PX = 9
 const MAX_STACK_FRACTION = 0.4
 const ARROWS_PER_ELEMENT = 5
 
-const labelStyle = (color: string): Partial<CSSStyleDeclaration> => ({ fontSize: '11px', color, textShadow: '0 0 2px #fff, 0 0 2px #fff' })
+const labelStyle = (color: string, offset: [number, number]): SceneLabelStyle => ({ size: 11, color, halo: '#ffffff', offset })
 
 /** DOF labels by position: 2D is X, Y, rotation about Z; 3D adds Z and the X/Y rotations. Anything past that falls back to a number. */
 function dofName(i: number, ndm: number): string {
@@ -85,9 +86,9 @@ function NodalArrows({ arrows, color }: { arrows: NodalArrow[]; color: string })
       }
     })
   })
-  const labels = useMemo<ScreenLabel[]>(() => arrows.filter((a) => a.label).map((a) => ({ position: a.at, text: a.label! })), [arrows])
-  const style = useMemo(() => labelStyle(color), [color])
-  return <>{arrows.length > 0 && <primitive object={lines} />}{labels.length > 0 && <ScreenLabels labels={labels} style={style} offset={[6, -18]} />}</>
+  const labels = useMemo<SceneLabel[]>(() => arrows.filter((a) => a.label).map((a) => ({ position: a.at, text: a.label! })), [arrows])
+  const style = useMemo(() => labelStyle(color, [6, -18]), [color])
+  return <>{arrows.length > 0 && <primitive object={lines} />}<SceneLabels labels={labels} style={style} /></>
 }
 
 interface MemberLoad { pid: number; a: Vector3; b: Vector3; w: Vector3; label: string }
@@ -140,9 +141,9 @@ function MemberLoadBoxes({ loads, ratioFor, offsetFor, refPoint, maxUnit, color,
     const unit = Math.min(worldUnitsPerPixel(state.camera, refPoint, state.size.height) * MAX_LEN_PX, maxUnit)
     write((buf) => { for (let i = 0; i < fixed.length; i++) buf[i] = fixed[i] + scaled[i] * unit })
   })
-  const labels = useMemo<ScreenLabel[]>(() => (showValues ? loads.map((l) => ({ position: l.a.clone().lerp(l.b, 0.5).toArray() as [number, number, number], text: l.label })) : []), [loads, showValues])
-  const style = useMemo(() => labelStyle(color), [color])
-  return <>{loads.length > 0 && <primitive object={lines} />}{labels.length > 0 && <ScreenLabels labels={labels} style={style} offset={[6, 6]} />}</>
+  const labels = useMemo<SceneLabel[]>(() => (showValues ? loads.map((l) => ({ position: l.a.clone().lerp(l.b, 0.5).toArray() as [number, number, number], text: l.label })) : []), [loads, showValues])
+  const style = useMemo(() => labelStyle(color, [6, 6]), [color])
+  return <>{loads.length > 0 && <primitive object={lines} />}<SceneLabels labels={labels} style={style} /></>
 }
 
 /** Renders nodal `load` and uniform `eleLoad` assignments from the patterns not hidden (Model entities, not a command history position). */
@@ -163,8 +164,10 @@ function ShellLoadContour({ loads, patterns, nodeMap, elementMap }: { loads: Map
     for (const [tag, q] of loads) {
       const xyz = elementMap.get(tag)!.nodes.map((n) => toVec3(nodeMap.get(n)?.coords ?? []))
       const rgb = rampColor(max - min > 1e-12 * Math.max(1, max) ? (q.magnitude - min) / (max - min) : 0.5)
-      for (let k = 1; k + 1 < xyz.length; k++) {
-        for (const p of [xyz[0], xyz[k], xyz[k + 1]]) { position.push(...p); color.push(...rgb) }
+      // A floor may be concave: triangulate its plan outline; shells are convex, a fan does.
+      const tris = isJoistFloor(elementMap.get(tag)!.eleType) ? ShapeUtils.triangulateShape(xyz.map((p) => new Vector2(p[0], p[1])), []) : xyz.slice(2).map((_, k) => [0, k + 1, k + 2])
+      for (const [i, j, k] of tris) {
+        for (const p of [xyz[i], xyz[j], xyz[k]]) { position.push(...p); color.push(...rgb) }
         owner.push(tag)
       }
     }
@@ -192,7 +195,7 @@ function ShellLoadContour({ loads, patterns, nodeMap, elementMap }: { loads: Map
       </mesh>
       {q && hover && (
         <Html position={hover.point} style={TOOLTIP_STYLE} zIndexRange={[20, 20]}>
-          {[`Shell ${hover.tag}: ${fmt(q.magnitude)} ${loadDirection(q)}`, ...q.parts.map((p) => `${name(p.patternId)} · ${p.kind === 'pressure' ? 'pressure' : 'self-weight'} ${fmt(alongTotal(p, q))}`)].join('\n')}
+          {[`${isJoistFloor(elementMap.get(hover.tag)?.eleType ?? '') ? 'Floor' : 'Shell'} ${hover.tag}: ${fmt(q.magnitude)} ${loadDirection(q)}`, ...q.parts.map((p) => `${name(p.patternId)} · ${p.kind === 'pressure' ? 'pressure' : p.kind === 'floor' ? 'floor load' : 'self-weight'} ${fmt(alongTotal(p, q))}`)].join('\n')}
         </Html>
       )}
     </>
@@ -230,6 +233,34 @@ export function LoadsLayer({ patterns, nodeMap, elementMap, geomTransfs, section
         return w.length() < 1e-12 ? [] : [{ pid: p.id, a, b, w, label }]
       })
     })) : []
+    // Stud-wall loads (Carapace-only) sit on the wall's top row: a line load as a member-load box (drawn at its mean), a point as an arrow.
+    const wallPoints: (NodalArrow & { color: string })[] = []
+    if (showElement) for (const p of visible) for (const c of p.children) {
+      if (c.kind !== 'eleLoad' || eleLoadKind(c.args) !== 'wall') continue
+      const w = wallLoadSpec(c.args)
+      for (const tag of (c.args.eleTags as number[] | undefined) ?? []) {
+        const ele = elementMap.get(tag)
+        const [p0, p1, , p3] = (ele?.nodes.slice(0, 4) ?? []).map((n) => nodeMap.get(n))
+        if (!p0 || !p1 || !p3) continue
+        const o = new Vector3(...toVec3(p0.coords)), ex = new Vector3(...toVec3(p1.coords)).sub(o), ey = new Vector3(...toVec3(p3.coords)).sub(o)
+        const L = ex.length()
+        if (L < 1e-12) continue
+        ex.normalize()
+        const top = (x: number) => o.clone().add(ey).addScaledVector(ex, x)
+        const vec = (along: number, up: number) => ex.clone().multiplyScalar(along).addScaledVector(ey.clone().normalize(), up)
+        if (w.kind === 'topPoint') {
+          const dir = vec(w.fx, w.fy)
+          if (dir.length() < 1e-12) continue
+          const label = showValues ? [['fx', w.fx], ['fy', w.fy]].filter(([, v]) => v).map(([n, v]) => `${n}: ${formatLoadValue(Number(v))}`).join('  ') : undefined
+          wallPoints.push({ at: top(w.x).toArray(), dir: dir.toArray(), label, color: colorOf(p.id) })
+        } else {
+          const mean = vec((w.wx0 + w.wx1) / 2, (w.wy0 + w.wy1) / 2)
+          if (mean.length() < 1e-12 || w.x1 === w.x0) continue
+          const range = (n: string, a: number, b: number) => (a || b ? `${n}: ${formatLoadValue(a)}${a === b ? '' : ` → ${formatLoadValue(b)}`}` : '')
+          memberLoads.push({ pid: p.id, a: top(w.x0), b: top(w.x1), w: mean, label: [range('wx', w.wx0, w.wx1), range('wy', w.wy0, w.wy1)].filter(Boolean).join('  ') })
+        }
+      }
+    }
     const maxW = memberLoads.reduce((m, l) => Math.max(m, l.w.length()), 0)
     const ratioFor = (l: MemberLoad) => Math.max(MIN_LEN_RATIO, l.w.length() / maxW)
     const refPoint = new Vector3()
@@ -248,7 +279,8 @@ export function LoadsLayer({ patterns, nodeMap, elementMap, geomTransfs, section
     if (memberLoads.length) for (const e of elementMap.values()) {
       if (isShell(e.eleType)) continue
       const n1 = nodeMap.get(e.nodes[0]), n2 = nodeMap.get(e.nodes[1])
-      if (n1 && n2) minLen = Math.min(minLen, Math.hypot(...[0, 1, 2].map((k) => (n2.coords[k] ?? 0) - (n1.coords[k] ?? 0))))
+      const d = n1 && n2 ? Math.hypot(...[0, 1, 2].map((k) => (n2.coords[k] ?? 0) - (n1.coords[k] ?? 0))) : 0
+      if (d > 1e-12) minLen = Math.min(minLen, d) // zero-length springs would collapse every box
     }
     const maxUnit = Number.isFinite(minLen) && stacked > 0 ? (MAX_STACK_FRACTION * minLen) / stacked : Infinity
 
@@ -263,6 +295,7 @@ export function LoadsLayer({ patterns, nodeMap, elementMap, geomTransfs, section
       nodal.push({ at: toVec3(node.coords), dir: [v[0] ?? 0, v[1] ?? 0, v[2] ?? 0], label, color: colorOf(p.id) })
     }
 
+    nodal.push(...wallPoints)
     // Past GLYPH_LIMIT arrows the value labels are dropped (the viewport names them as hidden).
     if (batchesLoads(nodal.length)) for (const n of nodal) n.label = undefined
     const colors = [...new Set([...memberLoads.map((l) => colorOf(l.pid)), ...nodal.map((n) => n.color)])]

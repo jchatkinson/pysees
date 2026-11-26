@@ -9,7 +9,9 @@ import type { Vec3 } from '@/app/lib/memberFrame'
 import { directive } from '@/app/lib/project/annotations'
 import { readShellModifiers, sectionNeedsShear, shellModifiersExport, type ShellModifiers } from '@/app/lib/shellModifiers'
 import { isStudWall } from '@/app/lib/studWalls'
-import { floorLoadNodal, studWallExport } from '@/app/lib/studWallExport'
+import { floorLoadNodal, studWallExport, wallLoadNodal } from '@/app/lib/studWallExport'
+import { isDiaphragm } from '@/app/lib/diaphragms'
+import { isJoistFloor } from '@/app/lib/floors'
 
 /** `E' = E f` and `Ep_modifier = m / f` for modifiers OpenSees can represent; otherwise the reason it cannot. */
 function foldShellModifiers(args: Record<string, unknown>, modifiers: ShellModifiers, needsShear: boolean): { args: Record<string, unknown>; reason?: undefined } | { args?: undefined; reason: string } {
@@ -116,9 +118,9 @@ export function encodePattern(pattern: PatternEntity, ctx: SchemaContext, model?
   const authoredShell: { index: number; child: PatternEntity['children'][number] }[] = []
   const enclosed: Call[] = []
   call.body = pattern.children.flatMap((child, index): Call[] => {
-    // A floor load (Carapace-only) is written as its reactions on the support walls; a project keeps the authored load in the generated block.
-    if (child.kind === 'floorLoad') {
-      const nodal = model ? floorLoadNodal(model, child) : []
+    // A floor or wall load (Carapace-only) is written as its reactions / nodal equivalent on the support walls; a project keeps the authored load in the generated block.
+    if (child.kind === 'floorLoad' || (child.kind === 'eleLoad' && eleLoadKind(child.args) === 'wall')) {
+      const nodal = model ? (child.kind === 'floorLoad' ? floorLoadNodal(model, child) : wallLoadNodal(model, child)) : []
       if (annotate) { authoredShell.push({ index, child }); enclosed.push(...nodal); return [] }
       return nodal
     }
@@ -198,7 +200,8 @@ export function encodeModel(model: Model, deferredPatterns: ReadonlySet<number> 
   for (const bi of byId(model.beamIntegrations)) calls.push(schemaCall('beamIntegration', bi.intType, bi.args, ctx))
   const studWalls = studWallExport(model)
   for (const e of byId(model.elements)) {
-    if (isStudWall(e.eleType)) {
+    if (isStudWall(e.eleType) || isDiaphragm(e.eleType) || isJoistFloor(e.eleType)) {
+      // A joist floor has no OpenSees counterpart (its loads are exported as wall reactions); a project keeps it in a generated block.
       const shells = studWalls?.walls.get(e.id) ?? []
       calls.push(...(annotate ? generated({ kind: 'carapaceOnly', writes: [{ kind: 'element', entity: e }] }, shells) : shells))
       continue

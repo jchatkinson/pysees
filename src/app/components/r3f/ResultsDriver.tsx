@@ -8,8 +8,12 @@ import { autoModeScale, autoScale, modelMetrics } from '@/app/lib/resultsScale'
 import type { DisplayBuffers } from './displayBuffers'
 import { createNodeDisplacements, displaceNodes, fillDeformedSegments, nodeValueLabels, readNodeDisplacements } from './displaced'
 import { fillDiagram } from './diagrams'
+import { readWallMembers, type WallMemberForce } from '@/app/lib/studBuilding'
 import { fillContourColors, shellNodalValues } from '@/app/lib/shellContour'
 import type { SceneIndex } from './sceneIndex'
+import { formatResult } from '@/app/lib/formatResult'
+import { useUnits } from '@/app/lib/units/useUnits'
+import { withUnit } from '@/app/lib/units/resultUnits'
 
 /** `out = a + t (b - a)`, element-wise. */
 function blendRows(a: Float64Array, b: Float64Array, t: number, out: Float64Array): Float64Array {
@@ -33,6 +37,9 @@ export function ResultsDriver({ index, buffers }: { index: SceneIndex; buffers: 
   const modeIndex = useAppStore((s) => s.resultsView.mode)
   const phase = useAppStore((s) => s.resultsView.phase)
   const showValues = useAppStore((s) => s.resultsView.showValues)
+  const labelDigits = useAppStore((s) => s.numberFormat.labelDigits)
+  const units = useUnits()
+  const walls = useAppStore((s) => s.resultsView.wallResults)
   const model = useAppStore((s) => s.model)
   const source = useResultsSource(runId)
   const modal = useModalResults(type === 'mode' ? runId : null)
@@ -51,7 +58,7 @@ export function ResultsDriver({ index, buffers }: { index: SceneIndex; buffers: 
   useEffect(() => {
     if (type === 'mode') return // drawn by the mode-shape effect below
     if (type !== 'contour') setContourRange(null)
-    if (type === 'none' || !source) { buffers.reset(); buffers.resetDiagram(); return }
+    if (type === 'none' || !source) { buffers.reset(); buffers.resetDiagram(); buffers.publishWallMembers(null); return }
     let live = true
     // Smooth playback sits between two steps: blend their rows (linear in every recorded column).
     const next = stepFrac > 0 && blendedRow ? source.get(step + 1) : Promise.resolve(null)
@@ -60,7 +67,7 @@ export function ResultsDriver({ index, buffers }: { index: SceneIndex; buffers: 
       if (!frame) { buffers.reset(); buffers.resetDiagram(); return }
       const row = nextFrame && blendedRow ? blendRows(frame.row, nextFrame.row, stepFrac, blendedRow) : frame.row
       // A contour on the undeformed geometry is the same drawing at scale 0.
-      const scale = type === 'contour' && !contourDeformed ? 0 : manualScale ?? autoScale(type === 'contour' ? 'deformed' : type, extents, metrics)
+      const scale = type === 'contour' && !contourDeformed ? 0 : manualScale ?? autoScale(type === 'contour' ? 'deformed' : type, extents, metrics, walls)
       if (type === 'deformed' || type === 'contour') {
         readNodeDisplacements(index, source.layout, row, nodeDisplacements)
         displaceNodes(index, nodeDisplacements, scale, buffers.nodePositions)
@@ -69,16 +76,24 @@ export function ResultsDriver({ index, buffers }: { index: SceneIndex; buffers: 
         const range = type === 'contour' ? shellNodalValues(index, source.layout, row, contour, contourValues.values, contourValues.counts) : null
         if (range) fillContourColors(contourValues.values, range, buffers.contourColors)
         setContourRange(range)
-        buffers.publish(showValues ? nodeValueLabels(index, source.layout, row, buffers.nodePositions) : [], range !== null)
+        buffers.publish(showValues ? nodeValueLabels(index, source.layout, row, buffers.nodePositions, (v, name) => {
+          // Translations convert to the displayed length; rotations stay in radians.
+          if (name.startsWith('r')) return formatResult(v, labelDigits, 1e-12, false)
+          return withUnit(formatResult(units.toDisplay('length', v), labelDigits, 1e-12, false), units.active ? units.symbol('length') : '')
+        }) : [], range !== null)
         buffers.resetDiagram()
       } else {
         // Diagrams sit on the undeformed shape.
         buffers.reset()
-        buffers.publishDiagram(fillDiagram(index, source.layout, row, type, scale, diagramArrays))
+        buffers.publishDiagram(fillDiagram(index, source.layout, row, type, scale, diagramArrays, walls))
       }
-    }).catch(() => { if (live) { buffers.reset(); buffers.resetDiagram() } })
+      // Member forces for the extruded framing's colours (axial view, members mode).
+      buffers.publishWallMembers(type === 'axial' && walls === 'members'
+        ? new Map(index.studWalls.flatMap((w) => { const id = index.elementIds[w.e], c = source.layout.columns.studWall.get(id); return c ? [[id, readWallMembers(c.labels, (k) => row[c.offset + k])] as [number, WallMemberForce[]]] : [] }))
+        : null)
+    }).catch(() => { if (live) { buffers.reset(); buffers.resetDiagram(); buffers.publishWallMembers(null) } })
     return () => { live = false }
-  }, [index, buffers, source, type, step, stepFrac, blendedRow, manualScale, showValues, metrics, nodeDisplacements, diagramArrays, first, last, contour, contourDeformed, contourValues, setContourRange])
+  }, [index, buffers, source, type, step, stepFrac, blendedRow, manualScale, showValues, labelDigits, units, metrics, nodeDisplacements, diagramArrays, first, last, contour, contourDeformed, contourValues, setContourRange, walls])
 
   // Mode shapes: the stored shape scaled by cos(phase), through the same deformed-shape drawing as a step's displacements.
   useEffect(() => {
@@ -95,7 +110,7 @@ export function ResultsDriver({ index, buffers }: { index: SceneIndex; buffers: 
   }, [index, buffers, type, modal, rows, current, modeIndex, phase, manualScale, metrics, nodeDisplacements])
 
   // Leaving the scene (or a new index) must not leave stale displaced nodes behind.
-  useEffect(() => () => { buffers.reset(); buffers.resetDiagram() }, [buffers])
+  useEffect(() => () => { buffers.reset(); buffers.resetDiagram(); buffers.publishWallMembers(null) }, [buffers])
 
   return null
 }

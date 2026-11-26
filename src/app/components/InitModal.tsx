@@ -5,7 +5,7 @@ import { Input } from '@/app/components/ui/input'
 import { Label } from '@/app/components/ui/label'
 import { Button } from '@/app/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/app/components/ui/tooltip'
-import { ArrowLeft, Building2, FilePlus, FolderOpen, House } from 'lucide-react'
+import { ArrowLeft, FilePlus, FolderOpen } from 'lucide-react'
 import { useAppStore } from '@/app/store/useAppStore'
 import { UNIT_PRESETS, type BaseUnits, type UnitPrefs } from '@/app/lib/units/units'
 import { canImport, readScriptFile } from '@/app/lib/project/open'
@@ -34,14 +34,21 @@ import frame2dImg from '@/app/assets/templates/frame2d.png'
 import frame3dImg from '@/app/assets/templates/frame3d.png'
 import plateImg from '@/app/assets/templates/plate.png'
 import precastWallImg from '@/app/assets/templates/precastWall.png'
+import gridImg from '@/app/assets/templates/grid.png'
+import towerImg from '@/app/assets/templates/tower.png'
+import studBuildingImg from '@/app/assets/templates/studBuilding.png'
+import rowhouseImg from '@/app/assets/templates/rowhouse.png'
 import { StudBuildingForm } from '@/app/components/StudBuildingForm'
+import { GridTemplateForm } from '@/app/components/GridTemplateForm'
 import { studBuildingModel } from '@/app/lib/studWalls'
 import { loadCarapaceWasm } from '@/app/lib/carapace/wasm'
+import { rowhouseTemplate, ROWHOUSE_PDF } from '@/app/lib/rowhouseTemplate'
+import { putPdf } from '@/app/lib/underlays/fileStore'
 import type { StudBuildingParams } from '@/app/types/model'
 
 const NO_UNITS = 'none'
 
-type Choice = 'new' | 'load' | 'momentCurvature' | 'cantilever' | 'frame' | 'frame3d' | 'plate' | 'precastWall' | 'tower' | 'studBuilding'
+type Choice = 'new' | 'load' | 'grid' | 'momentCurvature' | 'cantilever' | 'frame' | 'frame3d' | 'plate' | 'precastWall' | 'tower' | 'studBuilding' | 'rowhouse'
 
 interface CardProps {
   title: string
@@ -64,10 +71,10 @@ function Card({ title, description, image, icon, onClick, disabled }: CardProps)
       disabled={disabled}
     >
       {icon && <span className="shrink-0 text-muted-foreground group-hover:text-accent-foreground [&>svg]:size-10 [&>svg]:stroke-[1.25]">{icon}</span>}
-      {image && <img src={image} alt="" className="bg-muted rounded-sm aspect-video w-full mb-2 object-cover" />}
+      {image && <img src={image} alt="" className="bg-muted rounded-sm aspect-[2/1] w-full mb-1.5 object-cover" />}
       <span className="min-w-0">
-        <p className="text-sm font-medium">{title}</p>
-        <p className="text-xs text-muted-foreground leading-snug group-hover:text-accent-foreground">{description}</p>
+        <p className={image ? 'text-xs font-medium' : 'text-sm font-medium'}>{title}</p>
+        <p className={`${image ? 'text-[11px] line-clamp-2' : 'text-xs'} text-muted-foreground leading-snug group-hover:text-accent-foreground`} title={description}>{description}</p>
       </span>
     </button>
   )
@@ -82,6 +89,7 @@ export function InitModal() {
 function InitDialog() {
   const initModel = useAppStore((s) => s.initModel)
   const loadProject = useAppStore((s) => s.loadProject)
+  const addUnderlay = useAppStore((s) => s.addUnderlay)
   const fileInput = useRef<HTMLInputElement>(null)
   const [preview, setPreview] = useState<ImportPreview | null>(null)
   const pickFile = async (file: File | undefined) => {
@@ -158,6 +166,20 @@ function InitDialog() {
     } catch (e) { setStudError(e instanceof Error ? e.message : typeof e === 'object' && e && 'reason' in e ? String((e as { reason: unknown }).reason) : String(e)) } finally { setStudBusy(false) }
   }
 
+  // BC Rowhouse: the model, then its drawing sheets as underlays (the model is still made when the PDF can't be fetched or stored).
+  async function createRowhouse() {
+    setStudBusy(true); setStudError('')
+    const t = rowhouseTemplate()
+    let file: string | null = null
+    try {
+      const res = await fetch(ROWHOUSE_PDF.url)
+      if (res.ok) file = await putPdf(await res.arrayBuffer(), ROWHOUSE_PDF.fileName)
+    } catch { file = null }
+    setStudBusy(false)
+    initModel(t.ndm, t.ndf, { units: t.units, unitPrefs: { force: 'kN', stress: 'MPa' }, writes: t.writes, analysisCommands: t.analysisCommands, levels: t.levels, gridlines: t.gridlines })
+    if (file) for (const u of t.underlays(file)) addUnderlay(u)
+  }
+
   // Tower (the stress-test model)
   const [tower, setTower] = useState<TowerParams>(TOWER_DEFAULTS)
   const towerFields: [keyof TowerParams, string, number, number][] = [
@@ -198,6 +220,8 @@ function InitDialog() {
         dowelEnd: { Fy: dowelEnd.Fy * 1e3, K: dowelEnd.K * 1e6, b: dowelEnd.b }, dowelJoint: { Fy: dowelJoint.Fy * 1e3, K: dowelJoint.K * 1e6, b: dowelJoint.b },
       })
       initModel(t.ndm, t.ndf, { ...TEMPLATE_UNITS, writes: t.writes, analysisCommands: t.analysisCommands, levels: t.levels })
+    } else if (choice === 'rowhouse') {
+      void createRowhouse()
     } else if (choice === 'tower') {
       const t = towerTemplate(tower)
       initModel(t.ndm, t.ndf, { ...TEMPLATE_UNITS, writes: t.writes, analysisCommands: t.analysisCommands, levels: t.levels })
@@ -214,6 +238,7 @@ function InitDialog() {
   const step2Title: Record<Choice, string> = {
     load: 'Open Project',
     new: 'New Model',
+    grid: 'Grid only',
     momentCurvature: 'Moment-Curvature',
     cantilever: 'Cantilever Column',
     frame: '2D Frame',
@@ -222,6 +247,7 @@ function InitDialog() {
     precastWall: 'Precast Wall',
     tower: 'Tower',
     studBuilding: 'Stud-wall building',
+    rowhouse: 'BC Rowhouse',
   }
 
   return (
@@ -231,7 +257,8 @@ function InitDialog() {
         if (eventDetails.reason === 'outside-press' || eventDetails.reason === 'focus-out') eventDetails.cancel()
       }}
     >
-      <DialogContent className="sm:max-w-lg">
+      {/* At most 75% of the screen, centred; the template gallery is wider (4 per row), the forms after it stay narrow. */}
+      <DialogContent className={`flex max-h-[75dvh] flex-col ${step === 1 ? 'sm:max-w-[min(75vw,64rem)]' : 'sm:max-w-lg'}`}>
         {step === 1 && (
           <>
             <DialogHeader>
@@ -242,7 +269,10 @@ function InitDialog() {
               <Card title="Load" description="Open a saved project (.py)." icon={<FolderOpen />} onClick={() => fileInput.current?.click()} />
             </div>
             <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide pt-1">Templates</p>
-            <div className="grid grid-cols-3 gap-2">
+            {/* The templates scroll; the header and New / Load stay in view however short the window. */}
+            <div className="-mx-1 min-h-0 flex-1 overflow-y-auto px-1 pb-1">
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+              <Card title="Grid only" description="An empty model on grid lines and story levels you set up, ready to draw on." image={gridImg} onClick={() => select('grid')} />
               <Card
                 title="Moment-Curvature"
                 description="Two-node zerolength with fiber section (300×500mm, 4 Ø20 bars)."
@@ -279,8 +309,10 @@ function InitDialog() {
                 image={precastWallImg}
                 onClick={() => select('precastWall')}
               />
-              <Card title="Tower" description="Large flat-slab building: frame plus meshed shell slabs at every level. A stress test." icon={<Building2 />} onClick={() => select('tower')} />
-              <Card title="Stud-wall building" description="Multistorey light-frame box with floors, openings, anchorage and lateral loads." icon={<House />} onClick={() => select('studBuilding')} />
+              <Card title="Tower" description="Large flat-slab building: frame plus meshed shell slabs at every level. A stress test." image={towerImg} onClick={() => select('tower')} />
+              <Card title="Stud-wall building" description="Multistorey light-frame box with floors, openings, anchorage and lateral loads." image={studBuildingImg} onClick={() => select('studBuilding')} />
+              <Card title="BC Rowhouse" description="Two-unit, two-storey wood-frame rowhouse from a real drawing set, with its plans as underlays." image={rowhouseImg} onClick={() => select('rowhouse')} />
+            </div>
             </div>
           </>
         )}
@@ -302,6 +334,9 @@ function InitDialog() {
                 <DialogTitle>{step2Title[choice]}</DialogTitle>
               </div>
             </DialogHeader>
+
+            {/* A long form scrolls between the header and the Create / Open button. */}
+            <div className="-mx-1 min-h-0 flex-1 overflow-y-auto px-1">
 
             {choice === 'load' && preview && (
               <div className="grid gap-3 py-2">
@@ -608,12 +643,30 @@ function InitDialog() {
               </div>
             )}
 
+            {choice === 'grid' && <GridTemplateForm />}
+
+            {choice === 'rowhouse' && (
+              <div className="grid gap-2 py-1 text-sm">
+                <p>The CMHC Housing Design Catalogue's BC rowhouse (sheets A101–A103, S101–S103): two units on grids 1–5 / A–D, in N, mm.</p>
+                <ul className="list-disc pl-5 text-xs text-muted-foreground space-y-1">
+                  <li>20 stud walls (2x6 SPF @ 400, 12.5 mm ply) with the drawings' windows and doors, including the interior bearing walls by the stairs, held down to the foundation, the wall below or the cantilever.</li>
+                  <li>Second floor framed as on S102: a 610 mm cantilever backing onto (5) and (3) 2x12 beams, east–west joists to the interior walls, open stair voids; roof framing east–west. Rigid diaphragms at both levels.</li>
+                  <li>Dead, live and snow area loads, then an equivalent static earthquake in X (Y has factor 0).</li>
+                  <li>Plans as underlays on each level (structural sheets hidden; turn them on in Underlays).</li>
+                  <li>Not modelled yet: two-sided shear walls (SW2-B), the gable roof and wall self-weight.</li>
+                </ul>
+                {studError && <p className="text-xs text-destructive">{studError}</p>}
+              </div>
+            )}
+
             {choice === 'studBuilding' && <>{studError && <p className="text-xs text-destructive">{studError}</p>}<StudBuildingForm busy={studBusy} onCreate={(params) => void createStudBuilding(params)} /></>}
 
-            {choice !== 'studBuilding' && <div className="flex justify-end">
+            </div>
+
+            {choice !== 'studBuilding' && choice !== 'grid' && <div className="flex justify-end">
               {choice === 'load'
                 ? <Button disabled={!preview || !canImport(preview.result)} onClick={handleLoad}>Open</Button>
-                : <Button onClick={handleCreate}>Create Model</Button>}
+                : <Button disabled={studBusy} onClick={handleCreate}>Create Model</Button>}
             </div>}
           </>
         )}

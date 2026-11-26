@@ -63,7 +63,7 @@ export interface NodalLoadTable { pattern: number[]; node: number[]; dof: number
 export type ElementKind = 'truss' | 'elasticBeamColumn2d' | 'elasticBeamColumn3d' | 'dispBeamColumn2d' | 'dispBeamColumn3d' | 'forceBeamColumn2d' | 'forceBeamColumn3d' | 'zeroLength' | 'zeroLengthSection' | 'tri3' | 'quad4' | 'shell3' | 'shell4' | 'studWall' | 'diaphragm'
 /** Uniform load per length in the element's local axes: `wx` along the member, `wy` (and, in 3D, `wz`) transverse.
  * Shells take a pressure per area along the local normal, or a body acceleration in global axes (force per area `rho h b`). */
-export type ElementLoadSpec = { kind: 'uniform'; wx: number; wy: number; wz?: number } | { kind: 'shellPressure'; pressure: number } | { kind: 'shellBody'; bx: number; by: number; bz: number }
+export type ElementLoadSpec = { kind: 'uniform'; wx: number; wy: number; wz?: number } | { kind: 'shellPressure'; pressure: number } | { kind: 'shellBody'; bx: number; by: number; bz: number } | { kind: 'wallLoad'; load: WallLoadSpec }
 export interface ElementLoadTable { pattern: number[]; elementKind: ElementKind[]; elementIndex: number[]; load: ElementLoadSpec[]; stage: number[] }
 
 export type MaterialSpec =
@@ -125,7 +125,7 @@ export type RecorderSpecWire =
   /** A whole node or element table (or the `rows` of it, in that order) per step, as one flat Float64Array: row, then Gauss point, then component. */
   | { response: 'bulk'; table: 'nodes' | 'elements'; quantity: BulkQuantity; elementKind?: ElementKind; rows?: number[] }
 /** `nodes`: displacement, reaction, velocity, acceleration (ndf each). `elements`: endForce (the elementForce components), load (wx, wy(, wz)), stress / strain (shell resultants per Gauss point). */
-export type BulkQuantity = 'displacement' | 'reaction' | 'velocity' | 'acceleration' | 'endForce' | 'load' | 'stress' | 'strain'
+export type BulkQuantity = 'displacement' | 'reaction' | 'velocity' | 'acceleration' | 'endForce' | 'load' | 'stress' | 'strain' | 'memberForce'
 export interface SequenceSpec { stages: StageSpec[]; recorders: RecorderSpecWire[] }
 
 export interface BuildingSpec { storeys: StoreySpec[]; foundationAnchorage: AnchorageSpec; diaphragm: DiaphragmKind; combination?: [number, number, number, number, number, number, number, number] }
@@ -135,12 +135,16 @@ export type AnchorageBearingSpec = { kind: 'linear'; k: number } | { kind: 'o86C
 export type DiaphragmKind = 'rigid' | 'flexible'
 export interface WallSpec { name: string; start: [number, number]; direction: [number, number]; layout: WallLayoutSpec; loads?: SlotWallLoad[] }
 export interface SlotWallLoad { slot: number; load: WallLoadSpec }
-export interface WallLayoutSpec { length: number; height: number; studs: WallStudSpec[]; topEa: number; topEi: number | undefined; topDistribution: ChordDistributionSpec; bottomEa: number; bottomEi: number; openings?: WallOpeningSpec[]; sheathing: WallSheathingSpec | undefined; foundation?: boolean; floor?: FloorZoneSpec }
+export interface WallLayoutSpec { length: number; height: number; studs: WallStudSpec[]; topEa: number; topEi: number | undefined; topDistribution: ChordDistributionSpec; bottomEa: number; bottomEi: number; openings?: WallOpeningSpec[]; sheathing: WallSheathingSpec | undefined; foundation?: boolean; bearing?: WallBearingSpec; floor?: FloorZoneSpec }
+/** The wall bears on its `base` stations through the plate sandwich: `kv` / `kh` per bearing position, the hold-down law at pier ends (Carapace `docs/stud-wall-bearing.md`). */
+export interface WallBearingSpec { kv: number; kh: number; holdDown?: AnchorageSpec }
 /** Floor zone of depth `depth` above the framing: shear stiffness `ga`, rim `rimEa` added to the top chord. */
 export interface FloorZoneSpec { depth: number; ga: number; rimEa: number }
 /** One stud wall: corner nodes (bottom start, bottom end, top end, top start; local x = c0→c1, y = c0→c3) and its chord stations, all `nodes` indices. */
-export interface StudWallSpec { corners: [number, number, number, number]; stations: { chord: 'top' | 'bottom'; x: number; node: number }[]; layout: WallLayoutSpec }
+export interface StudWallSpec { corners: [number, number, number, number]; stations: { chord: 'top' | 'bottom' | 'base'; x: number; node: number }[]; layout: WallLayoutSpec }
 export type StudWallTable = StudWallSpec[]
+/** A flexible diaphragm (3D): grid nodes `i + j * u.length` (`nodes` indices) and their layout; see `lib/diaphragms.ts`. */
+export interface DiaphragmSpec { nodes: number[]; layout: { u: number[]; v: number[]; level: number; bays: (WallShearLawSpec | undefined)[]; eaU: number[]; eaV: number[] } }
 /** A one-way floor in a load pattern whose reactions load its support walls (`s` along the span, `t` across). */
 export interface FloorTransferSpec { bounds: [number, number, number, number]; continuity: FloorContinuitySpec; pattern: number; loads: FloorTransferLoadSpec[]; supports: { s: number; t0: number; t1: number; wall: { kind: 'studWall'; index: number }; xAtT0: number; reversed: boolean }[] }
 export type FloorTransferLoadSpec = { kind: 'area'; w: number; region: [number, number, number, number] | undefined } | { kind: 'line'; w: number; s: number; t0: number; t1: number } | { kind: 'lineAlong'; w: number; t: number; s0: number; s1: number } | { kind: 'point'; p: number; s: number; t: number }
@@ -183,6 +187,7 @@ export interface CarapaceInputV1 {
   nodalLoads?: NodalLoadTable
   elementLoads?: ElementLoadTable
   studWalls?: StudWallTable
+  diaphragms?: DiaphragmSpec[]
   floorLoads?: FloorTransferSpec[]
   sequence: SequenceSpec
 }

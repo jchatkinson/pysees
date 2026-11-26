@@ -1,5 +1,6 @@
 import { getRunLayout, queryBlock, queryColumns, queryRunExtents } from './resultsStorageClient'
 import type { RecorderKind, RecorderMetadata, ResultBlock, RunExtents, RunMetadata, StageMetadata } from '@/app/types/resultsStorage'
+import { recorderTagOf } from './recorderRows'
 
 const MAX_CACHED_BLOCKS = 8
 
@@ -54,7 +55,7 @@ function buildLayout(run: RunMetadata, recorders: RecorderMetadata[], stages: St
   const columns: RunLayout['columns'] = { disp: new Map(), vel: new Map(), accel: new Map(), reaction: new Map(), force: new Map(), shell: new Map(), studWall: new Map() }
   for (const rec of recorders) {
     const kind = rec.kind ?? 'disp'
-    const tag = Number(rec.recorderId.replace(/^[a-z]+:/, ''))
+    const tag = Number(recorderTagOf(rec.recorderId))
     columns[kind].set(tag, { offset: 1 + (rec.columnOffset ?? rec.nodeIndex * run.dofsPerNode), labels: rec.componentLayout })
   }
   return { run, stride: 1 + (run.columnCount ?? run.nodeCount * run.dofsPerNode), stages, columns }

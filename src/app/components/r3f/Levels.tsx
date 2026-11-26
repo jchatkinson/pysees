@@ -1,12 +1,14 @@
-import { Html, Line } from '@react-three/drei'
+import { Line } from '@react-three/drei'
+import { SceneLabels, type SceneLabelStyle } from './SceneLabels'
 import type { LevelEntity } from '@/app/types/levels'
 import type { GridlineEntity } from '@/app/types/gridlines'
 import { levelElevations } from '@/app/lib/levels'
 import { GRID_LINE_COLOR } from './Gridlines'
+import { gridDash, gridSize } from '@/app/lib/gridlines'
 
 const DEFAULT_HALF_EXTENT = 5
 const TEXT_OFFSET = 0.4
-const LEVEL_LABEL_STYLE: React.CSSProperties = { fontSize: 11, fontWeight: 600, color: GRID_LINE_COLOR, whiteSpace: 'nowrap', userSelect: 'none', pointerEvents: 'none', transform: 'translate(-100%, -50%)' }
+const LEVEL_LABEL_STYLE: SceneLabelStyle = { size: 11, weight: 600, color: GRID_LINE_COLOR, anchor: 'right', offset: [-4, 0] }
 
 function anchorPoint(gridlines: GridlineEntity[], ndm: 2 | 3): [number, number] {
   const xs = gridlines.flatMap((g) => [g.start[0] ?? 0, g.end[0] ?? 0])
@@ -17,19 +19,9 @@ function anchorPoint(gridlines: GridlineEntity[], ndm: 2 | 3): [number, number] 
   ]
 }
 
-function Level({
-  level,
-  elevation,
-  ndm,
-  gridlines,
-  anchor,
-}: {
-  level: LevelEntity
-  elevation: number
-  ndm: 2 | 3
-  gridlines: GridlineEntity[]
-  anchor: [number, number]
-}) {
+function Level({ elevation, ndm, gridlines }: { elevation: number; ndm: 2 | 3; gridlines: GridlineEntity[] }) {
+  // Lifted a hair off the level: floors and slabs have their top in this plane, and coplanar lines z-fight with them.
+  const size = gridSize(gridlines), dash = gridDash(size), z = elevation + size * 5e-4
   return (
     <>
       {/* Redraw the actual grids at this level's elevation, rather than a generic bounding box. */}
@@ -38,13 +30,13 @@ function Level({
           <Line
             key={g.id}
             points={[
-              [g.start[0] ?? 0, g.start[1] ?? 0, elevation],
-              [g.end[0] ?? 0, g.end[1] ?? 0, elevation],
+              [g.start[0] ?? 0, g.start[1] ?? 0, z],
+              [g.end[0] ?? 0, g.end[1] ?? 0, z],
             ]}
             color={GRID_LINE_COLOR}
             lineWidth={1}
             dashed
-            dashScale={8}
+            {...dash}
           />
         ))
         : gridlines.length > 0 && (
@@ -56,13 +48,9 @@ function Level({
             color={GRID_LINE_COLOR}
             lineWidth={1}
             dashed
-            dashScale={8}
+            {...dash}
           />
         )}
-      {/* HTML, not drei's SDF <Text>: its WebGL glyph generator was taking the viewport's WebGL context down with it. */}
-      <Html position={ndm === 3 ? [anchor[0] - TEXT_OFFSET, anchor[1] - TEXT_OFFSET, elevation] : [anchor[0] - TEXT_OFFSET, elevation, anchor[1] - TEXT_OFFSET]} style={LEVEL_LABEL_STYLE} zIndexRange={[10, 10]}>
-        {level.label}
-      </Html>
     </>
   )
 }
@@ -83,12 +71,13 @@ export function LevelsLayer({
 }) {
   if (!showLevels || levels.length === 0) return null
   const elevations = levelElevations(levels)
-  const anchor = anchorPoint(gridlines, ndm)
+  const [ax, ay] = anchorPoint(gridlines, ndm)
+  const shown = levels.flatMap((level, i) => (only !== undefined && i !== only ? [] : [{ level, elevation: elevations[i] }]))
+  const labels = shown.map(({ level, elevation }) => ({ text: level.label, position: (ndm === 3 ? [ax - TEXT_OFFSET, ay - TEXT_OFFSET, elevation] : [ax - TEXT_OFFSET, elevation, ay - TEXT_OFFSET]) as [number, number, number] }))
   return (
     <>
-      {levels.map((level, i) => (only !== undefined && i !== only ? null :
-        <Level key={level.id} level={level} elevation={elevations[i]} ndm={ndm} gridlines={gridlines} anchor={anchor} />
-      ))}
+      {shown.map(({ level, elevation }) => <Level key={level.id} elevation={elevation} ndm={ndm} gridlines={gridlines} />)}
+      <SceneLabels labels={labels} style={LEVEL_LABEL_STYLE} />
     </>
   )
 }

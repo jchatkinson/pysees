@@ -9,12 +9,12 @@ A saved project is an **OpenSeesPy script** with `# @pysees` comment lines carry
 
 ## Save and open
 
-- **File > Save .py** downloads the project (default name `model.py`). It is disabled until a model exists.
-- **File > Open .py** (or **Load** in the New model dialog) reads a project. A preview shows counts and any problems before you confirm.
+- **File > Save** downloads the project (default name `model.py`). It is disabled until a model exists.
+- **File > Open** (or **Load** in the New model dialog) reads a project. A preview shows counts and any problems before you confirm.
 
 ### What is saved
 
-The model, the analysis commands up to the current undo position (disabled commands included), grids and levels, saved plots, and display preferences including units.
+The model, the analysis commands up to the current undo position (disabled commands included), grids and levels, the placement of [PDF underlays](/docs/viewport/underlays) (not the PDF files), saved plots, and display preferences including units. Carapace-only parts (stud walls, joist floors, flexible diaphragms, friction) are kept in the project; the script part approximates them for OpenSees, with warning comments.
 
 ### What is not saved
 
@@ -25,7 +25,7 @@ Computed results, undo history, selection and playback state. Run the analysis a
 
 ## Import a plain script
 
-**File > Import .tcl / .py** reads an OpenSees script without running it. Constants and arithmetic are substituted; loops, conditionals and procedures are reported and skipped. Only the model is imported, not analysis commands. A dialog lists entity counts and diagnostics (error, warning, info) with line numbers, then **Replace model** loads the result.
+**File > Import** reads an OpenSees script without running it. Constants and arithmetic are substituted; loops, conditionals and procedures are reported and skipped. Only the model is imported, not analysis commands. A dialog lists entity counts and diagnostics (error, warning, info) with line numbers, then **Replace model** loads the result.
 
 ## Export
 

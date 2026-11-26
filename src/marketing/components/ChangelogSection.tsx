@@ -17,6 +17,85 @@ type ChangelogItem = {
 
 const CHANGELOG_ITEMS: ChangelogItem[] = [
   {
+    version: 'v0.8.0',
+    date: 'November 25, 2026',
+    title: 'Light-Frame Wood',
+    subtitle: 'Stud walls, joist floors and diaphragms, drawn over the drawing set.',
+    content: (
+      <>
+        <p>PySees now models wood-frame buildings in the built-in solver. Draw stud walls in a story plan with their lumber framing, openings, headers and sheathing; each pier end is held down to whatever is below it. Joist floors take area loads down to the walls and beams under them, overhangs included, and diaphragms tie each level together.</p>
+        <p>Trace over PDF drawing sheets placed under each plan, then walk through the result with the new fly mode. The BC Rowhouse template, a two-unit rowhouse from a real drawing set, shows it all together.</p>
+      </>
+    ),
+    new: [
+      'Stud walls: lumber framing (CSA O86 / NDS), openings with headers, O86 sheathing, hold-downs, wall loads',
+      'Joist floors of any outline, bearing on stud walls and beams, with a load takedown table',
+      'Rigid and flexible diaphragms assigned per level from the selection',
+      'Stud-wall results: pier chord forces and the axial force in every stud, post, jack and cripple',
+      'PDF underlays: import sheets at their printed scale, calibrate, align and crop',
+      'BC Rowhouse and Grid only templates',
+      'Fly mode (Shift+F): move through the model with W A S D and look around with the mouse',
+      'Extruded view of wall framing and floor joists',
+    ],
+    updates: [
+      'Labels (grid bubbles, levels, IDs, values, reactions) are drawn in the scene, hidden behind the model, and stay fast with thousands of them',
+      'Beams and joists in the extruded view hang from their top face, and elastic members show their real proportions',
+      'Grid and level lines are crisp at any zoom',
+      'Documentation for the ribbon, views, drawing and editing tools, stud walls, joist floors and underlays, with new screenshots',
+      'The New Model dialog fits any window: the templates and long forms scroll, and the buttons stay in view',
+    ],
+    bugs: [
+      'Several nodal loads on the same node and direction now add up instead of the last one replacing the others',
+      'Joist floors with notched outlines no longer lose a sliver of load at the corners',
+      'Grid and level lines no longer flicker against floors in the same plane',
+      'Grid only: story heights given in other units (12 ft in a kip-in model) no longer show rounding noise',
+      'The joist floor card counts the strips that bear on beams',
+    ],
+  },
+  {
+    version: 'v0.7.0',
+    date: 'November 24, 2026',
+    title: 'Drawing and Editing',
+    subtitle: 'A ribbon toolbar, story plans and elevations, and tools to draw and edit in the viewport.',
+    content: (
+      <>
+        <p>Studio has a new ribbon in place of the menus, with a command palette (Ctrl+K) to find any command. Look at a model in 3D, one story at a time in plan, or along a grid line in elevation, and draw members, beams, columns, shells and supports directly on the grids.</p>
+        <p>Move, copy, mirror, divide and merge what you select, reassign properties and supports from the selection panel, and switch on the extruded view to see members at their section shape. Multi-point constraints now run in the built-in solver, and large models draw and record much faster.</p>
+      </>
+    ),
+    new: [
+      'Ribbon toolbar and command palette',
+      'Story plan and grid elevation views, with the story above shown as outlines',
+      'Drawing tools: frame members (with typed lengths), quick beams and columns, shells, supports, on every story at once',
+      'Move, copy, mirror, divide and merge; assign nodal and member loads; isolate the selection',
+      'Extruded view of member sections and shell thickness',
+      'Support reactions in the results viewport',
+      'Precast Wall template with zero-length connectors and Coulomb friction',
+      'Shell stiffness modifiers for cracked slabs and walls',
+      'Tower template for large models',
+    ],
+    updates: [
+      'Multi-point constraints (equalDOF, rigidLink, rigidDiaphragm) run in the built-in solver',
+      'Faster drawing and recording for large models',
+    ],
+    bugs: ['Fixed running out of memory after a large run', 'Fiber sections not drawn about their centroid now respond as in OpenSees'],
+  },
+  {
+    version: 'v0.6.0',
+    date: 'October 12, 2026',
+    title: 'Projects and Docs',
+    subtitle: 'Save and reopen whole projects, and read the documentation.',
+    content: (
+      <>
+        <p>Projects save as an annotated OpenSeesPy script: run it in OpenSees as is, or open it in PySees to get the whole project back, including the analysis, grids, levels and saved plots.</p>
+        <p>The new documentation covers building a model, running analyses and reading results.</p>
+      </>
+    ),
+    new: ['Save and open projects as annotated .py scripts', 'Documentation site with search', 'AISC shapes and steel and concrete fiber section templates', 'Earthquake analysis block with Rayleigh damping'],
+    updates: ['Results show their maximum and minimum', 'More uniaxial materials wired to the solver'],
+    bugs: ['Fixed result storage for every analysis case'],
+  },
+  {
     version: 'v0.5.0',
     date: 'October 9, 2026',
     title: '3D Models and Shells',

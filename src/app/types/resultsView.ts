@@ -43,6 +43,8 @@ export interface ResultsView {
   /** Arrows and values of the support reactions at the current step (any result type). */
   showReactions: boolean
   fillDiagrams: boolean
+  /** Stud walls in the axial view: pier resultants (chord forces), or every framing member's force (studs, posts, jacks, cripples). */
+  wallResults: 'piers' | 'members'
 }
 
 export const DEFAULT_RESULTS_VIEW: ResultsView = {
@@ -66,4 +68,5 @@ export const DEFAULT_RESULTS_VIEW: ResultsView = {
   showValues: false,
   showReactions: false,
   fillDiagrams: true,
+  wallResults: 'piers',
 }

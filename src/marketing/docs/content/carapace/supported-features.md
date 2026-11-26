@@ -13,12 +13,14 @@ Analysis runs in your browser on **Carapace**, a Rust finite-element engine comp
 |---|---|
 | Models | 2D (3 DOF/node) and 3D (6 DOF/node) |
 | Elements | Truss, ElasticBeamColumn, DispBeamColumn (fiber), zeroLength and zeroLengthSection (2D), ShellMITC4 and ShellDKGT (3D) |
-| Uniaxial materials | Elastic, ElasticPP, ENT, Steel01, Steel02, Concrete01. See [Materials](/docs/model/materials) for the ones the solver has but PySees does not run yet |
+| Light-frame wood (3D, Carapace only) | [Stud walls](/docs/model/stud-walls) with `Anchorage` hold-downs and wall loads, flexible diaphragms, [joist floors](/docs/model/joist-floors) bearing on walls and beams |
+| Constraints | `fix`; `equalDOF`, `equalDOF_Mixed`, `rigidLink` (`beam`, `bar`) and, in 3D, `rigidDiaphragm` |
+| Uniaxial materials | Elastic, ElasticPP, ENT, Steel01, Steel02, Concrete01, Anchorage (hold-downs). See [Materials](/docs/model/materials) for the ones the solver has but PySees does not run yet |
 | Sections | Fiber (fibers and rectangular patches), ElasticMembranePlateSection for shells, with optional stiffness modifiers |
 | Time series | Constant, Linear, Path |
 | Patterns | Plain, UniformExcitation |
 | Analyses | Static load control, pushover (displacement control), earthquake (Newmark transient), eigen |
-| Recorders | Node displacement, velocity, acceleration and reaction; element force |
+| Recorders | Node displacement, velocity, acceleration and reaction; element force; shell stress resultants; stud-wall pier forces and framing member forces |
 
 ## Behaviour that differs from OpenSees
 
@@ -28,6 +30,8 @@ Analysis runs in your browser on **Carapace**, a Rust finite-element engine comp
 - Fiber coordinates are measured from the area-weighted centroid of the section's fibers, as OpenSees does, so a section that is not symmetric about the origin it was drawn against responds the same in both.
 - Earthquake analysis uses fixed-step Newmark.
 - *Wipe Analysis* has no effect, because each stage starts with fresh analysis objects.
+- Stud walls, joist floors and flexible diaphragms have no OpenSees equivalent. An exported script approximates each wall and diaphragm bay as elastic shells and each floor as nodal loads, with warning comments; its results will not match Carapace's.
+- Several nodal loads on the same node, DOF and pattern add up, as in OpenSees.
 
 ## Common diagnostics
 

@@ -19,8 +19,8 @@ export function formatLoadValue(v: number): string {
   return v.toExponential(1)
 }
 
-/** Above this many in the view, ID and value labels are not drawn: each is an HTML element. */
-export const LABEL_LIMIT = 400
+/** Above this many in the view, ID and value labels are not drawn: past that they are clutter (and a mesh rebuild per change). */
+export const LABEL_LIMIT = 5000
 
 /** Above this many load arrows they are drawn as one batch, without value labels (one glyph and label each would stall a large model). */
 const GLYPH_LIMIT = 500

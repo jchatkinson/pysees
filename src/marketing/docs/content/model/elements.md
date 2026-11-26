@@ -19,6 +19,8 @@ Elements are in the **Elements** group. Click an element in the viewport or its 
 
 Other OpenSees element names exist in the generated schemas but are not available in the element form.
 
+Three Carapace-only elements are drawn and edited with their own tools and cards rather than the element form: `studWall` ([Stud walls](/docs/model/stud-walls)), `joistFloor` ([Joist floors](/docs/model/joist-floors)) and `diaphragm` (a flexible diaphragm, assigned from the [selection panel](/docs/model/editing#selection-panel)). Members, shells and supports can also be drawn in the viewport with the [drawing tools](/docs/model/drawing-tools).
+
 ## Zero-length springs
 
 A `zeroLength` element joins two nodes, usually coincident, with an independent material in each listed direction: `-mat 1 2 -dir 1 2` puts material 1 on ux and material 2 on uy (3 is rz; in 3D 4-6 are the rotations). Directions without a material are free. `-orient` rotates the element's local axes. Use *force-deformation* materials (set when a uniaxial material is created) so the material's stress is the spring force and its strain the relative displacement.

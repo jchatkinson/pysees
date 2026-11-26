@@ -12,6 +12,31 @@ import { templateKey, templateOf } from '@/app/lib/editor/properties'
 import { bayAt, bayLines, cellAt, meshQuad, gridPoints, inGridSlab, pickSnap, snapPoints, workElevations, type Screen, type SnapPoint } from '@/app/lib/editor/snap'
 import { levelElevations } from '@/app/lib/levels'
 import { ScreenSize } from './ScreenSize'
+import { drawStudWall } from '@/app/lib/studWalls'
+
+const PICK_SHEET = '#db2777'
+
+/** Picks so far for the underlay tool: sheet points in magenta, align targets in blue with a dashed line from their sheet point, a crop rectangle. */
+function UnderlayPickPreview({ hover, z }: { hover: P3 | null; z: number }) {
+  const pick = useAppStore((s) => s.underlayPick)
+  if (!pick) return null
+  const noRaycast = () => null
+  const pts: P3[] = pick.points.map((p) => [p[0], p[1], z])
+  const all = hover && pts.length < (pick.kind === 'align' ? 4 : 2) ? [...pts, hover] : pts
+  const isTarget = (i: number) => pick.kind === 'align' && i % 2 === 1
+  const lines: P3[][] = []
+  if (pick.kind === 'calibrate' && all.length >= 2) lines.push([all[0], all[1]])
+  if (pick.kind === 'align') for (let i = 1; i < all.length; i += 2) lines.push([all[i - 1], all[i]])
+  if (pick.kind === 'crop' && all.length >= 2) { const [a, b] = all; lines.push([a, [b[0], a[1], z], b, [a[0], b[1], z], a]) }
+  return (
+    <>
+      {lines.map((l, i) => <Line key={i} points={l} color={PICK_SHEET} lineWidth={2} dashed={pick.kind === 'align'} dashSize={6} gapSize={4} raycast={noRaycast} />)}
+      {pts.map((p, i) => (
+        <ScreenSize key={i} position={p}><mesh raycast={noRaycast}><boxGeometry args={[7, 7, 7]} /><meshBasicMaterial color={isTarget(i) ? PREVIEW : PICK_SHEET} /></mesh></ScreenSize>
+      ))}
+    </>
+  )
+}
 
 const SNAP_PX = 12
 type Hover = { point: P3 | null; snap: SnapPoint | null; bay: [P3, P3] | null; cell?: P3[] | null }
@@ -52,6 +77,8 @@ export function ToolLayer({ mode, nodes, elements, ndm }: { mode: ViewMode; node
   const { camera, gl, size } = useThree()
   const [hover, setHover] = useState<Hover>(NO_HOVER)
   const [start, setStart] = useState<P3 | null>(null)
+  // The floor tool's outline so far (its last point is also `start`).
+  const [poly, setPoly] = useState<P3[]>([])
   const shift = useRef(false)
   const last = useRef<P3 | null>(null)
   const units = useUnits()
@@ -72,7 +99,7 @@ export function ToolLayer({ mode, nodes, elements, ndm }: { mode: ViewMode; node
   const columnLines = useMemo(() => bayLines('column', mode, grids, levels, ndm), [mode, grids, levels, ndm])
 
   const [seenTool, setSeenTool] = useState(tool)
-  if (seenTool !== tool) { setSeenTool(tool); setStart(null); setHover(NO_HOVER) }
+  if (seenTool !== tool) { setSeenTool(tool); setStart(null); setPoly([]); setHover(NO_HOVER) }
   // A typed length belongs to the chain it was typed for.
   useEffect(() => { useAppStore.getState().setToolInput('') }, [start, tool])
 
@@ -89,8 +116,14 @@ export function ToolLayer({ mode, nodes, elements, ndm }: { mode: ViewMode; node
       const ray = new Raycaster()
       ray.setFromCamera(new Vector2((cursor.x / r.width) * 2 - 1, -(cursor.y / r.height) * 2 + 1), camera)
       const hit = ray.ray.intersectPlane(plane, new Vector3())
-      const onPlane: P3 | null = hit ? roundToIncrement([hit.x, hit.y, hit.z], plane.normal, increment) : null
       const s = useAppStore.getState()
+      if (tool === 'underlay') {
+        // Points on the sheet are taken as clicked (no drawing increment); an align target snaps to grids and nodes.
+        const target = s.underlayPick?.kind === 'align' && s.underlayPick.points.length % 2 === 1
+        const snap = target ? pickSnap(snaps, project, cursor, SNAP_PX) : null
+        return { point: snap?.p ?? (hit ? [hit.x, hit.y, hit.z] : null), snap, bay: null }
+      }
+      const onPlane: P3 | null = hit ? roundToIncrement([hit.x, hit.y, hit.z], plane.normal, increment) : null
       if (tool === 'shell') return { point: null, snap: null, bay: null, cell: onPlane ? cellAt(mode, s.gridlines, s.levels, onPlane) : null }
       if (tool === 'quickBeam' || (tool === 'quickColumn' && mode.kind !== 'plan')) {
         return { point: null, snap: null, bay: onPlane ? bayAt(tool === 'quickBeam' ? beamLines : columnLines, onPlane, project, cursor, SNAP_PX) : null }
@@ -130,6 +163,7 @@ export function ToolLayer({ mode, nodes, elements, ndm }: { mode: ViewMode; node
     const onClick = (e: MouseEvent) => {
       if (e.button !== 0) return
       const h = read(e)
+      if (tool === 'underlay') { if (h.point) useAppStore.getState().addUnderlayPickPoint([h.point[0], h.point[1]]); return }
       if (tool === 'support') {
         if (h.snap?.nodeId !== undefined) { const id = h.snap.nodeId; commit((b) => b.support(id, supportDofs(preset, ndm, useAppStore.getState().model.config?.ndf ?? 6)), false) }
         return
@@ -139,23 +173,52 @@ export function ToolLayer({ mode, nodes, elements, ndm }: { mode: ViewMode; node
         if (cell && t) commit((b, at) => { for (const q of meshQuad(cell, s.shellDivisions, s.shellDivisions)) b.shell(t, q.map(at)) })
         return
       }
-      if (!template) return
-      if (tool === 'quickBeam' || tool === 'quickColumn') { const bay = h.bay; if (bay) commit((b, at) => { b.member(template, at(bay[0]), at(bay[1]), transfType()) }); return }
+      if (!template && tool !== 'studWall' && tool !== 'floor') return
+      if (template && (tool === 'quickBeam' || tool === 'quickColumn')) { const bay = h.bay; if (bay) commit((b, at) => { b.member(template, at(bay[0]), at(bay[1]), transfType()) }); return }
       if (!h.point) return
       place(h.point)
     }
+    // A joist floor through the outline's points at the plan's level (coincident nodes merge, so it shares the walls' top corners).
+    const finish = (pts: P3[]) => {
+      const t = useAppStore.getState().floorTemplate
+      if (t && pts.length >= 3) commit((b, at) => { const ids = pts.map((q) => b.node(at(q))); b.writeRaw({ kind: 'element', entity: { id: b.model.nextIds.element, eleType: 'joistFloor', nodes: ids, args: { ...t } as unknown as Record<string, unknown> } }) })
+      setPoly([]); setStart(null)
+    }
     const place = (p: P3) => {
-      if (start && template) { const a = start; commit((b, at) => { b.member(template, at(a), at(p), transfType()) }) }
+      if (tool === 'floor') {
+        if (mode.kind !== 'plan' || mode.level < 0 || !useAppStore.getState().floorTemplate) return
+        // Clicking the first point again closes the outline.
+        const a = poly.length >= 3 ? project(poly[0]) : null, q = project(p)
+        if (a && q && Math.hypot(a.x - q.x, a.y - q.y) <= SNAP_PX) { finish(poly); return }
+        setPoly([...poly, p]); setStart(p)
+        return
+      }
+      if (start && tool === 'studWall') {
+        // A wall spans the shown story: from the level below (the base under the first story) up to the plan's level.
+        const s = useAppStore.getState(), t = s.wallTemplate, a = start
+        if (!t || mode.kind !== 'plan' || mode.level < 0) return
+        const below = [0, ...levelElevations(s.levels)][mode.level]
+        commit((b, at) => { const A = at(a), B = at(p); drawStudWall(b, A, B, at([a[0], a[1], below])[2], A[2], t) })
+      } else if (start && template) { const a = start; commit((b, at) => { b.member(template, at(a), at(p), transfType()) }) }
       setStart(p)
     }
-    const onContext = (e: MouseEvent) => { if (start) { e.preventDefault(); setStart(null) } }
+    const onContext = (e: MouseEvent) => {
+      if (tool === 'floor' && poly.length) { e.preventDefault(); if (poly.length >= 3) finish(poly); else { setPoly([]); setStart(null) } return }
+      if (start) { e.preventDefault(); setStart(null) }
+    }
     // Typing after the first point of a chain enters a length (`6`, `6 ft`); Enter places the next point that far towards the cursor.
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Shift') shift.current = e.type === 'keydown'
       if (e.type !== 'keydown' || shouldIgnoreHotkeys(e.target)) return
       const s = useAppStore.getState()
-      const typing = tool === 'frame' && start && !e.ctrlKey && !e.metaKey && !e.altKey
       const consume = () => { e.preventDefault(); e.stopImmediatePropagation() }
+      if (tool === 'underlay') {
+        if (e.key === 'Escape') s.setActiveTool('select')
+        // Enter after the first align pair moves the sheet without rotating it.
+        if (e.key === 'Enter' && s.underlayPick?.kind === 'align' && s.underlayPick.points.length === 2) { consume(); s.applyUnderlayPick() }
+        return
+      }
+      const typing = (tool === 'frame' || tool === 'studWall') && start && !e.ctrlKey && !e.metaKey && !e.altKey
       if (typing && /^[0-9.,'"a-zA-Z ]$/.test(e.key) && (s.toolInput !== '' || /[0-9.]/.test(e.key))) { consume(); s.setToolInput(s.toolInput + e.key); return }
       if (typing && e.key === 'Backspace' && s.toolInput) { consume(); s.setToolInput(s.toolInput.slice(0, -1)); return }
       if (e.key === 'Enter' && typing && s.toolInput) {
@@ -170,6 +233,12 @@ export function ToolLayer({ mode, nodes, elements, ndm }: { mode: ViewMode; node
         return
       }
       if (e.key !== 'Escape' && e.key !== 'Enter') return
+      if (tool === 'floor') {
+        if (e.key === 'Enter' && poly.length >= 3) finish(poly)
+        else if (poly.length) { setPoly([]); setStart(null) }
+        else if (e.key === 'Escape') s.setActiveTool('select')
+        return
+      }
       if (s.toolInput) { consume(); s.setToolInput(''); return }
       if (start) setStart(null)
       else if (e.key === 'Escape') s.setActiveTool('select')
@@ -189,13 +258,16 @@ export function ToolLayer({ mode, nodes, elements, ndm }: { mode: ViewMode; node
       window.removeEventListener('keydown', onKey, true)
       window.removeEventListener('keyup', onKey)
     }
-  }, [tool, template, preset, camera, gl, size, plane, snaps, beamLines, columnLines, mode, ndm, start, units, increment])
+  }, [tool, template, preset, camera, gl, size, plane, snaps, beamLines, columnLines, mode, ndm, start, poly, units, increment])
 
   if (tool === 'select') return null
   const noRaycast = () => null
   return (
     <>
+      {tool === 'underlay' && <UnderlayPickPreview hover={hover.point} z={plane.normal.z ? -plane.constant / plane.normal.z : 0} />}
       {start && hover.point && <Line points={[start, hover.point]} color={PREVIEW} lineWidth={2} raycast={noRaycast} />}
+      {poly.length >= 2 && <Line points={poly} color={PREVIEW} lineWidth={2} raycast={noRaycast} />}
+      {poly.length >= 2 && hover.point && <Line points={[hover.point, poly[0]]} color={PREVIEW} lineWidth={1} dashed dashSize={6} gapSize={4} transparent opacity={0.6} raycast={noRaycast} />}
       {start && <ScreenSize position={start}><mesh raycast={noRaycast}><boxGeometry args={[7, 7, 7]} /><meshBasicMaterial color={PREVIEW} /></mesh></ScreenSize>}
       {hover.cell && <Line points={[...hover.cell, hover.cell[0]]} color={PREVIEW} lineWidth={3} transparent opacity={0.7} raycast={noRaycast} />}
       {hover.bay && <Line points={hover.bay} color={PREVIEW} lineWidth={4} transparent opacity={0.6} raycast={noRaycast} />}

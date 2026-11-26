@@ -11,8 +11,8 @@ export const modeFrequencyHz = (omega: number): number => omega / (2 * Math.PI)
 const sig = (v: number, digits = 4) => (Number.isFinite(v) ? String(Number(v.toPrecision(digits))) : '∞')
 
 /** "T = 0.4523 s (f = 2.211 Hz)" */
-export function modeTimingText(mode: Mode): string {
-  return `T = ${sig(modePeriod(mode.frequency))} s (f = ${sig(modeFrequencyHz(mode.frequency))} Hz)`
+export function modeTimingText(mode: Mode, digits = 4): string {
+  return `T = ${sig(modePeriod(mode.frequency), digits)} s (f = ${sig(modeFrequencyHz(mode.frequency), digits)} Hz)`
 }
 
 /** Tag -> row of the node-major shape. */

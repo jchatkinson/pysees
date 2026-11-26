@@ -30,3 +30,7 @@ dist-ssr
 __pycache__/
 *.py[cod]
 .nvmrc
+
+# Local reference drawings and Windows download markers
+docs/*.pdf
+*:Zone.Identifier

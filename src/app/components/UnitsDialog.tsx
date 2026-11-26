@@ -3,9 +3,35 @@ import { Button } from '@/app/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/app/components/ui/select'
 import { useAppStore } from '@/app/store/useAppStore'
 import { useUnits } from '@/app/lib/units/useUnits'
+import { DEFAULT_NUMBER_FORMAT, DIGIT_CHOICES, type NumberFormat } from '@/app/lib/formatResult'
 import { baseUnitsLabel, CATEGORIES, CATEGORY_IDS, derivedUnit, unitOptions, UNIT_PRESETS, type Category, type UnitPrefs } from '@/app/lib/units/units'
 
 const AUTO = '__auto__'
+
+const PRECISION: { key: keyof NumberFormat; label: string }[] = [{ key: 'digits', label: 'Tables and panels' }, { key: 'labelDigits', label: 'Viewport labels' }]
+
+/** Significant figures for displayed results; applies with or without units. */
+function PrecisionSection() {
+  const numberFormat = useAppStore((s) => s.numberFormat)
+  const setNumberFormat = useAppStore((s) => s.setNumberFormat)
+  return (
+    <div className="grid gap-2 border-t pt-2">
+      <div className="flex items-center justify-between">
+        <span className="text-xs font-medium">Result precision (significant figures)</span>
+        <Button variant="ghost" size="xs" onClick={() => setNumberFormat(DEFAULT_NUMBER_FORMAT)} disabled={numberFormat.digits === DEFAULT_NUMBER_FORMAT.digits && numberFormat.labelDigits === DEFAULT_NUMBER_FORMAT.labelDigits}>Reset</Button>
+      </div>
+      {PRECISION.map(({ key, label }) => (
+        <div key={key} className="grid grid-cols-[1fr_9rem] items-center gap-2">
+          <span className="text-xs">{label}</span>
+          <Select value={String(numberFormat[key])} onValueChange={(v) => v && setNumberFormat({ [key]: Number(v) })}>
+            <SelectTrigger size="sm" className="w-full"><SelectValue /></SelectTrigger>
+            <SelectContent>{DIGIT_CHOICES.map((d) => <SelectItem key={d} value={String(d)}>{d}</SelectItem>)}</SelectContent>
+          </Select>
+        </div>
+      ))}
+    </div>
+  )
+}
 
 /** Display units per quantity category. The model's own (base) system is fixed; these only change how numbers are shown and typed. */
 export function UnitsDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
@@ -57,6 +83,7 @@ export function UnitsDialog({ open, onOpenChange }: { open: boolean; onOpenChang
             })}
           </div>
         )}
+        <PrecisionSection />
       </DialogContent>
     </Dialog>
   )

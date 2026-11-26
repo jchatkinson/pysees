@@ -5,10 +5,12 @@ import { ModelPanel } from '@/app/components/ModelPanel'
 import { AnalysisPanel } from '@/app/components/AnalysisPanel'
 import { ReportPanel } from '@/app/components/ReportPanel'
 import { CommandForm } from '@/app/components/CommandForm'
+import { DrawOptions } from '@/app/components/DrawOptions'
 import { ResultsPanel } from '@/app/components/ResultsPanel'
 import { Viewport } from '@/app/components/Viewport'
 import { InitModal } from '@/app/components/InitModal'
 import { GridlinesDialog } from '@/app/components/GridlinesDialog'
+import { UnderlaysDialog } from '@/app/components/UnderlaysDialog'
 import { UnitsDialog } from '@/app/components/UnitsDialog'
 import { EditDialog } from '@/app/components/EditDialog'
 import { CommandPalette } from '@/app/components/ribbon/CommandPalette'
@@ -43,6 +45,8 @@ function LeftPanel() {
 function RightPanel() {
   const activeRightPanel = useAppStore((s) => s.activeRightPanel)
   const setActiveRightPanel = useAppStore((s) => s.setActiveRightPanel)
+  // A draw tool's options take the command form's place until the tool is put down.
+  const drawing = useAppStore((s) => s.activeTool !== 'select' && Boolean(s.model.config))
   return (
     <div className="flex flex-col h-full">
       <div className="flex border-b shrink-0">
@@ -51,7 +55,7 @@ function RightPanel() {
           className={`flex-1 h-7 rounded-none text-[11px] ${activeRightPanel === 'command' ? 'bg-accent text-accent-foreground' : ''}`}
           onClick={() => setActiveRightPanel('command')}
         >
-          Command
+          {drawing ? 'Draw' : 'Command'}
         </Button>
         <Button
           variant="ghost"
@@ -62,7 +66,7 @@ function RightPanel() {
         </Button>
       </div>
       <div className="flex-1 min-h-0">
-        {activeRightPanel === 'command' ? <CommandForm /> : <ResultsPanel />}
+        {activeRightPanel === 'results' ? <ResultsPanel /> : drawing ? <DrawOptions /> : <CommandForm />}
       </div>
     </div>
   )
@@ -73,6 +77,7 @@ export function AppShell() {
     <div className="flex flex-col h-screen overflow-hidden">
       <InitModal />
       <GridlinesDialog />
+      <UnderlaysDialog />
       <ConnectedUnitsDialog />
       <EditDialog />
       <CommandPalette />
