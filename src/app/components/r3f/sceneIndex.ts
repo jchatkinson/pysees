@@ -3,7 +3,7 @@ import { memberFrame } from '@/app/lib/memberFrame'
 import { shellFrame } from '@/app/lib/shells'
 import { isShell } from '@/app/lib/commands/tables'
 import { toVec3 } from './utils'
-import { isStudWall, studWallArgs } from '@/app/lib/studWalls'
+import { isStudWall, studWallArgs, wallBaseNodes } from '@/app/lib/studWalls'
 import { wallPiers } from '@/app/lib/studBuilding'
 import { diaphragmArgs, diaphragmOutline, isDiaphragm } from '@/app/lib/diaphragms'
 import { isJoistFloor } from '@/app/lib/floors'
@@ -14,11 +14,53 @@ function diaphragmCorners(el: ElementEntity): number[] {
   return [el.nodes[0], el.nodes[nu - 1], el.nodes[nu * nv - 1], el.nodes[nu * (nv - 1)]]
 }
 
-/** A stud wall's node ids around its outline: the bottom chord left to right (corner, stations, corner), then the top chord back. */
-function wallOutline(el: ElementEntity): number[] {
-  const stations = studWallArgs(el.args).stations ?? []
-  const chord = (c: 'top' | 'bottom') => stations.map((s, i) => ({ x: s.x, id: el.nodes[4 + i] })).filter((_, i) => stations[i].chord === c).sort((a, b) => a.x - b.x).map((s) => s.id)
-  return [el.nodes[0], ...chord('bottom'), el.nodes[1], el.nodes[2], ...chord('top').reverse(), el.nodes[3]]
+/** A stud wall's chords as node ids by wall-local x, corners included: the bottom (corners, bottom stations and, for a bearing wall, the
+ * nodes it stands on inside its length) and the top (corners and top stations). The outline runs along the bottom, then back along the top. */
+function wallChords(el: ElementEntity, nodes: Map<number, NodeEntity>, elements: Map<number, ElementEntity>) {
+  const { stations = [], layout } = studWallArgs(el.args)
+  const L = layout?.length ?? 0
+  const chord = (c: 'top' | 'bottom') => stations.flatMap((s, i) => (s.chord === c ? [{ x: s.x, id: el.nodes[4 + i] }] : []))
+  const bottom = chord('bottom')
+  if (layout?.bearing) for (const b of wallBaseNodes({ nodes, elements, fixes: new Map() }, el).nodes) if (b.x > 1e-9 * L && b.x < L * (1 - 1e-9) && !bottom.some((s) => Math.abs(s.x - b.x) <= 1e-9 * L)) bottom.push({ x: b.x, id: b.node })
+  const ends = (c: { x: number; id: number }[], a: number, b: number) => [{ x: 0, id: el.nodes[a] }, ...c.sort((p, q) => p.x - q.x), { x: L, id: el.nodes[b] }]
+  return { bottom: ends(bottom, 0, 1), top: ends(chord('top'), 3, 2) }
+}
+
+/**
+ * A joist floor's outline with the nodes it sits on inserted along each edge: the top rows of stud walls and the nodes of beams lying on
+ * the edge. It has no stiffness of its own, so its displaced outline and fill follow what carries it instead of cutting straight between
+ * its corners.
+ */
+function floorOutline(ids: number[], nodes: Map<number, NodeEntity>, carriers: () => number[]): number[] {
+  const out: number[] = []
+  ids.forEach((a, i) => {
+    out.push(a)
+    const p = nodes.get(a)?.coords, q = nodes.get(ids[(i + 1) % ids.length])?.coords
+    if (!p || !q) return
+    const d = [0, 1, 2].map((k) => (q[k] ?? 0) - (p[k] ?? 0)), len2 = d[0] ** 2 + d[1] ** 2 + d[2] ** 2, tol = 1e-6 * Math.sqrt(len2)
+    const on: [number, number][] = []
+    for (const id of carriers()) {
+      const c = nodes.get(id)!.coords, r = [0, 1, 2].map((k) => (c[k] ?? 0) - (p[k] ?? 0)), t = (r[0] * d[0] + r[1] * d[1] + r[2] * d[2]) / len2
+      if (t > 1e-6 && t < 1 - 1e-6 && Math.hypot(...r.map((v, k) => v - t * d[k])) <= tol) on.push([t, id])
+    }
+    on.sort((x, y) => x[0] - y[0]).forEach(([t, id], j) => { if (j === 0 || t - on[j - 1][0] > 1e-9) out.push(id) })
+  })
+  return out
+}
+
+/** A stud wall's chords as node rows at fractions `u` of its length (0 and 1 are the corners), each drawn straight between its nodes. */
+export interface WallChords { bottom: { u: number; r: number }[]; top: { u: number; r: number }[] }
+
+/** The point at fraction `u` along a wall and `v` up it (of its corner height), between its chords, from node positions `p` (3 per row). */
+export function wallPoint(p: ArrayLike<number>, w: WallChords, u: number, v: number, out: number[] | Float32Array = [0, 0, 0], o = 0) {
+  const along = (c: WallChords['bottom'], k: number) => {
+    let i = 0
+    while (i < c.length - 2 && u > c[i + 1].u) i++
+    const a = c[i], b = c[i + 1], t = b.u > a.u ? Math.min(1, Math.max(0, (u - a.u) / (b.u - a.u))) : 0
+    return (1 - t) * p[a.r * 3 + k] + t * p[b.r * 3 + k]
+  }
+  for (let k = 0; k < 3; k++) out[o + k] = (1 - v) * along(w.bottom, k) + v * along(w.top, k)
+  return out
 }
 
 /** Line segments each beam or truss span is split into (its displaced shape and diagrams are curved). Fixed so the line buffer
@@ -32,7 +74,7 @@ export const segmentsFor = (kind: ElementKind) => (kind === 'beam' || kind === '
  * positions in the sorted-by-id lists below; results data and instance buffers are indexed by them.
  */
 /** `wall` is a Carapace stud wall: its closed outline through the corners and chord stations, filled like a shell; `diaphragm` a
- * flexible diaphragm's boundary through its edge grid nodes; `floor` a joist floor's plan polygon (any shape). */
+ * flexible diaphragm's boundary through its edge grid nodes; `floor` a joist floor's plan polygon (any shape), through the wall-top and beam nodes on its edges. */
 export type ElementKind = 'beam' | 'truss' | 'shell' | 'wall' | 'diaphragm' | 'floor' | 'other'
 
 export interface SceneIndex {
@@ -57,11 +99,11 @@ export interface SceneIndex {
   elementSegmentStart: Uint32Array
   segmentCount: number
   /** Stud-wall piers, which carry the wall's recorded forces (`p<pier>.<quantity>` columns): the wall's element row, its corner node rows
-   * (bottom start, bottom end, top end, top start), the pier's ends as fractions of the wall length, its width (model length) and number. */
-  wallPiers: { e: number; corners: [number, number, number, number]; u0: number; u1: number; width: number; pier: number }[]
-  /** Stud walls, for member results: element row, corner rows, length, framing top as a fraction of the corner height (below a floor
+   * as chords (`wallPoint`), the pier's ends as fractions of the wall length, its width (model length) and number. */
+  wallPiers: { e: number; chords: WallChords; u0: number; u1: number; width: number; pier: number }[]
+  /** Stud walls, for member results: element row, chords, length, framing top as a fraction of the corner height (below a floor
    * zone), and each opening's edges and head (wall-local length). */
-  studWalls: { e: number; corners: [number, number, number, number]; length: number; framing: number; height: number; openings: { x0: number; x1: number; head: number }[] }[]
+  studWalls: { e: number; chords: WallChords; length: number; framing: number; height: number; openings: { x0: number; x1: number; head: number }[] }[]
 }
 
 /** Line spans of an element: a chain of `n - 1`, or for a shell the closed outline of `n`. */
@@ -93,9 +135,12 @@ export function buildSceneIndex(
   let segmentCount = 0
   const wallPierList: SceneIndex['wallPiers'] = []
   const studWallList: SceneIndex['studWalls'] = []
+  let carrierIds: number[] | null = null
+  const carriers = () => (carrierIds ??= [...new Set([...elements.values()].flatMap((w) => isStudWall(w.eleType) ? [w.nodes[2], w.nodes[3], ...(studWallArgs(w.args).stations ?? []).flatMap((st, i) => (st.chord === 'top' ? [w.nodes[4 + i]] : []))] : /BeamColumn$/i.test(w.eleType) || /^truss$/i.test(w.eleType) ? w.nodes : []))].filter((id) => nodes.has(id)))
   for (const el of [...elements.values()].sort((a, b) => a.id - b.id)) {
     const wall = isStudWall(el.eleType), diaphragm = isDiaphragm(el.eleType), floor = isJoistFloor(el.eleType)
-    const outline = wall ? wallOutline(el) : diaphragm ? diaphragmOutline(el.nodes, diaphragmArgs(el.args).layout) : el.nodes
+    const chords = wall ? wallChords(el, nodes, elements) : null
+    const outline = chords ? [...chords.bottom, ...chords.top.slice().reverse()].map((c) => c.id) : diaphragm ? diaphragmOutline(el.nodes, diaphragmArgs(el.args).layout) : floor ? floorOutline(el.nodes, nodes, carriers) : el.nodes
     const rows = outline.map((id) => nodeIndex.get(id)).filter((r): r is number => r !== undefined)
     if (rows.length < 2 || ((wall || diaphragm || floor || isShell(el.eleType)) && (rows.length !== outline.length || rows.length < 3))) continue
     const kind: ElementKind = wall ? 'wall' : diaphragm ? 'diaphragm' : floor ? 'floor' : isShell(el.eleType) ? 'shell' : /BeamColumn$/i.test(el.eleType) ? 'beam' : /^truss$/i.test(el.eleType) ? 'truss' : 'other'
@@ -116,13 +161,15 @@ export function buildSceneIndex(
     spans.push(mine)
     if (wall) {
       const { layout } = studWallArgs(el.args)
-      const corners = el.nodes.slice(0, 4).map((id) => nodeIndex.get(id)!) as [number, number, number, number]
-      if (layout?.length > 0) {
+      const corners = el.nodes.slice(0, 4).map((id) => nodeIndex.get(id)!)
+      if (layout?.length > 0 && chords) {
+        const rowsOf = (c: { x: number; id: number }[]) => c.map((p) => ({ u: p.x / layout.length, r: nodeIndex.get(p.id)! }))
+        const wc: WallChords = { bottom: rowsOf(chords.bottom), top: rowsOf(chords.top) }
         const c = (r: number) => [nodeCoords[r * 3], nodeCoords[r * 3 + 1], nodeCoords[r * 3 + 2]]
         const H = Math.hypot(...c(corners[3]).map((v, k) => v - c(corners[0])[k])) || layout.height
-        studWallList.push({ e: elementIds.length - 1, corners, length: layout.length, framing: Math.min(1, layout.height / H), height: H, openings: (layout.openings ?? []).map((o) => ({ x0: o.x0, x1: o.x1, head: o.headHeight })) })
+        studWallList.push({ e: elementIds.length - 1, chords: wc, length: layout.length, framing: Math.min(1, layout.height / H), height: H, openings: (layout.openings ?? []).map((o) => ({ x0: o.x0, x1: o.x1, head: o.headHeight })) })
+        wallPiers(layout).forEach((p, i) => wallPierList.push({ e: elementIds.length - 1, chords: wc, u0: p.start / layout.length, u1: p.end / layout.length, width: p.width, pier: i + 1 }))
       }
-      if (layout?.length > 0) wallPiers(layout).forEach((p, i) => wallPierList.push({ e: elementIds.length - 1, corners, u0: p.start / layout.length, u1: p.end / layout.length, width: p.width, pier: i + 1 }))
     }
     segmentCount += mine.length * segmentsFor(kind)
   }

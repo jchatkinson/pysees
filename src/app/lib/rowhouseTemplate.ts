@@ -185,6 +185,15 @@ export function rowhouseTemplate(): RowhouseTemplate {
   }
   const joist = lumberMember('o86-spf', '2x12', 2)
   for (const j of joists) frame(j, joist)
+  // A 2x12 rim across the cantilever tips under each wall that stands on them, with nodes at most 400 apart, so the wall bears along
+  // the rim (which spreads its studs' load to the cantilevers by bending) rather than only at the tips.
+  const rim = lumberMember('o86-spf', '2x12', 1)
+  for (const w of S2) {
+    const tips = [...new Set(joists.map((j) => along(w, j[0])).filter((x): x is number => x !== null).map(Math.round))].sort((p, q) => p - q)
+    if (tips.length < 2) continue
+    const xs = tips.flatMap((x, i) => { if (i === 0) return [x]; const n = Math.ceil((x - tips[i - 1]) / 400); return Array.from({ length: n }, (_, k) => Math.round(tips[i - 1] + (x - tips[i - 1]) * (k + 1) / n)) })
+    frame(xs.map((x) => at(w, x)), rim)
+  }
 
   // Second floor walls: pier ends held down to the wall below or to a cantilevered joist.
   for (const w of S2) drawStudWall(b, w.a, w.b, FLOOR, ROOF, WALL, `S2 ${w.name}`, { openings: w.openings })

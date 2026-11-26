@@ -465,7 +465,9 @@ describe('drawing walls with a hold-down recipe', () => {
     expect(top(lower)).toBeDefined()
     const history = { commands: [{ type: 'ANALYSIS_BLOCK' as const, blockId: 'whole-model-recorder', params: { directory: 'out' } }, { type: 'ANALYSIS_BLOCK' as const, blockId: 'run-gravity-analysis', params: { patterns: [p], steps: 1, holdLoads: 'Yes', algorithm: 'Newton', tol: 1e-9, maxIter: 50 } }], cursor: 1 }
     const run = runCarapace(model, history)
-    expect(run.compile.diagnostics.filter((d) => d.severity !== 'info')).toEqual([])
+    // A single line of walls: nothing holds it out of plane (Y), which is reported, and the run still solves (the ties make no mechanism).
+    const warnings = run.compile.diagnostics.filter((d) => d.severity !== 'info')
+    expect(warnings.map((d) => d.message.replace(/nodes? [\d, ]+ /, 'N '))).toEqual([lower, upper].map((id) => expect.stringMatching(new RegExp(`^Stud wall ${id}: nothing holds N along Y`))))
     expect(run.error).toBeFalsy()
     const row = run.compile.input!.studWalls![1]
     // The upper wall stands on every top node of the lower one.

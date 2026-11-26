@@ -37,8 +37,8 @@ grids don't sit on the walls, so they are fitted to the wall centrelines instead
 - Second floor framing (S102), as `ElasticBeamColumn` members at the floor plus joist floors:
   - (5) 2x12 D.Fir beam at y = 3140 from the west wall to the interior wall; (3) 2x12 header at y = 2440 across the stair void's south end
     (interior wall to party wall). Split where joists land.
-  - Under each second-floor pier end with no wall below: a (2) 2x12 SPF cantilever, tip → south wall → beam. The wall above is held down to
-    its tip node.
+  - Under each second-floor pier end with no wall below: a (2) 2x12 SPF cantilever, tip → south wall → beam, and a 2x12 SPF rim across the
+    tips under each south wall (nodes at most 400 mm apart). The wall above bears on the rim and is held down at its pier ends.
   - Joist zones (2x12 SPF @ 400, continuous): the cantilever zone (N–S, from the overhang edge over the south wall to the beam and header),
     west of the interior wall (E–W, west wall to interior wall), and north of the stair void (E–W, interior wall to party wall). The stair
     void (to y = 5970) has no floor.
@@ -61,8 +61,9 @@ reactions equal the gravity loads (to 1e-6) and the earthquake force.
    north/south walls needs two-sided sheathing in the wall law.
 2. **Roof.** The vaulted trusses are a flat joist roof at the plate; no gable end walls, no roof slope or overhangs.
 3. **Self-weight.** No wall dead load.
-4. **Cantilever load path.** The floor's own load on the cantilever goes to the south wall and beams by strip statics; the walls on the
-   cantilever load only the (2) 2x12 joists under their pier ends (no load sharing with the neighbouring joists, no blocking).
+4. **Cantilever load path.** The walls on the cantilever bear on a 2x12 rim across the (2) 2x12 joist tips under their pier ends, which
+   spreads their studs' load to those tips by bending; the 400 mm joists between them are not modelled (no load sharing with them). The
+   floor's strip statics treat the rim as a bearing at the overhang's edge, which hands that strip load to the tips at the same place.
 5. **Stair void edges.** The L1 header at the void's north end and the trimmers along it carry nothing (the joists beside them run parallel).
 6. **OpenSees export.** The script is written (walls as elastic shells, floors as nodal loads, with warnings), but its analysis is singular
    in OpenSees: the stud-wall shell approximation (`studWallExport.ts`) has never been run end to end.

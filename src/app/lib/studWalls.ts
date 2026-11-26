@@ -160,7 +160,7 @@ type V3 = [number, number, number]
 const xyz = (c: number[]): V3 => [c[0] ?? 0, c[1] ?? 0, c[2] ?? 0]
 
 /** A wall's frame from its corner nodes: origin c0, unit x (c0→c1), unit y (c0→c3), length and top height (to the exterior top row). */
-export function studWallFrame(model: Model, e: ElementEntity): { o: V3; ex: V3; ey: V3; L: number; H: number } | null {
+export function studWallFrame(model: Pick<Model, 'nodes'>, e: ElementEntity): { o: V3; ex: V3; ey: V3; L: number; H: number } | null {
   const c = e.nodes.slice(0, 4).map((id) => model.nodes.get(id)?.coords)
   if (c.length < 4 || c.some((p) => !p)) return null
   const [p0, p1, , p3] = c.map((p) => xyz(p!))
@@ -252,21 +252,25 @@ export function rebuildStudWall(model: Model, id: number, layout: WallLayoutSpec
  * What a bearing wall (`layout.bearing`) stands on, found from the model each time it is compiled or exported (docs: Carapace
  * `docs/stud-wall-bearing.md`): the nodes on its bottom line (plan offset and elevation within tolerance, any x) that are supports
  * (a fix restraining the vertical), the top row of another stud wall (corners and top stations) or a node of a beam-column or truss. It keeps
- * those within the wall and the nearest one beyond each end. `error` when an end has nothing at or beyond it; `gaps` lists spans between
+ * those within the wall and the nearest one beyond each end; where several meet at one point it keeps only those of walls in its own
+ * plane when there are any (walls are designed as independent planes, so a corner doesn't bear on the perpendicular wall). `error` when an end has nothing at or beyond it; `gaps` lists spans between
  * consecutive base positions longer than three stud spaces with a stud or jack inside, unless both ends are supports (the bearing treats
- * the sandwich as rigid across them).
+ * the sandwich as rigid across them). The viewport also draws a bearing wall's bottom through these nodes (fixes left out).
  */
-export function wallBaseNodes(model: Model, e: ElementEntity): { nodes: { x: number; node: number }[]; error?: string; gaps: [number, number][] } {
+export function wallBaseNodes(model: Pick<Model, 'nodes' | 'elements' | 'fixes'>, e: ElementEntity): { nodes: { x: number; node: number }[]; error?: string; gaps: [number, number][] } {
   const f = studWallFrame(model, e)
   const a = studWallArgs(e.args)
   if (!f || !a.layout) return { nodes: [], error: 'has missing corner nodes', gaps: [] }
   const tol = 1e-6 * Math.max(1, f.L, f.H)
   const own = new Set(e.nodes)
-  const candidates = new Set<number>(), fixed = new Set<number>()
+  const candidates = new Set<number>(), fixed = new Set<number>(), inPlane = new Set<number>()
   for (const [id, fix] of model.fixes) if (fix.dofs.includes(3)) { candidates.add(id); fixed.add(id) }
   for (const w of model.elements.values()) {
     if (w.id === e.id) continue
-    if (isStudWall(w.eleType)) { const wa = studWallArgs(w.args); [w.nodes[2], w.nodes[3], ...wa.stations.flatMap((s, i) => (s.chord === 'top' ? [w.nodes[4 + i]] : []))].forEach((n) => candidates.add(n)) }
+    if (isStudWall(w.eleType)) {
+      const wa = studWallArgs(w.args), wf = studWallFrame(model, w), same = !!wf && Math.abs(wf.ex[0] * f.ex[0] + wf.ex[1] * f.ex[1] + wf.ex[2] * f.ex[2]) > 1 - 1e-9
+      ;[w.nodes[2], w.nodes[3], ...wa.stations.flatMap((s, i) => (s.chord === 'top' ? [w.nodes[4 + i]] : []))].forEach((n) => { candidates.add(n); if (same) inPlane.add(n) })
+    }
     else if (/BeamColumn$/i.test(w.eleType) || /^truss$/i.test(w.eleType)) w.nodes.forEach((n) => candidates.add(n))
   }
   const on: { x: number; node: number }[] = []
@@ -279,6 +283,9 @@ export function wallBaseNodes(model: Model, e: ElementEntity): { nodes: { x: num
     if (Math.abs(y) <= tol && off <= tol) on.push({ x: Math.abs(x) <= tol ? 0 : Math.abs(x - f.L) <= tol ? f.L : x, node: id })
   }
   on.sort((p, q) => p.x - q.x || p.node - q.node)
+  // Walls are designed as independent planes: where several nodes meet at one point (two walls' corners, a beam on a corner), a wall
+  // bears only on the wall below in its own plane when there is one there, not on a perpendicular wall's corner.
+  for (let i = on.length - 1; i >= 0; i--) if (!inPlane.has(on[i].node) && on.some((q) => q !== on[i] && Math.abs(q.x - on[i].x) <= tol && inPlane.has(q.node))) on.splice(i, 1)
   const inside = on.filter((p) => p.x >= -tol && p.x <= f.L + tol)
   const before = on.filter((p) => p.x < -tol), after = on.filter((p) => p.x > f.L + tol)
   const nodes = [...(inside.some((p) => p.x <= tol) || !before.length ? [] : before.filter((p) => p.x === before[before.length - 1].x)), ...inside, ...(inside.some((p) => p.x >= f.L - tol) || !after.length ? [] : after.filter((p) => p.x === after[0].x))]

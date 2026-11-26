@@ -1,6 +1,6 @@
 import type { RunLayout } from '@/app/lib/resultsStorage/stepFrames'
 import type { DiagramLabel, DiagramResult } from './displayBuffers'
-import type { SceneIndex } from './sceneIndex'
+import { wallPoint, type SceneIndex, type WallChords } from './sceneIndex'
 import { readWallMembers, type WallMemberForce } from '@/app/lib/studBuilding'
 
 /** In 2D `shear` and `moment` are V and M in the plane; in 3D they are Vy and Mz (bending in the local x–y plane), with `shearZ`/`momentY` the x–z plane and `torsion` T. */
@@ -142,13 +142,12 @@ export function fillDiagram(index: SceneIndex, layout: RunLayout, row: Float64Ar
 
   // Stud walls, in their own plane (offset along the wall). A bar at fraction u of the wall's length between heights v0 and v1 (fractions of
   // its corner height), from its bottom to its top value; `inward` draws |value| on `side` whatever the sign (the colour carries it).
-  const wallBar = (corners: number[], u: number, v0: number, v1: number, bottomValue: number, topValue: number, side: 1 | -1, inward: boolean, label: 'both' | 'bottom' | 'none') => {
+  const wallBar = (w: WallChords, u: number, v0: number, v1: number, bottomValue: number, topValue: number, side: 1 | -1, inward: boolean, label: 'both' | 'bottom' | 'none') => {
     if (!Number.isFinite(bottomValue) || !Number.isFinite(topValue) || fv + 36 > out.fill.length || lv + 18 > out.lines.length) return
-    const [r0, r1, r2, r3] = corners.map((r) => r * 3)
+    const [r0, r1] = [w.bottom[0].r * 3, w.bottom[w.bottom.length - 1].r * 3]
     const len = Math.hypot(c[r1] - c[r0], c[r1 + 1] - c[r0 + 1], c[r1 + 2] - c[r0 + 2]) || 1
     const ex = [0, 1, 2].map((i) => (c[r1 + i] - c[r0 + i]) / len)
-    const at = (v: number) => [0, 1, 2].map((i) => (1 - v) * (c[r0 + i] + u * (c[r1 + i] - c[r0 + i])) + v * (c[r3 + i] + u * (c[r2 + i] - c[r3 + i])))
-    const bottom = at(v0), top = at(v1)
+    const bottom = wallPoint(c, w, u, v0) as number[], top = wallPoint(c, w, u, v1) as number[]
     const off = (p: number[], v: number) => p.map((x, i) => x + ex[i] * side * (inward ? Math.abs(v) : v) * scale)
     const ob = off(bottom, bottomValue), ot = off(top, topValue)
     const rgb = (v: number) => (v >= 0 ? POSITIVE_RGB : NEGATIVE_RGB)
@@ -182,7 +181,7 @@ export function fillDiagram(index: SceneIndex, layout: RunLayout, row: Float64Ar
       for (const m of members) {
         const h = head(m)
         const [v0, v1] = m.kind === 'stud' || h === undefined ? [0, w.framing] : m.kind === 'jack' ? [0, h / w.height] : [h / w.height, w.framing]
-        wallBar(w.corners, m.x / w.length, v0, v1, m.bottom, m.top, 1, false, m === hi || m === lo ? 'bottom' : 'none')
+        wallBar(w.chords, m.x / w.length, v0, v1, m.bottom, m.top, 1, false, m === hi || m === lo ? 'bottom' : 'none')
       }
     }
   } else if (kind === 'axial' || kind === 'shear' || kind === 'moment') for (const w of index.wallPiers) {
@@ -193,13 +192,13 @@ export function fillDiagram(index: SceneIndex, layout: RunLayout, row: Float64Ar
     const get = (q: string) => { const k = entry.labels.indexOf(`p${w.pier}.${q}`); return k < 0 ? NaN : row[entry.offset + k] }
     const mid = (w.u0 + w.u1) / 2
     if (kind === 'axial') {
-      wallBar(w.corners, w.u0, 0, 1, get('chordLeft'), get('chordLeft'), 1, true, 'both')
-      wallBar(w.corners, w.u1, 0, 1, get('chordRight'), get('chordRight'), -1, true, 'both')
+      wallBar(w.chords, w.u0, 0, 1, get('chordLeft'), get('chordLeft'), 1, true, 'both')
+      wallBar(w.chords, w.u1, 0, 1, get('chordRight'), get('chordRight'), -1, true, 'both')
     } else if (kind === 'shear') {
       const v = get('q') * w.width
-      wallBar(w.corners, mid, 0, 1, v, v, 1, false, 'both')
+      wallBar(w.chords, mid, 0, 1, v, v, 1, false, 'both')
     } else {
-      wallBar(w.corners, mid, 0, 1, get('momentBase'), get('momentTop'), 1, false, 'both')
+      wallBar(w.chords, mid, 0, 1, get('momentBase'), get('momentTop'), 1, false, 'both')
     }
   }
 
