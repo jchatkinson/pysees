@@ -14,3 +14,9 @@ install -m 0644 "$package_dir/carapace_wasm.js" "$output_dir/carapace_wasm.js"
 install -m 0644 "$package_dir/carapace_wasm.d.ts" "$output_dir/carapace_wasm.d.ts"
 install -m 0644 "$package_dir/carapace_wasm_bg.wasm" "$output_dir/carapace_wasm_bg.wasm"
 install -m 0644 "$package_dir/carapace_wasm_bg.wasm.d.ts" "$output_dir/carapace_wasm_bg.wasm.d.ts"
+
+# Which Carapace the bundled wasm was built from (read by the verification page generator and its freshness test).
+commit="$(git -C "$carapace_root" rev-parse HEAD)"
+dirty="$(git -C "$carapace_root" status --porcelain --untracked-files=no | grep -q . && echo true || echo false)"
+sha="$(sha256sum "$output_dir/carapace_wasm_bg.wasm" | cut -d' ' -f1)"
+printf '{ "commit": "%s", "dirty": %s, "wasmSha256": "%s" }\n' "$commit" "$dirty" "$sha" > "$output_dir/build-info.json"

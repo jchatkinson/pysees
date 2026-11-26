@@ -82,15 +82,23 @@ export function blockPatternTags(params: Record<string, unknown>): number[] {
  */
 const LOCAL_FORCE_ELEMENTS = new Set(['ElasticBeamColumn', 'DispBeamColumn'])
 
-/** The element-force recorders a model needs: one OpenSees response per file, since a recorder takes a single response type. */
+/** The element-force recorders a model needs: one OpenSees response per file, since a recorder takes a single response type. Global
+ * forces and shell resultants differ in width between shell types (a 4-node shell reports 24 forces, a triangle 18), so a group that mixes
+ * them gets one file per shell type (`eleForce-ShellDKGT.out`, other elements in `eleForce-members.out`) and every row of a file has the
+ * same width per element. */
 export function elementForceRecorders(model: Model): { response: 'force' | 'localForce' | 'stresses'; file: string; eleTags: number[] }[] {
-  const tags = (local: boolean) => [...model.elements.values()].filter((e) => LOCAL_FORCE_ELEMENTS.has(e.eleType) === local).map((e) => e.id).sort((a, b) => a - b)
-  // A shell's stress resultants at its Gauss points: the contour view's data, and what the `shell` results columns hold.
-  const shells = [...model.elements.values()].filter((e) => isShell(e.eleType)).map((e) => e.id).sort((a, b) => a - b)
+  const elements = [...model.elements.values()].sort((a, b) => a.id - b.id)
+  const key = (e: (typeof elements)[number]) => (isShell(e.eleType) ? e.eleType : 'members')
+  const split = (response: 'force' | 'stresses', file: string, group: typeof elements) => {
+    const keys = [...new Set(group.map(key))]
+    return keys.length <= 1 ? [{ response, file: `${file}.out`, eleTags: group.map((e) => e.id) }]
+      : keys.map((k) => ({ response, file: `${file}-${k}.out`, eleTags: group.filter((e) => key(e) === k).map((e) => e.id) }))
+  }
   return [
-    { response: 'localForce' as const, file: 'eleLocalForce.out', eleTags: tags(true) },
-    { response: 'force' as const, file: 'eleForce.out', eleTags: tags(false) },
-    { response: 'stresses' as const, file: 'eleShellStress.out', eleTags: shells },
+    { response: 'localForce' as const, file: 'eleLocalForce.out', eleTags: elements.filter((e) => LOCAL_FORCE_ELEMENTS.has(e.eleType)).map((e) => e.id) },
+    ...split('force', 'eleForce', elements.filter((e) => !LOCAL_FORCE_ELEMENTS.has(e.eleType))),
+    // A shell's stress resultants at its Gauss points: the contour view's data, and what the `shell` results columns hold.
+    ...split('stresses', 'eleShellStress', elements.filter((e) => isShell(e.eleType))),
   ].filter((g) => g.eleTags.length > 0)
 }
 

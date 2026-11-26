@@ -21,7 +21,7 @@ export interface TemplateResult {
 }
 
 // Bundled copies of public/LOS000.AT2 and LOS270.AT2 keep templates synchronous and self-contained.
-const FRAME_GROUND_MOTION = parseGroundMotion(los000Text)
+export const FRAME_GROUND_MOTION = parseGroundMotion(los000Text)
 const FRAME_GROUND_MOTION_Y = parseGroundMotion(los270Text)
 const PUSHOVER_STEPS = 100
 

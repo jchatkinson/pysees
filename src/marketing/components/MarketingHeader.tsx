@@ -8,7 +8,7 @@ interface MarketingHeaderProps {
   currentPath: string
 }
 
-const NAV = [['Features', '/#features'], ['Change Log', '/#changelog'], ['Docs', '/docs'], ['Solver', '/carapace'], ['About', '/about'], ['Contact', '/contact']] as const
+const NAV = [['Features', '/#features'], ['Change Log', '/#changelog'], ['Docs', '/docs'], ['Solver', '/carapace'], ['Verification', '/verification'], ['About', '/about'], ['Contact', '/contact']] as const
 
 function navItem(label: string, href: string, currentPath: string, className = '', onClick?: () => void) {
   const active = href === currentPath || (href !== '/' && !href.includes('#') && currentPath.startsWith(href + '/'))

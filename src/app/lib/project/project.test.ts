@@ -217,3 +217,11 @@ describe.skipIf(!opensesAvailable)('saved scripts run in real OpenSeesPy', () =>
     expect(emptyAnalysisHistory().cursor).toBe(-1)
   })
 })
+
+describe('opening a project from the address', () => {
+  it('accepts only same-origin script paths', async () => {
+    const { openPath } = await import('@/app/lib/project/open')
+    expect(openPath('?open=/verification/plate.pysees.py')).toBe('/verification/plate.pysees.py')
+    for (const bad of ['?open=https://evil.example/x.py', '?open=//evil.example/x.py', '?open=/a/../b.py', '?open=/notes.txt', '?open=javascript:alert(1)', '']) expect(openPath(bad), bad).toBeNull()
+  })
+})

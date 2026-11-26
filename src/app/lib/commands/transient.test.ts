@@ -112,7 +112,7 @@ describe('transient pipeline', () => {
       expect(dynamicComparison.compared[q], `${q}: ${JSON.stringify(dynamicComparison)}`).toBeGreaterThan(0)
       expect(dynamicComparison.maxRel[q], q).toBeLessThan(1e-5)
     }
-  })
+  }, 60_000)
 
   it('retains zero scale factors and refuses unsupported or invalid earthquake inputs', () => {
     const { model, history } = fixture(2, 0)

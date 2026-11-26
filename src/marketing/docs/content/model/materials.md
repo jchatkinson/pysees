@@ -19,14 +19,14 @@ Carapace, the in-browser solver, has its own implementations of the materials be
 | **Steel01** | Bilinear steel with kinematic hardening `b` and optional isotropic hardening (`a1`–`a4`). | Reinforcing and structural steel fibers | Yes |
 | **Steel02** | Menegotto–Pinto steel with a smooth elastic-to-plastic transition (`R0`, `cR1`, `cR2`), hardening `b` and optional isotropic hardening. | Steel fibers where the Bauschinger effect matters | Yes |
 | **Concrete01** | Kent–Scott–Park compression envelope with degrading unloading and no tension. Parameters: `fpc`, `epsc0`, `fpcu`, `epsU`. | Concrete fibers (compression only) | Yes |
-| **Concrete02** | Concrete01 plus linear tension softening. Adds tensile strength `ft` and softening slope `ets`. | Concrete fibers where cracking and tension stiffening matter | Not yet |
-| **Hysteretic** | Tri-linear backbone, different in each direction, with pinching and stiffness and strength degradation. Parameters: three (force, deformation) points per side, `pinchX`, `pinchY`, two damage factors and `beta`. | Moment–rotation and force–deformation springs | Not yet |
-| **Pinching4** | Four-point backbone per side with pinching and independent unloading-stiffness, reloading-stiffness and strength damage rules (energy- or cycle-based). | Detailed degrading springs, such as timber and masonry connections | Not yet |
+| **Concrete02** | Concrete01 plus linear tension softening. Adds tensile strength `ft` and softening slope `ets`. | Concrete fibers where cracking and tension stiffening matter | Yes |
+| **Hysteretic** | Tri-linear backbone, different in each direction, with pinching and stiffness and strength degradation. Parameters: three (force, deformation) points per side, `pinchX`, `pinchY`, two damage factors and `beta`. | Moment–rotation and force–deformation springs | Yes |
+| **Pinching4** | Four-point backbone per side with pinching and independent unloading-stiffness, reloading-stiffness and strength damage rules (energy- or cycle-based). | Detailed degrading springs, such as timber and masonry connections | Yes |
 | **Gap** | One-sided gap: stiff after the gap closes. Parameters: `E`, `gap`. | Contact and pounding springs | Not yet |
-| **Parallel**, **Series**, **MinMax** | Combine other materials: share strain, share stress, or fail outside a strain range. | Composite behaviour, fracture limits | Not yet |
+| **Parallel**, **Series**, **MinMax** | Combine other materials: share strain, share stress, or fail outside a strain range. | Composite behaviour, fracture limits | Yes |
 
 > [!NOTE]
-> "Not yet" means the solver implements the material but the PySees compiler does not pass it on, so a run stops with *Material N (type) is not yet supported by the Carapace compiler*. The material can still be created and exported to OpenSees, but the material preview does not support it either. Everything else in the OpenSees list, including nD materials, also stops a Carapace run.
+> "Not yet" (Gap) means the solver implements the material but the PySees compiler does not pass it on, so a run stops with *Material N (type) is not yet supported by the Carapace compiler*. The material can still be created and exported to OpenSees. Everything else in the OpenSees list, including nD materials, also stops a Carapace run. Each material marked "Yes" is driven through cycles and compared with OpenSees on the [verification page](/verification).
 
 Some optional arguments are not passed to Carapace: `epsyN` and `eps0` on ElasticPP (the yield strain is the same in both directions), and an initial stress on Steel02.
 

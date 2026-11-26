@@ -19,6 +19,8 @@ export interface CarapaceRun {
   columns: number[][]
   /** Pseudo-time of each step. */
   times: number[]
+  /** The wire stage (`compile.input.sequence.stages` index) each step belongs to. */
+  stageOfStep: number[]
   /** Each stage's initial-conditions row (recorded before its first step), by wire stage index: not part of `columns`, which — like OpenSees' recorders — hold only the steps. */
   initial: Map<number, number[]>
   error: unknown
@@ -34,6 +36,7 @@ export function runCarapace(model: Model, history: AnalysisHistory): CarapaceRun
   const session = loadCarapace().decodeInput(compile.input as never)
   const columns: number[][] = Array.from({ length: width }, () => [])
   const times: number[] = []
+  const stageOfStep: number[] = []
   const initial = new Map<number, number[]>()
   let error: unknown = null
   for (;;) {
@@ -43,13 +46,13 @@ export function runCarapace(model: Model, history: AnalysisHistory): CarapaceRun
       const row = rows!.data.subarray(f * stride, (f + 1) * stride)
       // The first row a stage produces is its initial condition (the run records them).
       if (!initial.has(rows!.stageIndex)) { initial.set(rows!.stageIndex, [...row.subarray(1)]); continue }
-      times.push(row[0])
+      times.push(row[0]); stageOfStep.push(rows!.stageIndex)
       for (let c = 0; c < width; c++) columns[c].push(row[1 + c])
     }
     if (o.error) { error = o.error; break }
     if (o.done) break
   }
-  return { compile, columns, times, initial, error }
+  return { compile, columns, times, stageOfStep, initial, error }
 }
 
 /** Compiles and runs a model + analysis history exactly as the app does, then returns every finished modal stage's results. */

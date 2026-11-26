@@ -9,9 +9,9 @@ export function modelFromWrites(ndm: 2 | 3, ndf: number, writes: ModelWrite[]): 
 }
 
 /** `skip` names the quantities the OpenSees comparison leaves out, where the engines legitimately report different things. */
-export interface Fixture { name: string; model: Model; history: AnalysisHistory; skip?: ('force')[] }
+export interface Fixture { name: string; model: Model; history: AnalysisHistory; skip?: ('force')[]; gridlines?: TemplateResult['gridlines']; levels?: TemplateResult['levels'] }
 
-const fromTemplate = (name: string, t: TemplateResult): Fixture => ({ name, model: modelFromWrites(t.ndm, t.ndf, t.writes), history: { commands: t.analysisCommands, cursor: t.analysisCommands.length - 1 } })
+export const fromTemplate = (name: string, t: TemplateResult): Fixture => ({ name, model: modelFromWrites(t.ndm, t.ndf, t.writes), history: { commands: t.analysisCommands, cursor: t.analysisCommands.length - 1 }, gridlines: t.gridlines, levels: t.levels })
 
 /** The same fixture with every solver stage's convergence tolerance set to `tol`. */
 const withTolerance = (f: Fixture, tol: number): Fixture => ({ ...f, history: { ...f.history, commands: f.history.commands.map((c) => (c.type === 'ANALYSIS_BLOCK' && (c.blockId === 'run-gravity-analysis' || c.blockId === 'run-pushover-analysis') ? { ...c, params: { ...c.params, tol, maxIter: 100 } } : c)) } })
@@ -184,7 +184,7 @@ export function trussFixtures(): Fixture[] {
 }
 
 /** Two distorted ShellMITC4 quads on the tilted plane z = 0.3x + 0.1y, clamped at nodes 1 and 4, loaded at nodes 5 and 6; `selfWeight` and `pressure` add shell loads on top.
- * With `triangle`, a ShellDKGT hangs off node 6 (valid in OpenSees; Carapace does not support it yet). */
+ * With `triangle`, a ShellDKGT hangs off node 6. */
 function shellWrites({ selfWeight = false, pressure = false, triangle = false } = {}): ModelWrite[] {
   const xy = [[0, 0], [2, 0.2], [2.3, 1.7], [-0.1, 1.4], [4.2, 0.1], [4.5, 1.6], [6, 0.9]]
   // The triangle takes the loads only with a pressure (self-weight on a ShellDKGT is exported as nodal loads, so it cannot be read back).

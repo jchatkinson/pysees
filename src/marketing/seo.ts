@@ -1,4 +1,5 @@
 import { FLAT, categoryTitle, findPage } from '@/marketing/docs/content'
+import { CASE_PAGES, INDEX, findCase } from '@/marketing/verification/content'
 
 export const SITE = 'https://pysees.app'
 export const OG_IMAGE = `${SITE}/docs/interface-tour.png`
@@ -6,7 +7,7 @@ const NAME = 'PySees'
 const TAGLINE = 'Browser-based structural modeling, analysis and results'
 const DESC = 'Model 2D and 3D frames, trusses and shells, run static, eigen and transient analyses in your browser on the Carapace solver, review results, and export a valid OpenSeesPy script.'
 
-export interface Meta { title: string; description: string; path: string; robots?: string; ogType?: 'website' | 'article'; jsonLd?: object[] }
+export interface Meta { title: string; description: string; path: string; robots?: string; ogType?: 'website' | 'article'; jsonLd?: object[]; image?: string }
 
 const STATIC: Record<string, Omit<Meta, 'path'>> = {
   '/': {
@@ -16,6 +17,7 @@ const STATIC: Record<string, Omit<Meta, 'path'>> = {
       { '@context': 'https://schema.org', '@type': 'SoftwareApplication', name: NAME, url: SITE, applicationCategory: 'EngineeringApplication', operatingSystem: 'Any (web browser)', description: DESC, offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' } },
     ],
   },
+  '/verification': { title: `Verification against OpenSees – ${NAME}`, description: `${INDEX.cases.length} structural problems solved by Carapace in the browser and by OpenSees from the exported script, compared value by value at every step.` },
   '/carapace': { title: `Carapace solver – ${NAME}`, description: 'Carapace is the Rust finite-element engine, compiled to WebAssembly, that runs PySees analyses in your browser and is validated against OpenSees.' },
   '/about': { title: `About – ${NAME}`, description: 'The mission and values behind PySees, a free browser-based GUI for building, running and reviewing OpenSees structural models.' },
   '/contact': { title: `Contact – ${NAME}`, description: 'Get in touch about PySees: questions, bug reports and feature requests.' },
@@ -41,11 +43,14 @@ export function metaFor(pathname: string): Meta {
       ],
     }
   }
+  const v = /^\/verification\/([^/]+)$/.exec(path)
+  const c = v && findCase(v[1])
+  if (c) return { path, ogType: 'article', title: `${c.title} – ${NAME} Verification`, description: c.description, image: `${SITE}/verification/${c.id}-result.webp` }
   return { ...NOT_FOUND, path }
 }
 
 /** Every URL that is prerendered; `/studio` is prerendered (own meta) but not in the sitemap. */
-export const PRERENDER_PATHS = ['/', '/about', '/carapace', '/contact', '/terms', '/studio', ...FLAT.map(p => p.path)]
+export const PRERENDER_PATHS = ['/', '/about', '/carapace', '/verification', '/contact', '/terms', '/studio', ...FLAT.map(p => p.path), ...CASE_PAGES.map(c => c.path)]
 export const SITEMAP_PATHS = PRERENDER_PATHS.filter(p => !STATIC[p]?.robots)
 
 const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;')
@@ -60,8 +65,8 @@ export function headTags(m: Meta): string {
     m.robots ? `<meta name="robots" content="${m.robots}">` : '',
     m.path === '/404' ? '' : `<link rel="canonical" href="${url}">`,
     `<meta property="og:site_name" content="${NAME}">`, `<meta property="og:type" content="${m.ogType ?? 'website'}">`,
-    `<meta property="og:title" content="${esc(m.title)}">`, `<meta property="og:description" content="${esc(m.description)}">`, `<meta property="og:url" content="${url}">`, `<meta property="og:image" content="${OG_IMAGE}">`,
-    `<meta name="twitter:card" content="summary_large_image">`, `<meta name="twitter:title" content="${esc(m.title)}">`, `<meta name="twitter:description" content="${esc(m.description)}">`, `<meta name="twitter:image" content="${OG_IMAGE}">`,
+    `<meta property="og:title" content="${esc(m.title)}">`, `<meta property="og:description" content="${esc(m.description)}">`, `<meta property="og:url" content="${url}">`, `<meta property="og:image" content="${m.image ?? OG_IMAGE}">`,
+    `<meta name="twitter:card" content="summary_large_image">`, `<meta name="twitter:title" content="${esc(m.title)}">`, `<meta name="twitter:description" content="${esc(m.description)}">`, `<meta name="twitter:image" content="${m.image ?? OG_IMAGE}">`,
   ]
   return t.filter(Boolean).join('\n  ') + (m.jsonLd ? '\n  ' + ld(m.jsonLd) : '')
 }
@@ -81,6 +86,7 @@ export function applyMeta(m: Meta) {
   set('link[rel="canonical"]', () => Object.assign(document.createElement('link'), { rel: 'canonical' }), 'href', m.path === '/404' ? undefined : url)
   meta('property', 'og:type', m.ogType ?? 'website'); meta('property', 'og:title', m.title); meta('property', 'og:description', m.description); meta('property', 'og:url', url)
   meta('name', 'twitter:title', m.title); meta('name', 'twitter:description', m.description)
+  meta('property', 'og:image', m.image ?? OG_IMAGE); meta('name', 'twitter:image', m.image ?? OG_IMAGE)
   document.head.querySelectorAll('script[data-seo]').forEach(e => e.remove())
   for (const o of m.jsonLd ?? []) { const s = document.createElement('script'); s.type = 'application/ld+json'; s.dataset.seo = ''; s.textContent = JSON.stringify(o); document.head.appendChild(s) }
 }

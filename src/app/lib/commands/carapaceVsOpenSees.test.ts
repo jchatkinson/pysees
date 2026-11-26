@@ -3,35 +3,25 @@ import { exportScript } from '@/app/lib/exportScript'
 import { runCarapace } from '@/app/lib/commands/carapaceRunner'
 import { compareRuns } from '@/app/lib/commands/comparison'
 import { opensesAvailable, runOpenSees } from '@/app/lib/commands/opensesRunner'
-import { TEMPLATE_FIXTURES, cantilever3dFixtures, constraintFixtures, plateFixture, shellFixtures, towerFixture, trussFixtures } from '@/app/lib/commands/testkit'
+import { TEMPLATE_FIXTURES } from '@/app/lib/commands/testkit'
+import { CASES } from '@/app/lib/verification/cases'
+import { verifyCase } from '@/app/lib/verification/verify'
+import { RTOL } from '@/app/lib/verification/types'
 
 /**
- * The same model, run twice: in Carapace (the wasm engine the app uses) and in real OpenSees from the script the app exports. The
- * recorded displacements, support reactions and element forces must agree step by step. This is what makes "export the model and run it
- * in OpenSees" a faithful claim, and it checks Carapace's numerics against the reference implementation.
+ * Every verification case (`lib/verification/cases.ts`), run twice: in Carapace (the wasm engine the app uses) and in real OpenSees from
+ * the script the app exports. The recorded displacements, reactions, element forces and shell resultants (velocities and accelerations
+ * on transient steps; frequencies and mode shapes for modal cases) must agree step by step. The same cases, and the same measurements,
+ * are what the site's verification page shows (`VERIFY=1 npx vitest run src/app/lib/verification`).
  *
  * Tolerance is relative to the largest OpenSees value of each quantity. Observed agreement is ~1e-6; the limit leaves a few-fold margin.
  */
-const RTOL = 1e-5
-const fixtures = [...TEMPLATE_FIXTURES, ...trussFixtures(), ...cantilever3dFixtures(), ...shellFixtures(), plateFixture(), towerFixture(), ...constraintFixtures()]
-
 describe.skipIf(!opensesAvailable)('Carapace agrees with OpenSees', () => {
-  it.each(fixtures)('$name', ({ model, history, skip }) => {
-    const carapace = runCarapace(model, history)
-    expect(carapace.error).toBeNull()
-    expect(carapace.compile.diagnostics.filter((d) => d.severity === 'error')).toEqual([])
-
-    const opensees = runOpenSees(exportScript(model, history, 'py'))
-    expect(opensees.failures, opensees.stderr).toEqual([])
-
-    const cmp = compareRuns(model, carapace, opensees.files)
-    expect(cmp.steps.opensees).toBe(cmp.steps.carapace) // OpenSees completed every step, not just the first few
-    const hasShells = [...model.elements.values()].some((e) => e.eleType.startsWith('Shell'))
-    for (const q of (['disp', 'reaction', 'force', ...(hasShells ? ['shell' as const] : [])] as const).filter((q) => !(skip as string[] | undefined)?.includes(q))) {
-      expect(cmp.compared[q], `${q}: nothing was compared`).toBeGreaterThan(0)
-      expect(cmp.maxRel[q], `${q}: max |diff| ${cmp.maxAbs[q]} against scale ${cmp.scale[q]}`).toBeLessThan(RTOL)
-    }
-  })
+  it.each(CASES.map((c) => ({ ...c, name: c.id })))('$name', (c) => {
+    const { result, opensees } = verifyCase(c)
+    expect(result.problems, opensees.stderr).toEqual([])
+    expect(result.pass).toBe(true)
+  }, 60_000)
 
   it('notices when the two engines disagree (the comparison can fail)', () => {
     const { model, history } = TEMPLATE_FIXTURES[1]

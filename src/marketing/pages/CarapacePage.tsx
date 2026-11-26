@@ -35,7 +35,7 @@ export function CarapacePage() {
         <div>
           <h2 className="text-3xl font-semibold tracking-tight text-slate-900">Built to match OpenSees</h2>
           <p className="mt-4 text-lg leading-relaxed text-slate-600">
-            Carapace is a from-scratch implementation of the subset of OpenSees that gets used in practice, not a port. Element and material formulations follow their OpenSees counterparts, and the PySees test suite runs the same models through Carapace and real OpenSees, requiring displacements, reactions and element forces to agree step by step.
+            Carapace is a from-scratch implementation of the subset of OpenSees that gets used in practice, not a port. Element and material formulations follow their OpenSees counterparts, and the PySees test suite runs the same models through Carapace and real OpenSees, requiring displacements, reactions and element forces to agree step by step. The <Link className="underline" to="/verification">verification page</Link> shows every one of those comparisons.
           </p>
           <p className="mt-4 text-lg leading-relaxed text-slate-600">
             Anything PySees can run, you can also export as an OpenSeesPy script and run in OpenSees. Carapace is meant for fast iteration in the browser, not to replace OpenSees for the full range of models it supports.

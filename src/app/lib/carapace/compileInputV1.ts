@@ -271,6 +271,7 @@ export function compileInputV1(model: Model, analysisHistory: AnalysisHistory): 
       elasticBeamColumns.e.push(Number(ele.args.E) || 0)
       elasticBeamColumns.a.push(Number(ele.args.A) || 0)
       elasticBeamColumns.iz.push(Number(ele.args.Iz) || 0)
+      warnJointOffsets(model, transfTag, `ElasticBeamColumn ${ele.id}`, diagnostics)
       elasticBeamColumns.transform.push(compileTransform(transfType, `ElasticBeamColumn ${ele.id}`, diagnostics))
       elasticBeamColumns.density.push(0)
       elementRefs.set(ele.id, { kind: 'elasticBeamColumn2d', index: elasticBeamColumns.nodeI.length - 1 })
@@ -286,7 +287,10 @@ export function compileInputV1(model: Model, analysisHistory: AnalysisHistory): 
       dispBeamColumns.nodeJ.push(resolveNode(ele.nodes[1], `DispBeamColumn ${ele.id}`))
       dispBeamColumns.fiberSection.push(secIdx)
       dispBeamColumns.integration.push(compileIntegration(integration, `DispBeamColumn ${ele.id}`, diagnostics))
-      dispBeamColumns.corotational.push(false)
+      warnJointOffsets(model, Number(ele.args.transfTag), `DispBeamColumn ${ele.id}`, diagnostics)
+      const fiberTransf = model.geomTransfs.get(Number(ele.args.transfTag))?.transfType
+      if (fiberTransf === 'PDelta') diagnostics.push({ severity: 'warning', message: `DispBeamColumn ${ele.id}: Carapace's 2D fiber beam-column supports Linear and Corotational geometry; PDelta was treated as Linear`, commandIndex: -1 })
+      dispBeamColumns.corotational.push(fiberTransf === 'Corotational')
       dispBeamColumns.density.push(0)
       elementRefs.set(ele.id, { kind: 'dispBeamColumn2d', index: dispBeamColumns.nodeI.length - 1 })
     } else if (ele.eleType === 'zeroLength') {
@@ -421,6 +425,7 @@ export function compileInputV1(model: Model, analysisHistory: AnalysisHistory): 
     const pattern = model.patterns.get(id)!
     const pIdx = patternIndex.get(id)!
     for (const child of pattern.children) {
+      if (child.kind === 'sp') diagnostics.push({ severity: 'warning', message: `Pattern ${id}: imposed displacements (sp) are not supported by Carapace and were skipped`, commandIndex: -1 })
       if (child.kind !== 'load') continue
       const a = child.args as { nodeTag: number; values: number[] }
       const nIdx = resolveNode(a.nodeTag, `Load in pattern ${id}`)
@@ -1091,6 +1096,12 @@ function compileTransform3(model: Model, transfTag: number, context: string, dia
   }
 }
 
+/** Carapace has no rigid end offsets: a transformation's `-jntOffset` is ignored, with a warning. */
+function warnJointOffsets(model: Model, transfTag: number, context: string, diagnostics: CompileDiagnostic[]) {
+  const transf = model.geomTransfs.get(transfTag)
+  if (transf && (transf.args.dI || transf.args.dJ)) diagnostics.push({ severity: 'warning', message: `${context}: geomTransf ${transfTag} joint offsets (-jntOffset) are not supported by Carapace and were ignored`, commandIndex: -1 })
+}
+
 function compileTransform(transfType: string | undefined, context: string, diagnostics: CompileDiagnostic[]): W.TransformSpec {
   switch (transfType) {
     case 'PDelta': return 'pDelta'
@@ -1118,7 +1129,8 @@ function compileTimeSeries(ts: { tsType: string; args: Record<string, unknown> }
 function compileAlgorithm(kind: AlgorithmKind): W.AlgorithmSpec {
   switch (kind) {
     case 'linear': return { kind: 'linear' }
-    case 'modified-newton': return { kind: 'newton', tangent: 'initial' }
+    // OpenSees' ModifiedNewton (without -initial) forms the tangent once per step, at the state the step starts from.
+    case 'modified-newton': return { kind: 'newton', tangent: 'reuseAtStepStart' }
     case 'krylov-newton': return { kind: 'krylovNewton', tangent: 'current', maxDimension: 3 }
     case 'newton-line-search': return { kind: 'newton', lineSearch: { kind: 'regulaFalsi', tol: 0.8, maxIter: 10, maxEta: 10 } }
     default: return { kind: 'newton' }
@@ -1174,7 +1186,10 @@ function compileStage(
   const unclaimed = stageIdx === 0 && stage.integrator.kind === 'load-control'
     ? [...patternIndex.keys()].filter((tag) => !claimedStage.has(tag))
     : []
-  const heldTags = stage.holdLoads === false ? [] : (stage.holdPatternsAfter ?? [...(stage.patterns ?? []), ...unclaimed])
+  // The exported script calls `loadConst` only after a load-controlled stage that holds its loads, so a pushover holds nothing by default:
+  // a later pushover on the same reference pattern continues from the load factor this one reached, as in OpenSees.
+  const holds = stage.integrator.kind === 'displacement-control' ? stage.holdLoads === true : stage.holdLoads !== false
+  const heldTags = !holds ? [] : (stage.holdPatternsAfter ?? [...(stage.patterns ?? []), ...unclaimed])
   const holdPatternsAfter = heldTags
     .map((id) => patternIndex.get(id))
     .filter((idx): idx is number => idx !== undefined)

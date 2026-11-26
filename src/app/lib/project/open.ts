@@ -9,3 +9,9 @@ export function readScriptFile(text: string, filename = ''): ImportResult {
 
 /** Whether a read file has anything to open. */
 export const canImport = (result: ImportResult) => !!result.project || result.writes.length > 0
+
+/** A same-origin path to a script (`/verification/plate.pysees.py`), or null for anything else: no other sites, no protocols. */
+export function openPath(search: string): string | null {
+  const path = new URLSearchParams(search).get('open')
+  return path && /^\/(?!\/)[\w./-]+\.(py|tcl)$/.test(path) && !path.includes('..') ? path : null
+}

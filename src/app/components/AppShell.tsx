@@ -9,6 +9,7 @@ import { DrawOptions } from '@/app/components/DrawOptions'
 import { ResultsPanel } from '@/app/components/ResultsPanel'
 import { Viewport } from '@/app/components/Viewport'
 import { InitModal } from '@/app/components/InitModal'
+import { OpenFromUrl } from '@/app/components/OpenFromUrl'
 import { GridlinesDialog } from '@/app/components/GridlinesDialog'
 import { UnderlaysDialog } from '@/app/components/UnderlaysDialog'
 import { UnitsDialog } from '@/app/components/UnitsDialog'
@@ -76,6 +77,7 @@ export function AppShell() {
   return (
     <div className="flex flex-col h-screen overflow-hidden">
       <InitModal />
+      <OpenFromUrl />
       <GridlinesDialog />
       <UnderlaysDialog />
       <ConnectedUnitsDialog />

@@ -55,12 +55,18 @@ OpenSees is optional. Users who want to run their model in OpenSees can export i
    `npm run dev`
 3. Run lint checks:
    `npm run lint`
-   Run tests: `npm test`
+   Run tests: `npm test`. The OpenSees comparisons need the pinned OpenSeesPy in `.venv` (they skip without it):
+   `uv venv && uv pip install -r requirements-verify.txt`
 4. Rebuild the bundled Carapace wasm after engine changes (needs the sibling `../carapace` checkout and `wasm-bindgen`):
    `scripts/build-carapace.sh`
-5. Build the app:
+   The build script records the Carapace commit in `src/app/carapace/wasm/build-info.json`; regenerate the verification page afterwards (next step).
+5. Regenerate the verification page (`/verification`) after engine or case changes: run every case in Carapace and OpenSees, write the
+   results to `src/marketing/verification/data` and the scripts to `public/verification`, then capture the screenshots from a running dev server:
+   `VERIFY=1 npx vitest run src/app/lib/verification/generate.test.ts`
+   `node scripts/verification-screenshots.mjs`
+6. Build the app:
    `npm run build`
-6. Preview the production build:
+7. Preview the production build:
    `npm run preview`
 
 Schema-related scripts:
