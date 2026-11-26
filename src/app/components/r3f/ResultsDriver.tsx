@@ -11,6 +11,9 @@ import { fillDiagram } from './diagrams'
 import { readWallMembers, type WallMemberForce } from '@/app/lib/studBuilding'
 import { fillContourColors, shellNodalValues } from '@/app/lib/shellContour'
 import type { SceneIndex } from './sceneIndex'
+import { formatResult } from '@/app/lib/formatResult'
+import { useUnits } from '@/app/lib/units/useUnits'
+import { withUnit } from '@/app/lib/units/resultUnits'
 
 /** `out = a + t (b - a)`, element-wise. */
 function blendRows(a: Float64Array, b: Float64Array, t: number, out: Float64Array): Float64Array {
@@ -34,6 +37,8 @@ export function ResultsDriver({ index, buffers }: { index: SceneIndex; buffers: 
   const modeIndex = useAppStore((s) => s.resultsView.mode)
   const phase = useAppStore((s) => s.resultsView.phase)
   const showValues = useAppStore((s) => s.resultsView.showValues)
+  const labelDigits = useAppStore((s) => s.numberFormat.labelDigits)
+  const units = useUnits()
   const walls = useAppStore((s) => s.resultsView.wallResults)
   const model = useAppStore((s) => s.model)
   const source = useResultsSource(runId)
@@ -71,7 +76,11 @@ export function ResultsDriver({ index, buffers }: { index: SceneIndex; buffers: 
         const range = type === 'contour' ? shellNodalValues(index, source.layout, row, contour, contourValues.values, contourValues.counts) : null
         if (range) fillContourColors(contourValues.values, range, buffers.contourColors)
         setContourRange(range)
-        buffers.publish(showValues ? nodeValueLabels(index, source.layout, row, buffers.nodePositions) : [], range !== null)
+        buffers.publish(showValues ? nodeValueLabels(index, source.layout, row, buffers.nodePositions, (v, name) => {
+          // Translations convert to the displayed length; rotations stay in radians.
+          if (name.startsWith('r')) return formatResult(v, labelDigits, 1e-12, false)
+          return withUnit(formatResult(units.toDisplay('length', v), labelDigits, 1e-12, false), units.active ? units.symbol('length') : '')
+        }) : [], range !== null)
         buffers.resetDiagram()
       } else {
         // Diagrams sit on the undeformed shape.
@@ -84,7 +93,7 @@ export function ResultsDriver({ index, buffers }: { index: SceneIndex; buffers: 
         : null)
     }).catch(() => { if (live) { buffers.reset(); buffers.resetDiagram(); buffers.publishWallMembers(null) } })
     return () => { live = false }
-  }, [index, buffers, source, type, step, stepFrac, blendedRow, manualScale, showValues, metrics, nodeDisplacements, diagramArrays, first, last, contour, contourDeformed, contourValues, setContourRange, walls])
+  }, [index, buffers, source, type, step, stepFrac, blendedRow, manualScale, showValues, labelDigits, units, metrics, nodeDisplacements, diagramArrays, first, last, contour, contourDeformed, contourValues, setContourRange, walls])
 
   // Mode shapes: the stored shape scaled by cos(phase), through the same deformed-shape drawing as a step's displacements.
   useEffect(() => {

@@ -109,10 +109,11 @@ describe('units', () => {
     f.model.materials.set(4, { id: 4, kind: 'uniaxial', matType: 'Elastic', args: { type: 'Elastic', matTag: 4, e: 120 }, usage: 'force-deformation' })
     f.model.materials.set(5, { id: 5, kind: 'uniaxial', matType: 'Elastic', args: { type: 'Elastic', matTag: 5, e: 29000 } })
     f.model.nextIds.material = 6
-    const doc = docOf(f, { unitPrefs: { length: 'ft', stress: 'MPa' } })
+    const doc = docOf(f, { unitPrefs: { length: 'ft', stress: 'MPa' }, numberFormat: { digits: 4, labelDigits: 2 } })
     const { project, text } = roundTrip(doc)
     expect(project.model.config?.units).toEqual({ length: 'in', force: 'kip', time: 's' })
     expect(project.display.unitPrefs).toEqual({ length: 'ft', stress: 'MPa' })
+    expect(project.display.numberFormat).toEqual({ digits: 4, labelDigits: 2 })
     expect(project.model.materials.get(4)?.usage).toBe('force-deformation')
     expect(project.model.materials.get(5)?.usage).toBeUndefined()
     expect(serializeProject(parseProject(text).project!)).toBe(text)

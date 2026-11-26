@@ -90,18 +90,16 @@ export function fillDeformedSegments(index: SceneIndex, nd: NodeDisplacements, s
   })
 }
 
-const fmt = (v: number) => (Math.abs(v) < 1e-12 ? '0' : Number(v.toPrecision(3)).toString())
-
 /**
  * Displacement text per recorded node, at the node's displayed position: one `name: value` line per
- * recorded component (e.g. `dx: 0.0123`), in recorded order. Values are the true displacements, not scaled.
+ * recorded component (e.g. `dx: 0.0123`), in recorded order, formatted by `fmt` (given the component name, to tell translations from rotations). Values are the true displacements, not scaled.
  */
-export function nodeValueLabels(index: SceneIndex, layout: RunLayout, row: Float64Array, positions: Float32Array): NodeLabel[] {
+export function nodeValueLabels(index: SceneIndex, layout: RunLayout, row: Float64Array, positions: Float32Array, fmt: (v: number, name: string) => string): NodeLabel[] {
   const labels: NodeLabel[] = []
   for (let i = 0; i < index.nodeIds.length; i++) {
     const entry = layout.columns.disp.get(index.nodeIds[i])
     if (!entry) continue
-    const text = entry.labels.map((name, c) => `${name}: ${fmt(row[entry.offset + c])}`).join('\n')
+    const text = entry.labels.map((name, c) => `${name}: ${fmt(row[entry.offset + c], name)}`).join('\n')
     labels.push({ position: [positions[i * 3], positions[i * 3 + 1], positions[i * 3 + 2]], text })
   }
   return labels

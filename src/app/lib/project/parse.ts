@@ -9,6 +9,7 @@ import { DIRECTIVES, DIRECTIVE_LINE, PROJECT_VERSION } from '@/app/lib/project/a
 import type { ImportDiagnostic, ImportResult } from '@/app/lib/scriptImport/types'
 import type { ProjectDocument } from '@/app/lib/project/types'
 import { parseBaseUnits, parseUnitPrefs } from '@/app/lib/units/units'
+import { parseNumberFormat } from '@/app/lib/formatResult'
 import { MATERIAL_USAGES, type MaterialUsage } from '@/app/lib/units/quantities'
 
 type Rec = Record<string, unknown>
@@ -194,7 +195,7 @@ export function parseProject(text: string): ImportResult {
     activeSavedPlotId: isInt(report.activeSavedPlotId) && savedPlots.some((p) => p.id === report.activeSavedPlotId) ? report.activeSavedPlotId : null,
     display: {
       viewSettings: isRec(display.viewSettings) ? Object.fromEntries(Object.entries(display.viewSettings).filter(([, v]) => typeof v === 'boolean')) as Record<string, boolean> : {},
-      unitPrefs: parseUnitPrefs(display.unitPrefs),
+      unitPrefs: parseUnitPrefs(display.unitPrefs), numberFormat: parseNumberFormat(display.numberFormat),
       hiddenLoadPatterns: Array.isArray(display.hiddenLoadPatterns) ? display.hiddenLoadPatterns.filter(isInt) : [],
       resultsView: isRec(display.resultsView) ? display.resultsView : {}, plotView: isRec(display.plotView) ? display.plotView : {},
     },

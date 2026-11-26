@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Line } from '@react-three/drei'
 import { useAppStore } from '@/app/store/useAppStore'
 import { useResultsSource } from '@/app/lib/resultsStorage/useResultsSource'
-import { formatResult } from '@/app/lib/formatResult'
+import { useResultFormat } from '@/app/lib/useResultFormat'
 import { useUnits } from '@/app/lib/units/useUnits'
 import type { FixEntity } from '@/app/types/model'
 import type { SceneIndex } from './sceneIndex'
@@ -44,6 +44,7 @@ export function ReactionsLayer({ index, fixes }: { index: SceneIndex; fixes: Fix
   const step = useAppStore((s) => s.resultsView.step)
   const tol = useAppStore((s) => s.zeroTolerance)
   const units = useUnits()
+  const f = useResultFormat()
   const source = useResultsSource(runId)
   const [reactions, setReactions] = useState<Reaction[]>([])
 
@@ -68,13 +69,13 @@ export function ReactionsLayer({ index, fixes }: { index: SceneIndex; fixes: Fix
 
   // One label per reaction, all in one layer: a row per non-zero component.
   const labels = useMemo(() => {
-    const fmt = (cat: 'force' | 'moment', v: number) => `${formatResult(units.toDisplay(cat, v), tol)}${units.active ? ` ${units.symbol(cat)}` : ''}`
+    const fmt = (cat: 'force' | 'moment', v: number) => `${f.label(units.toDisplay(cat, v), tol)}${units.active ? ` ${units.symbol(cat)}` : ''}`
     return reactions.flatMap((r) => {
       const lines = [...FORCES.map((n, k) => [n, r.forces[k], 'force'] as const), ...MOMENTS.map((n, k) => [n, r.moments[k], 'moment'] as const)]
         .filter(([, v]) => Math.abs(v) >= tol).map(([n, v, cat]) => `${n} ${fmt(cat, v)}`)
       return lines.length ? [{ position: r.position, text: lines.join('\n') }] : []
     })
-  }, [reactions, tol, units])
+  }, [reactions, tol, units, f])
   if (!source) return null
   return (
     <>

@@ -6,9 +6,11 @@ import { caseResultExtrema, type ResultExtrema, type ResultExtreme } from '@/app
 import { buildSceneIndex } from './r3f/sceneIndex'
 import { SHELL_RESULTANT_LABELS } from '@/app/lib/shellContour'
 import type { ResultType } from '@/app/types/resultsView'
+import { useResultFormat } from '@/app/lib/useResultFormat'
+import { useUnits } from '@/app/lib/units/useUnits'
+import { resultUnit, withUnit } from '@/app/lib/units/resultUnits'
 
 const labels: Partial<Record<ResultType, string>> = { deformed: 'Displacement |u|', axial: 'Axial force (N)', shear: 'Shear force (Vy)', shearZ: 'Shear force (Vz)', torsion: 'Torsion (T)', moment: 'Bending moment (Mz)', momentY: 'Bending moment (My)' }
-const fmt = (v: number) => v === 0 ? '0' : Number(v.toPrecision(5)).toString()
 
 export function ResultExtremaOverlay() {
   const runId = useAppStore((s) => s.resultsView.runId)
@@ -16,6 +18,9 @@ export function ResultExtremaOverlay() {
   const contour = useAppStore((s) => s.resultsView.contour)
   const walls = useAppStore((s) => s.resultsView.wallResults)
   const model = useAppStore((s) => s.model)
+  const rf = useResultFormat()
+  const units = useUnits()
+  const fmt = (v: number) => rf.value(v, 0, false)
   const source = useResultsSource(runId)
   const { current } = useCurrentCase()
   const first = current?.first ?? 0, count = current?.count ?? 0
@@ -36,7 +41,8 @@ export function ResultExtremaOverlay() {
   if (!visible) return null
   const result = loaded?.cache === cache && loaded.key === key ? loaded : null
   const title = type === 'axial' && walls === 'members' && index.studWalls.length ? 'Member axial force (N)' : type === 'contour' ? SHELL_RESULTANT_LABELS[contour] : model.config?.ndm === 2 && type === 'shear' ? 'Shear force (V)' : model.config?.ndm === 2 && type === 'moment' ? 'Bending moment (M)' : labels[type]
-  const detail = (r: ResultExtreme) => <><span className="font-medium tabular-nums">{fmt(r.value)}</span> · {r.target} #{r.id} · step {r.step - first} · t = {fmt(r.time)}</>
+  const u = resultUnit(units, type, contour)
+  const detail = (r: ResultExtreme) => <><span className="font-medium tabular-nums">{withUnit(fmt(u.toDisplay(r.value)), u.symbol)}</span> · {r.target} #{r.id} · step {r.step - first} · t = {fmt(r.time)}</>
   return (
     <div className="pointer-events-none absolute bottom-3 left-3 max-w-[calc(100%-1.5rem)] rounded-md bg-background/85 px-3 py-1.5 text-xs shadow">
       <div className="font-medium">{title} · case extrema</div>

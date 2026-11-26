@@ -6,6 +6,9 @@ import { useAppStore } from '@/app/store/useAppStore'
 import { isDiagramType } from '@/app/types/resultsView'
 import { BufferLines } from './BufferLines'
 import { LABEL_LIMIT } from './utils'
+import { useResultFormat } from '@/app/lib/useResultFormat'
+import { useUnits } from '@/app/lib/units/useUnits'
+import { resultUnit, withUnit } from '@/app/lib/units/resultUnits'
 import { SceneLabels, type SceneLabelStyle } from './SceneLabels'
 import type { DiagramLabel, DisplayBuffers } from './displayBuffers'
 
@@ -14,7 +17,6 @@ const OUTLINE_WIDTH_PX = 1.5
 
 const LABEL_STYLE: SceneLabelStyle = { size: 9, color: '#0f172a', anchor: 'center', box: { fill: 'rgba(255,255,255,0.85)', stroke: 'transparent', padX: 3, height: 14, radius: 2 }, lift: 32 }
 
-const fmt = (v: number) => Number(v.toPrecision(3)).toString()
 
 function DiagramFill({ buffers }: { buffers: DisplayBuffers }) {
   const ref = useRef<Mesh>(null)
@@ -42,8 +44,16 @@ function DiagramFill({ buffers }: { buffers: DisplayBuffers }) {
 
 function DiagramLabels({ buffers }: { buffers: DisplayBuffers }) {
   const [shown, setShown] = useState<{ version: number; labels: DiagramLabel[] }>({ version: -1, labels: [] })
+  const rf = useResultFormat()
+  const units = useUnits()
+  const type = useAppStore((s) => s.resultsView.type)
+  const contour = useAppStore((s) => s.resultsView.contour)
   useFrame(() => { if (shown.version !== buffers.diagramVersion) setShown({ version: buffers.diagramVersion, labels: buffers.diagramActive ? buffers.diagramLabels : [] }) })
-  const labels = useMemo(() => (shown.labels.length <= LABEL_LIMIT ? shown.labels.filter((l) => Math.abs(l.value) > 1e-9).map((l) => ({ position: l.position as [number, number, number], text: fmt(l.value) })) : []), [shown])
+  const labels = useMemo(() => {
+    if (shown.labels.length > LABEL_LIMIT) return []
+    const u = resultUnit(units, type, contour)
+    return shown.labels.filter((l) => Math.abs(l.value) > 1e-9).map((l) => ({ position: l.position as [number, number, number], text: withUnit(rf.label(u.toDisplay(l.value)), u.symbol) }))
+  }, [shown, rf, units, type, contour])
   return <SceneLabels labels={labels} style={LABEL_STYLE} />
 }
 

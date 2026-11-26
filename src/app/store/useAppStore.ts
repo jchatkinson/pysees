@@ -21,6 +21,7 @@ import { plotNameFor, restorePlot, snapshotPlot, uniqueName } from '@/app/lib/pl
 import { DEFAULT_PLOT_VIEW, SERIES_COLORS, type Channel, type PlotView, type SeriesSpec } from '@/app/types/plotView'
 import { RESULTS_PREF_KEYS, PLOT_PREF_KEYS, type ProjectDocument } from '@/app/lib/project/types'
 import type { BaseUnits, Category, UnitPrefs } from '@/app/lib/units/units'
+import { DEFAULT_NUMBER_FORMAT, type NumberFormat } from '@/app/lib/formatResult'
 import type { CompileDiagnostic } from '@/app/lib/compileAnalysisSequence'
 import type { ViewMode } from '@/app/lib/editor/viewSlice'
 import type { DrawTemplate } from '@/app/lib/editor/properties'
@@ -212,6 +213,9 @@ export interface AppStore {
   unitPrefs: UnitPrefs
   setUnitPref: (cat: Category, sym: string | null) => void
   setUnitPrefs: (prefs: UnitPrefs) => void
+  /** Significant figures for displayed results (presentation only, saved with the display prefs). */
+  numberFormat: NumberFormat
+  setNumberFormat: (f: Partial<NumberFormat>) => void
   /** Declares the system an unitless model's numbers are already in. Changes no value; a model that has units keeps them. */
   assignUnits: (units: BaseUnits) => void
   initModel: (ndm: 2 | 3, ndf: number, extra?: { units?: BaseUnits; unitPrefs?: UnitPrefs; writes?: ModelWrite[]; analysisCommands?: AnalysisCommand[]; gridlines?: GridlineEntity[]; levels?: LevelEntity[] }) => void
@@ -601,6 +605,8 @@ export const useAppStore = create<AppStore>((set, get) => {
     return { unitPrefs: sym ? { ...rest, [cat]: sym } : rest }
   }),
   setUnitPrefs: (unitPrefs) => set({ unitPrefs }),
+  numberFormat: DEFAULT_NUMBER_FORMAT,
+  setNumberFormat: (f) => set((s) => ({ numberFormat: { ...s.numberFormat, ...f } })),
   assignUnits: (units) => set((s) => (s.model.config && !s.model.config.units ? { model: { ...s.model, config: { ...s.model.config, units } } } : s)),
 
   projectFileName: 'model.py',
@@ -614,7 +620,7 @@ export const useAppStore = create<AppStore>((set, get) => {
       underlays: project.underlays, nextUnderlayId: project.nextUnderlayId,
       savedPlots: project.savedPlots, nextSavedPlotId: project.nextSavedPlotId, activeSavedPlotId: project.activeSavedPlotId,
       viewSettings: { ...s.viewSettings, ...Object.fromEntries(Object.entries(project.display.viewSettings).filter(([k]) => k in s.viewSettings)) },
-      unitPrefs: project.display.unitPrefs,
+      unitPrefs: project.display.unitPrefs, numberFormat: project.display.numberFormat,
       hiddenLoadPatterns: project.display.hiddenLoadPatterns,
       resultsView: { ...DEFAULT_RESULTS_VIEW, ...keep<ResultsView>(project.display.resultsView, RESULTS_PREF_KEYS) },
       plotView: { ...DEFAULT_PLOT_VIEW, ...keep<PlotView>(project.display.plotView, PLOT_PREF_KEYS) },
@@ -629,7 +635,7 @@ export const useAppStore = create<AppStore>((set, get) => {
       model: emptyModel(),
       modelPast: [],
       modelFuture: [],
-      unitPrefs: {},
+      unitPrefs: {}, numberFormat: DEFAULT_NUMBER_FORMAT,
       analysisHistory: emptyAnalysisHistory(),
       gridlines: [],
       nextGridlineId: 1,
