@@ -22,7 +22,7 @@ For a first run, pick the **Cantilever Column** or **2D Frame** template and pre
 
 ## 2. Look around
 
-Rotate with the middle mouse button, pan with the right button and zoom with the wheel. Click a node or element to select it. The left panel lists everything in the model, and the right panel shows its form. See [Interface tour](/docs/getting-started/interface-tour).
+Rotate with the middle mouse button, pan with the right button and zoom with the wheel; **Fly** (<kbd>Shift</kbd>+<kbd>F</kbd>) moves the camera through the model with the keyboard. Switch to a story **Plan** or an **Elevation** from the ribbon's View group. Click a node or element to select it. The left panel lists everything in the model, and the right panel shows its form. See [Interface tour](/docs/getting-started/interface-tour).
 
 ## 3. Run an analysis
 
@@ -32,8 +32,8 @@ If the run stops with an error, expand the diagnostics under the status bar. Eac
 
 ## 4. Review the results
 
-When the run is done, open the results panel in the viewport. Choose a **Case** and a **Result** such as the deformed shape or the bending moment diagram, then use the step controls to play back the response. The **Results** tab on the right lists the same data as tables.
+When the run is done, the ribbon switches to the **Results** tab; open the **Display** panel in the viewport. Choose a **Case** and a **Result** such as the deformed shape or the bending moment diagram, then use the step controls to play back the response. The **Results** tab on the right lists the same data as tables.
 
 ## 5. Save or export
 
-Use **File > Save .py** to save the whole project, or **File > Export .tcl** for a Tcl script. See [Save and open projects](/docs/files/save-open-projects).
+Use **File > Save** to save the whole project, or **File > Export .tcl** for a Tcl script. See [Save and open projects](/docs/files/save-open-projects).

@@ -4,7 +4,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Input } from '@/app/components/ui/input'
 import { Label } from '@/app/components/ui/label'
 import { Button } from '@/app/components/ui/button'
-import { UNIT_PRESETS, makeUnitContext, type BaseUnits } from '@/app/lib/units/units'
+import { UNIT_PRESETS, makeUnitContext, snapQuantity, type BaseUnits } from '@/app/lib/units/units'
 import { gridTemplate, parseSpacings } from '@/app/lib/gridTemplate'
 
 const NO_UNITS = 'none'
@@ -53,7 +53,8 @@ export function GridTemplateForm() {
   const [text, setText] = useState<Partial<Record<Field, string>>>({})
   const shown = { ...defaults(units), ...text }
   const ctx = makeUnitContext(units)
-  const parse = (f: Field) => parseSpacings(shown[f], (t) => ctx.parse('length', t))
+  // Snapped like a form field, so 12 ft is stored as 144 in, not 144.00000000000003.
+  const parse = (f: Field) => parseSpacings(shown[f], (t) => { const v = ctx.parse('length', t); return v === null ? null : snapQuantity(v) })
   const x = parse('x'), y = parse('y'), stories = parse('stories')
   const ok = x !== null && x.length > 0 && stories !== null && (ndm === 2 || (y !== null && y.length > 0))
   const cum = (s: number[] | null) => (s ?? []).reduce<number[]>((acc, d) => [...acc, acc[acc.length - 1] + d], [0])
@@ -100,7 +101,7 @@ export function GridTemplateForm() {
         Lists like <code>3@30 ft, 24 ft</code> (three bays of 30 ft, then one of 24 ft). {unit ? `Bare numbers are in ${unit}.` : 'Plain numbers, in your own consistent units.'}
         {' '}The model starts empty: draw members, shells and walls on the grids from the Model tab. Grids and levels stay editable in Model › Grids &amp; levels.
       </p>
-      <div className="flex justify-end"><Button disabled={!ok} onClick={create}>Create Model</Button></div>
+      <div className="sticky bottom-0 flex justify-end bg-popover py-2"><Button disabled={!ok} onClick={create}>Create Model</Button></div>
     </div>
   )
 }

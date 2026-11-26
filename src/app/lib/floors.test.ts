@@ -107,6 +107,7 @@ describe('floor framing for drawing', () => {
     const t = floorTransferRows(model, 10, [{ kind: 'area', w: 0.002 }])
     expect(t.rows).toEqual([])
     expect(t.problems).toEqual([])
+    expect(t.strips).toBe(5) // counted although none went to Carapace
     // Per unit width: span 4000, overhang 1000 → beam 0.002·5000·2500/4000, wall the rest.
     const beam = 0.002 * 5000 * 2500 / 4000 * 2000, wall = 0.002 * 5000 * 2000 - beam
     expect(t.wallLines.reduce((sum, l) => sum + l.q * (l.x1 - l.x0), 0)).toBeCloseTo(wall, 6)

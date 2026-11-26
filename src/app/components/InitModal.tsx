@@ -257,7 +257,7 @@ function InitDialog() {
         if (eventDetails.reason === 'outside-press' || eventDetails.reason === 'focus-out') eventDetails.cancel()
       }}
     >
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="flex max-h-[calc(100dvh-2rem)] flex-col sm:max-w-lg">
         {step === 1 && (
           <>
             <DialogHeader>
@@ -268,6 +268,8 @@ function InitDialog() {
               <Card title="Load" description="Open a saved project (.py)." icon={<FolderOpen />} onClick={() => fileInput.current?.click()} />
             </div>
             <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide pt-1">Templates</p>
+            {/* The templates scroll; the header and New / Load stay in view however short the window. */}
+            <div className="-mx-1 min-h-0 flex-1 overflow-y-auto px-1 pb-1">
             <div className="grid grid-cols-3 gap-2">
               <Card title="Grid only" description="An empty model on grid lines and story levels you set up, ready to draw on." image={gridImg} onClick={() => select('grid')} />
               <Card
@@ -310,6 +312,7 @@ function InitDialog() {
               <Card title="Stud-wall building" description="Multistorey light-frame box with floors, openings, anchorage and lateral loads." image={studBuildingImg} onClick={() => select('studBuilding')} />
               <Card title="BC Rowhouse" description="Two-unit, two-storey wood-frame rowhouse from a real drawing set, with its plans as underlays." image={rowhouseImg} onClick={() => select('rowhouse')} />
             </div>
+            </div>
           </>
         )}
 
@@ -330,6 +333,9 @@ function InitDialog() {
                 <DialogTitle>{step2Title[choice]}</DialogTitle>
               </div>
             </DialogHeader>
+
+            {/* A long form scrolls between the header and the Create / Open button. */}
+            <div className="-mx-1 min-h-0 flex-1 overflow-y-auto px-1">
 
             {choice === 'load' && preview && (
               <div className="grid gap-3 py-2">
@@ -653,6 +659,8 @@ function InitDialog() {
             )}
 
             {choice === 'studBuilding' && <>{studError && <p className="text-xs text-destructive">{studError}</p>}<StudBuildingForm busy={studBusy} onCreate={(params) => void createStudBuilding(params)} /></>}
+
+            </div>
 
             {choice !== 'studBuilding' && choice !== 'grid' && <div className="flex justify-end">
               {choice === 'load'

@@ -16,6 +16,20 @@ keywords: ndm ndf z-up local axes units stage case pseudo-time recorder
 - **Beam local axes:** local x runs from the first node to the second. In 2D, local y is x rotated 90° counter-clockwise. In 3D, the transformation's `vecxz` vector lies in the local x–z plane, then `y = vecxz × x` and `z = x × y`. Beam loads and the force diagrams use these axes.
 - **Shells:** nodes are listed counter-clockwise and the normal follows the right-hand rule. Stress resultants are per unit length in the shell's local axes.
 
+## Views and layout
+
+- **Plan / elevation:** a slice of a 3D model, one story seen from above or the members along one grid line. See [Views](/docs/viewport/views).
+- **Grids and levels:** reference lines and story elevations; layout, not part of the model. See [Grids and levels](/docs/model/grids-levels).
+- **Underlay:** a PDF drawing sheet shown under a level's plan. See [PDF underlays](/docs/viewport/underlays).
+- **Property:** the element type and arguments a drawing tool draws with. See [Drawing tools](/docs/model/drawing-tools#frame-properties).
+
+## Light-frame wood (Carapace only)
+
+- **Stud wall:** a wood shear wall element with its framing, openings, sheathing and hold-downs. See [Stud walls](/docs/model/stud-walls).
+- **Pier:** a full-height stretch of wall between openings or wall ends; each pier end has a hold-down.
+- **Joist floor:** a floor outline with one-way joists that takes area loads down to the walls and beams under it. See [Joist floors](/docs/model/joist-floors).
+- **Diaphragm:** what ties a level together, either rigid (a constraint) or flexible (sheathing elements).
+
 ## Units
 
 The model is stored in one consistent system of length, force and time units, chosen at creation. **Display units** are presentation only: values convert at the screen and are never stored converted. A model can also be unitless. See [Units](/docs/viewport/units).

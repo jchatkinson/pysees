@@ -18,6 +18,11 @@ Expand the diagnostics under the status bar. Typical causes:
 
 Results need the [Whole Model Recorder](/docs/analysis/recorder) before the stages. Editing the model afterwards discards results; run again.
 
+## A joist floor or stud wall warning
+
+- *Joist strips … bear on fewer than two walls or beams and carry no load:* part of the floor reaches only one support. Check that the walls or beams under it reach the floor's level and cross the joists, or turn the joist direction.
+- *No hold-down at pier end …* (on the wall card): nothing is under that pier end. Draw the wall below first, or add a support or beam there.
+
 ## A project won't open
 
 Opening is strict about `# @pysees` blocks and reports the line. Files without the header are imported as models only. See [Save and open](/docs/files/save-open-projects).

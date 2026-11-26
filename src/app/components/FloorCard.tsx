@@ -123,7 +123,7 @@ function FloorEditor({ element }: { element: ElementEntity }) {
         <Row k="Outline" v={`${element.nodes.length} nodes, area ${show('area', area)}`} />
         <Row k="Depth" v={`${show('length', depth)} (joist + subfloor)`} />
         <Row k="Bears on" v={[walls.length ? `walls ${walls.join(', ')}` : 'no walls', ...(beams.length ? [`beams ${beams.join(', ')}`] : [])].join('; ')} />
-        {check && <Row k="Joist strips" v={String(check.rows.length)} />}
+        {check && <Row k="Joist strips" v={String(check.strips)} />}
       </div>
       {check?.problems.map((p) => <p key={p} className="text-[10px] text-amber-700">{p[0].toUpperCase() + p.slice(1)}.</p>)}
 

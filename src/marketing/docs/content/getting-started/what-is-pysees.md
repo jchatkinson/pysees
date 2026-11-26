@@ -23,7 +23,9 @@ You build a parametric model: nodes, materials, sections, elements, supports and
 ## What you can model
 
 - 2D and 3D models. A 3D model is Z-up: the plan is the X–Y plane and levels rise in Z. A 2D model lies in the XY plane with Y up.
-- Truss, elastic and fiber beam-column elements, plus 3D shell elements.
+- Truss, elastic and fiber beam-column elements, zero-length springs, plus 3D shell elements and multi-point constraints.
+- Light-frame wood buildings (Carapace only): [stud walls](/docs/model/stud-walls) with openings, lumber framing and hold-downs, [joist floors](/docs/model/joist-floors) and flexible or rigid diaphragms.
+- Draw on grids in story plans and elevations, trace over [PDF drawing sheets](/docs/viewport/underlays), and edit with move, copy, mirror and divide.
 - Fiber sections from templates, AISC shapes, or fibers and patches you define.
 - Static, pushover, earthquake (ground motion) and modal analyses.
 

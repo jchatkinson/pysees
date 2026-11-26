@@ -97,7 +97,8 @@ function bearings(model: Model, f: NonNullable<ReturnType<typeof floorFrame>>, t
  * solved here with the same statics (`stripReactions`) and come out as loads: `wallLines` (downward force per length `q` over wall-local
  * [x0, x1] of a wall's top) and `nodal` (downward force `fz` on a beam's end nodes, each strip's reaction split by its position).
  */
-export interface FloorTransfer { rows: FloorLoadArgs[]; problems: string[]; wallLines: { wall: number; x0: number; x1: number; q: number }[]; nodal: { node: number; beam: number; fz: number }[] }
+/** `strips`: the joist strip pieces that carry load, whether they went to Carapace (`rows`) or were solved here (on a beam). */
+export interface FloorTransfer { rows: FloorLoadArgs[]; problems: string[]; wallLines: { wall: number; x0: number; x1: number; q: number }[]; nodal: { node: number; beam: number; fz: number }[]; strips: number }
 
 /**
  * A floor load as one row per joist strip piece: its bounds the strip, its supports the bearings the strip's centre line crosses inside
@@ -107,7 +108,7 @@ export interface FloorTransfer { rows: FloorLoadArgs[]; problems: string[]; wall
 export function floorTransferRows(model: Model, floorId: number, loads: FloorAreaLoadArgs['loads']): FloorTransfer {
   const e = model.elements.get(floorId)
   const problems: string[] = [], wallLines: FloorTransfer['wallLines'] = [], nodal = new Map<number, { beam: number; fz: number }>()
-  const empty = (p: string): FloorTransfer => ({ rows: [], problems: [p], wallLines: [], nodal: [] })
+  const empty = (p: string): FloorTransfer => ({ rows: [], problems: [p], wallLines: [], nodal: [], strips: 0 })
   if (!e || !isJoistFloor(e.eleType)) return empty(`floor ${floorId} is not a joist floor`)
   const a = joistFloorArgs(e.args), f = floorFrame(model, e)
   if (!f) return empty(`floor ${floorId} has fewer than three nodes`)
@@ -116,7 +117,7 @@ export function floorTransferRows(model: Model, floorId: number, loads: FloorAre
   const all = bearings(model, f, Math.max(tol, 1e-6 * Math.abs(f.z)))
   const total = loads.reduce((sum, l) => sum + l.w, 0)
   const rows: FloorLoadArgs[] = []
-  let unsupported = 0, short = 0
+  let unsupported = 0, short = 0, strips = 0
   for (const strip of floorStrips(f.st, a.spacing)) {
     const tc = (strip.t0 + strip.t1) / 2, w = strip.t1 - strip.t0
     for (const [s0, s1] of strip.chords) {
@@ -129,6 +130,7 @@ export function floorTransferRows(model: Model, floorId: number, loads: FloorAre
       const on = [...walls, ...beams]
       const levels = [...new Set(on.map((b) => b.s))].sort((p, q) => p - q).filter((x, i, l) => i === 0 || x - l[i - 1] > tol)
       if (levels.length < 2) { unsupported++; continue }
+      strips++
       // Wall-local x of the strip's start, shifted so the strip's width stays on the wall.
       const startOn = (b: Bearing) => Math.min(Math.max((tc - b.ta) * b.sign - w / 2, 0), b.L - w)
       if (!beams.length) {
@@ -153,12 +155,12 @@ export function floorTransferRows(model: Model, floorId: number, loads: FloorAre
   }
   if (unsupported) problems.push(`${unsupported} joist strip${unsupported > 1 ? 's' : ''} of floor ${floorId} bear${unsupported > 1 ? '' : 's'} on fewer than two walls or beams and carr${unsupported > 1 ? 'y' : 'ies'} no load`)
   if (short) problems.push(`floor ${floorId}: ${short} bearing${short > 1 ? 's' : ''} on walls shorter than the joist spacing ${short > 1 ? 'were' : 'was'} left out`)
-  return { rows, problems, wallLines, nodal: [...nodal].map(([node, v]) => ({ node, ...v })) }
+  return { rows, problems, wallLines, nodal: [...nodal].map(([node, v]) => ({ node, ...v })), strips }
 }
 
 /** The floor's transfer rows for a `floorLoad` child: a joist-floor load expands; an explicit (template) row stays as it is. */
 export function floorLoadRows(model: Model, child: LoadAssignment): FloorTransfer {
-  if (!isFloorAreaLoad(child)) return { rows: [child.args as unknown as FloorLoadArgs], problems: [], wallLines: [], nodal: [] }
+  if (!isFloorAreaLoad(child)) return { rows: [child.args as unknown as FloorLoadArgs], problems: [], wallLines: [], nodal: [], strips: 1 }
   const a = child.args as unknown as FloorAreaLoadArgs
   return floorTransferRows(model, a.floor, a.loads)
 }
