@@ -1,0 +1,43 @@
+import openseespy.opensees as ops
+
+# @pysees project {"ndf":3,"ndm":2,"nextIds":{"beamIntegration":1,"element":2,"geomTransf":2,"material":1,"misc":1,"mpConstraint":1,"node":3,"pattern":2,"region":1,"section":1,"timeSeries":2},"version":1}
+# @pysees layout {"gridlines":[],"levels":[],"nextGridlineId":1,"nextLevelId":1}
+# @pysees report {"activeSavedPlotId":null,"nextSavedPlotId":1,"savedPlots":[]}
+# @pysees display {"hiddenLoadPatterns":[],"numberFormat":{"digits":5,"labelDigits":3},"plotView":{"maximized":false,"nextSeriesId":1,"open":false,"pos":null,"series":[],"sharedX":true,"showEditor":true,"showStageTicks":true,"showStepMarker":true,"size":{"h":380,"w":520},"x":{"type":"step"}},"resultsView":{"contour":"Mx","contourDeformed":true,"fillDiagrams":true,"fps":5,"loop":true,"modeSpeed":0.5,"scales":{"axial":null,"deformed":null,"mode":null,"moment":null,"momentY":null,"shear":null,"shearZ":null,"torsion":null},"showReactions":false,"showUndeformed":true,"showValues":false,"smooth":true,"type":"none"},"unitPrefs":{},"viewSettings":{}}
+ops.wipe()
+ops.model('basic', '-ndm', 2, '-ndf', 3)
+ops.node(1, 0, 0)
+ops.node(2, 0, 3)
+# @pysees generated begin {"kind":"beamMass","nodeId":1,"writes":[]}
+ops.mass(1, 0.75, 0.75, 0)
+# @pysees generated end
+# @pysees generated begin {"kind":"beamMass","nodeId":2,"writes":[{"entity":{"nodeId":2,"values":[2,2,0]},"kind":"mass"}]}
+ops.mass(2, 2.75, 2.75, 0)
+# @pysees generated end
+ops.geomTransf('Linear', 1)
+# @pysees generated begin {"elementId":1,"kind":"beamMass","writes":[{"entity":{"args":{"A":1,"E":1000,"G":400,"Iy":2,"Iz":1,"J":1,"mass":0.5,"transfTag":1},"eleType":"ElasticBeamColumn","id":1,"nodes":[1,2]},"kind":"element"}]}
+ops.element('elasticBeamColumn', 1, 1, 2, 1, 1000, 1, 1)
+# @pysees generated end
+ops.fix(1, 1, 1, 1)
+ops.timeSeries('Path', 1, '-dt', 0.01, '-values', 1, 0.9945218953682733, 0.9781476007338057, 0.9510565162951535, 0.9135454576426009, 0.8660254037844387, 0.8090169943749475, 0.7431448254773942, 0.6691306063588582, 0.5877852522924731, 0.5000000000000001, 0.4067366430758004, 0.30901699437494745, 0.20791169081775923, 0.10452846326765346, 2.83276944882399e-16, -0.10452846326765333, -0.20791169081775934, -0.30901699437494734, -0.4067366430758001, -0.4999999999999998, -0.587785252292473, -0.6691306063588579, -0.7431448254773941, -0.8090169943749473, -0.8660254037844387, -0.913545457642601, -0.9510565162951535, -0.9781476007338057, -0.9945218953682734, -1, -0.9945218953682734, -0.9781476007338057, -0.9510565162951536, -0.9135454576426009, -0.8660254037844388, -0.8090169943749475, -0.7431448254773942, -0.6691306063588585, -0.5877852522924732, -0.5000000000000004, -0.40673664307580093, -0.30901699437494756, -0.2079116908177598, -0.10452846326765423, -1.8369701987210297e-16, 0.10452846326765299, 0.20791169081775943, 0.30901699437494723, 0.40673664307579976, 0.5000000000000001, 0.5877852522924729, 0.6691306063588585, 0.7431448254773942, 0.8090169943749473, 0.8660254037844388, 0.913545457642601, 0.9510565162951535, 0.9781476007338057, 0.9945218953682733, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, '-factor', 1)
+# @pysees analysis begin {"command":{"blockId":"whole-model-recorder","params":{"directory":"out","dynamic":"Yes"},"type":"ANALYSIS_BLOCK"}}
+ops.recorder('Node', '-file', 'out/disp.out', '-time', '-node', 1, 2, '-dof', 1, 2, 3, 'disp')
+ops.recorder('Node', '-file', 'out/reaction.out', '-time', '-node', 1, 2, '-dof', 1, 2, 3, 'reaction')
+ops.recorder('Node', '-file', 'out/vel.out', '-time', '-node', 1, 2, '-dof', 1, 2, 3, 'vel')
+ops.recorder('Node', '-file', 'out/accel.out', '-time', '-node', 1, 2, '-dof', 1, 2, 3, 'accel')
+ops.recorder('Element', '-file', 'out/eleLocalForce.out', '-time', '-ele', 1, 'localForce')
+# @pysees analysis end
+ops.pattern('UniformExcitation', 1, 1, '-accel', 1, '-fact', 1)
+# @pysees analysis begin {"command":{"blockId":"run-earthquake-analysis","params":{"algorithm":"Linear","alphaM":0.1,"betaK":0.001,"dampingMode":"Coefficients","dt":0.01,"nSteps":400},"type":"ANALYSIS_BLOCK"}}
+ops.constraints('Plain')
+ops.numberer('RCM')
+ops.system('BandGeneral')
+ops.test('NormDispIncr', 0.000001, 25)
+ops.algorithm('Linear')
+ops.setTime(0)
+ops.rayleigh(0.1, 0.001, 0, 0)
+ops.integrator('Newmark', 0.5, 0.25)
+ops.analysis('Transient')
+ops.analyze(400, 0.01)
+ops.remove('loadPattern', 1)
+# @pysees analysis end

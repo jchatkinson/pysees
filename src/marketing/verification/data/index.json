@@ -1,0 +1,1675 @@
+{
+ "generated": "2026-11-26",
+ "pysees": {
+  "commit": "c1448e97ed951ff1d79fe77f3effc8be67214924"
+ },
+ "carapace": {
+  "commit": "d6bed33fe85318ece088c36aa81fee1cd9e35fde",
+  "wasmSha256": "1b982b864cfeba51ec1ef3e220b275560680dfe5e4353cc8fd6b022998c01e79"
+ },
+ "opensees": {
+  "package": "openseespy",
+  "version": "3.7.1.2"
+ },
+ "cases": [
+  {
+   "id": "cantilever-elastic",
+   "category": "linear",
+   "skip": [],
+   "rtol": {
+    "value": 0.00001
+   },
+   "sources": [
+    "core/src/model/elements/elastic_beam_column.rs",
+    "core/src/model/transform.rs"
+   ],
+   "shot": {
+    "view": "front",
+    "result": "M"
+   },
+   "ndm": 2,
+   "elements": 4,
+   "nodes": 5,
+   "steps": {
+    "carapace": 10,
+    "opensees": 10
+   },
+   "worst": 0.0000011111111191035153,
+   "pass": true,
+   "source": {
+    "file": "src/app/lib/verification/cases.ts",
+    "line": 14
+   }
+  },
+  {
+   "id": "truss-elastic",
+   "category": "linear",
+   "skip": [],
+   "rtol": {
+    "value": 0.00001
+   },
+   "sources": [
+    "core/src/model/elements/truss.rs",
+    "core/src/model/materials/elastic_like.rs"
+   ],
+   "shot": {
+    "view": "front",
+    "result": "N"
+   },
+   "ndm": 2,
+   "elements": 3,
+   "nodes": 3,
+   "steps": {
+    "carapace": 5,
+    "opensees": 5
+   },
+   "worst": 0.000002659430173739303,
+   "pass": true,
+   "source": {
+    "file": "src/app/lib/verification/cases.ts",
+    "line": 20
+   }
+  },
+  {
+   "id": "cantilever3d-elastic",
+   "category": "linear",
+   "skip": [],
+   "rtol": {
+    "value": 0.00001
+   },
+   "sources": [
+    "core/src/model/elements/elastic_beam_column.rs",
+    "core/src/model/transform.rs"
+   ],
+   "shot": {
+    "view": "3d",
+    "result": "deformed"
+   },
+   "ndm": 3,
+   "elements": 2,
+   "nodes": 3,
+   "steps": {
+    "carapace": 4,
+    "opensees": 4
+   },
+   "worst": 8.620682234804212e-7,
+   "pass": true,
+   "source": {
+    "file": "src/app/lib/verification/cases.ts",
+    "line": 25
+   }
+  },
+  {
+   "id": "constraints-2d",
+   "category": "linear",
+   "skip": [],
+   "rtol": {
+    "value": 0.00001
+   },
+   "sources": [
+    "core/src/model/constraint.rs",
+    "core/src/model/elements/elastic_beam_column.rs"
+   ],
+   "shot": {
+    "view": "front",
+    "result": "deformed"
+   },
+   "ndm": 2,
+   "elements": 3,
+   "nodes": 7,
+   "steps": {
+    "carapace": 2,
+    "opensees": 2
+   },
+   "worst": 0.0000015203344733114236,
+   "pass": true,
+   "source": {
+    "file": "src/app/lib/verification/cases.ts",
+    "line": 30
+   }
+  },
+  {
+   "id": "constraints-3d",
+   "category": "linear",
+   "skip": [],
+   "rtol": {
+    "value": 0.00001
+   },
+   "sources": [
+    "core/src/model/constraint.rs",
+    "core/src/model/elements/elastic_beam_column.rs"
+   ],
+   "shot": {
+    "view": "3d",
+    "result": "deformed"
+   },
+   "ndm": 3,
+   "elements": 6,
+   "nodes": 14,
+   "steps": {
+    "carapace": 2,
+    "opensees": 2
+   },
+   "worst": 0.0000012249691680932533,
+   "pass": true,
+   "source": {
+    "file": "src/app/lib/verification/cases.ts",
+    "line": 35
+   }
+  },
+  {
+   "id": "shell-patch",
+   "category": "shells",
+   "skip": [],
+   "rtol": {
+    "value": 0.00001
+   },
+   "sources": [
+    "core/src/model/elements/shell4.rs",
+    "core/src/model/materials/shell_section.rs"
+   ],
+   "shot": {
+    "view": "3d",
+    "result": "contour"
+   },
+   "ndm": 3,
+   "elements": 2,
+   "nodes": 6,
+   "steps": {
+    "carapace": 2,
+    "opensees": 2
+   },
+   "worst": 0.0000022467853503677824,
+   "pass": true,
+   "source": {
+    "file": "src/app/lib/verification/cases.ts",
+    "line": 41
+   }
+  },
+  {
+   "id": "shell-patch-with-triangle",
+   "category": "shells",
+   "skip": [],
+   "rtol": {
+    "value": 0.00001
+   },
+   "sources": [
+    "core/src/model/elements/shell4.rs",
+    "core/src/model/elements/shell3.rs",
+    "core/src/model/materials/shell_section.rs"
+   ],
+   "shot": {
+    "view": "3d",
+    "result": "contour"
+   },
+   "ndm": 3,
+   "elements": 3,
+   "nodes": 7,
+   "steps": {
+    "carapace": 2,
+    "opensees": 2
+   },
+   "worst": 0.0000014106841262558396,
+   "pass": true,
+   "source": {
+    "file": "src/app/lib/verification/cases.ts",
+    "line": 46
+   }
+  },
+  {
+   "id": "shell-patch-self-weight-pressure",
+   "category": "shells",
+   "skip": [],
+   "rtol": {
+    "value": 0.00001
+   },
+   "sources": [
+    "core/src/model/elements/shell4.rs",
+    "core/src/model/materials/shell_section.rs"
+   ],
+   "shot": {
+    "view": "3d",
+    "result": "contour"
+   },
+   "ndm": 3,
+   "elements": 2,
+   "nodes": 6,
+   "steps": {
+    "carapace": 2,
+    "opensees": 2
+   },
+   "worst": 0.00000133838320527173,
+   "pass": true,
+   "source": {
+    "file": "src/app/lib/verification/cases.ts",
+    "line": 51
+   }
+  },
+  {
+   "id": "plate",
+   "category": "shells",
+   "skip": [],
+   "rtol": {
+    "value": 0.00001
+   },
+   "sources": [
+    "core/src/model/elements/shell4.rs",
+    "core/src/model/materials/shell_section.rs"
+   ],
+   "shot": {
+    "view": "3d",
+    "result": "contour"
+   },
+   "ndm": 3,
+   "elements": 8,
+   "nodes": 15,
+   "steps": {
+    "carapace": 4,
+    "opensees": 4
+   },
+   "worst": 0.0000026651825356944973,
+   "pass": true,
+   "source": {
+    "file": "src/app/lib/verification/cases.ts",
+    "line": 56
+   }
+  },
+  {
+   "id": "tower",
+   "category": "shells",
+   "skip": [],
+   "rtol": {
+    "value": 0.00001
+   },
+   "sources": [
+    "core/src/model/elements/shell4.rs",
+    "core/src/model/elements/elastic_beam_column.rs",
+    "core/src/model/materials/shell_section.rs"
+   ],
+   "shot": {
+    "view": "3d",
+    "result": "deformed",
+    "extruded": true
+   },
+   "ndm": 3,
+   "elements": 56,
+   "nodes": 36,
+   "steps": {
+    "carapace": 2,
+    "opensees": 2
+   },
+   "worst": 0.000001729024783832936,
+   "pass": true,
+   "source": {
+    "file": "src/app/lib/verification/cases.ts",
+    "line": 61
+   }
+  },
+  {
+   "id": "moment-curvature",
+   "category": "material",
+   "skip": [],
+   "rtol": {
+    "value": 0.00001
+   },
+   "sources": [
+    "core/src/model/fiber_section.rs",
+    "core/src/model/materials/steel01.rs",
+    "core/src/model/materials/concrete01.rs"
+   ],
+   "shot": {
+    "view": "front",
+    "result": "deformed"
+   },
+   "ndm": 2,
+   "elements": 1,
+   "nodes": 2,
+   "steps": {
+    "carapace": 210,
+    "opensees": 210
+   },
+   "worst": 0.000004743579868820703,
+   "pass": true,
+   "source": {
+    "file": "src/app/lib/verification/cases.ts",
+    "line": 67
+   }
+  },
+  {
+   "id": "cantilever-disp",
+   "category": "material",
+   "skip": [],
+   "rtol": {
+    "value": 0.00001
+   },
+   "sources": [
+    "core/src/model/elements/disp_beam_column.rs",
+    "core/src/model/fiber_section.rs",
+    "core/src/model/integration.rs"
+   ],
+   "shot": {
+    "view": "front",
+    "result": "M"
+   },
+   "ndm": 2,
+   "elements": 4,
+   "nodes": 5,
+   "steps": {
+    "carapace": 100,
+    "opensees": 100
+   },
+   "worst": 0.000002514207949173388,
+   "pass": true,
+   "source": {
+    "file": "src/app/lib/verification/cases.ts",
+    "line": 72
+   }
+  },
+  {
+   "id": "frame-disp-pinned",
+   "category": "material",
+   "skip": [],
+   "rtol": {
+    "value": 0.00001
+   },
+   "sources": [
+    "core/src/model/elements/disp_beam_column.rs",
+    "core/src/model/fiber_section.rs",
+    "core/src/analysis/transient.rs"
+   ],
+   "shot": {
+    "view": "front",
+    "result": "M"
+   },
+   "ndm": 2,
+   "elements": 3,
+   "nodes": 4,
+   "steps": {
+    "carapace": 2110,
+    "opensees": 2110
+   },
+   "worst": 0.000003636500673361152,
+   "pass": true,
+   "source": {
+    "file": "src/app/lib/verification/cases.ts",
+    "line": 77
+   }
+  },
+  {
+   "id": "precast-wall",
+   "category": "material",
+   "skip": [],
+   "rtol": {
+    "value": 0.00001
+   },
+   "sources": [
+    "core/src/model/elements/disp_beam_column.rs",
+    "core/src/model/elements/zero_length.rs",
+    "core/src/model/materials/steel02.rs",
+    "core/src/model/materials/concrete02.rs",
+    "core/src/model/materials/elastic_like.rs",
+    "core/src/model/materials/composite.rs"
+   ],
+   "shot": {
+    "view": "front",
+    "result": "deformed"
+   },
+   "ndm": 2,
+   "elements": 61,
+   "nodes": 58,
+   "steps": {
+    "carapace": 210,
+    "opensees": 210
+   },
+   "worst": 0.0000032632646679264453,
+   "pass": true,
+   "source": {
+    "file": "src/app/lib/verification/cases.ts",
+    "line": 82
+   }
+  },
+  {
+   "id": "cantilever3d-fiber-pushover",
+   "category": "fiber3d",
+   "skip": [],
+   "rtol": {
+    "value": 0.00001
+   },
+   "sources": [
+    "core/src/model/elements/disp_beam_column.rs",
+    "core/src/model/fiber_section.rs",
+    "core/src/model/materials/steel01.rs",
+    "core/src/model/materials/concrete01.rs"
+   ],
+   "shot": {
+    "view": "3d",
+    "result": "deformed",
+    "extruded": true
+   },
+   "ndm": 3,
+   "elements": 2,
+   "nodes": 3,
+   "steps": {
+    "carapace": 60,
+    "opensees": 60
+   },
+   "worst": 5.149526751374879e-7,
+   "pass": true,
+   "source": {
+    "file": "src/app/lib/verification/cases.ts",
+    "line": 87
+   }
+  },
+  {
+   "id": "truss-yielding",
+   "category": "material",
+   "skip": [],
+   "rtol": {
+    "value": 0.00001
+   },
+   "sources": [
+    "core/src/model/elements/truss.rs",
+    "core/src/model/materials/steel01.rs"
+   ],
+   "shot": {
+    "view": "front",
+    "result": "N"
+   },
+   "ndm": 2,
+   "elements": 3,
+   "nodes": 3,
+   "steps": {
+    "carapace": 60,
+    "opensees": 60
+   },
+   "worst": 0.0000016677987446544717,
+   "pass": true,
+   "source": {
+    "file": "src/app/lib/verification/cases.ts",
+    "line": 92
+   }
+  },
+  {
+   "id": "truss-concrete02",
+   "category": "material",
+   "skip": [],
+   "rtol": {
+    "value": 0.00001
+   },
+   "sources": [
+    "core/src/model/elements/truss.rs",
+    "core/src/model/materials/concrete02.rs"
+   ],
+   "shot": {
+    "view": "front",
+    "result": "N"
+   },
+   "ndm": 2,
+   "elements": 3,
+   "nodes": 3,
+   "steps": {
+    "carapace": 25,
+    "opensees": 25
+   },
+   "worst": 0.000002994943862912548,
+   "pass": true,
+   "source": {
+    "file": "src/app/lib/verification/cases.ts",
+    "line": 92
+   }
+  },
+  {
+   "id": "truss-hysteretic",
+   "category": "material",
+   "skip": [],
+   "rtol": {
+    "value": 0.00001
+   },
+   "sources": [
+    "core/src/model/elements/truss.rs",
+    "core/src/model/materials/hysteretic.rs"
+   ],
+   "shot": {
+    "view": "front",
+    "result": "N"
+   },
+   "ndm": 2,
+   "elements": 3,
+   "nodes": 3,
+   "steps": {
+    "carapace": 60,
+    "opensees": 60
+   },
+   "worst": 0.0000021947758914617092,
+   "pass": true,
+   "source": {
+    "file": "src/app/lib/verification/cases.ts",
+    "line": 92
+   }
+  },
+  {
+   "id": "truss-pinching4",
+   "category": "material",
+   "skip": [],
+   "rtol": {
+    "value": 0.00001
+   },
+   "sources": [
+    "core/src/model/elements/truss.rs",
+    "core/src/model/materials/pinching4.rs"
+   ],
+   "shot": {
+    "view": "front",
+    "result": "N"
+   },
+   "ndm": 2,
+   "elements": 3,
+   "nodes": 3,
+   "steps": {
+    "carapace": 60,
+    "opensees": 60
+   },
+   "worst": 0.0000017106189167099883,
+   "pass": true,
+   "source": {
+    "file": "src/app/lib/verification/cases.ts",
+    "line": 92
+   }
+  },
+  {
+   "id": "truss-parallel",
+   "category": "material",
+   "skip": [],
+   "rtol": {
+    "value": 0.00001
+   },
+   "sources": [
+    "core/src/model/elements/truss.rs",
+    "core/src/model/materials/composite.rs",
+    "core/src/model/materials/steel01.rs"
+   ],
+   "shot": {
+    "view": "front",
+    "result": "N"
+   },
+   "ndm": 2,
+   "elements": 3,
+   "nodes": 3,
+   "steps": {
+    "carapace": 60,
+    "opensees": 60
+   },
+   "worst": 0.0000016616934080509593,
+   "pass": true,
+   "source": {
+    "file": "src/app/lib/verification/cases.ts",
+    "line": 92
+   }
+  },
+  {
+   "id": "truss-series",
+   "category": "material",
+   "skip": [],
+   "rtol": {
+    "value": 0.00001
+   },
+   "sources": [
+    "core/src/model/elements/truss.rs",
+    "core/src/model/materials/composite.rs",
+    "core/src/model/materials/steel01.rs"
+   ],
+   "shot": {
+    "view": "front",
+    "result": "N"
+   },
+   "ndm": 2,
+   "elements": 3,
+   "nodes": 3,
+   "steps": {
+    "carapace": 60,
+    "opensees": 60
+   },
+   "worst": 0.0000017076544710350715,
+   "pass": true,
+   "source": {
+    "file": "src/app/lib/verification/cases.ts",
+    "line": 92
+   }
+  },
+  {
+   "id": "truss-minmax",
+   "category": "material",
+   "skip": [],
+   "rtol": {
+    "value": 0.00001
+   },
+   "sources": [
+    "core/src/model/elements/truss.rs",
+    "core/src/model/materials/composite.rs",
+    "core/src/model/materials/steel01.rs"
+   ],
+   "shot": {
+    "view": "front",
+    "result": "N"
+   },
+   "ndm": 2,
+   "elements": 3,
+   "nodes": 3,
+   "steps": {
+    "carapace": 60,
+    "opensees": 60
+   },
+   "worst": 0.000001712306256958053,
+   "pass": true,
+   "source": {
+    "file": "src/app/lib/verification/cases.ts",
+    "line": 92
+   }
+  },
+  {
+   "id": "frame-elastic",
+   "category": "dynamics",
+   "skip": [],
+   "rtol": {
+    "value": 0.00001
+   },
+   "sources": [
+    "core/src/model/elements/elastic_beam_column.rs",
+    "core/src/analysis/transient.rs",
+    "core/src/analysis/damping.rs",
+    "core/src/analysis/ground_motion.rs",
+    "core/src/analysis/modal.rs"
+   ],
+   "shot": {
+    "view": "front",
+    "result": "M"
+   },
+   "ndm": 2,
+   "elements": 10,
+   "nodes": 9,
+   "steps": {
+    "carapace": 2110,
+    "opensees": 2110
+   },
+   "worst": 0.000004031988590036352,
+   "pass": true,
+   "source": {
+    "file": "src/app/lib/verification/cases.ts",
+    "line": 99
+   }
+  },
+  {
+   "id": "frame3d-elastic",
+   "category": "dynamics",
+   "skip": [],
+   "rtol": {
+    "value": 0.00001
+   },
+   "sources": [
+    "core/src/model/elements/elastic_beam_column.rs",
+    "core/src/analysis/transient.rs",
+    "core/src/analysis/damping.rs",
+    "core/src/analysis/ground_motion.rs",
+    "core/src/analysis/modal.rs"
+   ],
+   "shot": {
+    "view": "3d",
+    "result": "deformed",
+    "extruded": true
+   },
+   "ndm": 3,
+   "elements": 26,
+   "nodes": 18,
+   "steps": {
+    "carapace": 2110,
+    "opensees": 2110
+   },
+   "worst": 0.000003132270596807047,
+   "pass": true,
+   "source": {
+    "file": "src/app/lib/verification/cases.ts",
+    "line": 104
+   }
+  },
+  {
+   "id": "pdelta-cantilever-2d",
+   "category": "geometric",
+   "skip": [],
+   "rtol": {
+    "value": 0.05,
+    "why": "Carapace's PDelta uses the consistent geometric stiffness, which captures both P-Δ (chord rotation) and P-δ (member curvature); OpenSees' PDelta keeps only the chord term N/L. The two agree exactly without axial load and differ by a few percent under heavy compression, with Carapace closer to the exact beam-column solution."
+   },
+   "sources": [
+    "core/src/model/elements/elastic_beam_column.rs",
+    "core/src/model/transform.rs"
+   ],
+   "shot": {
+    "view": "front",
+    "result": "M"
+   },
+   "ndm": 2,
+   "elements": 1,
+   "nodes": 2,
+   "steps": {
+    "carapace": 30,
+    "opensees": 30
+   },
+   "worst": 0.020018924421883813,
+   "pass": true,
+   "source": {
+    "file": "src/app/lib/verification/newCases.ts",
+    "line": 350
+   }
+  },
+  {
+   "id": "pdelta-portal-2d",
+   "category": "geometric",
+   "skip": [],
+   "rtol": {
+    "value": 0.05,
+    "why": "Carapace's PDelta uses the consistent geometric stiffness, which captures both P-Δ (chord rotation) and P-δ (member curvature); OpenSees' PDelta keeps only the chord term N/L. The two agree exactly without axial load and differ by a few percent under heavy compression, with Carapace closer to the exact beam-column solution."
+   },
+   "sources": [
+    "core/src/model/elements/elastic_beam_column.rs",
+    "core/src/model/transform.rs"
+   ],
+   "shot": {
+    "view": "front",
+    "result": "M"
+   },
+   "ndm": 2,
+   "elements": 5,
+   "nodes": 6,
+   "steps": {
+    "carapace": 60,
+    "opensees": 60
+   },
+   "worst": 0.03526010713700015,
+   "pass": true,
+   "source": {
+    "file": "src/app/lib/verification/newCases.ts",
+    "line": 359
+   }
+  },
+  {
+   "id": "corot-cantilever-2d",
+   "category": "geometric",
+   "skip": [],
+   "rtol": {
+    "value": 0.00001
+   },
+   "sources": [
+    "core/src/model/elements/elastic_beam_column.rs",
+    "core/src/model/transform.rs"
+   ],
+   "shot": {
+    "view": "front",
+    "result": "deformed"
+   },
+   "ndm": 2,
+   "elements": 10,
+   "nodes": 11,
+   "steps": {
+    "carapace": 50,
+    "opensees": 50
+   },
+   "worst": 0.000005152675912501966,
+   "pass": true,
+   "source": {
+    "file": "src/app/lib/verification/newCases.ts",
+    "line": 364
+   }
+  },
+  {
+   "id": "corot-euler-column-2d",
+   "category": "geometric",
+   "skip": [],
+   "rtol": {
+    "value": 0.00001
+   },
+   "sources": [
+    "core/src/model/elements/elastic_beam_column.rs",
+    "core/src/model/transform.rs"
+   ],
+   "shot": {
+    "view": "front",
+    "result": "deformed"
+   },
+   "ndm": 2,
+   "elements": 10,
+   "nodes": 11,
+   "steps": {
+    "carapace": 60,
+    "opensees": 60
+   },
+   "worst": 0.000005865914887630883,
+   "pass": true,
+   "source": {
+    "file": "src/app/lib/verification/newCases.ts",
+    "line": 373
+   }
+  },
+  {
+   "id": "corot-fiber-column-2d",
+   "category": "geometric",
+   "skip": [],
+   "rtol": {
+    "value": 0.0002,
+    "quantities": [
+     "force"
+    ],
+    "why": "Under Corotational geometry OpenSees reports a member's local end shear as (Mi + Mj)/L0, with the undeformed length; Carapace divides by the current chord length, which is what equilibrium of the deformed member gives. End moments, axial forces, displacements and reactions agree to 1e-6; the end shears differ by the ratio of the two lengths (up to 0.1% of the shear here)."
+   },
+   "sources": [
+    "core/src/model/elements/disp_beam_column.rs",
+    "core/src/model/fiber_section.rs",
+    "core/src/model/transform.rs",
+    "core/src/model/materials/concrete01.rs",
+    "core/src/model/materials/steel01.rs"
+   ],
+   "shot": {
+    "view": "front",
+    "result": "M",
+    "extruded": true
+   },
+   "ndm": 2,
+   "elements": 4,
+   "nodes": 5,
+   "steps": {
+    "carapace": 70,
+    "opensees": 70
+   },
+   "worst": 0.0000823589547360704,
+   "pass": true,
+   "source": {
+    "file": "src/app/lib/verification/newCases.ts",
+    "line": 379
+   }
+  },
+  {
+   "id": "pdelta-frame-3d",
+   "category": "geometric",
+   "skip": [],
+   "rtol": {
+    "value": 0.05,
+    "why": "Carapace's PDelta uses the consistent geometric stiffness, which captures both P-Δ (chord rotation) and P-δ (member curvature); OpenSees' PDelta keeps only the chord term N/L. The two agree exactly without axial load and differ by a few percent under heavy compression, with Carapace closer to the exact beam-column solution."
+   },
+   "sources": [
+    "core/src/model/elements/elastic_beam_column.rs",
+    "core/src/model/transform.rs"
+   ],
+   "shot": {
+    "view": "3d",
+    "result": "deformed",
+    "extruded": true
+   },
+   "ndm": 3,
+   "elements": 26,
+   "nodes": 18,
+   "steps": {
+    "carapace": 40,
+    "opensees": 40
+   },
+   "worst": 0.009559449005672878,
+   "pass": true,
+   "source": {
+    "file": "src/app/lib/verification/newCases.ts",
+    "line": 385
+   }
+  },
+  {
+   "id": "fiber-column-biaxial-3d",
+   "category": "fiber3d",
+   "skip": [],
+   "rtol": {
+    "value": 0.00001
+   },
+   "sources": [
+    "core/src/model/elements/disp_beam_column.rs",
+    "core/src/model/fiber_section.rs",
+    "core/src/model/integration.rs",
+    "core/src/model/materials/concrete01.rs",
+    "core/src/model/materials/steel01.rs"
+   ],
+   "shot": {
+    "view": "3d",
+    "result": "deformed",
+    "extruded": true
+   },
+   "ndm": 3,
+   "elements": 3,
+   "nodes": 4,
+   "steps": {
+    "carapace": 60,
+    "opensees": 60
+   },
+   "worst": 9.918569374156583e-7,
+   "pass": true,
+   "source": {
+    "file": "src/app/lib/verification/newCases.ts",
+    "line": 392
+   }
+  },
+  {
+   "id": "fiber-frame-3d",
+   "category": "fiber3d",
+   "skip": [],
+   "rtol": {
+    "value": 0.00001
+   },
+   "sources": [
+    "core/src/model/elements/disp_beam_column.rs",
+    "core/src/model/fiber_section.rs",
+    "core/src/model/integration.rs",
+    "core/src/model/materials/concrete01.rs",
+    "core/src/model/materials/steel01.rs"
+   ],
+   "shot": {
+    "view": "3d",
+    "result": "M",
+    "extruded": true
+   },
+   "ndm": 3,
+   "elements": 16,
+   "nodes": 12,
+   "steps": {
+    "carapace": 50,
+    "opensees": 50
+   },
+   "worst": 0.0000013093474488916803,
+   "pass": true,
+   "source": {
+    "file": "src/app/lib/verification/newCases.ts",
+    "line": 397
+   }
+  },
+  {
+   "id": "fiber-frame-3d-earthquake",
+   "category": "fiber3d",
+   "skip": [],
+   "rtol": {
+    "value": 0.00001
+   },
+   "sources": [
+    "core/src/model/elements/disp_beam_column.rs",
+    "core/src/model/fiber_section.rs",
+    "core/src/analysis/transient.rs",
+    "core/src/analysis/damping.rs",
+    "core/src/analysis/ground_motion.rs"
+   ],
+   "shot": {
+    "view": "3d",
+    "result": "deformed",
+    "extruded": true
+   },
+   "ndm": 3,
+   "elements": 16,
+   "nodes": 12,
+   "steps": {
+    "carapace": 610,
+    "opensees": 610
+   },
+   "worst": 0.0000015065493971485254,
+   "pass": true,
+   "source": {
+    "file": "src/app/lib/verification/newCases.ts",
+    "line": 402
+   }
+  },
+  {
+   "id": "cyclic-steel01",
+   "category": "cyclic",
+   "skip": [],
+   "rtol": {
+    "value": 0.00001
+   },
+   "sources": [
+    "core/src/model/elements/truss.rs",
+    "core/src/model/materials/steel01.rs"
+   ],
+   "shot": {
+    "view": "front",
+    "result": "N"
+   },
+   "ndm": 2,
+   "elements": 2,
+   "nodes": 2,
+   "steps": {
+    "carapace": 1040,
+    "opensees": 1040
+   },
+   "worst": 0.0000046948356792573285,
+   "pass": true,
+   "source": {
+    "file": "src/app/lib/verification/newCases.ts",
+    "line": 407
+   }
+  },
+  {
+   "id": "cyclic-steel02",
+   "category": "cyclic",
+   "skip": [],
+   "rtol": {
+    "value": 0.00001
+   },
+   "sources": [
+    "core/src/model/elements/truss.rs",
+    "core/src/model/materials/steel02.rs"
+   ],
+   "shot": {
+    "view": "front",
+    "result": "N"
+   },
+   "ndm": 2,
+   "elements": 2,
+   "nodes": 2,
+   "steps": {
+    "carapace": 1040,
+    "opensees": 1040
+   },
+   "worst": 0.0000046948356792573285,
+   "pass": true,
+   "source": {
+    "file": "src/app/lib/verification/newCases.ts",
+    "line": 408
+   }
+  },
+  {
+   "id": "cyclic-concrete01",
+   "category": "cyclic",
+   "skip": [],
+   "rtol": {
+    "value": 0.00001
+   },
+   "sources": [
+    "core/src/model/elements/truss.rs",
+    "core/src/model/materials/concrete01.rs"
+   ],
+   "shot": {
+    "view": "front",
+    "result": "N"
+   },
+   "ndm": 2,
+   "elements": 2,
+   "nodes": 2,
+   "steps": {
+    "carapace": 588,
+    "opensees": 588
+   },
+   "worst": 0.0000016666666666666667,
+   "pass": true,
+   "source": {
+    "file": "src/app/lib/verification/newCases.ts",
+    "line": 409
+   }
+  },
+  {
+   "id": "cyclic-concrete02",
+   "category": "cyclic",
+   "skip": [],
+   "rtol": {
+    "value": 0.00001
+   },
+   "sources": [
+    "core/src/model/elements/truss.rs",
+    "core/src/model/materials/concrete02.rs"
+   ],
+   "shot": {
+    "view": "front",
+    "result": "N"
+   },
+   "ndm": 2,
+   "elements": 2,
+   "nodes": 2,
+   "steps": {
+    "carapace": 608,
+    "opensees": 608
+   },
+   "worst": 0.0000016666666666666667,
+   "pass": true,
+   "source": {
+    "file": "src/app/lib/verification/newCases.ts",
+    "line": 410
+   }
+  },
+  {
+   "id": "cyclic-hysteretic",
+   "category": "cyclic",
+   "skip": [],
+   "rtol": {
+    "value": 0.00001
+   },
+   "sources": [
+    "core/src/model/elements/truss.rs",
+    "core/src/model/materials/hysteretic.rs"
+   ],
+   "shot": {
+    "view": "front",
+    "result": "N"
+   },
+   "ndm": 2,
+   "elements": 2,
+   "nodes": 2,
+   "steps": {
+    "carapace": 1120,
+    "opensees": 1120
+   },
+   "worst": 0.0000016581447321611147,
+   "pass": true,
+   "source": {
+    "file": "src/app/lib/verification/newCases.ts",
+    "line": 411
+   }
+  },
+  {
+   "id": "cyclic-pinching4",
+   "category": "cyclic",
+   "skip": [],
+   "rtol": {
+    "value": 0.00001
+   },
+   "sources": [
+    "core/src/model/elements/truss.rs",
+    "core/src/model/materials/pinching4.rs"
+   ],
+   "shot": {
+    "view": "front",
+    "result": "N"
+   },
+   "ndm": 2,
+   "elements": 2,
+   "nodes": 2,
+   "steps": {
+    "carapace": 1120,
+    "opensees": 1120
+   },
+   "worst": 0.0000014285486861730793,
+   "pass": true,
+   "source": {
+    "file": "src/app/lib/verification/newCases.ts",
+    "line": 412
+   }
+  },
+  {
+   "id": "cyclic-elasticpp",
+   "category": "cyclic",
+   "skip": [],
+   "rtol": {
+    "value": 0.00001
+   },
+   "sources": [
+    "core/src/model/elements/truss.rs",
+    "core/src/model/materials/elastic_like.rs"
+   ],
+   "shot": {
+    "view": "front",
+    "result": "N"
+   },
+   "ndm": 2,
+   "elements": 2,
+   "nodes": 2,
+   "steps": {
+    "carapace": 560,
+    "opensees": 560
+   },
+   "worst": 0.0000014028393471724632,
+   "pass": true,
+   "source": {
+    "file": "src/app/lib/verification/newCases.ts",
+    "line": 413
+   }
+  },
+  {
+   "id": "cyclic-ent",
+   "category": "cyclic",
+   "skip": [],
+   "rtol": {
+    "value": 0.00001
+   },
+   "sources": [
+    "core/src/model/elements/truss.rs",
+    "core/src/model/materials/elastic_like.rs"
+   ],
+   "shot": {
+    "view": "front",
+    "result": "N"
+   },
+   "ndm": 2,
+   "elements": 2,
+   "nodes": 2,
+   "steps": {
+    "carapace": 240,
+    "opensees": 240
+   },
+   "worst": 7.035218342241115e-7,
+   "pass": true,
+   "source": {
+    "file": "src/app/lib/verification/newCases.ts",
+    "line": 414
+   }
+  },
+  {
+   "id": "modal-frame-2d",
+   "category": "dynamics",
+   "skip": [],
+   "rtol": {
+    "value": 0.00001
+   },
+   "sources": [
+    "core/src/analysis/modal.rs",
+    "core/src/model/elements/elastic_beam_column.rs"
+   ],
+   "shot": {
+    "view": "front",
+    "result": "mode"
+   },
+   "ndm": 2,
+   "elements": 15,
+   "nodes": 12,
+   "steps": {
+    "carapace": 0,
+    "opensees": 0
+   },
+   "worst": 1.0366152380925087e-12,
+   "pass": true,
+   "source": {
+    "file": "src/app/lib/verification/newCases.ts",
+    "line": 417
+   }
+  },
+  {
+   "id": "modal-frame-3d",
+   "category": "dynamics",
+   "skip": [],
+   "rtol": {
+    "value": 0.00001
+   },
+   "sources": [
+    "core/src/analysis/modal.rs",
+    "core/src/model/elements/elastic_beam_column.rs"
+   ],
+   "shot": {
+    "view": "3d",
+    "result": "mode"
+   },
+   "ndm": 3,
+   "elements": 26,
+   "nodes": 18,
+   "steps": {
+    "carapace": 0,
+    "opensees": 0
+   },
+   "worst": 2.1138424344258055e-11,
+   "pass": true,
+   "source": {
+    "file": "src/app/lib/verification/newCases.ts",
+    "line": 421
+   }
+  },
+  {
+   "id": "modal-element-mass",
+   "category": "dynamics",
+   "skip": [],
+   "rtol": {
+    "value": 0.00001
+   },
+   "sources": [
+    "core/src/analysis/modal.rs",
+    "core/src/model/elements/elastic_beam_column.rs"
+   ],
+   "shot": {
+    "view": "front",
+    "result": "mode"
+   },
+   "ndm": 2,
+   "elements": 10,
+   "nodes": 9,
+   "steps": {
+    "carapace": 0,
+    "opensees": 0
+   },
+   "worst": 3.2499558599852207e-12,
+   "pass": true,
+   "source": {
+    "file": "src/app/lib/verification/newCases.ts",
+    "line": 425
+   }
+  },
+  {
+   "id": "modal-plate",
+   "category": "dynamics",
+   "skip": [],
+   "rtol": {
+    "value": 0.15,
+    "why": "Carapace lumps a shell's mass at its nodes (translations only); OpenSees' ShellMITC4 forms a consistent mass matrix. Both are standard; the consistent mass gives somewhat lower frequencies for a coarse mesh, and the two converge as the mesh is refined. Stiffness is identical: static plate results agree to 1e-6."
+   },
+   "sources": [
+    "core/src/analysis/modal.rs",
+    "core/src/model/elements/shell4.rs",
+    "core/src/model/materials/shell_section.rs"
+   ],
+   "shot": {
+    "view": "3d",
+    "result": "mode"
+   },
+   "ndm": 3,
+   "elements": 18,
+   "nodes": 28,
+   "steps": {
+    "carapace": 0,
+    "opensees": 0
+   },
+   "worst": 0.10117684075898671,
+   "pass": true,
+   "source": {
+    "file": "src/app/lib/verification/newCases.ts",
+    "line": 429
+   }
+  },
+  {
+   "id": "transient-cantilever-2d",
+   "category": "dynamics",
+   "skip": [],
+   "rtol": {
+    "value": 0.00001
+   },
+   "sources": [
+    "core/src/analysis/transient.rs",
+    "core/src/analysis/damping.rs",
+    "core/src/analysis/ground_motion.rs",
+    "core/src/model/elements/elastic_beam_column.rs"
+   ],
+   "shot": {
+    "view": "front",
+    "result": "deformed"
+   },
+   "ndm": 2,
+   "elements": 1,
+   "nodes": 2,
+   "steps": {
+    "carapace": 400,
+    "opensees": 400
+   },
+   "worst": 0.0000034060406038737552,
+   "pass": true,
+   "source": {
+    "file": "src/app/lib/verification/cases.ts",
+    "line": 1
+   }
+  },
+  {
+   "id": "transient-cantilever-3d",
+   "category": "dynamics",
+   "skip": [],
+   "rtol": {
+    "value": 0.00001
+   },
+   "sources": [
+    "core/src/analysis/transient.rs",
+    "core/src/analysis/damping.rs",
+    "core/src/analysis/ground_motion.rs",
+    "core/src/model/elements/elastic_beam_column.rs"
+   ],
+   "shot": {
+    "view": "3d",
+    "result": "deformed"
+   },
+   "ndm": 3,
+   "elements": 1,
+   "nodes": 2,
+   "steps": {
+    "carapace": 400,
+    "opensees": 400
+   },
+   "worst": 0.0000022295496300294922,
+   "pass": true,
+   "source": {
+    "file": "src/app/lib/verification/cases.ts",
+    "line": 1
+   }
+  },
+  {
+   "id": "transient-nonzero-initial-acceleration",
+   "category": "dynamics",
+   "skip": [],
+   "rtol": {
+    "value": 0.3,
+    "why": "The record starts at a non-zero acceleration. Carapace starts the Newmark integration from the consistent initial acceleration (M·a₀ = −M·ι·ag(0) − C·v₀ − K·u₀), OpenSees from a₀ = 0, so the relative acceleration differs by the initial ground acceleration at the start and the difference decays with damping (displacements differ far less). Records that start at zero (or are padded with -prependZero, as PySees does for imported records) agree to 1e-6."
+   },
+   "sources": [
+    "core/src/analysis/transient.rs",
+    "core/src/analysis/ground_motion.rs"
+   ],
+   "shot": {
+    "view": "front",
+    "result": "deformed"
+   },
+   "ndm": 2,
+   "elements": 1,
+   "nodes": 2,
+   "steps": {
+    "carapace": 400,
+    "opensees": 400
+   },
+   "worst": 0.2575428124457064,
+   "pass": true,
+   "source": {
+    "file": "src/app/lib/verification/newCases.ts",
+    "line": 439
+   }
+  },
+  {
+   "id": "transient-modal-damping",
+   "category": "dynamics",
+   "skip": [],
+   "rtol": {
+    "value": 0.00001
+   },
+   "sources": [
+    "core/src/analysis/transient.rs",
+    "core/src/analysis/damping.rs",
+    "core/src/analysis/modal.rs"
+   ],
+   "shot": {
+    "view": "3d",
+    "result": "deformed"
+   },
+   "ndm": 3,
+   "elements": 1,
+   "nodes": 2,
+   "steps": {
+    "carapace": 400,
+    "opensees": 400
+   },
+   "worst": 0.000002407811021677089,
+   "pass": true,
+   "source": {
+    "file": "src/app/lib/verification/newCases.ts",
+    "line": 445
+   }
+  },
+  {
+   "id": "algorithm-newton-norm-unbalance",
+   "category": "solution",
+   "skip": [],
+   "rtol": {
+    "value": 0.00001
+   },
+   "sources": [
+    "core/src/analysis/algorithm.rs",
+    "core/src/analysis/convergence.rs",
+    "core/src/model/elements/disp_beam_column.rs"
+   ],
+   "shot": {
+    "view": "front",
+    "result": "M"
+   },
+   "ndm": 2,
+   "elements": 4,
+   "nodes": 5,
+   "steps": {
+    "carapace": 100,
+    "opensees": 100
+   },
+   "worst": 0.0000025136735136292037,
+   "pass": true,
+   "source": {
+    "file": "src/app/lib/verification/newCases.ts",
+    "line": 457
+   }
+  },
+  {
+   "id": "algorithm-newton-energy-incr",
+   "category": "solution",
+   "skip": [],
+   "rtol": {
+    "value": 0.00001
+   },
+   "sources": [
+    "core/src/analysis/algorithm.rs",
+    "core/src/analysis/convergence.rs",
+    "core/src/model/elements/disp_beam_column.rs"
+   ],
+   "shot": {
+    "view": "front",
+    "result": "M"
+   },
+   "ndm": 2,
+   "elements": 4,
+   "nodes": 5,
+   "steps": {
+    "carapace": 100,
+    "opensees": 100
+   },
+   "worst": 0.0000025136735136292037,
+   "pass": true,
+   "source": {
+    "file": "src/app/lib/verification/newCases.ts",
+    "line": 457
+   }
+  },
+  {
+   "id": "algorithm-modified-newton",
+   "category": "solution",
+   "skip": [],
+   "rtol": {
+    "value": 0.00001
+   },
+   "sources": [
+    "core/src/analysis/algorithm.rs",
+    "core/src/analysis/convergence.rs",
+    "core/src/model/elements/disp_beam_column.rs"
+   ],
+   "shot": {
+    "view": "front",
+    "result": "M"
+   },
+   "ndm": 2,
+   "elements": 4,
+   "nodes": 5,
+   "steps": {
+    "carapace": 100,
+    "opensees": 100
+   },
+   "worst": 0.0000025136735133348945,
+   "pass": true,
+   "source": {
+    "file": "src/app/lib/verification/newCases.ts",
+    "line": 457
+   }
+  },
+  {
+   "id": "algorithm-krylov-newton",
+   "category": "solution",
+   "skip": [],
+   "rtol": {
+    "value": 0.00001
+   },
+   "sources": [
+    "core/src/analysis/algorithm.rs",
+    "core/src/analysis/convergence.rs",
+    "core/src/analysis/krylov.rs",
+    "core/src/model/elements/disp_beam_column.rs"
+   ],
+   "shot": {
+    "view": "front",
+    "result": "M"
+   },
+   "ndm": 2,
+   "elements": 4,
+   "nodes": 5,
+   "steps": {
+    "carapace": 100,
+    "opensees": 100
+   },
+   "worst": 0.000002513673514217823,
+   "pass": true,
+   "source": {
+    "file": "src/app/lib/verification/newCases.ts",
+    "line": 457
+   }
+  },
+  {
+   "id": "algorithm-newton-line-search",
+   "category": "solution",
+   "skip": [],
+   "rtol": {
+    "value": 0.00001
+   },
+   "sources": [
+    "core/src/analysis/algorithm.rs",
+    "core/src/analysis/convergence.rs",
+    "core/src/analysis/line_search.rs",
+    "core/src/model/elements/disp_beam_column.rs"
+   ],
+   "shot": {
+    "view": "front",
+    "result": "M"
+   },
+   "ndm": 2,
+   "elements": 4,
+   "nodes": 5,
+   "steps": {
+    "carapace": 100,
+    "opensees": 100
+   },
+   "worst": 0.000002513673513040585,
+   "pass": true,
+   "source": {
+    "file": "src/app/lib/verification/newCases.ts",
+    "line": 457
+   }
+  },
+  {
+   "id": "zero-length-section-hinges",
+   "category": "material",
+   "skip": [],
+   "rtol": {
+    "value": 0.00001
+   },
+   "sources": [
+    "core/src/model/fiber_section.rs",
+    "core/src/model/elements/zero_length.rs",
+    "core/src/model/materials/concrete01.rs",
+    "core/src/model/materials/steel01.rs"
+   ],
+   "shot": {
+    "view": "front",
+    "result": "M"
+   },
+   "ndm": 2,
+   "elements": 5,
+   "nodes": 6,
+   "steps": {
+    "carapace": 70,
+    "opensees": 70
+   },
+   "worst": 0.000001663783581508834,
+   "pass": true,
+   "source": {
+    "file": "src/app/lib/verification/newCases.ts",
+    "line": 463
+   }
+  }
+ ]
+}

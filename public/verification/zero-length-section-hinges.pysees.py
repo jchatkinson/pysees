@@ -1,0 +1,66 @@
+import openseespy.opensees as ops
+
+# @pysees project {"ndf":3,"ndm":2,"nextIds":{"beamIntegration":1,"element":6,"geomTransf":2,"material":3,"misc":1,"mpConstraint":1,"node":13,"pattern":3,"region":1,"section":2,"timeSeries":3},"version":1}
+# @pysees layout {"gridlines":[],"levels":[],"nextGridlineId":1,"nextLevelId":1}
+# @pysees report {"activeSavedPlotId":null,"nextSavedPlotId":1,"savedPlots":[]}
+# @pysees display {"hiddenLoadPatterns":[],"numberFormat":{"digits":5,"labelDigits":3},"plotView":{"maximized":false,"nextSeriesId":1,"open":false,"pos":null,"series":[],"sharedX":true,"showEditor":true,"showStageTicks":true,"showStepMarker":true,"size":{"h":380,"w":520},"x":{"type":"step"}},"resultsView":{"contour":"Mx","contourDeformed":true,"fillDiagrams":true,"fps":5,"loop":true,"modeSpeed":0.5,"scales":{"axial":null,"deformed":null,"mode":null,"moment":null,"momentY":null,"shear":null,"shearZ":null,"torsion":null},"showReactions":false,"showUndeformed":true,"showValues":false,"smooth":true,"type":"none"},"unitPrefs":{},"viewSettings":{}}
+ops.wipe()
+ops.model('basic', '-ndm', 2, '-ndf', 3)
+ops.node(1, 0, 0)
+ops.node(2, 6, 0)
+ops.node(3, 0, 3.5)
+ops.node(4, 6, 3.5)
+ops.node(11, 0, 0)
+ops.node(12, 6, 0)
+ops.uniaxialMaterial('Concrete01', 1, -30000000, -0.002, -6000000, -0.006)
+ops.uniaxialMaterial('Steel01', 2, 400000000, 200000000000, 0.01)
+ops.section('Fiber', 1)
+ops.patch('rect', 1, 10, 6, -0.25, -0.2, 0.25, 0.2)
+ops.fiber(-0.2, -0.15000000000000002, 0.0008, 2)
+ops.fiber(-0.2, 0.15000000000000002, 0.0008, 2)
+ops.fiber(0.2, -0.15000000000000002, 0.0008, 2)
+ops.fiber(0.2, 0.15000000000000002, 0.0008, 2)
+ops.geomTransf('Linear', 1)
+ops.element('zeroLengthSection', 1, 1, 11, 1, '-orient', 0, 1, 0)
+ops.element('zeroLengthSection', 2, 12, 2, 1, '-orient', 0, -1, 0)
+ops.element('elasticBeamColumn', 3, 11, 3, 0.2, 30000000000, 0.004, 1)
+ops.element('elasticBeamColumn', 4, 12, 4, 0.2, 30000000000, 0.004, 1)
+ops.element('elasticBeamColumn', 5, 3, 4, 0.15, 30000000000, 0.003, 1)
+ops.fix(1, 1, 1, 1)
+ops.fix(2, 1, 1, 1)
+ops.fix(11, 1, 0, 0)
+ops.fix(12, 1, 0, 0)
+ops.timeSeries('Linear', 1, '-factor', 1)
+ops.timeSeries('Linear', 2, '-factor', 1)
+# @pysees analysis begin {"command":{"blockId":"whole-model-recorder","params":{"directory":"out"},"type":"ANALYSIS_BLOCK"}}
+ops.recorder('Node', '-file', 'out/disp.out', '-time', '-node', 1, 2, 3, 4, 11, 12, '-dof', 1, 2, 3, 'disp')
+ops.recorder('Node', '-file', 'out/reaction.out', '-time', '-node', 1, 2, 3, 4, 11, 12, '-dof', 1, 2, 3, 'reaction')
+ops.recorder('Element', '-file', 'out/eleLocalForce.out', '-time', '-ele', 3, 4, 5, 'localForce')
+ops.recorder('Element', '-file', 'out/eleForce.out', '-time', '-ele', 1, 2, 'force')
+# @pysees analysis end
+ops.pattern('Plain', 1, 1, '-fact', 1)
+ops.load(3, 0, -400000, 0)
+ops.load(4, 0, -400000, 0)
+# @pysees analysis begin {"command":{"blockId":"run-gravity-analysis","params":{"holdLoads":"Yes","maxIter":100,"patterns":[1],"steps":10,"testType":"NormDispIncr","tol":1e-10},"type":"ANALYSIS_BLOCK"}}
+ops.constraints('Plain')
+ops.numberer('RCM')
+ops.system('BandGeneral')
+ops.test('NormDispIncr', 1e-10, 100)
+ops.algorithm('Newton')
+ops.integrator('LoadControl', 0.1)
+ops.analysis('Static')
+ops.analyze(10)
+ops.loadConst('-time', 0)
+# @pysees analysis end
+ops.pattern('Plain', 2, 2, '-fact', 1)
+ops.load(3, 1, 0, 0)
+# @pysees analysis begin {"command":{"blockId":"run-pushover-analysis","params":{"dof":1,"increment":0.0005,"maxIter":100,"nodeTag":3,"patterns":[2],"steps":60,"testType":"NormDispIncr","tol":1e-10},"type":"ANALYSIS_BLOCK"}}
+ops.constraints('Plain')
+ops.numberer('RCM')
+ops.system('BandGeneral')
+ops.test('NormDispIncr', 1e-10, 100)
+ops.algorithm('Newton')
+ops.integrator('DisplacementControl', 3, 1, 0.0005)
+ops.analysis('Static')
+ops.analyze(60)
+# @pysees analysis end
