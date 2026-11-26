@@ -71,10 +71,10 @@ function Card({ title, description, image, icon, onClick, disabled }: CardProps)
       disabled={disabled}
     >
       {icon && <span className="shrink-0 text-muted-foreground group-hover:text-accent-foreground [&>svg]:size-10 [&>svg]:stroke-[1.25]">{icon}</span>}
-      {image && <img src={image} alt="" className="bg-muted rounded-sm aspect-video w-full mb-2 object-cover" />}
+      {image && <img src={image} alt="" className="bg-muted rounded-sm aspect-[2/1] w-full mb-1.5 object-cover" />}
       <span className="min-w-0">
-        <p className="text-sm font-medium">{title}</p>
-        <p className="text-xs text-muted-foreground leading-snug group-hover:text-accent-foreground">{description}</p>
+        <p className={image ? 'text-xs font-medium' : 'text-sm font-medium'}>{title}</p>
+        <p className={`${image ? 'text-[11px] line-clamp-2' : 'text-xs'} text-muted-foreground leading-snug group-hover:text-accent-foreground`} title={description}>{description}</p>
       </span>
     </button>
   )
@@ -257,7 +257,8 @@ function InitDialog() {
         if (eventDetails.reason === 'outside-press' || eventDetails.reason === 'focus-out') eventDetails.cancel()
       }}
     >
-      <DialogContent className="flex max-h-[calc(100dvh-2rem)] flex-col sm:max-w-lg">
+      {/* At most 75% of the screen, centred; the template gallery is wider (4 per row), the forms after it stay narrow. */}
+      <DialogContent className={`flex max-h-[75dvh] flex-col ${step === 1 ? 'sm:max-w-[min(75vw,64rem)]' : 'sm:max-w-lg'}`}>
         {step === 1 && (
           <>
             <DialogHeader>
@@ -270,7 +271,7 @@ function InitDialog() {
             <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide pt-1">Templates</p>
             {/* The templates scroll; the header and New / Load stay in view however short the window. */}
             <div className="-mx-1 min-h-0 flex-1 overflow-y-auto px-1 pb-1">
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
               <Card title="Grid only" description="An empty model on grid lines and story levels you set up, ready to draw on." image={gridImg} onClick={() => select('grid')} />
               <Card
                 title="Moment-Curvature"
